@@ -1,0 +1,20 @@
+name: "🐛 Bug"
+description: "Report a defect or unintended behavior"
+title: "[BUG]"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Please describe the bug and steps to reproduce it.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: "What happened, and what did you expect to happen?"
+      placeholder: "When I click login, it crashes with error 500."
+      render: markdown
+    validations:
+      required: true

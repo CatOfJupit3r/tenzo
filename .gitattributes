@@ -1,0 +1,8 @@
+# Auto-detect text files and normalize to LF in the repo
+* text=auto eol=lf
+
+# Override for Windows scripts that need CRLF
+*.{bat,cmd,ps1} text eol=crlf
+
+# Treat common binary assets correctly
+*.{png,jpg,jpeg,gif,webp,ico,svg,ttf,otf,woff,woff2} binary

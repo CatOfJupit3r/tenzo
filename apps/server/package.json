@@ -1,0 +1,55 @@
+{
+  "name": "server",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test:watch": "NODE_ENV=test vitest",
+    "test:ui": "NODE_ENV=test vitest --ui"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "prettier": "@startername/prettier-config",
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@hono/standard-validator": "0.2.1",
+    "@hono/tsyringe": "^1.0.1",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "@startername/shared": "workspace:*",
+    "@typegoose/typegoose": "13.0.0",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "1.1.2",
+    "ioredis": "5.8.2",
+    "lodash-es": "catalog:",
+    "mongoose": "9.1.1",
+    "reflect-metadata": "0.2.2",
+    "safe-stable-stringify": "2.5.0",
+    "tsyringe": "4.10.0",
+    "winston": "3.19.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@startername/eslint-config": "workspace:*",
+    "@startername/prettier-config": "workspace:*",
+    "@swc-node/register": "catalog:",
+    "@swc/core": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "@vitest/ui": "catalog:",
+    "eslint": "catalog:",
+    "mongodb-memory-server": "11.0.1",
+    "prettier": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "unplugin-swc": "catalog:",
+    "vitest": "catalog:"
+  },
+  "overrides": {
+    "mongodb": "7.0.0"
+  }
+}

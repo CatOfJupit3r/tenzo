@@ -1,0 +1,108 @@
+name: Pull Request | CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  CI: true
+
+jobs:
+  ci:
+    name: Validate & Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for moon to detect changes
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.11.1
+          cache: 'pnpm'
+
+      # Cache moon's task outputs
+      - name: Restore moon cache
+        uses: actions/cache@v4
+        with:
+          path: .moon/cache
+          key: moon-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            moon-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # moon ci automatically:
+      # 1. Detects which projects changed based on git diff
+      # 2. Runs only affected tasks in correct dependency order
+      # 3. Parallelizes independent tasks
+      # 4. Restores cached outputs for unchanged projects
+      # Tests run in a dedicated job (runInCI: false in .moon/tasks.yml)
+      - name: Run CI tasks
+        run: pnpm exec moon ci
+        env:
+          VITE_SERVER_URL: http://localhost:3000
+
+      # Alternative: Run specific tasks for all projects (if you want full validation)
+      # - name: Type check all
+      #   run: pnpm exec moon run :check-types
+      # - name: Lint all  
+      #   run: pnpm exec moon run :lint
+      # - name: Build all
+      #   run: pnpm exec moon run :build
+
+  # Run tests with MongoDB Memory Server
+  test-server:
+    name: Server Tests
+    runs-on: ubuntu-latest
+    needs: ci
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.11.0
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.11.1
+          cache: 'pnpm'
+      
+      - name: Restore moon cache
+        uses: actions/cache@v4
+        with:
+          path: .moon/cache
+          key: moon-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            moon-${{ runner.os }}-
+      
+      # Cache MongoDB binaries for mongodb-memory-server
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-8.0.4
+          restore-keys: |
+            mongodb-binaries-${{ runner.os }}-
+      
+      - run: pnpm install
+      
+      - name: Run server tests
+        run: pnpm exec moon run server:test
+        env:
+          NODE_ENV: test
+          BETTER_AUTH_SECRET: test-secret
+          BETTER_AUTH_URL: http://localhost:3000/auth
+          LOG_LEVEL: error

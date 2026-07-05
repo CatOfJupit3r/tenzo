@@ -1,0 +1,39 @@
+# https://moonrepo.dev/docs/config/project
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'typescript'
+type: 'application'
+platform: 'node'
+
+dependsOn:
+  - 'shared'
+
+tags:
+  - 'server'
+  - 'backend'
+
+tasks:
+  dev:
+    command: 'node --import @swc-node/register/esm-register --watch ./src/index.ts'
+    env:
+      NODE_ENV: 'development'
+
+  start:
+    command: 'node --import @swc-node/register/esm-register ./src/index.ts'
+
+  build:
+    command: 'rimraf ./dist && tsgo'
+    deps:
+      - 'shared:build'
+
+  check-types:
+    deps:
+      - 'shared:build'
+
+  test:
+    deps:
+      - 'shared:build'
+
+  lint:
+    deps:
+      - 'shared:build'

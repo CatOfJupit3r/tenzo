@@ -1,0 +1,25 @@
+name: "🧩 Task"
+description: "A smaller unit of work contributing to an Epic"
+title: "[TASK]"
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Task Details
+        Use this template for an individual task that contributes to a larger epic.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: "Explain what needs to be done and why"
+      placeholder: "Implement login form UI"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes
+      description: "Anything else relevant (links, screenshots, etc.)"

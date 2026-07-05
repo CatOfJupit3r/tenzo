@@ -1,0 +1,31 @@
+# https://moonrepo.dev/docs/config/toolchain
+$schema: "https://moonrepo.dev/schemas/toolchain.json"
+
+# Extend shared configurations
+extends: null
+
+# Node.js as the primary runtime
+node:
+  # Node.js version (sync with your local/CI version)
+  version: "24.13.0"
+  
+  # Package manager
+  packageManager: "pnpm"
+  
+  # pnpm version
+  pnpm:
+    version: "10.11.0"
+  
+  # Sync project workspace dependencies
+  syncProjectWorkspaceDependencies: true
+
+# TypeScript configuration
+typescript:
+  # Root tsconfig that all projects extend
+  root: "tsconfig.base.json"
+  
+  # Sync project references
+  syncProjectReferences: false
+  
+  # Route out dir to moon's cache
+  routeOutDirToCache: false

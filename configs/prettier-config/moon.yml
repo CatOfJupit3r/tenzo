@@ -1,0 +1,22 @@
+# https://moonrepo.dev/docs/config/project
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'javascript'
+type: 'library'
+platform: 'node'
+
+tags:
+  - 'config'
+  - 'library'
+
+# Config packages don't need build tasks - they export raw JS/MJS
+workspace:
+  inheritedTasks:
+    exclude:
+      - 'build'
+      - 'test'
+      - 'dev'
+      - 'start'
+      - 'check-types'
+      - 'lint'
+      - 'prettify'

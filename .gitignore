@@ -1,0 +1,7 @@
+node_modules
+.turbo
+.alchemy
+.env
+mongo/data
+.moon/cache
+.github/skills/react-best-practices/

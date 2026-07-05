@@ -1,0 +1,58 @@
+diff --git a/dist/adapters/mongodb-adapter/mongodb-adapter.mjs b/dist/adapters/mongodb-adapter/mongodb-adapter.mjs
+index 3c42ef40dd82d0986abe13f26769d9e61ad6b624..94a974dfd98abe3d28a3956d56dd4d4277d54e0e 100644
+--- a/dist/adapters/mongodb-adapter/mongodb-adapter.mjs
++++ b/dist/adapters/mongodb-adapter/mongodb-adapter.mjs
+@@ -23,24 +23,16 @@ const mongodbAdapter = (db, config) => {
+ 			if (field === "id" || field === "_id" || schema[model].fields[field]?.references?.field === "id") {
+ 				if (value === null || value === void 0) return value;
+ 				if (typeof value !== "string") {
+-					if (value instanceof ObjectId) return value;
++					if (value instanceof ObjectId) return value.toHexString();
+ 					if (Array.isArray(value)) return value.map((v) => {
+ 						if (v === null || v === void 0) return v;
+-						if (typeof v === "string") try {
+-							return new ObjectId(v);
+-						} catch {
+-							return v;
+-						}
+-						if (v instanceof ObjectId) return v;
++						if (typeof v === "string") return v;
++						if (v instanceof ObjectId) return v.toHexString();
+ 						throw new MongoAdapterError("INVALID_ID", "Invalid id value");
+ 					});
+ 					throw new MongoAdapterError("INVALID_ID", "Invalid id value");
+ 				}
+-				try {
+-					return new ObjectId(value);
+-				} catch {
+-					return value;
+-				}
++				return value;
+ 			}
+ 			return value;
+ 		}
+@@ -340,20 +332,13 @@ const mongodbAdapter = (db, config) => {
+ 					if (customIdGen) return data;
+ 					if (action !== "create") return data;
+ 					if (Array.isArray(data)) return data.map((v) => {
+-						if (typeof v === "string") try {
+-							return new ObjectId(v);
+-						} catch {
+-							return v;
+-						}
++						if (v instanceof ObjectId) return v.toHexString();
+ 						return v;
+ 					});
+-					if (typeof data === "string") try {
+-						return new ObjectId(data);
+-					} catch {
+-						return data;
+-					}
++					if (data instanceof ObjectId) return data.toHexString();
++					if (typeof data === "string") return data;
+ 					if (fieldAttributes?.references?.field === "id" && !fieldAttributes?.required && data === null) return null;
+-					return new ObjectId();
++					return new ObjectId().toHexString();
+ 				}
+ 				return data;
+ 			},

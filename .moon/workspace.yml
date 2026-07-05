@@ -1,0 +1,58 @@
+# https://moonrepo.dev/docs/config/workspace
+$schema: "https://moonrepo.dev/schemas/workspace.json"
+
+# Projects in the monorepo
+projects:
+  server: "apps/server"
+  web: "apps/web"
+  shared: "packages/shared"
+  eslint-config: "configs/eslint-config"
+  prettier-config: "configs/prettier-config"
+
+# VCS settings
+vcs:
+  manager: "git"
+  defaultBranch: "main"
+  syncHooks: true
+
+# Version control
+versionConstraint: ">=1.0.0"
+
+# Codeowners
+codeowners:
+  syncOnRun: false
+
+# Hasher configuration  
+hasher:
+  optimization: "performance"
+  # Ignore patterns for performance
+  ignorePatterns:
+    - "**/*.md"
+    - "**/node_modules/**"
+    - "**/dist/**"
+    - "**/.moon/cache/**"
+
+# Notifier (CI integration)
+notifier:
+  webhookUrl: null
+
+# Runner configuration
+runner:
+  cacheLifetime: "7 days"
+  inheritColorsForPipedTasks: true
+  logRunningCommand: true
+  # Archive outputs for better caching
+  archivableTargets:
+    - "~:build"
+    - "~:test"
+
+# Constraints
+constraints:
+  enforceProjectTypeRelationships: true
+  # Enforce that applications depend on libraries, not vice versa
+  tagRelationships:
+    application:
+      - "library"
+      - "application"
+    library:
+      - "library"

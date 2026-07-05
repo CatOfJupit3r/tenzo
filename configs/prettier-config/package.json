@@ -1,0 +1,17 @@
+{
+  "name": "@startername/prettier-config",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Shared Prettier configuration for startername monorepo",
+  "main": "./prettier.config.mjs",
+  "exports": {
+    ".": "./prettier.config.mjs"
+  },
+  "dependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2"
+  },
+  "peerDependencies": {
+    "prettier": "catalog:"
+  }
+}

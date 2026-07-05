@@ -1,0 +1,25 @@
+name: "👾 Epic"
+description: "A large, high-level feature or initiative"
+title: "[EPIC]"
+labels: ["epic"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Epic Overview
+        Provide a description of the epic and its objectives.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: "Explain what needs to be done and why"
+      placeholder: "Implement login form UI"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes
+      description: "Any design docs, discussions, or context"

@@ -117,7 +117,6 @@ export function CharacterCreatorPage() {
 
   const { data } = card;
   const generalCharacterIdea = getGeneralCharacterIdea();
-  const hasLoadedExamples = exampleCharacters.length > 0;
   const selectedRequestModeLabel =
     generationSettings.requestMode === REQUEST_MODES.proxy ? 'Server proxy' : 'Browser request';
   const maxExampleContextCharacters = getExampleContextCharacterBudget(
@@ -438,44 +437,6 @@ export function CharacterCreatorPage() {
                 />
               </CardContent>
             </Card>
-
-            <Card className="gap-4 bg-card/95 shadow-sm">
-              <CardHeader>
-                <CardTitle>Core Identity</CardTitle>
-                <CardDescription>Name the card and keep browse-facing tags tidy.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <CharacterField
-                  fieldId="character-name"
-                  label="Name"
-                  value={data.name}
-                  rows={1}
-                  shouldUseGeneralCharacterIdea={shouldUseGeneralCharacterIdea('field:name')}
-                  instructionValue={getFieldInstruction('field:name')}
-                  generationErrorMessage={getFieldRuntime('field:name').errorMessage}
-                  isGenerating={getFieldRuntime('field:name').isGenerating}
-                  onValueChange={(value) => updateField('name', value)}
-                  onShouldUseGeneralCharacterIdeaChange={(value) =>
-                    updateFieldShouldUseGeneralCharacterIdea('field:name', value)
-                  }
-                  onInstructionChange={(value) => updateFieldInstruction('field:name', value)}
-                  onGenerate={() => {
-                    runGeneration(createStandardFieldTarget('name', 'Name', data.name), (value) =>
-                      updateField('name', value),
-                    ).catch(() => undefined);
-                  }}
-                  onContinue={() => {
-                    runGeneration(
-                      createStandardFieldTarget('name', 'Name', data.name),
-                      (value) => updateField('name', value),
-                      true,
-                    ).catch(() => undefined);
-                  }}
-                  onCancel={() => cancelGeneration('field:name')}
-                />
-                <TagsInput value={data.tags} onChange={updateTags} />
-              </CardContent>
-            </Card>
           </div>
 
           <Tabs defaultValue={CHARACTER_CREATOR_TABS.core} className="gap-4">
@@ -687,6 +648,8 @@ export function CharacterCreatorPage() {
                     onValueChange={updateGeneralCharacterIdea}
                   />
                 </div>
+
+                <TagsInput value={data.tags} onChange={updateTags} />
 
                 <div className="grid gap-4 xl:grid-cols-2">
                   {METADATA_FIELD_CONFIGS.map((config) => {

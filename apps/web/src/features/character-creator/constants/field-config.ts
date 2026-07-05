@@ -9,6 +9,12 @@ export interface iCharacterFieldConfig {
 
 export const CORE_FIELD_CONFIGS: iCharacterFieldConfig[] = [
   {
+    key: 'name',
+    label: 'Name',
+    rows: 1,
+    hint: "The character's name. Supports {{char}} and {{user}} macros.",
+  },
+  {
     key: 'description',
     label: 'Description',
     rows: 8,

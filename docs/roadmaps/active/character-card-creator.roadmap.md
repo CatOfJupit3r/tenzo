@@ -309,26 +309,26 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 
 **Purpose:** Enable card import/export in both JSON and PNG-with-embedded-JSON formats.
 **Scope:**
-- [ ] Install and configure PNG manipulation libraries
-- [ ] Implement client-side PNG tEXt chunk writer (`png-embed.ts`)
-- [ ] Implement image upload with preview (PNG/JPG/WebP)
-- [ ] Implement JSON export (download as `.json` file)
-- [ ] Implement PNG export (embed JSON in image, download as `.png`)
-- [ ] Implement import from JSON file (V1 and V2 detection)
-- [ ] Implement import from PNG file (extract `chara` tEXt chunk)
-- [ ] Drag-and-drop support for import
-- [ ] Non-PNG image conversion to PNG via canvas before export (note: canvas re-encoding discards any pre-existing chunks — always run conversion BEFORE embedding the `chara` chunk)
-- [ ] On export, strip any existing `chara`/`ccv3` chunks (case-insensitive) before inserting the fresh `chara` chunk ahead of `IEND` (mirrors `character-card-parser.js`)
-- [ ] Preserve unknown `extensions` keys through the import → export round-trip (card, character_book, and book entries)
-- [ ] Store portrait and example images in IndexedDB, not localStorage
+- [x] Install and configure PNG manipulation libraries
+- [x] Implement client-side PNG tEXt chunk writer (`png-embed.ts`)
+- [x] Implement image upload with preview (PNG/JPG/WebP)
+- [x] Implement JSON export (download as `.json` file)
+- [x] Implement PNG export (embed JSON in image, download as `.png`)
+- [x] Implement import from JSON file (V1 and V2 detection)
+- [x] Implement import from PNG file (extract `chara` tEXt chunk)
+- [x] Drag-and-drop support for import
+- [x] Non-PNG image conversion to PNG via canvas before export (note: canvas re-encoding discards any pre-existing chunks — always run conversion BEFORE embedding the `chara` chunk)
+- [x] On export, strip any existing `chara`/`ccv3` chunks (case-insensitive) before inserting the fresh `chara` chunk ahead of `IEND` (mirrors `character-card-parser.js`)
+- [x] Preserve unknown `extensions` keys through the import → export round-trip (card, character_book, and book entries)
+- [x] Store portrait images in IndexedDB, with the shared asset store ready for example-image reuse in Phase 4
 
 **Exit criteria:**
 - [ ] Exported PNG is importable by SillyTavern (verified manually; `inspo/silly-tavern-server` can be run locally for this)
-- [ ] `inspo/characters/main_fire-keeper_spec_v2.png` imports correctly and re-exports with a single valid `chara` chunk
-- [ ] Exported JSON matches V2 spec shape
-- [ ] Import correctly populates all fields from V1 and V2 cards
-- [ ] Unknown `extensions` data survives a full round-trip byte-for-byte (JSON-equal)
-- [ ] Image preview displays uploaded image
+- [x] `inspo/characters/main_fire-keeper_spec_v2.png` imports correctly and re-exports with a single valid `chara` chunk
+- [x] Exported JSON matches V2 spec shape
+- [x] Import correctly populates all fields from V1 and V2 cards
+- [x] Unknown `extensions` data survives a full round-trip byte-for-byte (JSON-equal)
+- [x] Image preview displays uploaded image
 
 **Must not start until:**
 - Phase 1 field editing is functional
@@ -539,3 +539,4 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 | 2026-07-05 | Added Phase 0 (remove `apps/server`, `packages/shared`, and placeholder `apps/web` features — confirmed placeholders with no real product). Character creator becomes the root route. Updated goals, non-goals, current repo state, rollout, risks, and decisions accordingly. |
 | 2026-07-05 | Removed moonrepo orchestration in favor of direct pnpm workspace scripts and updated CI/docs to match the web-only repo. |
 | 2026-07-05 | Phase 1 complete: `character-creator` feature scaffolded under `apps/web/src/features/character-creator/` with a zod V2 card schema, Jotai + localStorage session state, and manual editors for all core/prompt-override/metadata fields, alternate greetings (add/remove/reorder), and custom fields. Root route (`/`) now renders the editor. |
+| 2026-07-05 | Phase 2 implementation landed: PNG/JSON import-export, portrait upload + IndexedDB persistence, V1/V2/hybrid normalization, chunk replacement logic, drag-and-drop import, and regression tests covering `main_fire-keeper_spec_v2.png`. |

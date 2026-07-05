@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 
 import { characterCardAtom } from '../atoms/character-session.atom';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
-import type { CharacterTextFieldKey, CustomField } from '../lib/card-schema';
+import type { CharacterCard, CharacterTextFieldKey, CustomField } from '../lib/card-schema';
 
 export function useCharacterSession() {
   const [card, setCard] = useAtom(characterCardAtom);
@@ -117,6 +117,13 @@ export function useCharacterSession() {
     [setCard],
   );
 
+  const replaceCard = useCallback(
+    (nextCard: CharacterCard) => {
+      setCard(nextCard);
+    },
+    [setCard],
+  );
+
   const resetCard = useCallback(() => {
     setCard(createEmptyCharacterCard());
   }, [setCard]);
@@ -132,6 +139,7 @@ export function useCharacterSession() {
     addCustomField,
     updateCustomField,
     removeCustomField,
+    replaceCard,
     resetCard,
   };
 }

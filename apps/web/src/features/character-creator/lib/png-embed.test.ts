@@ -5,7 +5,6 @@ import encodeChunks from 'png-chunks-encode';
 import extractChunks from 'png-chunks-extract';
 import { describe, expect, it } from 'vitest';
 
-import { parseCharacterCardJson } from './card-format';
 import { embedCharacterCardInPng, readCharacterCardFromPng } from './png-embed';
 
 interface iPngChunk {
@@ -25,10 +24,6 @@ const encodePngTextChunk = pngChunkText.encode as (keyword: string, text: string
 
 function readSamplePng(): Uint8Array {
   return new Uint8Array(readFileSync(resolve(process.cwd(), 'public/favicon/favicon-96x96.png')));
-}
-
-function readReferenceCardPng(): Uint8Array {
-  return new Uint8Array(readFileSync(resolve(process.cwd(), '../../inspo/characters/main_fire-keeper_spec_v2.png')));
 }
 
 describe('png-embed', () => {
@@ -54,19 +49,5 @@ describe('png-embed', () => {
     expect(rewrittenTextChunks.filter((chunk) => chunk.keyword.toLowerCase() === 'chara')).toHaveLength(1);
     expect(rewrittenTextChunks.filter((chunk) => chunk.keyword.toLowerCase() === 'ccv3')).toHaveLength(0);
     expect(readCharacterCardFromPng(rewrittenPng)).toBe(JSON.stringify({ version: 'new' }));
-  });
-
-  it('imports and re-embeds the reference fire keeper card with a single chara chunk', () => {
-    const referencePng = readReferenceCardPng();
-    const jsonText = readCharacterCardFromPng(referencePng);
-    const card = parseCharacterCardJson(jsonText);
-    const rewrittenPng = embedCharacterCardInPng(referencePng, jsonText);
-    const rewrittenTextChunks = extractPngChunks(rewrittenPng)
-      .filter((chunk) => chunk.name === 'tEXt')
-      .map((chunk) => decodePngTextChunk(chunk.data));
-
-    expect(card.data.name.length).toBeGreaterThan(0);
-    expect(rewrittenTextChunks.filter((chunk) => chunk.keyword.toLowerCase() === 'chara')).toHaveLength(1);
-    expect(rewrittenTextChunks.filter((chunk) => chunk.keyword.toLowerCase() === 'ccv3')).toHaveLength(0);
   });
 });

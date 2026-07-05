@@ -1,21 +1,17 @@
+import { useLiveQuery } from '@tanstack/react-db';
 import { useAtom } from 'jotai';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { localStorageApi } from '@~/db/storage';
-import { useIsomorphicLayoutEffect } from '@~/hooks/use-isomorphic-layout-effect';
-
-import { activeCharacterIdAtom, characterLibraryAtom, exampleCharactersAtom } from '../atoms/character-session.atom';
+import { activeCharacterIdAtom } from '../atoms/character-session.atom';
+import { characterLibraryCollection } from '../collections/character-library.collection';
+import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import type { CharacterCard, CharacterTextFieldKey, CustomField } from '../lib/card-schema';
 import {
-  CHARACTER_LIBRARY_SOURCES,
-  DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
-  createDuplicateCharacterName,
   createCharacterLibraryItem,
+  createDuplicateCharacterName,
   createEmptyCharacterLibraryItem,
-  hasMeaningfulCharacterCardData,
-  sanitizeCharacterLibrary,
-  sanitizeCharacterPortraitReference,
+  DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
 } from '../lib/character-library';
 import type {
   CharacterLibrarySource,
@@ -27,112 +23,21 @@ import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '.
 import {
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   sanitizeCharacterGenerationPromptSettings,
-  sanitizeCharacterGenerationSettings,
 } from '../lib/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../lib/generation-config';
-
-const CHARACTER_LIBRARY_STORAGE_KEY = 'tenzo:character-creator:library';
-const ACTIVE_CHARACTER_ID_STORAGE_KEY = 'tenzo:character-creator:active-character-id';
-const LEGACY_CARD_STORAGE_KEY = 'tenzo:character-creator:card';
-const LEGACY_PORTRAIT_STORAGE_KEY = 'tenzo:character-creator:portrait';
-const LEGACY_GENERATION_SETTINGS_STORAGE_KEY = 'tenzo:character-creator:generation-settings';
-
-function parseStoredJsonValue(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-function touchCharacter(
-  character: iCharacterLibraryItem,
-  patch: Partial<iCharacterLibraryItem>,
-): iCharacterLibraryItem {
-  return {
-    ...character,
-    ...patch,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function migrateLegacyCharacterLibraryItem(): iCharacterLibraryItem | null {
-  const legacyCardValue = parseStoredJsonValue(localStorageApi.getItem(LEGACY_CARD_STORAGE_KEY));
-  const legacyPortraitValue = parseStoredJsonValue(localStorageApi.getItem(LEGACY_PORTRAIT_STORAGE_KEY));
-  const legacyGenerationSettingsValue = parseStoredJsonValue(
-    localStorageApi.getItem(LEGACY_GENERATION_SETTINGS_STORAGE_KEY),
-  );
-  const legacyGenerationSettings = sanitizeCharacterGenerationSettings(legacyGenerationSettingsValue);
-
-  if (!legacyCardValue || typeof legacyCardValue !== 'object') {
-    return null;
-  }
-
-  const legacyLibrary = sanitizeCharacterLibrary([
-    {
-      id: DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
-      card: legacyCardValue,
-      portrait: sanitizeCharacterPortraitReference(legacyPortraitValue),
-      promptSettings: sanitizeCharacterGenerationPromptSettings(legacyGenerationSettings),
-      source: CHARACTER_LIBRARY_SOURCES.manual,
-    },
-  ]);
-
-  const migratedCharacter = legacyLibrary[0];
-
-  if (!migratedCharacter) {
-    return null;
-  }
-
-  if (!hasMeaningfulCharacterCardData(migratedCharacter.card) && migratedCharacter.portrait === null) {
-    return null;
-  }
-
-  return migratedCharacter;
-}
+import { ensurePortraitAssetLoaded } from '../lib/portrait-asset-cache';
+import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
+import { useCharacterLibraryList } from './use-character-library-list';
 
 export function useCharacterSession() {
-  const [characterLibrary, setCharacterLibrary] = useAtom(characterLibraryAtom);
   const [activeCharacterId, setActiveCharacterId] = useAtom(activeCharacterIdAtom);
-  const [exampleCharacters, setExampleCharacters] = useAtom(exampleCharactersAtom);
-  const hasInitializedLibraryRef = useRef(false);
-  const [isCharacterLibraryReady, setIsCharacterLibraryReady] = useState(false);
+  const backfilledThumbnailIdsRef = useRef<Set<string>>(new Set());
 
-  useIsomorphicLayoutEffect(() => {
-    if (hasInitializedLibraryRef.current) {
-      return;
-    }
+  const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
 
-    hasInitializedLibraryRef.current = true;
-    const storedCharacterLibrary = sanitizeCharacterLibrary(
-      parseStoredJsonValue(localStorageApi.getItem(CHARACTER_LIBRARY_STORAGE_KEY)),
-    );
-    const storedActiveCharacterIdValue = parseStoredJsonValue(localStorageApi.getItem(ACTIVE_CHARACTER_ID_STORAGE_KEY));
-
-    if (storedCharacterLibrary.length > 0) {
-      const fallbackActiveCharacterId = storedCharacterLibrary[0]?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID;
-      const nextActiveCharacterId =
-        typeof storedActiveCharacterIdValue === 'string' &&
-        storedCharacterLibrary.some((character) => character.id === storedActiveCharacterIdValue)
-          ? storedActiveCharacterIdValue
-          : fallbackActiveCharacterId;
-
-      setCharacterLibrary(storedCharacterLibrary);
-      setActiveCharacterId(nextActiveCharacterId);
-      setIsCharacterLibraryReady(true);
-      return;
-    }
-
-    const migratedCharacter = migrateLegacyCharacterLibraryItem();
-    const fallbackCharacter = migratedCharacter ?? createEmptyCharacterLibraryItem();
-    setCharacterLibrary([fallbackCharacter]);
-    setActiveCharacterId(fallbackCharacter.id);
-    setIsCharacterLibraryReady(true);
-  }, [setActiveCharacterId, setCharacterLibrary]);
+  const { data: exampleCharacters } = useLiveQuery((query) =>
+    query.from({ example: exampleCharactersCollection }).orderBy(({ example }) => example.fileName, 'asc'),
+  );
 
   const activeCharacter = useMemo(
     () => characterLibrary.find((character) => character.id === activeCharacterId) ?? characterLibrary[0] ?? null,
@@ -140,230 +45,217 @@ export function useCharacterSession() {
   );
 
   useEffect(() => {
-    if (!activeCharacter) {
-      return;
-    }
-
-    if (activeCharacter.id !== activeCharacterId) {
+    if (activeCharacter && activeCharacter.id !== activeCharacterId) {
       setActiveCharacterId(activeCharacter.id);
     }
   }, [activeCharacter, activeCharacterId, setActiveCharacterId]);
 
+  useEffect(() => {
+    characterLibrary.forEach((character) => {
+      if (
+        !character.portrait ||
+        character.portrait.thumbnailDataUrl ||
+        backfilledThumbnailIdsRef.current.has(character.id)
+      ) {
+        return;
+      }
+
+      backfilledThumbnailIdsRef.current.add(character.id);
+      const { cropRect } = character.portrait;
+
+      void ensurePortraitAssetLoaded(character.portrait.assetId).then(async (entry) => {
+        if (!entry.blob) {
+          return;
+        }
+
+        const thumbnailDataUrl = await renderPortraitThumbnailDataUrl(entry.blob, cropRect);
+
+        if (characterLibraryCollection.has(character.id)) {
+          characterLibraryCollection.update(character.id, (draft) => {
+            if (draft.portrait) {
+              draft.portrait.thumbnailDataUrl = thumbnailDataUrl;
+            }
+          });
+        }
+      });
+    });
+  }, [characterLibrary]);
+
   const card = activeCharacter?.card ?? createEmptyCharacterCard();
   const promptSettings = activeCharacter?.promptSettings ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS;
   const portraitReference = activeCharacter?.portrait ?? null;
+  const activeCharacterKey = activeCharacter?.id ?? null;
 
-  const updateActiveCharacter = useCallback(
-    (updater: (character: iCharacterLibraryItem) => iCharacterLibraryItem) => {
-      setCharacterLibrary((prev) =>
-        prev.map((character) => (character.id === activeCharacter?.id ? updater(character) : character)),
-      );
+  const mutateActiveCharacter = useCallback(
+    (recipe: (draft: iCharacterLibraryItem) => unknown) => {
+      if (!activeCharacterKey || !characterLibraryCollection.has(activeCharacterKey)) {
+        return;
+      }
+
+      characterLibraryCollection.update(activeCharacterKey, (draft) => {
+        // The card schema applies defaults, so the draft's input type widens some
+        // fields to optional; at runtime they are always populated.
+        recipe(draft as iCharacterLibraryItem);
+        draft.updatedAt = new Date().toISOString();
+      });
     },
-    [activeCharacter?.id, setCharacterLibrary],
+    [activeCharacterKey],
   );
 
   const updateField = useCallback(
     (key: CharacterTextFieldKey, value: string) => {
-      updateActiveCharacter((character) =>
-        touchCharacter(character, {
-          card: { ...character.card, data: { ...character.card.data, [key]: value } },
-        }),
-      );
+      mutateActiveCharacter((draft) => {
+        draft.card.data[key] = value;
+      });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
   const updateTags = useCallback(
     (tags: string[]) => {
-      updateActiveCharacter((character) =>
-        touchCharacter(character, {
-          card: { ...character.card, data: { ...character.card.data, tags } },
-        }),
-      );
+      mutateActiveCharacter((draft) => {
+        draft.card.data.tags = tags;
+      });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
   const addGreeting = useCallback(() => {
-    updateActiveCharacter((character) =>
-      touchCharacter(character, {
-        card: {
-          ...character.card,
-          data: {
-            ...character.card.data,
-            alternate_greetings: [...character.card.data.alternate_greetings, ''],
-          },
-        },
-      }),
-    );
-  }, [updateActiveCharacter]);
+    mutateActiveCharacter((draft) => {
+      draft.card.data.alternate_greetings.push('');
+    });
+  }, [mutateActiveCharacter]);
 
   const updateGreeting = useCallback(
     (index: number, value: string) => {
-      updateActiveCharacter((character) => {
-        const alternateGreetings = [...character.card.data.alternate_greetings];
-        alternateGreetings[index] = value;
-
-        return touchCharacter(character, {
-          card: { ...character.card, data: { ...character.card.data, alternate_greetings: alternateGreetings } },
-        });
+      mutateActiveCharacter((draft) => {
+        draft.card.data.alternate_greetings[index] = value;
       });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
   const removeGreeting = useCallback(
     (index: number) => {
-      updateActiveCharacter((character) =>
-        touchCharacter(character, {
-          card: {
-            ...character.card,
-            data: {
-              ...character.card.data,
-              alternate_greetings: character.card.data.alternate_greetings.filter(
-                (_, itemIndex) => itemIndex !== index,
-              ),
-            },
-          },
-        }),
-      );
+      mutateActiveCharacter((draft) => {
+        draft.card.data.alternate_greetings.splice(index, 1);
+      });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
   const reorderGreetings = useCallback(
     (fromIndex: number, toIndex: number) => {
-      updateActiveCharacter((character) => {
-        const alternateGreetings = [...character.card.data.alternate_greetings];
+      mutateActiveCharacter((draft) => {
+        const alternateGreetings = draft.card.data.alternate_greetings;
 
         if (toIndex < 0 || toIndex >= alternateGreetings.length) {
-          return character;
+          return;
         }
 
         const [movedGreeting] = alternateGreetings.splice(fromIndex, 1);
 
         if (movedGreeting === undefined) {
-          return character;
+          return;
         }
 
         alternateGreetings.splice(toIndex, 0, movedGreeting);
-
-        return touchCharacter(character, {
-          card: { ...character.card, data: { ...character.card.data, alternate_greetings: alternateGreetings } },
-        });
       });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
   const addCustomField = useCallback(() => {
-    updateActiveCharacter((character) => {
+    mutateActiveCharacter((draft) => {
       const customField: CustomField = { id: crypto.randomUUID(), label: '', value: '' };
-
-      return touchCharacter(character, {
-        card: {
-          ...character.card,
-          data: {
-            ...character.card.data,
-            extensions: {
-              ...character.card.data.extensions,
-              custom_fields: [...character.card.data.extensions.custom_fields, customField],
-            },
-          },
-        },
-      });
+      draft.card.data.extensions.custom_fields.push(customField);
     });
-  }, [updateActiveCharacter]);
+  }, [mutateActiveCharacter]);
 
   const updateCustomField = useCallback(
     (id: string, patch: Partial<Pick<CustomField, 'label' | 'value'>>) => {
-      updateActiveCharacter((character) =>
-        touchCharacter(character, {
-          card: {
-            ...character.card,
-            data: {
-              ...character.card.data,
-              extensions: {
-                ...character.card.data.extensions,
-                custom_fields: character.card.data.extensions.custom_fields.map((field) =>
-                  field.id === id ? { ...field, ...patch } : field,
-                ),
-              },
-            },
-          },
-        }),
-      );
+      mutateActiveCharacter((draft) => {
+        const customField = draft.card.data.extensions.custom_fields.find((field) => field.id === id);
+
+        if (customField) {
+          Object.assign(customField, patch);
+        }
+      });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
   const removeCustomField = useCallback(
     (id: string) => {
-      updateActiveCharacter((character) =>
-        touchCharacter(character, {
-          card: {
-            ...character.card,
-            data: {
-              ...character.card.data,
-              extensions: {
-                ...character.card.data.extensions,
-                custom_fields: character.card.data.extensions.custom_fields.filter((field) => field.id !== id),
-              },
-            },
-          },
-        }),
-      );
+      mutateActiveCharacter((draft) => {
+        draft.card.data.extensions.custom_fields = draft.card.data.extensions.custom_fields.filter(
+          (field) => field.id !== id,
+        );
+      });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
   const updatePromptSettings = useCallback(
     (updater: (settings: iCharacterGenerationPromptSettings) => iCharacterGenerationPromptSettings) => {
-      updateActiveCharacter((character) =>
-        touchCharacter(character, {
-          promptSettings: sanitizeCharacterGenerationPromptSettings(updater(character.promptSettings)),
-        }),
-      );
+      mutateActiveCharacter((draft) => {
+        draft.promptSettings = sanitizeCharacterGenerationPromptSettings(updater(draft.promptSettings));
+      });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
 
-  const addExampleCharacters = useCallback(
-    (nextExampleCharacters: iStoredExampleCharacter[]) => {
-      setExampleCharacters((prev) => [...prev, ...nextExampleCharacters]);
+  const replacePromptSettings = useCallback(
+    (nextPromptSettings: iCharacterGenerationPromptSettings) => {
+      mutateActiveCharacter((draft) => {
+        draft.promptSettings = sanitizeCharacterGenerationPromptSettings(nextPromptSettings);
+      });
     },
-    [setExampleCharacters],
-  );
-
-  const updateExampleCharacterIncludedFields = useCallback(
-    (id: string, includedFieldKeys: ExampleCharacterContextFieldKey[]) => {
-      setExampleCharacters((prev) =>
-        prev.map((exampleCharacter) =>
-          exampleCharacter.id === id
-            ? {
-                ...exampleCharacter,
-                includedFieldKeys: sanitizeExampleCharacterIncludedFieldKeys(includedFieldKeys),
-              }
-            : exampleCharacter,
-        ),
-      );
-    },
-    [setExampleCharacters],
-  );
-
-  const removeExampleCharacter = useCallback(
-    (id: string) => {
-      setExampleCharacters((prev) => prev.filter((exampleCharacter) => exampleCharacter.id !== id));
-    },
-    [setExampleCharacters],
+    [mutateActiveCharacter],
   );
 
   const replaceCard = useCallback(
     (nextCard: CharacterCard) => {
-      updateActiveCharacter((character) => touchCharacter(character, { card: nextCard }));
+      mutateActiveCharacter((draft) => {
+        draft.card = nextCard;
+      });
     },
-    [updateActiveCharacter],
+    [mutateActiveCharacter],
   );
+
+  const setActiveCharacterPortrait = useCallback(
+    (portrait: iCharacterPortraitReference | null) => {
+      mutateActiveCharacter((draft) => {
+        draft.portrait = portrait;
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const addExampleCharacters = useCallback((nextExampleCharacters: iStoredExampleCharacter[]) => {
+    nextExampleCharacters.forEach((exampleCharacter) => {
+      exampleCharactersCollection.insert(exampleCharacter);
+    });
+  }, []);
+
+  const updateExampleCharacterIncludedFields = useCallback(
+    (id: string, includedFieldKeys: ExampleCharacterContextFieldKey[]) => {
+      if (!exampleCharactersCollection.has(id)) {
+        return;
+      }
+
+      exampleCharactersCollection.update(id, (draft) => {
+        draft.includedFieldKeys = sanitizeExampleCharacterIncludedFieldKeys(includedFieldKeys);
+      });
+    },
+    [],
+  );
+
+  const removeExampleCharacter = useCallback((id: string) => {
+    if (exampleCharactersCollection.has(id)) {
+      exampleCharactersCollection.delete(id);
+    }
+  }, []);
 
   const createCharacter = useCallback(
     ({
@@ -384,12 +276,12 @@ export function useCharacterSession() {
         source,
       });
 
-      setCharacterLibrary((prev) => [...prev, nextCharacter]);
+      characterLibraryCollection.insert(nextCharacter);
       setActiveCharacterId(nextCharacter.id);
 
       return nextCharacter.id;
     },
-    [setActiveCharacterId, setCharacterLibrary],
+    [setActiveCharacterId],
   );
 
   const selectCharacter = useCallback(
@@ -400,14 +292,8 @@ export function useCharacterSession() {
   );
 
   const duplicateCharacter = useCallback(
-    ({
-      id,
-      portrait,
-    }: {
-      id: string;
-      portrait?: iCharacterPortraitReference | null;
-    }) => {
-      const characterToDuplicate = characterLibrary.find((character) => character.id === id);
+    ({ id, portrait }: { id: string; portrait?: iCharacterPortraitReference | null }) => {
+      const characterToDuplicate = characterLibraryCollection.get(id);
 
       if (!characterToDuplicate) {
         return null;
@@ -422,50 +308,33 @@ export function useCharacterSession() {
 
       nextCharacter.card.data.name = createDuplicateCharacterName(characterToDuplicate.card.data.name);
 
-      setCharacterLibrary((prev) => [...prev, nextCharacter]);
+      characterLibraryCollection.insert(nextCharacter);
       setActiveCharacterId(nextCharacter.id);
 
       return nextCharacter.id;
     },
-    [characterLibrary, setActiveCharacterId, setCharacterLibrary],
+    [setActiveCharacterId],
   );
 
   const removeCharacter = useCallback(
     (id: string) => {
-      setCharacterLibrary((prev) => {
-        const filteredCharacters = prev.filter((character) => character.id !== id);
+      if (characterLibraryCollection.has(id)) {
+        characterLibraryCollection.delete(id);
+      }
 
-        if (filteredCharacters.length > 0) {
-          return filteredCharacters;
-        }
-
-        return [createEmptyCharacterLibraryItem()];
-      });
+      if (characterLibraryCollection.size === 0) {
+        const fallbackCharacter = createEmptyCharacterLibraryItem();
+        characterLibraryCollection.insert(fallbackCharacter);
+        setActiveCharacterId(fallbackCharacter.id);
+        return;
+      }
 
       if (activeCharacterId === id) {
-        const nextActiveCharacter = characterLibrary.find((character) => character.id !== id);
+        const nextActiveCharacter = characterLibraryCollection.values().next().value;
         setActiveCharacterId(nextActiveCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID);
       }
     },
-    [activeCharacterId, characterLibrary, setActiveCharacterId, setCharacterLibrary],
-  );
-
-  const setActiveCharacterPortrait = useCallback(
-    (portrait: iCharacterPortraitReference | null) => {
-      updateActiveCharacter((character) => touchCharacter(character, { portrait }));
-    },
-    [updateActiveCharacter],
-  );
-
-  const replacePromptSettings = useCallback(
-    (nextPromptSettings: iCharacterGenerationPromptSettings) => {
-      updateActiveCharacter((character) =>
-        touchCharacter(character, {
-          promptSettings: sanitizeCharacterGenerationPromptSettings(nextPromptSettings),
-        }),
-      );
-    },
-    [updateActiveCharacter],
+    [activeCharacterId, setActiveCharacterId],
   );
 
   return {

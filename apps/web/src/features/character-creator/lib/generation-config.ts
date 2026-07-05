@@ -29,11 +29,13 @@ export interface iCharacterGenerationConnectionSettings {
   presencePenalty: number;
 }
 
-export interface iCharacterGenerationPromptSettings {
-  generalCharacterIdea: string;
-  fieldInstructions: Record<string, string>;
-  fieldShouldUseGeneralCharacterIdea: Record<string, boolean>;
-}
+export const CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA = z.object({
+  generalCharacterIdea: z.string(),
+  fieldInstructions: z.record(z.string(), z.string()),
+  fieldShouldUseGeneralCharacterIdea: z.record(z.string(), z.boolean()),
+});
+
+export type iCharacterGenerationPromptSettings = z.infer<typeof CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA>;
 
 export interface iCharacterGenerationSettings
   extends iCharacterGenerationConnectionSettings, iCharacterGenerationPromptSettings {}

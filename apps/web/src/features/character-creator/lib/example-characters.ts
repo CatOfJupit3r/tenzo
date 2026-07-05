@@ -1,4 +1,7 @@
+import { z } from 'zod';
+
 import type { iImportedCharacterCardFile } from './card-files';
+import { CHARACTER_CARD_SCHEMA } from './card-schema';
 import type { CharacterCard } from './card-schema';
 import type { iPromptExampleCharacter } from './prompt-builder';
 
@@ -31,6 +34,16 @@ export const EXAMPLE_CHARACTER_CONTEXT_FIELD_LABELS = {
   alternate_greetings: 'Alternate Greetings',
   custom_fields: 'Custom Fields',
 } satisfies Record<ExampleCharacterContextFieldKey, string>;
+
+export const IMPORTED_CARD_SOURCE_KIND_SCHEMA = z.enum(['json', 'png']);
+
+export const STORED_EXAMPLE_CHARACTER_SCHEMA = z.object({
+  id: z.string(),
+  fileName: z.string(),
+  sourceKind: IMPORTED_CARD_SOURCE_KIND_SCHEMA,
+  card: CHARACTER_CARD_SCHEMA,
+  includedFieldKeys: z.array(z.enum(EXAMPLE_CHARACTER_CONTEXT_FIELD_KEYS)),
+});
 
 export interface iStoredExampleCharacter {
   id: string;

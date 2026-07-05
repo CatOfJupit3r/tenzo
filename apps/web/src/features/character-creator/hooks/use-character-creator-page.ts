@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastSuccess } from '@~/components/toastifications';
 
+import { characterLibraryCollection } from '../collections/character-library.collection';
+import type { iCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.constants';
 import { exportCharacterCardJson, exportCharacterCardPng, importCharacterCardFile } from '../lib/card-files';
 import type { CharacterTextFieldKey } from '../lib/card-schema';
 import { CHARACTER_LIBRARY_SOURCES } from '../lib/character-library';
@@ -354,7 +356,7 @@ export function useCharacterCreatorPage() {
 
   const handleDuplicateCharacter = useCallback(
     async (id: string) => {
-      const character = characterLibrary.find((item) => item.id === id);
+      const character = characterLibraryCollection.get(id);
 
       if (!character) {
         toastError('Duplicate failed', 'The selected character could not be found.');
@@ -391,12 +393,12 @@ export function useCharacterCreatorPage() {
 
       toastSuccess('Character duplicated', 'The copied entry is ready in your library.');
     },
-    [characterLibrary, duplicateCharacter],
+    [duplicateCharacter],
   );
 
   const handleRemoveCharacter = useCallback(
     async (id: string) => {
-      const character = characterLibrary.find((item) => item.id === id);
+      const character = characterLibraryCollection.get(id);
 
       if (character?.portrait) {
         await deleteCharacterAssetBlob(character.portrait.assetId);
@@ -406,7 +408,7 @@ export function useCharacterCreatorPage() {
       removeCharacter(id);
       toastSuccess('Character removed', 'The library entry has been cleared from this browser.');
     },
-    [characterLibrary, removeCharacter],
+    [removeCharacter],
   );
 
   const handleRemoveGreeting = useCallback(
@@ -622,7 +624,27 @@ export function useCharacterCreatorPage() {
     }
   }, [card, portraitBlob, portraitCropRect]);
 
+  const actions = useMemo<iCharacterCreatorActions>(
+    () => ({
+      openImportDialog,
+      openExportDialog,
+      handleCreateCharacter,
+      handleSelectCharacter,
+      handleDuplicateCharacter,
+      handleRemoveCharacter,
+    }),
+    [
+      handleCreateCharacter,
+      handleDuplicateCharacter,
+      handleRemoveCharacter,
+      handleSelectCharacter,
+      openExportDialog,
+      openImportDialog,
+    ],
+  );
+
   return {
+    actions,
     isCharacterLibraryReady,
     characterLibrary,
     activeCharacterId,

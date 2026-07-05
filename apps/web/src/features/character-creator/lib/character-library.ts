@@ -4,6 +4,7 @@ import { createEmptyCharacterCard } from '../constants/card-defaults';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
 import {
+  CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   sanitizeCharacterGenerationPromptSettings,
 } from './generation-config';
@@ -17,23 +18,34 @@ export type CharacterLibrarySource = z.infer<typeof CHARACTER_LIBRARY_SOURCE_SCH
 
 export const DEFAULT_CHARACTER_LIBRARY_ITEM_ID = 'draft-character';
 
-export interface iCharacterPortraitReference {
-  assetId: string;
-  fileName: string;
-  mimeType: string;
-  cropRect: iPortraitCropRect | null;
-  thumbnailDataUrl: string | null;
-}
+export const PORTRAIT_CROP_RECT_SCHEMA = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number(),
+});
 
-export interface iCharacterLibraryItem {
-  id: string;
-  card: CharacterCard;
-  promptSettings: iCharacterGenerationPromptSettings;
-  portrait: iCharacterPortraitReference | null;
-  source: CharacterLibrarySource;
-  createdAt: string;
-  updatedAt: string;
-}
+export const CHARACTER_PORTRAIT_REFERENCE_SCHEMA = z.object({
+  assetId: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  cropRect: PORTRAIT_CROP_RECT_SCHEMA.nullable(),
+  thumbnailDataUrl: z.string().nullable(),
+});
+
+export const CHARACTER_LIBRARY_ITEM_SCHEMA = z.object({
+  id: z.string(),
+  card: CHARACTER_CARD_SCHEMA,
+  promptSettings: CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
+  portrait: CHARACTER_PORTRAIT_REFERENCE_SCHEMA.nullable(),
+  source: CHARACTER_LIBRARY_SOURCE_SCHEMA,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type iCharacterPortraitReference = z.infer<typeof CHARACTER_PORTRAIT_REFERENCE_SCHEMA>;
+
+export type iCharacterLibraryItem = z.infer<typeof CHARACTER_LIBRARY_ITEM_SCHEMA>;
 
 function getTimestamp() {
   return new Date().toISOString();

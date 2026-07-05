@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import { memo, useCallback, useMemo } from 'react';
 import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
 
@@ -16,7 +17,9 @@ import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button';
 import { cn } from '@~/lib/utils';
 
-import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
+import { activeCharacterIdAtom } from '../atoms/character-session.atom';
+import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
+import { useCharacterLibraryList } from '../hooks/use-character-library-list';
 import type { iCharacterLibraryItem } from '../lib/character-library';
 import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/character-library';
 import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
@@ -52,119 +55,114 @@ function CharacterLibraryLoadingState() {
   );
 }
 
-const CharacterLibraryItem = memo(({
-  character,
-  isActiveCharacter,
-  onSelect,
-  onDuplicate,
-  onRemove,
-}: iCharacterLibraryItemProps) => {
-  const displayName = getCharacterLibraryItemDisplayName(character);
-  const hasCreator = character.card.data.creator.trim() !== '';
-  const hasTags = character.card.data.tags.length > 0;
-  const hasAlternateGreetings = character.card.data.alternate_greetings.length > 0;
+const CharacterLibraryItem = memo(
+  ({ character, isActiveCharacter, onSelect, onDuplicate, onRemove }: iCharacterLibraryItemProps) => {
+    const displayName = getCharacterLibraryItemDisplayName(character);
+    const hasCreator = character.card.data.creator.trim() !== '';
+    const hasTags = character.card.data.tags.length > 0;
+    const hasAlternateGreetings = character.card.data.alternate_greetings.length > 0;
 
-  return (
-    <div
-      className={cn(
-        'overflow-hidden rounded-lg border transition-colors',
-        isActiveCharacter ? 'border-primary/60 bg-primary/5 shadow-sm' : 'bg-muted/10 hover:bg-muted/20',
-      )}
-    >
-      <button
-        className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)] gap-3 p-3 text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-        type="button"
-        aria-current={isActiveCharacter ? 'true' : undefined}
-        onClick={() => onSelect(character.id)}
+    return (
+      <div
+        className={cn(
+          'overflow-hidden rounded-lg border transition-colors',
+          isActiveCharacter ? 'border-primary/60 bg-primary/5 shadow-sm' : 'bg-muted/10 hover:bg-muted/20',
+        )}
       >
-        <div className="flex h-24 w-18 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
-          {character.portrait?.thumbnailDataUrl ? (
-            <img
-              alt={`${displayName} portrait preview`}
-              className="size-full object-cover"
-              src={character.portrait.thumbnailDataUrl}
-              style={{ aspectRatio: SILLY_TAVERN_PORTRAIT_ASPECT_RATIO }}
-            />
-          ) : (
-            <LuImage className="size-5 text-muted-foreground" />
-          )}
-        </div>
-
-        <div className="min-w-0 space-y-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <p className="min-w-0 truncate text-sm font-semibold">{displayName}</p>
-            {isActiveCharacter ? <Badge>Editing</Badge> : null}
-          </div>
-
-          <p className="line-clamp-2 text-sm text-muted-foreground">{getCharacterLibraryItemSummary(character)}</p>
-
-          <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {hasCreator ? (
-              <span className="inline-flex min-w-0 items-center gap-1">
-                <LuUserPen className="size-3.5 shrink-0" />
-                <span className="truncate">{character.card.data.creator.trim()}</span>
-              </span>
-            ) : null}
-            {hasTags ? <span>{character.card.data.tags.length} tags</span> : null}
-            {hasAlternateGreetings ? <span>{character.card.data.alternate_greetings.length} greetings</span> : null}
-          </div>
-        </div>
-      </button>
-
-      <div className="flex justify-end gap-1 border-t px-2 py-1.5">
-        <Button
+        <button
+          className="grid w-full grid-cols-[4.5rem_minmax(0,1fr)] gap-3 p-3 text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           type="button"
-          size="icon"
-          variant="ghost"
-          aria-label={`Duplicate ${displayName}`}
-          title="Duplicate"
-          onClick={async () => {
-            await onDuplicate(character.id);
-          }}
+          aria-current={isActiveCharacter ? 'true' : undefined}
+          onClick={() => onSelect(character.id)}
         >
-          <LuCopy className="size-4" />
-        </Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button type="button" size="icon" variant="ghost" aria-label={`Remove ${displayName}`} title="Remove">
-              <LuTrash2 className="size-4" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Remove character?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This clears the saved character entry and its local portrait asset from this browser.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  await onRemove(character.id);
-                }}
-              >
-                Remove
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+          <div className="flex h-24 w-18 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+            {character.portrait?.thumbnailDataUrl ? (
+              <img
+                alt={`${displayName} portrait preview`}
+                className="size-full object-cover"
+                src={character.portrait.thumbnailDataUrl}
+                style={{ aspectRatio: SILLY_TAVERN_PORTRAIT_ASPECT_RATIO }}
+              />
+            ) : (
+              <LuImage className="size-5 text-muted-foreground" />
+            )}
+          </div>
+
+          <div className="min-w-0 space-y-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <p className="min-w-0 truncate text-sm font-semibold">{displayName}</p>
+              {isActiveCharacter ? <Badge>Editing</Badge> : null}
+            </div>
+
+            <p className="line-clamp-2 text-sm text-muted-foreground">{getCharacterLibraryItemSummary(character)}</p>
+
+            <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {hasCreator ? (
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <LuUserPen className="size-3.5 shrink-0" />
+                  <span className="truncate">{character.card.data.creator.trim()}</span>
+                </span>
+              ) : null}
+              {hasTags ? <span>{character.card.data.tags.length} tags</span> : null}
+              {hasAlternateGreetings ? <span>{character.card.data.alternate_greetings.length} greetings</span> : null}
+            </div>
+          </div>
+        </button>
+
+        <div className="flex justify-end gap-1 border-t px-2 py-1.5">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label={`Duplicate ${displayName}`}
+            title="Duplicate"
+            onClick={async () => {
+              await onDuplicate(character.id);
+            }}
+          >
+            <LuCopy className="size-4" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button type="button" size="icon" variant="ghost" aria-label={`Remove ${displayName}`} title="Remove">
+                <LuTrash2 className="size-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove character?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This clears the saved character entry and its local portrait asset from this browser.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    await onRemove(character.id);
+                  }}
+                >
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  },
+);
 
 export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPanelProps) {
+  const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
+  const activeCharacterId = useAtomValue(activeCharacterIdAtom);
   const {
-    isCharacterLibraryReady,
-    characterLibrary,
-    activeCharacterId,
     handleCreateCharacter,
     handleSelectCharacter,
     handleDuplicateCharacter,
     handleRemoveCharacter,
     openImportDialog,
-  } = useCharacterCreatorContext();
+  } = useCharacterCreatorActions();
 
   const characterCountLabel = useMemo(() => {
     if (!isCharacterLibraryReady && characterLibrary.length === 0) {

@@ -44,7 +44,7 @@ export const EMPTY_PORTRAIT_ASSET_ENTRY: iPortraitAssetEntry = Object.freeze({
 
 const store = new Map<string, iPortraitAssetEntry>();
 const inFlightLoads = new Map<string, Promise<iPortraitAssetEntry>>();
-const listeners = new Set<() => void>();
+const listeners = new Set<() => unknown>();
 
 function notify() {
   for (const listener of listeners) {
@@ -83,7 +83,7 @@ function setEntry(assetId: string, entry: iPortraitAssetEntry) {
   evictOverflow();
 }
 
-export function subscribeToPortraitAssets(listener: () => void) {
+export function subscribeToPortraitAssets(listener: () => unknown) {
   listeners.add(listener);
 
   return () => {

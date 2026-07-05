@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LuFolderOpen, LuImage, LuPlus, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
+import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
 
 import {
   AlertDialog,
@@ -38,6 +38,7 @@ interface iCharacterLibraryItemProps {
   preview: iCharacterLibraryPreview | null;
   isActiveCharacter: boolean;
   onSelect: (id: string) => void;
+  onDuplicate: (id: string) => Promise<unknown>;
   onRemove: (id: string) => Promise<unknown>;
 }
 
@@ -122,6 +123,7 @@ function CharacterLibraryItem({
   preview,
   isActiveCharacter,
   onSelect,
+  onDuplicate,
   onRemove,
 }: iCharacterLibraryItemProps) {
   const displayName = getCharacterLibraryItemDisplayName(character);
@@ -178,7 +180,19 @@ function CharacterLibraryItem({
         </div>
       </button>
 
-      <div className="flex justify-end border-t px-2 py-1.5">
+      <div className="flex justify-end gap-1 border-t px-2 py-1.5">
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          aria-label={`Duplicate ${displayName}`}
+          title="Duplicate"
+          onClick={async () => {
+            await onDuplicate(character.id);
+          }}
+        >
+          <LuCopy className="size-4" />
+        </Button>
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button type="button" size="icon" variant="ghost" aria-label={`Remove ${displayName}`} title="Remove">
@@ -215,6 +229,7 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
     activeCharacterId,
     handleCreateCharacter,
     handleSelectCharacter,
+    handleDuplicateCharacter,
     handleRemoveCharacter,
     openImportDialog,
   } = useCharacterCreatorContext();
@@ -296,6 +311,7 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
                 preview={previewUrls[character.id] ?? null}
                 isActiveCharacter={character.id === activeCharacterId}
                 onSelect={handleSelectCharacterFromPanel}
+                onDuplicate={handleDuplicateCharacter}
                 onRemove={handleRemoveCharacter}
               />
             ))}

@@ -3,7 +3,7 @@ import { useCallback, useId, useState } from 'react';
 import { LuFocus, LuImagePlus, LuRefreshCw, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
 
 import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
 import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
@@ -95,10 +95,6 @@ export function ImageUpload({
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
               <DialogHeader>
                 <DialogTitle>Portrait & previews</DialogTitle>
-                <DialogDescription>
-                  Drag to choose which part stays centered in the exported crop, then confirm how it reads in portrait
-                  and avatar surfaces.
-                </DialogDescription>
               </DialogHeader>
 
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">

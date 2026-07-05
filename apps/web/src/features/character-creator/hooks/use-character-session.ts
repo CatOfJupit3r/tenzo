@@ -9,6 +9,7 @@ import type { CharacterCard, CharacterTextFieldKey, CustomField } from '../lib/c
 import {
   CHARACTER_LIBRARY_SOURCES,
   DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
+  createDuplicateCharacterName,
   createCharacterLibraryItem,
   createEmptyCharacterLibraryItem,
   hasMeaningfulCharacterCardData,
@@ -394,6 +395,37 @@ export function useCharacterSession() {
     [setActiveCharacterId],
   );
 
+  const duplicateCharacter = useCallback(
+    ({
+      id,
+      portrait,
+    }: {
+      id: string;
+      portrait?: iCharacterPortraitReference | null;
+    }) => {
+      const characterToDuplicate = characterLibrary.find((character) => character.id === id);
+
+      if (!characterToDuplicate) {
+        return null;
+      }
+
+      const nextCharacter = createCharacterLibraryItem({
+        card: structuredClone(characterToDuplicate.card),
+        promptSettings: structuredClone(characterToDuplicate.promptSettings),
+        portrait: portrait ?? characterToDuplicate.portrait,
+        source: characterToDuplicate.source,
+      });
+
+      nextCharacter.card.data.name = createDuplicateCharacterName(characterToDuplicate.card.data.name);
+
+      setCharacterLibrary((prev) => [...prev, nextCharacter]);
+      setActiveCharacterId(nextCharacter.id);
+
+      return nextCharacter.id;
+    },
+    [characterLibrary, setActiveCharacterId, setCharacterLibrary],
+  );
+
   const removeCharacter = useCallback(
     (id: string) => {
       setCharacterLibrary((prev) => {
@@ -456,6 +488,7 @@ export function useCharacterSession() {
     replaceCard,
     createCharacter,
     selectCharacter,
+    duplicateCharacter,
     removeCharacter,
     setActiveCharacterPortrait,
   };

@@ -12,7 +12,7 @@ import {
   toPromptExampleCharacter,
 } from '../lib/example-characters';
 import { REQUEST_MODES } from '../lib/generation-config';
-import { deleteCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
+import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import { buildExampleContextSummary, GENERATION_MODES, getExampleContextCharacterBudget } from '../lib/prompt-builder';
 import type { GenerationMode, iFieldGenerationTarget } from '../lib/prompt-builder';
 import { useCharacterPortrait } from './use-character-portrait';
@@ -77,6 +77,7 @@ export function useCharacterCreatorPage() {
     removeExampleCharacter,
     createCharacter,
     selectCharacter,
+    duplicateCharacter,
     removeCharacter,
   } = useCharacterSession();
 
@@ -345,6 +346,48 @@ export function useCharacterCreatorPage() {
       selectCharacter(id);
     },
     [selectCharacter],
+  );
+
+  const handleDuplicateCharacter = useCallback(
+    async (id: string) => {
+      const character = characterLibrary.find((item) => item.id === id);
+
+      if (!character) {
+        toastError('Duplicate failed', 'The selected character could not be found.');
+        return;
+      }
+
+      let nextPortrait = character.portrait;
+
+      if (character.portrait) {
+        const duplicatedPortraitBlob = await readCharacterAssetBlob(character.portrait.assetId);
+
+        if (duplicatedPortraitBlob) {
+          const assetId = crypto.randomUUID();
+          await writeCharacterAssetBlob(assetId, duplicatedPortraitBlob);
+          nextPortrait = {
+            ...character.portrait,
+            assetId,
+            cropRect: character.portrait.cropRect ? { ...character.portrait.cropRect } : null,
+          };
+        } else {
+          nextPortrait = null;
+        }
+      }
+
+      const duplicatedCharacterId = duplicateCharacter({
+        id,
+        portrait: nextPortrait,
+      });
+
+      if (!duplicatedCharacterId) {
+        toastError('Duplicate failed', 'The selected character could not be copied.');
+        return;
+      }
+
+      toastSuccess('Character duplicated', 'The copied entry is ready in your library.');
+    },
+    [characterLibrary, duplicateCharacter],
   );
 
   const handleRemoveCharacter = useCallback(
@@ -654,6 +697,7 @@ export function useCharacterCreatorPage() {
     handleExportPng,
     handleCreateCharacter,
     handleSelectCharacter,
+    handleDuplicateCharacter,
     handleRemoveCharacter,
   };
 }

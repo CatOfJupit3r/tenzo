@@ -169,6 +169,16 @@ export function getCharacterLibraryItemDisplayName(character: iCharacterLibraryI
   return 'Untitled character';
 }
 
+export function createDuplicateCharacterName(name: string) {
+  const trimmedName = name.trim();
+
+  if (trimmedName === '') {
+    return 'Untitled character copy';
+  }
+
+  return `${trimmedName} Copy`;
+}
+
 export function getCharacterLibraryItemSummary(character: iCharacterLibraryItem) {
   const { data } = character.card;
   const summarySource =

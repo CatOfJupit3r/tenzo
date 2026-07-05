@@ -1,5 +1,6 @@
 import { METADATA_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
+import { GENERATION_MODES } from '../../lib/prompt-builder';
 import { CharacterField } from '../character-field';
 import { CharacterFieldPanel } from '../character-field-panel';
 import { CustomFields } from '../custom-fields';
@@ -20,6 +21,7 @@ export function MetadataTab() {
     updateCustomFieldInstruction,
     generateCustomField,
     cancelCustomFieldGeneration,
+    revertCustomFieldRewrite,
   } = useCharacterCreatorContext();
 
   return (
@@ -56,8 +58,12 @@ export function MetadataTab() {
             void generateCustomField(id);
           }}
           onContinue={(id) => {
-            void generateCustomField(id, true);
+            void generateCustomField(id, GENERATION_MODES.continue);
           }}
+          onRewrite={(id) => {
+            void generateCustomField(id, GENERATION_MODES.rewrite);
+          }}
+          onRevertRewrite={revertCustomFieldRewrite}
           onCancel={cancelCustomFieldGeneration}
         />
       </div>

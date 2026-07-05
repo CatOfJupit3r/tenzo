@@ -13,8 +13,8 @@ import {
 } from '../lib/example-characters';
 import { REQUEST_MODES } from '../lib/generation-config';
 import { deleteCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
-import { buildExampleContextSummary, getExampleContextCharacterBudget } from '../lib/prompt-builder';
-import type { iFieldGenerationTarget } from '../lib/prompt-builder';
+import { buildExampleContextSummary, GENERATION_MODES, getExampleContextCharacterBudget } from '../lib/prompt-builder';
+import type { GenerationMode, iFieldGenerationTarget } from '../lib/prompt-builder';
 import { useCharacterPortrait } from './use-character-portrait';
 import { useCharacterSession } from './use-character-session';
 import { useGeneration } from './use-generation';
@@ -24,10 +24,16 @@ export interface iFieldGenerationState {
   instructionValue: string;
   errorMessage: string | null | undefined;
   isGenerating: boolean;
+  hasRewriteBackup: boolean;
 }
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function removeRewriteBackup(backups: Record<string, string>, fieldKey: string) {
+  const { [fieldKey]: _removedBackup, ...remainingBackups } = backups;
+  return remainingBackups;
 }
 
 function createStandardFieldTarget(key: CharacterTextFieldKey, label: string, value: string): iFieldGenerationTarget {
@@ -42,6 +48,7 @@ function createStandardFieldTarget(key: CharacterTextFieldKey, label: string, va
 export function useCharacterCreatorPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [rewriteBackups, setRewriteBackups] = useState<Record<string, string>>({});
 
   const {
     characterLibrary,
@@ -129,9 +136,10 @@ export function useCharacterCreatorPage() {
         instructionValue: getFieldInstruction(fieldKey),
         errorMessage: runtime.errorMessage,
         isGenerating: runtime.isGenerating,
+        hasRewriteBackup: rewriteBackups[fieldKey] !== undefined,
       };
     },
-    [getFieldInstruction, getFieldRuntime, shouldUseGeneralCharacterIdea],
+    [getFieldInstruction, getFieldRuntime, rewriteBackups, shouldUseGeneralCharacterIdea],
   );
 
   const getStandardFieldGenerationState = useCallback(
@@ -140,13 +148,29 @@ export function useCharacterCreatorPage() {
   );
 
   const runGeneration = useCallback(
-    async (target: iFieldGenerationTarget, onValueChange: (value: string) => unknown, isContinuation = false) => {
+    async (
+      target: iFieldGenerationTarget,
+      onValueChange: (value: string) => unknown,
+      mode: GenerationMode = GENERATION_MODES.generate,
+    ) => {
+      setRewriteBackups((prev) => {
+        if (mode === GENERATION_MODES.rewrite) {
+          return { ...prev, [target.key]: target.value };
+        }
+
+        if (mode === GENERATION_MODES.continue) {
+          return prev;
+        }
+
+        return removeRewriteBackup(prev, target.key);
+      });
+
       try {
         await generateField({
           card,
           target,
           onValueChange,
-          isContinuation,
+          mode,
           exampleCharacters: promptExampleCharacters,
           maxExampleContextCharacters,
         });
@@ -162,13 +186,23 @@ export function useCharacterCreatorPage() {
     [card, generateField, maxExampleContextCharacters, promptExampleCharacters],
   );
 
+  const revertFieldRewrite = useCallback(
+    (fieldKey: string, onValueChange: (value: string) => unknown) => {
+      const backupValue = rewriteBackups[fieldKey];
+
+      if (backupValue === undefined) {
+        return;
+      }
+
+      onValueChange(backupValue);
+      setRewriteBackups((prev) => removeRewriteBackup(prev, fieldKey));
+    },
+    [rewriteBackups],
+  );
+
   const generateStandardField = useCallback(
-    async (key: CharacterTextFieldKey, label: string, isContinuation = false) => {
-      await runGeneration(
-        createStandardFieldTarget(key, label, data[key]),
-        (value) => updateField(key, value),
-        isContinuation,
-      );
+    async (key: CharacterTextFieldKey, label: string, mode: GenerationMode = GENERATION_MODES.generate) => {
+      await runGeneration(createStandardFieldTarget(key, label, data[key]), (value) => updateField(key, value), mode);
     },
     [data, runGeneration, updateField],
   );
@@ -176,6 +210,11 @@ export function useCharacterCreatorPage() {
   const cancelStandardFieldGeneration = useCallback(
     (key: CharacterTextFieldKey) => cancelGeneration(`field:${key}`),
     [cancelGeneration],
+  );
+
+  const revertStandardFieldRewrite = useCallback(
+    (key: CharacterTextFieldKey) => revertFieldRewrite(`field:${key}`, (value) => updateField(key, value)),
+    [revertFieldRewrite, updateField],
   );
 
   const updateStandardFieldShouldUseGeneralCharacterIdea = useCallback(
@@ -302,7 +341,7 @@ export function useCharacterCreatorPage() {
   );
 
   const generateAlternateGreeting = useCallback(
-    async (index: number, isContinuation = false) => {
+    async (index: number, mode: GenerationMode = GENERATION_MODES.generate) => {
       await runGeneration(
         {
           key: `alternate_greetings:${index}`,
@@ -311,7 +350,7 @@ export function useCharacterCreatorPage() {
           kind: 'alternate-greeting',
         },
         (value) => updateGreeting(index, value),
-        isContinuation,
+        mode,
       );
     },
     [data.alternate_greetings, runGeneration, updateGreeting],
@@ -320,6 +359,11 @@ export function useCharacterCreatorPage() {
   const cancelAlternateGreetingGeneration = useCallback(
     (index: number) => cancelGeneration(`alternate_greetings:${index}`),
     [cancelGeneration],
+  );
+
+  const revertAlternateGreetingRewrite = useCallback(
+    (index: number) => revertFieldRewrite(`alternate_greetings:${index}`, (value) => updateGreeting(index, value)),
+    [revertFieldRewrite, updateGreeting],
   );
 
   const handleRemoveCustomField = useCallback(
@@ -341,7 +385,7 @@ export function useCharacterCreatorPage() {
   );
 
   const generateCustomField = useCallback(
-    async (id: string, isContinuation = false) => {
+    async (id: string, mode: GenerationMode = GENERATION_MODES.generate) => {
       const customField = data.extensions.custom_fields.find((field) => field.id === id);
 
       if (!customField) {
@@ -356,13 +400,18 @@ export function useCharacterCreatorPage() {
           kind: 'custom-field',
         },
         (value) => updateCustomField(id, { value }),
-        isContinuation,
+        mode,
       );
     },
     [data.extensions.custom_fields, runGeneration, updateCustomField],
   );
 
   const cancelCustomFieldGeneration = useCallback((id: string) => cancelGeneration(`custom:${id}`), [cancelGeneration]);
+
+  const revertCustomFieldRewrite = useCallback(
+    (id: string) => revertFieldRewrite(`custom:${id}`, (value) => updateCustomField(id, { value })),
+    [revertFieldRewrite, updateCustomField],
+  );
 
   const handleImportExampleFiles = useCallback(
     async (files: File[]) => {
@@ -491,6 +540,7 @@ export function useCharacterCreatorPage() {
     getStandardFieldGenerationState,
     generateStandardField,
     cancelStandardFieldGeneration,
+    revertStandardFieldRewrite,
     updateStandardFieldShouldUseGeneralCharacterIdea,
     updateStandardFieldInstruction,
 
@@ -499,12 +549,14 @@ export function useCharacterCreatorPage() {
     updateAlternateGreetingInstruction,
     generateAlternateGreeting,
     cancelAlternateGreetingGeneration,
+    revertAlternateGreetingRewrite,
 
     customFieldGenerationStates,
     updateCustomFieldShouldUseGeneralCharacterIdea,
     updateCustomFieldInstruction,
     generateCustomField,
     cancelCustomFieldGeneration,
+    revertCustomFieldRewrite,
 
     portraitReference,
     portraitBlob,

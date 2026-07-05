@@ -18,8 +18,8 @@ import {
   sanitizeCharacterGenerationSettings,
 } from '../lib/generation-config';
 import type { iCharacterGenerationConnectionSettings } from '../lib/generation-config';
-import { buildGenerationMessages, getGenerationTargetKey } from '../lib/prompt-builder';
-import type { iFieldGenerationTarget, iPromptExampleCharacter } from '../lib/prompt-builder';
+import { buildGenerationMessages, GENERATION_MODES, getGenerationTargetKey } from '../lib/prompt-builder';
+import type { GenerationMode, iFieldGenerationTarget, iPromptExampleCharacter } from '../lib/prompt-builder';
 import { probeProviderMetadata } from '../lib/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
 import { getPrefilled, parseResponse } from '../lib/response-parser';
@@ -34,7 +34,7 @@ interface iGenerateFieldOptions {
   card: CharacterCard;
   target: iFieldGenerationTarget;
   onValueChange: (value: string) => void;
-  isContinuation?: boolean;
+  mode?: GenerationMode;
   exampleCharacters?: iPromptExampleCharacter[];
   maxExampleContextCharacters?: number;
 }
@@ -377,7 +377,7 @@ export function useGeneration() {
       card,
       target,
       onValueChange,
-      isContinuation = false,
+      mode = GENERATION_MODES.generate,
       exampleCharacters = [],
       maxExampleContextCharacters,
     }: iGenerateFieldOptions) => {
@@ -398,6 +398,8 @@ export function useGeneration() {
       abortControllersRef.current[fieldKey] = abortController;
       setFieldRuntimeState(fieldKey, { isGenerating: true, errorMessage: null });
 
+      const isContinuation = mode === GENERATION_MODES.continue;
+
       if (!isContinuation) {
         startTransition(() => {
           onValueChange('');
@@ -412,10 +414,15 @@ export function useGeneration() {
           apiKey,
           model: connectionSettings.model,
           maxTokens: connectionSettings.maxTokens,
+          temperature: connectionSettings.temperature,
+          topP: connectionSettings.topP,
+          frequencyPenalty: connectionSettings.frequencyPenalty,
+          presencePenalty: connectionSettings.presencePenalty,
           messages: buildGenerationMessages({
             card,
             target,
             outputFormat: connectionSettings.outputFormat,
+            mode,
             generalCharacterIdea: promptSettings.generalCharacterIdea,
             shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
             userInstructions: getFieldInstruction(fieldKey),

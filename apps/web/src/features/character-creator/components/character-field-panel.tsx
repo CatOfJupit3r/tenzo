@@ -2,6 +2,7 @@ import { cn } from '@~/lib/utils';
 
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import type { CharacterTextFieldKey } from '../lib/card-schema';
+import { GENERATION_MODES } from '../lib/prompt-builder';
 import { CharacterField } from './character-field';
 import { FIELD_PANEL_CLASS_NAME } from './tabs/tabs.constants';
 
@@ -24,6 +25,7 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
     getStandardFieldGenerationState,
     generateStandardField,
     cancelStandardFieldGeneration,
+    revertStandardFieldRewrite,
     updateStandardFieldShouldUseGeneralCharacterIdea,
     updateStandardFieldInstruction,
   } = useCharacterCreatorContext();
@@ -41,6 +43,7 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
         instructionValue={generationState.instructionValue}
         generationErrorMessage={generationState.errorMessage}
         isGenerating={generationState.isGenerating}
+        hasRewriteBackup={generationState.hasRewriteBackup}
         onValueChange={(value) => updateField(config.key, value)}
         onShouldUseGeneralCharacterIdeaChange={(value) =>
           updateStandardFieldShouldUseGeneralCharacterIdea(config.key, value)
@@ -50,8 +53,12 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
           void generateStandardField(config.key, config.label);
         }}
         onContinue={() => {
-          void generateStandardField(config.key, config.label, true);
+          void generateStandardField(config.key, config.label, GENERATION_MODES.continue);
         }}
+        onRewrite={() => {
+          void generateStandardField(config.key, config.label, GENERATION_MODES.rewrite);
+        }}
+        onRevertRewrite={() => revertStandardFieldRewrite(config.key)}
         onCancel={() => cancelStandardFieldGeneration(config.key)}
       />
     </div>

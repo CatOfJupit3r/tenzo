@@ -9,7 +9,14 @@ import type { iOptionType } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
 import { cn } from '@~/lib/utils';
 
-import { OUTPUT_FORMATS, REQUEST_MODES } from '../lib/generation-config';
+import {
+  FREQUENCY_PENALTY_RANGE,
+  OUTPUT_FORMATS,
+  PRESENCE_PENALTY_RANGE,
+  REQUEST_MODES,
+  TEMPERATURE_RANGE,
+  TOP_P_RANGE,
+} from '../lib/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
 
 export interface iConnectionHealthViewModel {
@@ -124,6 +131,92 @@ export function ApiSettings({
             }}
           />
           <p className="text-sm text-muted-foreground">Used to budget how much example context can be sent.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="api-temperature">Temperature</Label>
+          <Input
+            id="api-temperature"
+            type="number"
+            min={TEMPERATURE_RANGE.min}
+            max={TEMPERATURE_RANGE.max}
+            step={0.1}
+            value={String(generationSettings.temperature)}
+            onChange={(event) => {
+              const nextValue = Number.parseFloat(event.target.value);
+              onSettingsChange({
+                temperature: Number.isNaN(nextValue)
+                  ? TEMPERATURE_RANGE.min
+                  : Math.min(TEMPERATURE_RANGE.max, Math.max(TEMPERATURE_RANGE.min, nextValue)),
+              });
+            }}
+          />
+          <p className="text-sm text-muted-foreground">Higher values increase randomness in the response.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="api-top-p">Top P</Label>
+          <Input
+            id="api-top-p"
+            type="number"
+            min={TOP_P_RANGE.min}
+            max={TOP_P_RANGE.max}
+            step={0.05}
+            value={String(generationSettings.topP)}
+            onChange={(event) => {
+              const nextValue = Number.parseFloat(event.target.value);
+              onSettingsChange({
+                topP: Number.isNaN(nextValue)
+                  ? TOP_P_RANGE.max
+                  : Math.min(TOP_P_RANGE.max, Math.max(TOP_P_RANGE.min, nextValue)),
+              });
+            }}
+          />
+          <p className="text-sm text-muted-foreground">Restricts sampling to the top probability mass.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="api-frequency-penalty">Frequency penalty</Label>
+          <Input
+            id="api-frequency-penalty"
+            type="number"
+            min={FREQUENCY_PENALTY_RANGE.min}
+            max={FREQUENCY_PENALTY_RANGE.max}
+            step={0.1}
+            value={String(generationSettings.frequencyPenalty)}
+            onChange={(event) => {
+              const nextValue = Number.parseFloat(event.target.value);
+              onSettingsChange({
+                frequencyPenalty: Number.isNaN(nextValue)
+                  ? 0
+                  : Math.min(FREQUENCY_PENALTY_RANGE.max, Math.max(FREQUENCY_PENALTY_RANGE.min, nextValue)),
+              });
+            }}
+          />
+          <p className="text-sm text-muted-foreground">Penalizes tokens proportionally to how often they recur.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="api-presence-penalty">Presence penalty</Label>
+          <Input
+            id="api-presence-penalty"
+            type="number"
+            min={PRESENCE_PENALTY_RANGE.min}
+            max={PRESENCE_PENALTY_RANGE.max}
+            step={0.1}
+            value={String(generationSettings.presencePenalty)}
+            onChange={(event) => {
+              const nextValue = Number.parseFloat(event.target.value);
+              onSettingsChange({
+                presencePenalty: Number.isNaN(nextValue)
+                  ? 0
+                  : Math.min(PRESENCE_PENALTY_RANGE.max, Math.max(PRESENCE_PENALTY_RANGE.min, nextValue)),
+              });
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Penalizes tokens that already appeared at all, encouraging new topics.
+          </p>
         </div>
 
         <div className="flex items-end">

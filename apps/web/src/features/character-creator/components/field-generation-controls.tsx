@@ -1,4 +1,4 @@
-import { LuLoaderCircle, LuSparkles, LuSquare, LuStepForward } from 'react-icons/lu';
+import { LuLoaderCircle, LuSparkles, LuSquare, LuStepForward, LuUndo2, LuWandSparkles } from 'react-icons/lu';
 
 import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Button } from '@~/components/ui/button';
@@ -15,11 +15,14 @@ export interface iFieldGenerationControlsProps {
   instructionValue: string;
   errorMessage?: string | null;
   hasExistingValue: boolean;
+  hasRewriteBackup: boolean;
   isGenerating: boolean;
   onShouldUseGeneralCharacterIdeaChange: (value: boolean) => void;
   onInstructionChange: (value: string) => void;
   onGenerate: () => void;
   onContinue: () => void;
+  onRewrite: () => void;
+  onRevertRewrite: () => void;
   onCancel: () => void;
 }
 
@@ -30,11 +33,14 @@ export function FieldGenerationControls({
   instructionValue,
   errorMessage,
   hasExistingValue,
+  hasRewriteBackup,
   isGenerating,
   onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
   onGenerate,
   onContinue,
+  onRewrite,
+  onRevertRewrite,
   onCancel,
 }: iFieldGenerationControlsProps) {
   const instructionId = `${fieldId}-instructions`;
@@ -95,6 +101,22 @@ export function FieldGenerationControls({
             <LuStepForward className="size-4" />
             Continue
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={isGenerating || !hasExistingValue}
+            onClick={onRewrite}
+          >
+            <LuWandSparkles className="size-4" />
+            Rewrite
+          </Button>
+          {hasRewriteBackup ? (
+            <Button type="button" size="sm" variant="outline" disabled={isGenerating} onClick={onRevertRewrite}>
+              <LuUndo2 className="size-4" />
+              Undo rewrite
+            </Button>
+          ) : null}
           <Button type="button" size="sm" variant="ghost" disabled={!isGenerating} onClick={onCancel}>
             <LuSquare className="size-4" />
             Cancel

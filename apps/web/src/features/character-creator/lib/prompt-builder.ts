@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import {
   DEFAULT_CHARACTER_CARD_WRITING_GUIDE,
   DEFAULT_POST_HISTORY_INSTRUCTIONS,
@@ -5,6 +7,10 @@ import {
 } from '../constants/default-prompts';
 import type { CharacterCard, CharacterTextFieldKey, CustomField } from './card-schema';
 import type { OutputFormat } from './generation-config';
+
+export const GENERATION_MODE_SCHEMA = z.enum(['generate', 'continue', 'rewrite']);
+export const GENERATION_MODES = GENERATION_MODE_SCHEMA.enum;
+export type GenerationMode = z.infer<typeof GENERATION_MODE_SCHEMA>;
 
 export interface iGenerationMessage {
   role: 'system' | 'user' | 'assistant';
@@ -348,6 +354,7 @@ export interface iBuildGenerationMessagesOptions {
   card: CharacterCard;
   target: iFieldGenerationTarget;
   outputFormat: OutputFormat;
+  mode?: GenerationMode;
   generalCharacterIdea?: string;
   shouldUseGeneralCharacterIdea?: boolean;
   userInstructions?: string;
@@ -355,10 +362,23 @@ export interface iBuildGenerationMessagesOptions {
   maxExampleContextCharacters?: number;
 }
 
+function getTaskInstruction(target: iFieldGenerationTarget, mode: GenerationMode) {
+  if (!target.value.trim()) {
+    return `The current ${target.label} value is empty. Create it from scratch based on the available card context.`;
+  }
+
+  if (mode === GENERATION_MODES.rewrite) {
+    return `Rewrite the current ${target.label} value provided in the context above according to the instructions below. Replace it entirely instead of continuing or appending to it.`;
+  }
+
+  return `The current ${target.label} value is provided in the context above. Improve or continue it only when the request context implies that.`;
+}
+
 export function buildGenerationMessages({
   card,
   target,
   outputFormat,
+  mode = GENERATION_MODES.generate,
   generalCharacterIdea = '',
   shouldUseGeneralCharacterIdea = true,
   userInstructions = '',
@@ -377,9 +397,7 @@ export function buildGenerationMessages({
     exampleContextSummary.section,
     [
       `Your task is to write the "${target.label}" field for a SillyTavern V2 character card.`,
-      target.value.trim()
-        ? `The current ${target.label} value is provided in the context above. Improve or continue it only when the request context implies that.`
-        : `The current ${target.label} value is empty. Create it from scratch based on the available card context.`,
+      getTaskInstruction(target, mode),
       'Keep the result consistent with the rest of the card.',
       exampleContextSummary.isTruncated
         ? `Reference example content was truncated to stay within the ${maxExampleContextCharacters}-character context budget. Use only the included reference details.`

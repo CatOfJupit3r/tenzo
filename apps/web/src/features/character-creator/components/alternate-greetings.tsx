@@ -11,6 +11,7 @@ interface iAlternateGreetingGenerationState {
   instructionValue: string;
   errorMessage?: string | null;
   isGenerating: boolean;
+  hasRewriteBackup: boolean;
 }
 
 export interface iAlternateGreetingsProps {
@@ -24,6 +25,8 @@ export interface iAlternateGreetingsProps {
   onInstructionChange: (index: number, value: string) => void;
   onGenerate: (index: number) => void;
   onContinue: (index: number) => void;
+  onRewrite: (index: number) => void;
+  onRevertRewrite: (index: number) => void;
   onCancel: (index: number) => void;
 }
 
@@ -38,6 +41,8 @@ export function AlternateGreetings({
   onInstructionChange,
   onGenerate,
   onContinue,
+  onRewrite,
+  onRevertRewrite,
   onCancel,
 }: iAlternateGreetingsProps) {
   return (
@@ -99,11 +104,14 @@ export function AlternateGreetings({
                 instructionValue={generationStates[index]?.instructionValue ?? ''}
                 errorMessage={generationStates[index]?.errorMessage ?? null}
                 hasExistingValue={greeting.trim().length > 0}
+                hasRewriteBackup={generationStates[index]?.hasRewriteBackup ?? false}
                 isGenerating={generationStates[index]?.isGenerating ?? false}
                 onShouldUseGeneralCharacterIdeaChange={(value) => onShouldUseGeneralCharacterIdeaChange(index, value)}
                 onInstructionChange={(value) => onInstructionChange(index, value)}
                 onGenerate={() => onGenerate(index)}
                 onContinue={() => onContinue(index)}
+                onRewrite={() => onRewrite(index)}
+                onRevertRewrite={() => onRevertRewrite(index)}
                 onCancel={() => onCancel(index)}
               />
 

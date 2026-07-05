@@ -16,11 +16,14 @@ export interface iCharacterFieldProps {
   instructionValue?: string;
   generationErrorMessage?: string | null;
   isGenerating?: boolean;
+  hasRewriteBackup?: boolean;
   onValueChange: (value: string) => void;
   onShouldUseGeneralCharacterIdeaChange?: (value: boolean) => void;
   onInstructionChange?: (value: string) => void;
   onGenerate?: () => void;
   onContinue?: () => void;
+  onRewrite?: () => void;
+  onRevertRewrite?: () => void;
   onCancel?: () => void;
 }
 
@@ -34,15 +37,18 @@ export function CharacterField({
   instructionValue = '',
   generationErrorMessage = null,
   isGenerating = false,
+  hasRewriteBackup = false,
   onValueChange,
   onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
   onGenerate,
   onContinue,
+  onRewrite,
+  onRevertRewrite,
   onCancel,
 }: iCharacterFieldProps) {
   const hasGenerationControls =
-    onShouldUseGeneralCharacterIdeaChange && onInstructionChange && onGenerate && onContinue && onCancel;
+    onShouldUseGeneralCharacterIdeaChange && onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
 
   return (
     <div className="space-y-3">
@@ -55,11 +61,14 @@ export function CharacterField({
           instructionValue={instructionValue}
           errorMessage={generationErrorMessage}
           hasExistingValue={value.trim().length > 0}
+          hasRewriteBackup={hasRewriteBackup}
           isGenerating={isGenerating}
           onShouldUseGeneralCharacterIdeaChange={onShouldUseGeneralCharacterIdeaChange}
           onInstructionChange={onInstructionChange}
           onGenerate={onGenerate}
           onContinue={onContinue}
+          onRewrite={onRewrite}
+          onRevertRewrite={onRevertRewrite ?? (() => undefined)}
           onCancel={onCancel}
         />
       ) : null}

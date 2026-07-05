@@ -13,6 +13,7 @@ interface iCustomFieldGenerationState {
   instructionValue: string;
   errorMessage?: string | null;
   isGenerating: boolean;
+  hasRewriteBackup: boolean;
 }
 
 export interface iCustomFieldsProps {
@@ -25,6 +26,8 @@ export interface iCustomFieldsProps {
   onInstructionChange: (id: string, value: string) => void;
   onGenerate: (id: string) => void;
   onContinue: (id: string) => void;
+  onRewrite: (id: string) => void;
+  onRevertRewrite: (id: string) => void;
   onCancel: (id: string) => void;
 }
 
@@ -38,6 +41,8 @@ export function CustomFields({
   onInstructionChange,
   onGenerate,
   onContinue,
+  onRewrite,
+  onRevertRewrite,
   onCancel,
 }: iCustomFieldsProps) {
   return (
@@ -82,6 +87,7 @@ export function CustomFields({
                 instructionValue={generationStates[field.id]?.instructionValue ?? ''}
                 errorMessage={generationStates[field.id]?.errorMessage ?? null}
                 hasExistingValue={field.value.trim().length > 0}
+                hasRewriteBackup={generationStates[field.id]?.hasRewriteBackup ?? false}
                 isGenerating={generationStates[field.id]?.isGenerating ?? false}
                 onShouldUseGeneralCharacterIdeaChange={(value) =>
                   onShouldUseGeneralCharacterIdeaChange(field.id, value)
@@ -89,6 +95,8 @@ export function CustomFields({
                 onInstructionChange={(value) => onInstructionChange(field.id, value)}
                 onGenerate={() => onGenerate(field.id)}
                 onContinue={() => onContinue(field.id)}
+                onRewrite={() => onRewrite(field.id)}
+                onRevertRewrite={() => onRevertRewrite(field.id)}
                 onCancel={() => onCancel(field.id)}
               />
 

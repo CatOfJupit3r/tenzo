@@ -6,6 +6,10 @@ export interface iChatCompletionsRequest {
   model: string;
   maxTokens: number;
   messages: iGenerationMessage[];
+  temperature: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
 }
 
 interface iChatCompletionsRequestPayload {
@@ -13,6 +17,10 @@ interface iChatCompletionsRequestPayload {
   messages: iGenerationMessage[];
   max_tokens: number;
   stream: boolean;
+  temperature: number;
+  top_p: number;
+  frequency_penalty: number;
+  presence_penalty: number;
 }
 
 function normalizeProviderTextPart(value: unknown): string {
@@ -103,12 +111,20 @@ export function buildChatCompletionsPayload({
   model,
   maxTokens,
   messages,
+  temperature,
+  topP,
+  frequencyPenalty,
+  presencePenalty,
 }: iChatCompletionsRequest): iChatCompletionsRequestPayload {
   return {
     model: model.trim(),
     messages,
     max_tokens: Math.max(1, Math.floor(maxTokens)),
     stream: true,
+    temperature,
+    top_p: topP,
+    frequency_penalty: frequencyPenalty,
+    presence_penalty: presencePenalty,
   };
 }
 

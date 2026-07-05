@@ -10,6 +10,11 @@ export type RequestMode = z.infer<typeof REQUEST_MODE_SCHEMA>;
 
 export const DEFAULT_CONTEXT_SIZE = 8_192;
 
+export const TEMPERATURE_RANGE = { min: 0, max: 2 } as const;
+export const TOP_P_RANGE = { min: 0, max: 1 } as const;
+export const FREQUENCY_PENALTY_RANGE = { min: -2, max: 2 } as const;
+export const PRESENCE_PENALTY_RANGE = { min: -2, max: 2 } as const;
+
 export interface iCharacterGenerationConnectionSettings {
   endpoint: string;
   model: string;
@@ -18,6 +23,10 @@ export interface iCharacterGenerationConnectionSettings {
   maxTokens: number;
   outputFormat: OutputFormat;
   requestMode: RequestMode;
+  temperature: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
 }
 
 export interface iCharacterGenerationPromptSettings {
@@ -37,6 +46,10 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   maxTokens: 600,
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
+  temperature: 1,
+  topP: 1,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
 };
 
 export const DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS: iCharacterGenerationPromptSettings = {
@@ -56,6 +69,14 @@ function readString(value: unknown, fallbackValue: string) {
 
 function readPositiveInteger(value: unknown, fallbackValue: number) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallbackValue;
+}
+
+function readFloatInRange(value: unknown, range: { min: number; max: number }, fallbackValue: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallbackValue;
+  }
+
+  return Math.min(range.max, Math.max(range.min, value));
 }
 
 function readFieldInstructions(value: unknown) {
@@ -103,6 +124,22 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
     requestMode: REQUEST_MODE_SCHEMA.safeParse(candidate.requestMode).success
       ? (candidate.requestMode as RequestMode)
       : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.requestMode,
+    temperature: readFloatInRange(
+      candidate.temperature,
+      TEMPERATURE_RANGE,
+      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.temperature,
+    ),
+    topP: readFloatInRange(candidate.topP, TOP_P_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topP),
+    frequencyPenalty: readFloatInRange(
+      candidate.frequencyPenalty,
+      FREQUENCY_PENALTY_RANGE,
+      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.frequencyPenalty,
+    ),
+    presencePenalty: readFloatInRange(
+      candidate.presencePenalty,
+      PRESENCE_PENALTY_RANGE,
+      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.presencePenalty,
+    ),
   };
 }
 

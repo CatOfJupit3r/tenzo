@@ -1,5 +1,6 @@
 import { CORE_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
+import { GENERATION_MODES } from '../../lib/prompt-builder';
 import { AlternateGreetings } from '../alternate-greetings';
 import { CharacterFieldPanel } from '../character-field-panel';
 import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
@@ -18,6 +19,7 @@ export function DialogueTab() {
     updateAlternateGreetingInstruction,
     generateAlternateGreeting,
     cancelAlternateGreetingGeneration,
+    revertAlternateGreetingRewrite,
   } = useCharacterCreatorContext();
 
   return (
@@ -40,8 +42,12 @@ export function DialogueTab() {
             void generateAlternateGreeting(index);
           }}
           onContinue={(index) => {
-            void generateAlternateGreeting(index, true);
+            void generateAlternateGreeting(index, GENERATION_MODES.continue);
           }}
+          onRewrite={(index) => {
+            void generateAlternateGreeting(index, GENERATION_MODES.rewrite);
+          }}
+          onRevertRewrite={revertAlternateGreetingRewrite}
           onCancel={cancelAlternateGreetingGeneration}
         />
       </div>

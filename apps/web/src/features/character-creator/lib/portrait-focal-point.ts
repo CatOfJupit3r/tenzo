@@ -184,10 +184,17 @@ export async function readPortraitDimensions(blob: Blob): Promise<iPortraitDimen
   }
 }
 
-export async function renderPortraitBlobWithCrop(
+export const PORTRAIT_THUMBNAIL_WIDTH = 128;
+export const PORTRAIT_THUMBNAIL_HEIGHT = 192;
+const PORTRAIT_THUMBNAIL_MIME_TYPE = 'image/webp';
+const PORTRAIT_THUMBNAIL_QUALITY = 0.72;
+
+async function drawCroppedPortraitToCanvas(
   sourceBlob: Blob,
   cropRect: Partial<iPortraitCropRect> | null | undefined,
-): Promise<Blob> {
+  targetWidth: number,
+  targetHeight: number,
+): Promise<HTMLCanvasElement> {
   const imageBitmap = await createImageBitmap(sourceBlob);
 
   try {
@@ -200,8 +207,8 @@ export async function renderPortraitBlobWithCrop(
     );
 
     const canvas = document.createElement('canvas');
-    canvas.width = SILLY_TAVERN_PORTRAIT_WIDTH;
-    canvas.height = SILLY_TAVERN_PORTRAIT_HEIGHT;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
     const context = canvas.getContext('2d');
     if (!context) {
@@ -216,21 +223,54 @@ export async function renderPortraitBlobWithCrop(
       safeCropRect.height,
       0,
       0,
-      SILLY_TAVERN_PORTRAIT_WIDTH,
-      SILLY_TAVERN_PORTRAIT_HEIGHT,
+      targetWidth,
+      targetHeight,
     );
 
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob);
-          return;
-        }
-
-        reject(new Error('Failed to encode portrait as PNG.'));
-      }, 'image/png');
-    });
+    return canvas;
   } finally {
     imageBitmap.close();
   }
+}
+
+export async function renderPortraitBlobWithCrop(
+  sourceBlob: Blob,
+  cropRect: Partial<iPortraitCropRect> | null | undefined,
+): Promise<Blob> {
+  const canvas = await drawCroppedPortraitToCanvas(
+    sourceBlob,
+    cropRect,
+    SILLY_TAVERN_PORTRAIT_WIDTH,
+    SILLY_TAVERN_PORTRAIT_HEIGHT,
+  );
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+        return;
+      }
+
+      reject(new Error('Failed to encode portrait as PNG.'));
+    }, 'image/png');
+  });
+}
+
+/**
+ * Renders a small, pre-cropped portrait thumbnail as a data URL. Persisted on the
+ * library row so avatars paint synchronously on first render without an IndexedDB
+ * round-trip.
+ */
+export async function renderPortraitThumbnailDataUrl(
+  sourceBlob: Blob,
+  cropRect: Partial<iPortraitCropRect> | null | undefined,
+): Promise<string> {
+  const canvas = await drawCroppedPortraitToCanvas(
+    sourceBlob,
+    cropRect,
+    PORTRAIT_THUMBNAIL_WIDTH,
+    PORTRAIT_THUMBNAIL_HEIGHT,
+  );
+
+  return canvas.toDataURL(PORTRAIT_THUMBNAIL_MIME_TYPE, PORTRAIT_THUMBNAIL_QUALITY);
 }

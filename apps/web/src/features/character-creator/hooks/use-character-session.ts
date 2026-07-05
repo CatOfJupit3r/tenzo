@@ -1,7 +1,8 @@
 import { useAtom } from 'jotai';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { localStorageApi } from '@~/db/storage';
+import { useIsomorphicLayoutEffect } from '@~/hooks/use-isomorphic-layout-effect';
 
 import { activeCharacterIdAtom, characterLibraryAtom, exampleCharactersAtom } from '../atoms/character-session.atom';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
@@ -31,6 +32,7 @@ import {
 import type { iCharacterGenerationPromptSettings } from '../lib/generation-config';
 
 const CHARACTER_LIBRARY_STORAGE_KEY = 'tenzo:character-creator:library';
+const ACTIVE_CHARACTER_ID_STORAGE_KEY = 'tenzo:character-creator:active-character-id';
 const LEGACY_CARD_STORAGE_KEY = 'tenzo:character-creator:card';
 const LEGACY_PORTRAIT_STORAGE_KEY = 'tenzo:character-creator:portrait';
 const LEGACY_GENERATION_SETTINGS_STORAGE_KEY = 'tenzo:character-creator:generation-settings';
@@ -98,37 +100,39 @@ export function useCharacterSession() {
   const [activeCharacterId, setActiveCharacterId] = useAtom(activeCharacterIdAtom);
   const [exampleCharacters, setExampleCharacters] = useAtom(exampleCharactersAtom);
   const hasInitializedLibraryRef = useRef(false);
+  const [isCharacterLibraryReady, setIsCharacterLibraryReady] = useState(false);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (hasInitializedLibraryRef.current) {
       return;
     }
 
     hasInitializedLibraryRef.current = true;
+    const storedCharacterLibrary = sanitizeCharacterLibrary(
+      parseStoredJsonValue(localStorageApi.getItem(CHARACTER_LIBRARY_STORAGE_KEY)),
+    );
+    const storedActiveCharacterIdValue = parseStoredJsonValue(localStorageApi.getItem(ACTIVE_CHARACTER_ID_STORAGE_KEY));
 
-    const hasStoredLibrary = localStorageApi.getItem(CHARACTER_LIBRARY_STORAGE_KEY) !== null;
+    if (storedCharacterLibrary.length > 0) {
+      const fallbackActiveCharacterId = storedCharacterLibrary[0]?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID;
+      const nextActiveCharacterId =
+        typeof storedActiveCharacterIdValue === 'string' &&
+        storedCharacterLibrary.some((character) => character.id === storedActiveCharacterIdValue)
+          ? storedActiveCharacterIdValue
+          : fallbackActiveCharacterId;
 
-    if (hasStoredLibrary) {
+      setCharacterLibrary(storedCharacterLibrary);
+      setActiveCharacterId(nextActiveCharacterId);
+      setIsCharacterLibraryReady(true);
       return;
     }
 
     const migratedCharacter = migrateLegacyCharacterLibraryItem();
-
-    if (migratedCharacter) {
-      setCharacterLibrary([migratedCharacter]);
-      setActiveCharacterId(migratedCharacter.id);
-    }
-  }, [setActiveCharacterId, setCharacterLibrary]);
-
-  useEffect(() => {
-    if (characterLibrary.length > 0) {
-      return;
-    }
-
-    const fallbackCharacter = createEmptyCharacterLibraryItem();
+    const fallbackCharacter = migratedCharacter ?? createEmptyCharacterLibraryItem();
     setCharacterLibrary([fallbackCharacter]);
     setActiveCharacterId(fallbackCharacter.id);
-  }, [characterLibrary.length, setActiveCharacterId, setCharacterLibrary]);
+    setIsCharacterLibraryReady(true);
+  }, [setActiveCharacterId, setCharacterLibrary]);
 
   const activeCharacter = useMemo(
     () => characterLibrary.find((character) => character.id === activeCharacterId) ?? characterLibrary[0] ?? null,
@@ -465,6 +469,7 @@ export function useCharacterSession() {
   );
 
   return {
+    isCharacterLibraryReady,
     characterLibrary,
     activeCharacterId: activeCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
     card,

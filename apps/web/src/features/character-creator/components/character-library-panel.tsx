@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
 
 import {
@@ -19,14 +19,7 @@ import { cn } from '@~/lib/utils';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import type { iCharacterLibraryItem } from '../lib/character-library';
 import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/character-library';
-import { readCharacterAssetBlob } from '../lib/image-store';
-import {
-  getPortraitCropRect,
-  readPortraitDimensions,
-  SILLY_TAVERN_PORTRAIT_ASPECT_RATIO,
-} from '../lib/portrait-focal-point';
-import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
-import { PortraitPreviewSurface } from './portrait-preview-surface';
+import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
 
 interface iCharacterLibraryPanelProps {
   isOpen: boolean;
@@ -35,97 +28,37 @@ interface iCharacterLibraryPanelProps {
 
 interface iCharacterLibraryItemProps {
   character: iCharacterLibraryItem;
-  preview: iCharacterLibraryPreview | null;
   isActiveCharacter: boolean;
   onSelect: (id: string) => void;
   onDuplicate: (id: string) => Promise<unknown>;
   onRemove: (id: string) => Promise<unknown>;
 }
 
-interface iCharacterLibraryPreview {
-  cropRect: iPortraitCropRect | null;
-  portraitDimensions: iPortraitDimensions | null;
-  previewUrl: string | null;
+function CharacterLibraryLoadingState() {
+  return (
+    <div className="space-y-2" aria-hidden="true">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div key={index} className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-3 rounded-lg border bg-muted/10 p-3">
+          <div className="h-24 w-18 animate-pulse rounded-md bg-muted/40" />
+          <div className="space-y-2 py-1">
+            <div className="h-4 w-2/3 animate-pulse rounded-sm bg-muted/40" />
+            <div className="h-3 w-full animate-pulse rounded-sm bg-muted/30" />
+            <div className="h-3 w-5/6 animate-pulse rounded-sm bg-muted/30" />
+            <div className="h-3 w-1/2 animate-pulse rounded-sm bg-muted/30" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function useCharacterLibraryPreviewUrls() {
-  const { characterLibrary } = useCharacterCreatorContext();
-  const [previewUrls, setPreviewUrls] = useState<Record<string, iCharacterLibraryPreview>>({});
-
-  useEffect(() => {
-    let isCancelled = false;
-    const createdUrls: string[] = [];
-
-    Promise.all(
-      characterLibrary.map(async (character) => {
-        if (!character.portrait) {
-          return [
-            character.id,
-            {
-              cropRect: null,
-              portraitDimensions: null,
-              previewUrl: null,
-            },
-          ] as const;
-        }
-
-        const blob = await readCharacterAssetBlob(character.portrait.assetId);
-
-        if (!blob) {
-          return [
-            character.id,
-            {
-              cropRect: null,
-              portraitDimensions: null,
-              previewUrl: null,
-            },
-          ] as const;
-        }
-
-        const portraitDimensions = await readPortraitDimensions(blob);
-        const objectUrl = URL.createObjectURL(blob);
-        createdUrls.push(objectUrl);
-        return [
-          character.id,
-          {
-            cropRect: getPortraitCropRect(portraitDimensions, character.portrait.cropRect),
-            portraitDimensions,
-            previewUrl: objectUrl,
-          },
-        ] as const;
-      }),
-    )
-      .then((entries) => {
-        if (isCancelled) {
-          createdUrls.forEach((url) => URL.revokeObjectURL(url));
-          return;
-        }
-
-        setPreviewUrls(Object.fromEntries(entries));
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setPreviewUrls({});
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-      createdUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [characterLibrary]);
-
-  return previewUrls;
-}
-
-function CharacterLibraryItem({
+const CharacterLibraryItem = memo(({
   character,
-  preview,
   isActiveCharacter,
   onSelect,
   onDuplicate,
   onRemove,
-}: iCharacterLibraryItemProps) {
+}: iCharacterLibraryItemProps) => {
   const displayName = getCharacterLibraryItemDisplayName(character);
   const hasCreator = character.card.data.creator.trim() !== '';
   const hasTags = character.card.data.tags.length > 0;
@@ -145,13 +78,11 @@ function CharacterLibraryItem({
         onClick={() => onSelect(character.id)}
       >
         <div className="flex h-24 w-18 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
-          {preview?.previewUrl && preview.cropRect && preview.portraitDimensions ? (
-            <PortraitPreviewSurface
+          {character.portrait?.thumbnailDataUrl ? (
+            <img
               alt={`${displayName} portrait preview`}
-              className="size-full"
-              cropRect={preview.cropRect}
-              portraitDimensions={preview.portraitDimensions}
-              portraitUrl={preview.previewUrl}
+              className="size-full object-cover"
+              src={character.portrait.thumbnailDataUrl}
               style={{ aspectRatio: SILLY_TAVERN_PORTRAIT_ASPECT_RATIO }}
             />
           ) : (
@@ -221,10 +152,11 @@ function CharacterLibraryItem({
       </div>
     </div>
   );
-}
+});
 
 export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPanelProps) {
   const {
+    isCharacterLibraryReady,
     characterLibrary,
     activeCharacterId,
     handleCreateCharacter,
@@ -233,15 +165,18 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
     handleRemoveCharacter,
     openImportDialog,
   } = useCharacterCreatorContext();
-  const previewUrls = useCharacterLibraryPreviewUrls();
 
   const characterCountLabel = useMemo(() => {
+    if (!isCharacterLibraryReady && characterLibrary.length === 0) {
+      return 'Loading saved characters...';
+    }
+
     if (characterLibrary.length === 1) {
       return '1 character saved locally';
     }
 
     return `${characterLibrary.length} characters saved locally`;
-  }, [characterLibrary.length]);
+  }, [characterLibrary.length, isCharacterLibraryReady]);
 
   const handleSelectCharacterFromPanel = useCallback(
     (id: string) => {
@@ -273,7 +208,9 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-base font-semibold">Library</h2>
-                <Badge variant="outline">{characterLibrary.length}</Badge>
+                <Badge variant="outline">
+                  {!isCharacterLibraryReady && characterLibrary.length === 0 ? '...' : characterLibrary.length}
+                </Badge>
               </div>
               <p className="text-sm text-muted-foreground">{characterCountLabel}</p>
             </div>
@@ -303,19 +240,22 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <div className="space-y-2">
-            {characterLibrary.map((character) => (
-              <CharacterLibraryItem
-                key={character.id}
-                character={character}
-                preview={previewUrls[character.id] ?? null}
-                isActiveCharacter={character.id === activeCharacterId}
-                onSelect={handleSelectCharacterFromPanel}
-                onDuplicate={handleDuplicateCharacter}
-                onRemove={handleRemoveCharacter}
-              />
-            ))}
-          </div>
+          {!isCharacterLibraryReady && characterLibrary.length === 0 ? (
+            <CharacterLibraryLoadingState />
+          ) : (
+            <div className="space-y-2">
+              {characterLibrary.map((character) => (
+                <CharacterLibraryItem
+                  key={character.id}
+                  character={character}
+                  isActiveCharacter={character.id === activeCharacterId}
+                  onSelect={handleSelectCharacterFromPanel}
+                  onDuplicate={handleDuplicateCharacter}
+                  onRemove={handleRemoveCharacter}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </aside>

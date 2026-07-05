@@ -2,7 +2,7 @@ import { atomWithStorage, createJSONStorage } from 'jotai/utils';
 
 import { localStorageApi } from '@~/db/storage';
 
-import { DEFAULT_CHARACTER_LIBRARY_ITEM_ID, createEmptyCharacterLibraryItem } from '../lib/character-library';
+import { DEFAULT_CHARACTER_LIBRARY_ITEM_ID } from '../lib/character-library';
 import type { iCharacterLibraryItem } from '../lib/character-library';
 import type { iStoredExampleCharacter } from '../lib/example-characters';
 
@@ -12,7 +12,7 @@ const exampleCharactersStorage = createJSONStorage<iStoredExampleCharacter[]>(()
 
 export const characterLibraryAtom = atomWithStorage<iCharacterLibraryItem[]>(
   'tenzo:character-creator:library',
-  [createEmptyCharacterLibraryItem()],
+  [],
   characterLibraryStorage,
 );
 

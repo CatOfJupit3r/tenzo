@@ -13,6 +13,8 @@ import {
 } from '../lib/example-characters';
 import { REQUEST_MODES } from '../lib/generation-config';
 import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
+import { invalidatePortraitAsset } from '../lib/portrait-asset-cache';
+import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
 import { buildExampleContextSummary, GENERATION_MODES, getExampleContextCharacterBudget } from '../lib/prompt-builder';
 import type { GenerationMode, iFieldGenerationTarget } from '../lib/prompt-builder';
 import { useCharacterPortrait } from './use-character-portrait';
@@ -58,6 +60,7 @@ export function useCharacterCreatorPage() {
   const [pendingRewriteReviewKeys, setPendingRewriteReviewKeys] = useState<Record<string, boolean>>({});
 
   const {
+    isCharacterLibraryReady,
     characterLibrary,
     activeCharacterId,
     card,
@@ -313,6 +316,7 @@ export function useCharacterCreatorPage() {
                 fileName: importedCardFile.fileName,
                 mimeType: importedCardFile.portraitBlob.type || 'application/octet-stream',
                 cropRect: null,
+                thumbnailDataUrl: await renderPortraitThumbnailDataUrl(importedCardFile.portraitBlob, null),
               };
 
         if (portrait && importedCardFile.portraitBlob) {
@@ -396,6 +400,7 @@ export function useCharacterCreatorPage() {
 
       if (character?.portrait) {
         await deleteCharacterAssetBlob(character.portrait.assetId);
+        invalidatePortraitAsset(character.portrait.assetId);
       }
 
       removeCharacter(id);
@@ -618,6 +623,7 @@ export function useCharacterCreatorPage() {
   }, [card, portraitBlob, portraitCropRect]);
 
   return {
+    isCharacterLibraryReady,
     characterLibrary,
     activeCharacterId,
     card,

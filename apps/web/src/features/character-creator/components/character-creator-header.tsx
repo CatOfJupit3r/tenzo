@@ -29,6 +29,7 @@ export function CharacterCreatorHeader({
 }: iCharacterCreatorHeaderProps) {
   const {
     data,
+    isCharacterLibraryReady,
     characterLibrary,
     activeCharacterId,
     generationSettings,
@@ -49,9 +50,11 @@ export function CharacterCreatorHeader({
   } = useCharacterCreatorContext();
   const activeCharacter =
     characterLibrary.find((character) => character.id === activeCharacterId) ?? characterLibrary[0];
-  const activeCharacterLabel = activeCharacter
-    ? getCharacterLibraryItemDisplayName(activeCharacter)
-    : 'Untitled character';
+  const activeCharacterLabel = !isCharacterLibraryReady
+    ? 'Loading library...'
+    : activeCharacter
+      ? getCharacterLibraryItemDisplayName(activeCharacter)
+      : 'Untitled character';
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/92 backdrop-blur-sm">

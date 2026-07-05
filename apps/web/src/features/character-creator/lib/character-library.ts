@@ -22,6 +22,7 @@ export interface iCharacterPortraitReference {
   fileName: string;
   mimeType: string;
   cropRect: iPortraitCropRect | null;
+  thumbnailDataUrl: string | null;
 }
 
 export interface iCharacterLibraryItem {
@@ -55,6 +56,7 @@ export function sanitizeCharacterPortraitReference(value: unknown): iCharacterPo
   const assetId = readString(candidate.assetId);
   const fileName = readString(candidate.fileName);
   const mimeType = readString(candidate.mimeType, 'application/octet-stream');
+  const thumbnailDataUrl = readString(candidate.thumbnailDataUrl);
 
   if (assetId.trim() === '' || fileName.trim() === '') {
     return null;
@@ -65,6 +67,7 @@ export function sanitizeCharacterPortraitReference(value: unknown): iCharacterPo
     fileName,
     mimeType,
     cropRect: sanitizeStoredPortraitCropRect(candidate.cropRect as Partial<iPortraitCropRect> | null | undefined),
+    thumbnailDataUrl: thumbnailDataUrl.startsWith('data:') ? thumbnailDataUrl : null,
   };
 }
 

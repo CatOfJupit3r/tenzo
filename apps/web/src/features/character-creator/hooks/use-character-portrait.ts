@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { iCharacterPortraitReference } from '../lib/character-library';
-import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
+import { deleteCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
+import { invalidatePortraitAsset, PORTRAIT_ASSET_STATUSES, primePortraitAsset } from '../lib/portrait-asset-cache';
 import {
   arePortraitCropRectsEqual,
   getPortraitCropRect,
   readPortraitDimensions,
+  renderPortraitThumbnailDataUrl,
   sanitizeStoredPortraitCropRect,
 } from '../lib/portrait-focal-point';
-import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
+import type { iPortraitCropRect } from '../lib/portrait-focal-point';
+import { isPortraitAssetHydrating, usePortraitAsset } from './use-portrait-asset';
 import { useCharacterSession } from './use-character-session';
+
+const THUMBNAIL_REGENERATION_DELAY_MS = 200;
 
 function sanitizePortraitReference(
   portraitReference: iCharacterPortraitReference | null,
@@ -29,18 +34,27 @@ function sanitizePortraitReference(
   };
 }
 
+function serializeCropRect(cropRect: iPortraitCropRect | null) {
+  if (!cropRect) {
+    return 'default';
+  }
+
+  return `${cropRect.x}:${cropRect.y}:${cropRect.width}:${cropRect.height}`;
+}
+
 export function useCharacterPortrait() {
   const { portraitReference: storedPortraitReference, setActiveCharacterPortrait } = useCharacterSession();
-  const [portraitBlob, setPortraitBlob] = useState<Blob | null>(null);
-  const [portraitObjectUrl, setPortraitObjectUrl] = useState<string | null>(null);
-  const [portraitDimensions, setPortraitDimensions] = useState<iPortraitDimensions | null>(null);
-  const [isHydratingPortrait, setIsHydratingPortrait] = useState(false);
-  const loadedPortraitAssetIdRef = useRef<string | null>(null);
   const portraitReference = useMemo(
     () => sanitizePortraitReference(storedPortraitReference),
     [storedPortraitReference],
   );
   const portraitAssetId = portraitReference?.assetId ?? null;
+  const portraitAsset = usePortraitAsset(portraitAssetId);
+  const portraitBlob = portraitAsset.blob;
+  const portraitObjectUrl = portraitAsset.objectUrl;
+  const portraitDimensions = portraitAsset.dimensions;
+  const isHydratingPortrait = Boolean(portraitAssetId) && isPortraitAssetHydrating(portraitAsset);
+  const lastThumbnailSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!storedPortraitReference || portraitReference === storedPortraitReference) {
@@ -51,99 +65,11 @@ export function useCharacterPortrait() {
   }, [portraitReference, setActiveCharacterPortrait, storedPortraitReference]);
 
   useEffect(() => {
-    let isCancelled = false;
-
-    if (!portraitAssetId) {
-      loadedPortraitAssetIdRef.current = null;
-      setPortraitBlob(null);
-      setPortraitDimensions(null);
-      setIsHydratingPortrait(false);
-      return undefined;
+    // A referenced asset that cannot be read is stale; drop the dangling reference.
+    if (portraitReference && portraitAsset.status === PORTRAIT_ASSET_STATUSES.error) {
+      setActiveCharacterPortrait(null);
     }
-
-    if (loadedPortraitAssetIdRef.current === portraitAssetId && portraitBlob) {
-      setIsHydratingPortrait(false);
-      return undefined;
-    }
-
-    setIsHydratingPortrait(true);
-
-    readCharacterAssetBlob(portraitAssetId)
-      .then((blob) => {
-        if (isCancelled) {
-          return;
-        }
-
-        if (!blob) {
-          loadedPortraitAssetIdRef.current = null;
-          setActiveCharacterPortrait(null);
-          setPortraitBlob(null);
-          setPortraitDimensions(null);
-          return;
-        }
-
-        loadedPortraitAssetIdRef.current = portraitAssetId;
-        setPortraitBlob(blob);
-      })
-      .catch(() => {
-        if (isCancelled) {
-          return;
-        }
-
-        loadedPortraitAssetIdRef.current = null;
-        setActiveCharacterPortrait(null);
-        setPortraitBlob(null);
-        setPortraitDimensions(null);
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsHydratingPortrait(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [portraitAssetId, portraitBlob, setActiveCharacterPortrait]);
-
-  useEffect(() => {
-    if (!portraitBlob) {
-      setPortraitObjectUrl(null);
-      return undefined;
-    }
-
-    const nextObjectUrl = URL.createObjectURL(portraitBlob);
-    setPortraitObjectUrl(nextObjectUrl);
-
-    return () => {
-      URL.revokeObjectURL(nextObjectUrl);
-    };
-  }, [portraitBlob]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    if (!portraitBlob) {
-      setPortraitDimensions(null);
-      return undefined;
-    }
-
-    readPortraitDimensions(portraitBlob)
-      .then((dimensions) => {
-        if (!isCancelled) {
-          setPortraitDimensions(dimensions);
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setPortraitDimensions(null);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [portraitBlob]);
+  }, [portraitAsset.status, portraitReference, setActiveCharacterPortrait]);
 
   const portraitCropRect = useMemo(() => {
     if (!portraitDimensions) {
@@ -168,27 +94,71 @@ export function useCharacterPortrait() {
     });
   }, [portraitCropRect, portraitReference, setActiveCharacterPortrait]);
 
+  useEffect(() => {
+    // Trust the persisted thumbnail across character switches; only regenerate when
+    // the crop changes within this session (or when no thumbnail exists yet).
+    lastThumbnailSignatureRef.current = null;
+  }, [portraitAssetId]);
+
+  useEffect(() => {
+    if (!portraitReference || !portraitBlob || !portraitCropRect) {
+      return undefined;
+    }
+
+    const signature = `${portraitReference.assetId}:${serializeCropRect(portraitCropRect)}`;
+    if (lastThumbnailSignatureRef.current === signature) {
+      return undefined;
+    }
+
+    if (lastThumbnailSignatureRef.current === null && portraitReference.thumbnailDataUrl) {
+      lastThumbnailSignatureRef.current = signature;
+      return undefined;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      void renderPortraitThumbnailDataUrl(portraitBlob, portraitCropRect).then((thumbnailDataUrl) => {
+        if (isCancelled) {
+          return;
+        }
+
+        lastThumbnailSignatureRef.current = signature;
+        setActiveCharacterPortrait({
+          ...portraitReference,
+          thumbnailDataUrl,
+        });
+      });
+    }, THUMBNAIL_REGENERATION_DELAY_MS);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [portraitBlob, portraitCropRect, portraitReference, setActiveCharacterPortrait]);
+
   const setPortrait = useCallback(
     async (blob: Blob, fileName: string, cropRect: iPortraitCropRect | null = null) => {
       const dimensions = await readPortraitDimensions(blob);
       const assetId = crypto.randomUUID();
       const nextCropRect = getPortraitCropRect(dimensions, cropRect);
+      const thumbnailDataUrl = await renderPortraitThumbnailDataUrl(blob, nextCropRect);
 
       await writeCharacterAssetBlob(assetId, blob);
 
       if (portraitReference) {
         await deleteCharacterAssetBlob(portraitReference.assetId);
+        invalidatePortraitAsset(portraitReference.assetId);
       }
 
+      primePortraitAsset(assetId, blob, dimensions);
+      lastThumbnailSignatureRef.current = `${assetId}:${serializeCropRect(nextCropRect)}`;
       setActiveCharacterPortrait({
         assetId,
         fileName,
         mimeType: blob.type || 'application/octet-stream',
         cropRect: nextCropRect,
+        thumbnailDataUrl,
       });
-      loadedPortraitAssetIdRef.current = assetId;
-      setPortraitBlob(blob);
-      setPortraitDimensions(dimensions);
     },
     [portraitReference, setActiveCharacterPortrait],
   );
@@ -215,12 +185,11 @@ export function useCharacterPortrait() {
   const clearPortrait = useCallback(async () => {
     if (portraitReference) {
       await deleteCharacterAssetBlob(portraitReference.assetId);
+      invalidatePortraitAsset(portraitReference.assetId);
     }
 
+    lastThumbnailSignatureRef.current = null;
     setActiveCharacterPortrait(null);
-    loadedPortraitAssetIdRef.current = null;
-    setPortraitBlob(null);
-    setPortraitDimensions(null);
   }, [portraitReference, setActiveCharacterPortrait]);
 
   return {

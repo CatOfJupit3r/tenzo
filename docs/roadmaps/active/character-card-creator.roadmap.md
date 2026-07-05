@@ -284,23 +284,23 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 
 **Purpose:** Establish the feature structure, V2 schema, and manual card editing without AI.
 **Scope:**
-- [ ] Create feature directory structure under `apps/web/src/features/character-creator/`
-- [ ] Define zod schema for V2 card (`card-schema.ts`)
-- [ ] Define field configuration (labels, default prompts, metadata)
-- [ ] Make the character creator the root route (`apps/web/src/routes/index.tsx`) — with the placeholder landing page and dashboard/profile routes removed in Phase 0, there is no reason for the tool to live at a nested `/character-creator` path instead of `/`
-- [ ] Implement character field editor component (textarea + label)
-- [ ] Implement all core V2 fields: name, description, personality, scenario, first_mes, mes_example
-- [ ] Implement alternate greetings editor (add/remove/reorder)
-- [ ] Implement metadata fields: tags, creator, creator_notes, character_version
-- [ ] Implement system_prompt and post_history_instructions fields
-- [ ] Implement Jotai-based session state with localStorage persistence
-- [ ] Implement custom field add/remove/edit
+- [x] Create feature directory structure under `apps/web/src/features/character-creator/`
+- [x] Define zod schema for V2 card (`card-schema.ts`)
+- [x] Define field configuration (labels, default prompts, metadata)
+- [x] Make the character creator the root route (`apps/web/src/routes/index.tsx`) — with the placeholder landing page and dashboard/profile routes removed in Phase 0, there is no reason for the tool to live at a nested `/character-creator` path instead of `/`
+- [x] Implement character field editor component (textarea + label)
+- [x] Implement all core V2 fields: name, description, personality, scenario, first_mes, mes_example
+- [x] Implement alternate greetings editor (add/remove/reorder)
+- [x] Implement metadata fields: tags, creator, creator_notes, character_version
+- [x] Implement system_prompt and post_history_instructions fields
+- [x] Implement Jotai-based session state with localStorage persistence
+- [x] Implement custom field add/remove/edit
 
 **Exit criteria:**
-- [ ] User can manually create a complete V2 character card
-- [ ] State persists across page reloads
-- [ ] Custom fields can be added and edited
-- [ ] All V2 spec fields are represented
+- [x] User can manually create a complete V2 character card
+- [x] State persists across page reloads
+- [x] Custom fields can be added and edited
+- [x] All V2 spec fields are represented
 
 **Must not start until:**
 - Phase 0 cleanup is complete (repo builds/typechecks/lints clean with `apps/server` and `packages/shared` removed)
@@ -538,3 +538,4 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 | 2026-07-05 | Audit pass: added extensions-preservation requirements (spec MUST), chara/ccv3 chunk-replacement behavior, hybrid V1+V2 export decision, output-format parsing, IndexedDB for binary storage, CORS proxy as default path, deferrals for revise sessions and prompt presets. |
 | 2026-07-05 | Added Phase 0 (remove `apps/server`, `packages/shared`, and placeholder `apps/web` features — confirmed placeholders with no real product). Character creator becomes the root route. Updated goals, non-goals, current repo state, rollout, risks, and decisions accordingly. |
 | 2026-07-05 | Removed moonrepo orchestration in favor of direct pnpm workspace scripts and updated CI/docs to match the web-only repo. |
+| 2026-07-05 | Phase 1 complete: `character-creator` feature scaffolded under `apps/web/src/features/character-creator/` with a zod V2 card schema, Jotai + localStorage session state, and manual editors for all core/prompt-override/metadata fields, alternate greetings (add/remove/reorder), and custom fields. Root route (`/`) now renders the editor. |

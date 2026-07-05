@@ -1,0 +1,22 @@
+import type { CharacterCard } from '../lib/card-schema';
+
+export const createEmptyCharacterCard = (): CharacterCard => ({
+  spec: 'chara_card_v2',
+  spec_version: '2.0',
+  data: {
+    name: '',
+    description: '',
+    personality: '',
+    scenario: '',
+    first_mes: '',
+    mes_example: '',
+    creator_notes: '',
+    system_prompt: '',
+    post_history_instructions: '',
+    alternate_greetings: [],
+    tags: [],
+    creator: '',
+    character_version: '',
+    extensions: { custom_fields: [] },
+  },
+});

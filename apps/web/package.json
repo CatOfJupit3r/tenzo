@@ -19,6 +19,8 @@
     "@tailwindcss/vite": "4.1.18",
     "@tanstack/devtools-vite": "0.4.0",
     "@tanstack/pacer": "0.17.0",
+    "@tanstack/query-db-collection": "1.0.46",
+    "@tanstack/react-db": "0.1.92",
     "@tanstack/react-devtools": "0.9.0",
     "@tanstack/react-form": "1.27.7",
     "@tanstack/react-form-devtools": "0.2.10",
@@ -50,6 +52,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@startername/eslint-config": "workspace:*",
+    "@startername/prettier-config": "workspace:*",
     "@tanstack/router-plugin": "1.145.2",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
@@ -59,8 +63,6 @@
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@typescript/native-preview": "catalog:",
-    "@startername/eslint-config": "workspace:*",
-    "@startername/prettier-config": "workspace:*",
     "@vitejs/plugin-react": "5.1.2",
     "@vitest/ui": "catalog:",
     "babel-plugin-react-compiler": "1.0.0",

@@ -3,14 +3,7 @@ import { useCallback, useId, useState } from 'react';
 import { LuFocus, LuImagePlus, LuRefreshCw, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@~/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
 
 import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
 import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';

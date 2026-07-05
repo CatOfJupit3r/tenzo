@@ -10,7 +10,7 @@ export type RequestMode = z.infer<typeof REQUEST_MODE_SCHEMA>;
 
 export const DEFAULT_CONTEXT_SIZE = 8_192;
 
-export interface iCharacterGenerationSettings {
+export interface iCharacterGenerationConnectionSettings {
   endpoint: string;
   model: string;
   apiKeyCiphertext: string;
@@ -18,12 +18,18 @@ export interface iCharacterGenerationSettings {
   maxTokens: number;
   outputFormat: OutputFormat;
   requestMode: RequestMode;
+}
+
+export interface iCharacterGenerationPromptSettings {
   generalCharacterIdea: string;
   fieldInstructions: Record<string, string>;
   fieldShouldUseGeneralCharacterIdea: Record<string, boolean>;
 }
 
-export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings = {
+export interface iCharacterGenerationSettings
+  extends iCharacterGenerationConnectionSettings, iCharacterGenerationPromptSettings {}
+
+export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerationConnectionSettings = {
   endpoint: 'https://api.openai.com',
   model: 'gpt-4.1-mini',
   apiKeyCiphertext: '',
@@ -31,9 +37,17 @@ export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings
   maxTokens: 600,
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
+};
+
+export const DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS: iCharacterGenerationPromptSettings = {
   generalCharacterIdea: '',
   fieldInstructions: {},
   fieldShouldUseGeneralCharacterIdea: {},
+};
+
+export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings = {
+  ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
+  ...DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
 };
 
 function readString(value: unknown, fallbackValue: string) {
@@ -46,7 +60,7 @@ function readPositiveInteger(value: unknown, fallbackValue: number) {
 
 function readFieldInstructions(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return DEFAULT_CHARACTER_GENERATION_SETTINGS.fieldInstructions;
+    return DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldInstructions;
   }
 
   return Object.fromEntries(
@@ -58,7 +72,7 @@ function readFieldInstructions(value: unknown) {
 
 function readFieldShouldUseGeneralCharacterIdea(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return DEFAULT_CHARACTER_GENERATION_SETTINGS.fieldShouldUseGeneralCharacterIdea;
+    return DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldShouldUseGeneralCharacterIdea;
   }
 
   return Object.fromEntries(
@@ -68,29 +82,49 @@ function readFieldShouldUseGeneralCharacterIdea(value: unknown) {
   );
 }
 
-export function sanitizeCharacterGenerationSettings(value: unknown): iCharacterGenerationSettings {
+export function sanitizeCharacterGenerationConnectionSettings(value: unknown): iCharacterGenerationConnectionSettings {
   const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
   return {
-    endpoint: readString(candidate.endpoint, DEFAULT_CHARACTER_GENERATION_SETTINGS.endpoint),
-    model: readString(candidate.model, DEFAULT_CHARACTER_GENERATION_SETTINGS.model),
-    apiKeyCiphertext: readString(candidate.apiKeyCiphertext, DEFAULT_CHARACTER_GENERATION_SETTINGS.apiKeyCiphertext),
-    contextSize: readPositiveInteger(candidate.contextSize, DEFAULT_CHARACTER_GENERATION_SETTINGS.contextSize),
-    maxTokens: readPositiveInteger(candidate.maxTokens, DEFAULT_CHARACTER_GENERATION_SETTINGS.maxTokens),
+    endpoint: readString(candidate.endpoint, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.endpoint),
+    model: readString(candidate.model, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.model),
+    apiKeyCiphertext: readString(
+      candidate.apiKeyCiphertext,
+      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.apiKeyCiphertext,
+    ),
+    contextSize: readPositiveInteger(
+      candidate.contextSize,
+      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.contextSize,
+    ),
+    maxTokens: readPositiveInteger(candidate.maxTokens, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.maxTokens),
     outputFormat: OUTPUT_FORMAT_SCHEMA.safeParse(candidate.outputFormat).success
       ? (candidate.outputFormat as OutputFormat)
-      : DEFAULT_CHARACTER_GENERATION_SETTINGS.outputFormat,
+      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.outputFormat,
     requestMode: REQUEST_MODE_SCHEMA.safeParse(candidate.requestMode).success
       ? (candidate.requestMode as RequestMode)
-      : DEFAULT_CHARACTER_GENERATION_SETTINGS.requestMode,
+      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.requestMode,
+  };
+}
+
+export function sanitizeCharacterGenerationPromptSettings(value: unknown): iCharacterGenerationPromptSettings {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
+  return {
     generalCharacterIdea: readString(
       candidate.generalCharacterIdea,
-      DEFAULT_CHARACTER_GENERATION_SETTINGS.generalCharacterIdea,
+      DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.generalCharacterIdea,
     ),
     fieldInstructions: readFieldInstructions(candidate.fieldInstructions),
     fieldShouldUseGeneralCharacterIdea: readFieldShouldUseGeneralCharacterIdea(
       candidate.fieldShouldUseGeneralCharacterIdea,
     ),
+  };
+}
+
+export function sanitizeCharacterGenerationSettings(value: unknown): iCharacterGenerationSettings {
+  return {
+    ...sanitizeCharacterGenerationConnectionSettings(value),
+    ...sanitizeCharacterGenerationPromptSettings(value),
   };
 }
 

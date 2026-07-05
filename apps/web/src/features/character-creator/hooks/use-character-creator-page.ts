@@ -4,6 +4,7 @@ import { toastError, toastSuccess } from '@~/components/toastifications';
 
 import { exportCharacterCardJson, exportCharacterCardPng, importCharacterCardFile } from '../lib/card-files';
 import type { CharacterTextFieldKey } from '../lib/card-schema';
+import { CHARACTER_LIBRARY_SOURCES } from '../lib/character-library';
 import {
   createStoredExampleCharacter,
   getExampleCharacterDisplayName,
@@ -11,6 +12,7 @@ import {
   toPromptExampleCharacter,
 } from '../lib/example-characters';
 import { REQUEST_MODES } from '../lib/generation-config';
+import { deleteCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import { buildExampleContextSummary, getExampleContextCharacterBudget } from '../lib/prompt-builder';
 import type { iFieldGenerationTarget } from '../lib/prompt-builder';
 import { useCharacterPortrait } from './use-character-portrait';
@@ -42,7 +44,10 @@ export function useCharacterCreatorPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   const {
+    characterLibrary,
+    activeCharacterId,
     card,
+    portraitReference,
     updateField,
     updateTags,
     addGreeting,
@@ -56,7 +61,9 @@ export function useCharacterCreatorPage() {
     addExampleCharacters,
     updateExampleCharacterIncludedFields,
     removeExampleCharacter,
-    replaceCard,
+    createCharacter,
+    selectCharacter,
+    removeCharacter,
   } = useCharacterSession();
 
   const {
@@ -73,7 +80,6 @@ export function useCharacterCreatorPage() {
     removeCustomFieldInstruction,
     removeAlternateGreetingInstruction,
     reorderAlternateGreetingInstructions,
-    clearDynamicFieldInstructions,
     connectionHealth,
     generateField,
     cancelGeneration,
@@ -82,7 +88,6 @@ export function useCharacterCreatorPage() {
   } = useGeneration();
 
   const {
-    portraitReference,
     portraitBlob,
     portraitDimensions,
     portraitObjectUrl,
@@ -213,14 +218,26 @@ export function useCharacterCreatorPage() {
     async (file: File) => {
       try {
         const importedCardFile = await importCharacterCardFile(file);
-        replaceCard(importedCardFile.card);
-        clearDynamicFieldInstructions();
+        const portrait =
+          importedCardFile.portraitBlob === null
+            ? null
+            : {
+                assetId: crypto.randomUUID(),
+                fileName: importedCardFile.fileName,
+                mimeType: importedCardFile.portraitBlob.type || 'application/octet-stream',
+                cropRect: null,
+              };
 
-        if (importedCardFile.portraitBlob) {
-          await setPortrait(importedCardFile.portraitBlob, importedCardFile.fileName);
-        } else {
-          await clearPortrait();
+        if (portrait && importedCardFile.portraitBlob) {
+          await writeCharacterAssetBlob(portrait.assetId, importedCardFile.portraitBlob);
         }
+
+        createCharacter({
+          card: importedCardFile.card,
+          portrait,
+          source:
+            importedCardFile.sourceKind === 'png' ? CHARACTER_LIBRARY_SOURCES.png : CHARACTER_LIBRARY_SOURCES.json,
+        });
 
         toastSuccess('Character imported', importedCardFile.fileName);
       } catch (error) {
@@ -229,7 +246,33 @@ export function useCharacterCreatorPage() {
         throw error;
       }
     },
-    [clearDynamicFieldInstructions, clearPortrait, replaceCard, setPortrait],
+    [createCharacter],
+  );
+
+  const handleCreateCharacter = useCallback(() => {
+    createCharacter();
+    toastSuccess('Character created', 'A fresh entry is ready in your library.');
+  }, [createCharacter]);
+
+  const handleSelectCharacter = useCallback(
+    (id: string) => {
+      selectCharacter(id);
+    },
+    [selectCharacter],
+  );
+
+  const handleRemoveCharacter = useCallback(
+    async (id: string) => {
+      const character = characterLibrary.find((item) => item.id === id);
+
+      if (character?.portrait) {
+        await deleteCharacterAssetBlob(character.portrait.assetId);
+      }
+
+      removeCharacter(id);
+      toastSuccess('Character removed', 'The library entry has been cleared from this browser.');
+    },
+    [characterLibrary, removeCharacter],
   );
 
   const handleRemoveGreeting = useCallback(
@@ -414,6 +457,8 @@ export function useCharacterCreatorPage() {
   }, [card, portraitBlob, portraitCropRect]);
 
   return {
+    characterLibrary,
+    activeCharacterId,
     card,
     data,
     updateField,
@@ -480,5 +525,8 @@ export function useCharacterCreatorPage() {
     handleImport,
     handleExportJson,
     handleExportPng,
+    handleCreateCharacter,
+    handleSelectCharacter,
+    handleRemoveCharacter,
   };
 }

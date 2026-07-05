@@ -2,32 +2,24 @@ import { atomWithStorage, createJSONStorage } from 'jotai/utils';
 
 import { localStorageApi } from '@~/db/storage';
 
-import { createEmptyCharacterCard } from '../constants/card-defaults';
-import type { CharacterCard } from '../lib/card-schema';
+import { DEFAULT_CHARACTER_LIBRARY_ITEM_ID, createEmptyCharacterLibraryItem } from '../lib/character-library';
+import type { iCharacterLibraryItem } from '../lib/character-library';
 import type { iStoredExampleCharacter } from '../lib/example-characters';
-import type { iPortraitCropRect } from '../lib/portrait-focal-point';
 
-const characterCardStorage = createJSONStorage<CharacterCard>(() => localStorageApi);
-const characterPortraitStorage = createJSONStorage<iCharacterPortraitStorageValue | null>(() => localStorageApi);
+const characterLibraryStorage = createJSONStorage<iCharacterLibraryItem[]>(() => localStorageApi);
+const activeCharacterIdStorage = createJSONStorage<string>(() => localStorageApi);
 const exampleCharactersStorage = createJSONStorage<iStoredExampleCharacter[]>(() => localStorageApi);
 
-export interface iCharacterPortraitStorageValue {
-  assetId: string;
-  fileName: string;
-  mimeType: string;
-  cropRect: iPortraitCropRect | null;
-}
-
-export const characterCardAtom = atomWithStorage<CharacterCard>(
-  'tenzo:character-creator:card',
-  createEmptyCharacterCard(),
-  characterCardStorage,
+export const characterLibraryAtom = atomWithStorage<iCharacterLibraryItem[]>(
+  'tenzo:character-creator:library',
+  [createEmptyCharacterLibraryItem()],
+  characterLibraryStorage,
 );
 
-export const characterPortraitAtom = atomWithStorage<iCharacterPortraitStorageValue | null>(
-  'tenzo:character-creator:portrait',
-  null,
-  characterPortraitStorage,
+export const activeCharacterIdAtom = atomWithStorage<string>(
+  'tenzo:character-creator:active-character-id',
+  DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
+  activeCharacterIdStorage,
 );
 
 export const exampleCharactersAtom = atomWithStorage<iStoredExampleCharacter[]>(

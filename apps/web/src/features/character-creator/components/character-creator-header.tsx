@@ -1,4 +1,4 @@
-import { LuDownload, LuFileUp } from 'react-icons/lu';
+import { LuChevronRight, LuDownload, LuFileUp } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
 import {
@@ -9,14 +9,26 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@~/components/ui/dialog';
+import { cn } from '@~/lib/utils';
 
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
+import { getCharacterLibraryItemDisplayName } from '../lib/character-library';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/example-characters';
 import { ApiSettings } from './api-settings';
 import { ExampleCharacters } from './example-characters';
 
-export function CharacterCreatorHeader() {
+export interface iCharacterCreatorHeaderProps {
+  isCharacterLibraryPanelOpen: boolean;
+  onCharacterLibraryPanelToggle: () => void;
+}
+
+export function CharacterCreatorHeader({
+  isCharacterLibraryPanelOpen,
+  onCharacterLibraryPanelToggle,
+}: iCharacterCreatorHeaderProps) {
   const {
+    characterLibrary,
+    activeCharacterId,
     generationSettings,
     apiKey,
     connectionHealth,
@@ -33,10 +45,15 @@ export function CharacterCreatorHeader() {
     openImportDialog,
     openExportDialog,
   } = useCharacterCreatorContext();
+  const activeCharacter =
+    characterLibrary.find((character) => character.id === activeCharacterId) ?? characterLibrary[0];
+  const activeCharacterLabel = activeCharacter
+    ? getCharacterLibraryItemDisplayName(activeCharacter)
+    : 'Untitled character';
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/92 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+      <div className="mx-auto flex max-w-384 flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm">
             C
@@ -44,7 +61,7 @@ export function CharacterCreatorHeader() {
           <div className="space-y-0.5">
             <p className="text-sm font-semibold">Character Card Creator</p>
             <p className="text-xs text-muted-foreground">
-              {selectedRequestModeLabel} | {generationSettings.model || 'Model not set'}
+              {activeCharacterLabel} | {selectedRequestModeLabel} | {generationSettings.model || 'Model not set'}
             </p>
             <p className="text-xs text-muted-foreground">
               Context budget: {maxExampleContextCharacters.toLocaleString()} chars
@@ -53,6 +70,21 @@ export function CharacterCreatorHeader() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-controls="character-library-panel"
+            aria-expanded={isCharacterLibraryPanelOpen}
+            aria-label={isCharacterLibraryPanelOpen ? 'Hide character library' : 'Show character library'}
+            onClick={onCharacterLibraryPanelToggle}
+          >
+            <LuChevronRight
+              className={cn('size-4 transition-transform', isCharacterLibraryPanelOpen ? 'rotate-180' : null)}
+            />
+            Library
+          </Button>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button type="button" size="sm" variant="outline">

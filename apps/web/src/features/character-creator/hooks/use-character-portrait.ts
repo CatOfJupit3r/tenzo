@@ -1,8 +1,6 @@
-import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { iCharacterPortraitStorageValue } from '../atoms/character-session.atom';
-import { characterPortraitAtom } from '../atoms/character-session.atom';
+import type { iCharacterPortraitReference } from '../lib/character-library';
 import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import {
   arePortraitCropRectsEqual,
@@ -11,10 +9,11 @@ import {
   sanitizeStoredPortraitCropRect,
 } from '../lib/portrait-focal-point';
 import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
+import { useCharacterSession } from './use-character-session';
 
 function sanitizePortraitReference(
-  portraitReference: iCharacterPortraitStorageValue | null,
-): iCharacterPortraitStorageValue | null {
+  portraitReference: iCharacterPortraitReference | null,
+): iCharacterPortraitReference | null {
   if (!portraitReference) {
     return null;
   }
@@ -31,7 +30,7 @@ function sanitizePortraitReference(
 }
 
 export function useCharacterPortrait() {
-  const [storedPortraitReference, setPortraitReference] = useAtom(characterPortraitAtom);
+  const { portraitReference: storedPortraitReference, setActiveCharacterPortrait } = useCharacterSession();
   const [portraitBlob, setPortraitBlob] = useState<Blob | null>(null);
   const [portraitObjectUrl, setPortraitObjectUrl] = useState<string | null>(null);
   const [portraitDimensions, setPortraitDimensions] = useState<iPortraitDimensions | null>(null);
@@ -48,8 +47,8 @@ export function useCharacterPortrait() {
       return;
     }
 
-    setPortraitReference(portraitReference);
-  }, [portraitReference, setPortraitReference, storedPortraitReference]);
+    setActiveCharacterPortrait(portraitReference);
+  }, [portraitReference, setActiveCharacterPortrait, storedPortraitReference]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -77,7 +76,7 @@ export function useCharacterPortrait() {
 
         if (!blob) {
           loadedPortraitAssetIdRef.current = null;
-          setPortraitReference(null);
+          setActiveCharacterPortrait(null);
           setPortraitBlob(null);
           setPortraitDimensions(null);
           return;
@@ -92,7 +91,7 @@ export function useCharacterPortrait() {
         }
 
         loadedPortraitAssetIdRef.current = null;
-        setPortraitReference(null);
+        setActiveCharacterPortrait(null);
         setPortraitBlob(null);
         setPortraitDimensions(null);
       })
@@ -105,7 +104,7 @@ export function useCharacterPortrait() {
     return () => {
       isCancelled = true;
     };
-  }, [portraitAssetId, portraitBlob, setPortraitReference]);
+  }, [portraitAssetId, portraitBlob, setActiveCharacterPortrait]);
 
   useEffect(() => {
     if (!portraitBlob) {
@@ -163,11 +162,11 @@ export function useCharacterPortrait() {
       return;
     }
 
-    setPortraitReference({
+    setActiveCharacterPortrait({
       ...portraitReference,
       cropRect: portraitCropRect,
     });
-  }, [portraitCropRect, portraitReference, setPortraitReference]);
+  }, [portraitCropRect, portraitReference, setActiveCharacterPortrait]);
 
   const setPortrait = useCallback(
     async (blob: Blob, fileName: string, cropRect: iPortraitCropRect | null = null) => {
@@ -181,7 +180,7 @@ export function useCharacterPortrait() {
         await deleteCharacterAssetBlob(portraitReference.assetId);
       }
 
-      setPortraitReference({
+      setActiveCharacterPortrait({
         assetId,
         fileName,
         mimeType: blob.type || 'application/octet-stream',
@@ -191,7 +190,7 @@ export function useCharacterPortrait() {
       setPortraitBlob(blob);
       setPortraitDimensions(dimensions);
     },
-    [portraitReference, setPortraitReference],
+    [portraitReference, setActiveCharacterPortrait],
   );
 
   const updatePortraitCropRect = useCallback(
@@ -205,12 +204,12 @@ export function useCharacterPortrait() {
         return;
       }
 
-      setPortraitReference({
+      setActiveCharacterPortrait({
         ...portraitReference,
         cropRect: nextCropRect,
       });
     },
-    [portraitDimensions, portraitReference, setPortraitReference],
+    [portraitDimensions, portraitReference, setActiveCharacterPortrait],
   );
 
   const clearPortrait = useCallback(async () => {
@@ -218,11 +217,11 @@ export function useCharacterPortrait() {
       await deleteCharacterAssetBlob(portraitReference.assetId);
     }
 
-    setPortraitReference(null);
+    setActiveCharacterPortrait(null);
     loadedPortraitAssetIdRef.current = null;
     setPortraitBlob(null);
     setPortraitDimensions(null);
-  }, [portraitReference, setPortraitReference]);
+  }, [portraitReference, setActiveCharacterPortrait]);
 
   return {
     portraitReference,

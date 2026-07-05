@@ -4,20 +4,17 @@ applyTo: '**/*.ts'
 
 ## Guidelines, Structure, and Purpose
 - This file outlines the overall workspace structure, development guidelines, and key conventions for contributors to the monorepo
-- The repo is a moonrepo monorepo managed with pnpm (packageManager pinned at 10.0.0) and Docker-backed MongoDB; `pnpm run dev` boots both the API (http://localhost:3000) and web app (http://localhost:3001).
-- Backend code uses TypeScript + Hono + oRPC on top of MongoDB via Mongoose; shared contracts live in packages/shared and drive both REST/OpenAPI and RPC layers.
-- Frontend code is React 19 with Vite, TanStack Router/Query/Form, Tailwind, Sonner, and the Better Auth client; shared types come from packages/shared.
-- Quality gates run locally via `pnpm run check-types`, `pnpm run lint`, and `pnpm run prettier`; Husky hooks (installed by `pnpm run prepare`) enforce these before commits.
-- Follow the workspace workflow: open an issue, branch as `<issue>-<slug>`, commit with `git cz` (or `pnpm commit`), keep Docker running for seeded Mongo, and avoid rebases on main.
-- Make sure to see `.github/skills/` for detailed guides on specific tasks like contract creation, error handling, testing, and frontend patterns.
+- The repo is a pnpm workspace (packageManager pinned at 10.0.0); `pnpm run dev` boots the TanStack Start web app in `apps/web`.
+- Product code lives in `apps/web` and targets a standalone character card creator built with React 19, TanStack Start, TanStack Router/Query/Form, Tailwind, Jotai, and Zod.
+- Quality gates run locally via `pnpm run check-types`, `pnpm run lint`, and `pnpm run prettify`; Husky hooks (installed by `pnpm run prepare`) enforce these before commits.
+- Follow the workspace workflow: open an issue, branch as `<issue>-<slug>`, commit with `git cz` (or `pnpm commit`), and avoid rebases on main.
+- Make sure to see `.github/skills/` for detailed guides on frontend patterns and workflow tasks that still apply to the web app.
 - Avoid creating summarizatiion `.md` docs of your changes if not asked directly.
 
 ### Monorepo Layout Highlights
-- `apps/server`: API entry (`src/index.ts`), oRPC context/auth (`src/lib`), routers, loaders, and Mongoose models (`src/db`).
-- `apps/web`: Vite app bootstrapped in `src/main.tsx`, TanStack Router tree, UI components, query hooks, and auth services.
-- `packages/shared`: Source of truth for oRPC contracts (`src/contract`), exported via `CONTRACT` and consumed on both server and client.
+- `apps/web`: TanStack Start app bootstrapped in `src/main.tsx`, with routes, shared UI components, and feature folders.
 - `docs`: Product requirements, risks, roadmap, and other high-level references.
-- `mongo`: Local MongoDB volume used by docker-compose.dev.yml (avoid committing changes here).
+- `inspo`: reference specs, example cards, and prior implementation material used by the roadmap.
 
 ### Code Style and Conventions
 - Follow standard TypeScript conventions with strict typing, `async/await`, and modular design. Avoid using `enum`, prefer `as const` objects.
@@ -30,7 +27,7 @@ applyTo: '**/*.ts'
   export const USER_ROLES = userRolesSchema.enum;
   export type UserRole = z.infer<typeof userRolesSchema>;
   ```
-- If your variable is reused across server and client, define it in `packages/shared/src/constants` and import it from `@startername/shared/constants`. Only do this for non-sensitive data.
+- If a variable is reused across multiple web features, define it in `apps/web/src/constants` and import it from there instead of duplicating literals.
 - When resolving warnings or errors, prefer addressing the root cause instead of using `// @ts-ignore` or `as unknown as <Type>`. Use these only as a last resort with a comment explaining why.
 - If you encounter eslint warnings, run `pnpm run lint` to fix them in the file.
 - When referencing values, that have enum, ALWAYS use the enum itself instead of hardcoding strings. Example:
@@ -59,31 +56,26 @@ applyTo: '**/*.ts'
 - use conventional commit messages.
 
 ### Environment and Configuration
-- Copy `.env.example` to `.env` in `apps/server` and `apps/web`; server validates configuration with `zod` in `src/constants/env.ts`.
-- The Better Auth server is mounted under `/auth/*` and expects HTTPS cookies (`sameSite: 'none'`, `secure: true`); keep this in mind when testing locally.
-- Aliases: `@~/` resolves to `apps/server/src` or `apps/web/src` depending on the package; `@startername/shared` surfaces shared types.
-- MongoDB runs at `mongodb://localhost:6060/startername` by default; adjust via env vars and update docker-compose if ports change.
+- Aliases: `@~/` resolves to `apps/web/src` inside the web package.
 - Node.js v24 is required; use nvm or similar to manage Node versions.
 - pnpm ≥10.0.0 is the package manager; use `corepack enable` to activate it.
 
 ### Structure and Patterns
 
-Our repository is organized to promote clarity, maintainability, and scalability. We use a feature-based structure for both backend and frontend code, ensuring that related files are grouped together.
+The repository is organized around a feature-based frontend structure so character-creator code can stay local and easy to reason about.
 
-#### Contracts
+#### Feature Layout
 
-Shared API contracts:
+Primary product work lives under:
 ```
-packages/shared/src/contract/*.contract.ts
+apps/web/src/features/character-creator/
 ```
 
-#### Legacy / Global
+Supporting shared UI and route shells live under:
 
 ```
-Models: apps/server/src/db/models/*.model.ts
-Routers: apps/server/src/routers/*.router.ts
-Error Handling: apps/server/src/lib/orpc-error-wrapper.ts
-Error Codes: packages/shared/src/enums/errors.ts
+apps/web/src/components/
+apps/web/src/routes/
 ```
 
 #### Tests
@@ -92,11 +84,11 @@ Mirror the feature structure:
 
 ```
 apps/<workspace>/test/
-  ├── features/<feature>/<feature>.service.test.ts
+  ├── features/<feature>/
   ├── integration/
   └── utils/
 ```
 
 ### Product Context
 
-TODO: Replace this with actual product documentation later.
+See `docs/roadmaps/active/character-card-creator.roadmap.md` for the current source of truth.

@@ -23,7 +23,6 @@ export default defineConfig(({ mode }) => {
   const processEnv = loadEnv(mode, process.cwd());
 
   const VITE_CONFIG_SCHEMA = z.object({
-    VITE_SERVER_URL: z.string(),
     VITE_HOST: z.string().default('localhost'),
     VITE_PORT: z.coerce.number().default(3030),
   });
@@ -54,15 +53,6 @@ export default defineConfig(({ mode }) => {
     server: {
       host: env.VITE_HOST,
       port: env.VITE_PORT,
-      proxy: {
-        '/api': {
-          // keep this in-sync with SSR helpers as during SSR vite proxy is not recognized
-          target: env.VITE_SERVER_URL,
-          changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/api/, ''),
-          // configure: configureProxy,
-        },
-      },
     },
   };
 });

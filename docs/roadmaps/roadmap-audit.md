@@ -1,5 +1,7 @@
 # Roadmap Audit
 
+Repository scope: single-product TanStack Start app in `apps/web`; backend/shared placeholder scaffolding removed in Phase 0.
+
 ## Active Roadmaps
 
 | Slug | Title | Status | Priority | Last Updated |

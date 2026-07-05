@@ -254,29 +254,28 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 
 **Purpose:** Delete the unused `apps/server` backend, `packages/shared` contract package, and the placeholder `apps/web` features so the repo's real scope matches the character creator, before any character-creator code is added. Doing this first (not last) means Phases 1+ are never written against, or accidentally coupled to, code that is about to be deleted.
 **Scope:**
-- [ ] Delete `apps/server` entirely (Hono/oRPC/Mongoose/tsyringe/Better Auth backend, its tests, its Dockerfile if any)
-- [ ] Delete `packages/shared` entirely (oRPC contracts, shared constants/enums/helpers)
-- [ ] Delete `apps/web/src/features/{achievements,badges,user,auth,dev-tools}`
-- [ ] Delete their routes: `apps/web/src/routes/_auth_only.tsx`, `apps/web/src/routes/_auth_only/*`, `apps/web/src/routes/(general)/_to_dashboard.*`
-- [ ] Replace `apps/web/src/routes/index.tsx` — it is the starter-template landing page (dashboard/profile links, health-check/metrics widgets tied to `apps/server`), not a page to keep. Either delete it in Phase 0 (leaving the route empty until Phase 1 builds the real page) or replace its content directly with the character creator in Phase 1 — see Phase 1 note.
-- [ ] Delete `apps/web/src/hooks/queries/use-health-check.ts` and `use-metrics.ts` (call `apps/server` endpoints that no longer exist)
-- [ ] Delete `apps/web/src/utils/orpc.ts` and `apps/web/src/utils/tanstack-orpc.ts`, and the `router.tsx` context wiring that passes `tanstackRPC` (replace with just `queryClient` in router context)
-- [ ] Remove `@startername/shared`, `@orpc/*`, `axios`, `better-auth` from `apps/web/package.json` (re-check each against actual remaining usage before removing — don't remove a dep still used by a kept file)
-- [ ] Remove `mongo`, `valkey` services from `docker-compose.dev.yml`; delete `docker-compose.dev.yml` if nothing else needs it; delete `mongo/init-mongo.js` and the `mongo/` directory
-- [ ] Delete `patches/better-auth.patch` and its `pnpm-workspace.yaml` `patchedDependencies` entry
-- [ ] Update `.moon/workspace.yml` to remove the `server` and `shared` project entries
-- [ ] Update root `package.json` scripts: remove `dev:server`, `build:deps` (or repoint if something else needs `shared:build`), and simplify `dev` if it no longer needs `docker compose up` (re-check once AI proxy needs, if any, are confirmed to need no local service)
-- [ ] Update `.github/workflows/pull-request.yml` and `copilot-setup-steps.yml` to drop any MongoDB/server setup steps
-- [ ] Update `apps/web/moon.yml` to drop `dependsOn: ['shared']` and the `shared:build` deps on `build`/`check-types`/`lint`
-- [ ] Grep the repo for `@startername/shared`, `apps/server`, `orpc`, `tanstackRPC` after deletion to confirm no dangling imports remain
+- [x] Delete `apps/server` entirely (Hono/oRPC/Mongoose/tsyringe/Better Auth backend, its tests, its Dockerfile if any)
+- [x] Delete `packages/shared` entirely (oRPC contracts, shared constants/enums/helpers)
+- [x] Delete `apps/web/src/features/{achievements,badges,user,auth,dev-tools}`
+- [x] Delete their routes: `apps/web/src/routes/_auth_only.tsx`, `apps/web/src/routes/_auth_only/*`, `apps/web/src/routes/(general)/_to_dashboard.*`
+- [x] Replace `apps/web/src/routes/index.tsx` — it is the starter-template landing page (dashboard/profile links, health-check/metrics widgets tied to `apps/server`), not a page to keep. Either delete it in Phase 0 (leaving the route empty until Phase 1 builds the real page) or replace its content directly with the character creator in Phase 1 — see Phase 1 note.
+- [x] Delete `apps/web/src/hooks/queries/use-health-check.ts` and `use-metrics.ts` (call `apps/server` endpoints that no longer exist)
+- [x] Delete `apps/web/src/utils/orpc.ts` and `apps/web/src/utils/tanstack-orpc.ts`, and the `router.tsx` context wiring that passes `tanstackRPC` (replace with just `queryClient` in router context)
+- [x] Remove `@startername/shared`, `@orpc/*`, `axios`, `better-auth` from `apps/web/package.json` (re-check each against actual remaining usage before removing — don't remove a dep still used by a kept file)
+- [x] Remove `mongo`, `valkey` services from `docker-compose.dev.yml`; delete `docker-compose.dev.yml` if nothing else needs it; delete `mongo/init-mongo.js` and the `mongo/` directory
+- [x] Delete `patches/better-auth.patch` and its `pnpm-workspace.yaml` `patchedDependencies` entry
+- [x] Remove moonrepo configuration (`.moon/`, `*/moon.yml`, `@moonrepo/cli`) and replace root scripts with direct `pnpm --dir apps/web ...` commands
+- [x] Update root `package.json` scripts: remove `dev:server`, `build:deps`, and moon-based orchestration; keep direct web app commands only
+- [x] Update `.github/workflows/pull-request.yml` and `copilot-setup-steps.yml` to drop any MongoDB/server setup steps
+- [x] Grep the repo for `@startername/shared`, `apps/server`, `orpc`, `tanstackRPC`, and `moon` after deletion to confirm no dangling imports or tooling references remain
 
 **Exit criteria:**
-- [ ] `apps/server` and `packages/shared` directories no longer exist
-- [ ] `pnpm install` succeeds with no dangling workspace references
-- [ ] `pnpm run check-types`, `pnpm run lint`, and `pnpm run build` succeed for the (now single) `apps/web` project
-- [ ] `apps/web` has no imports from `@startername/shared` or any removed feature
-- [ ] Root README and `docs/roadmaps/roadmap-audit.md` no longer describe a multi-app / backend architecture
-- [ ] `docker-compose.dev.yml` either no longer exists or starts nothing the app needs to run
+- [x] `apps/server` and `packages/shared` directories no longer exist
+- [x] `pnpm install` succeeds with no dangling workspace references
+- [x] `pnpm run check-types`, `pnpm run lint`, and `pnpm run build` succeed for the (now single) `apps/web` project
+- [x] `apps/web` has no imports from `@startername/shared` or any removed feature
+- [x] Root README and `docs/roadmaps/roadmap-audit.md` no longer describe a multi-app / backend architecture
+- [x] `docker-compose.dev.yml` either no longer exists or starts nothing the app needs to run
 
 **Must not start until:**
 - Nothing — this is the first phase and blocks all others.
@@ -454,7 +453,7 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 | Risk | Impact | Mitigation | Owner |
 | ---- | ------ | ---------- | ----- |
 | Deleting `apps/server`/`packages/shared` removes something still needed (e.g. a dependency another kept file relies on) | Broken build after Phase 0 | Grep for `@startername/shared`, `apps/server`, `orpc` imports after deletion before proceeding to Phase 1; run full `check-types`/`lint`/`build` as Phase 0 exit criteria | Dev |
-| CI workflows or scripts reference removed projects (moon `server`/`shared`, docker mongo step) | CI fails after merge | Explicit Phase 0 scope items for `.moon/workspace.yml`, root `package.json`, and `.github/workflows/*` | Dev |
+| CI workflows or scripts reference removed projects or removed moon orchestration | CI fails after merge | Explicit Phase 0 scope items for root `package.json` and `.github/workflows/*`; run build/lint/typecheck without moon before merge | Dev |
 | PNG library doesn't work client-side | Cannot export embedded PNGs | Libraries are small and browser-compatible; fallback to JSON-only export | Dev |
 | Streaming through TanStack Start server function proxy is fiddly (SSE passthrough, buffering) | Degraded generation UX | Prototype the streaming proxy early in Phase 3; fall back to non-streaming proxy with spinner if blocked | Dev |
 | API keys stored in localStorage are insecure | Key theft via XSS | Warn users; suggest using local/proxy endpoints; consider session-only storage option | Dev |
@@ -538,3 +537,4 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 | 2026-07-05 | Created roadmap. |
 | 2026-07-05 | Audit pass: added extensions-preservation requirements (spec MUST), chara/ccv3 chunk-replacement behavior, hybrid V1+V2 export decision, output-format parsing, IndexedDB for binary storage, CORS proxy as default path, deferrals for revise sessions and prompt presets. |
 | 2026-07-05 | Added Phase 0 (remove `apps/server`, `packages/shared`, and placeholder `apps/web` features — confirmed placeholders with no real product). Character creator becomes the root route. Updated goals, non-goals, current repo state, rollout, risks, and decisions accordingly. |
+| 2026-07-05 | Removed moonrepo orchestration in favor of direct pnpm workspace scripts and updated CI/docs to match the web-only repo. |

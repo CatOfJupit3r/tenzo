@@ -1,20 +1,19 @@
 /**
- * Shared lint-staged configuration for startername monorepo
+ * Shared lint-staged configuration for monorepo
  *
  * This configuration runs linting and formatting on staged files before commit.
  * It's optimized for a monorepo structure with TypeScript/JavaScript files.
- *
- * @param {string} workspace - The moon workspace name (e.g., 'server', 'web', 'shared')
  */
 module.exports = (workspace) => ({
   '*.{ts,tsx}': [
-    'eslint --fix',
+    // Run via the workspace package so ESLint's flat config resolves relative to apps/${workspace}
+    `pnpm --filter=${workspace} exec eslint --fix --no-warn-ignored`,
     'prettier --write',
-    // Type check via moon for the specific workspace
-    () => `pnpm exec moon run ${workspace}:check-types`,
+    // Type check via pnpm for the specific workspace
+    () => `pnpm --filter=${workspace} run check-types`,
   ],
 
-  '*.{js,jsx}': ['eslint --fix', 'prettier --write'],
+  '*.{js,jsx}': [`pnpm --filter=${workspace} exec eslint --fix --no-warn-ignored`, 'prettier --write'],
 
   '*.{json,yaml,yml,md}': ['prettier --write'],
 });

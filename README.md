@@ -1,39 +1,28 @@
-# Ultimate Starter
-
-This starter is designed for me by me with all the shiny new things! (as of now)
-
-To finish setup, run `Replace All` to replace `startername` with name of your project.
-Also, make sure to customize `.github/instructions/copilot-instructions.md` with description of you project
-so that agentic tools work efficiently.
+# Character Card Creator
 
 ## Project Overview
 
-- **Contract-first development.** API endpoints start as shared `zod` schemas in `packages/shared`, ensuring server and client stay type-safe.
-- **Real-time challenge lifecycle.** Hono-based routes expose public and authenticated procedures, backed by MongoDB via Typegoose models.
-- **Typed React client.** The web app consumes the generated oRPC client, TanStack Router, and Query utilities for fully typed data interactions.
-- **Developer-focused tooling.** Node.js 24, pnpm, moonrepo, and Husky hooks enable quick local feedback loops and consistent commits.
+- **Single-product repo.** The repository now centers on a standalone character card creator in `apps/web`.
+- **Client-first architecture.** Character editing, persistence, import, and export live in the browser.
+- **TanStack Start foundation.** React 19, TanStack Router/Query/Form, Tailwind CSS 4, and Jotai power the app shell.
+- **Developer-focused tooling.** Node.js 24, pnpm workspaces, and Husky hooks keep local feedback loops fast.
 
 ## Tech Stack
 
-- **Runtime & Tooling:** Node.js 24, pnpm, moonrepo, Commitizen, Husky
-- **Backend:** TypeScript, Hono, oRPC, Typegoose/Mongoose, Better Auth, Zod, Vitest
-- **Frontend:** React 19, Vite, TanStack Stack/Query/Form, Tailwind CSS, Vitest
-- **Shared Contracts:** `@startername/shared` with oRPC + OpenAPI generation
+- **Runtime & Tooling:** Node.js 24, pnpm, Commitizen, Husky
+- **App:** React 19, Vite, TanStack Start, TanStack Router/Query/Form, Tailwind CSS, Jotai, Zod, Vitest
 
 ## Repository Structure
 
-- `apps/server` – Node.js + Hono API, oRPC routers, Typegoose models, Better Auth setup
-- `apps/web` – React 19 client, TanStack Router tree, authentication flows, Tailwind config
-- `packages/shared` – Contract definitions, shared types, and schema exports
+- `apps/web` – character card creator application
+- `configs` – shared ESLint and Prettier config packages
 - `docs` – Product requirements, roadmap, risk registers, and supporting documentation
-- `mongo` – Docker-managed MongoDB volume (keep uncommitted)
-- `.moon/` – moonrepo configuration files
-- `tsconfig*.json` – TypeScript project references
+- `inspo` – reference implementations, example cards, and spec material
+- `tsconfig*.json` – TypeScript configuration
 
 ## Prerequisites
 
 - Git ≥ 2.40
-- Docker Desktop (required for the MongoDB container)
 - Node.js **exactly** v24 (use nvm or similar)
 - pnpm ≥ 10.0.0
 
@@ -65,24 +54,21 @@ npm install -g pnpm@10
 ## Getting Started
 
 ```bash
-git clone https://github.com/CatOfJupit3r/startername.git
-cd startername
+git clone https://github.com/CatOfJupit3r/tenzo.git
+cd tenzo
 pnpm install
 ```
 
-1. Copy environment templates: duplicate `.env.example` to `.env` in both `apps/server` and `apps/web`.
-2. Start Docker Desktop so MongoDB can launch.
-3. Boot everything with `pnpm run dev`:
-    - Web client: `http://localhost:3030`
-    - API + Better Auth: `http://localhost:5050`
-    - MongoDB starts via `docker compose -f docker-compose.dev.yml up -d`
+1. Start the app with `pnpm run dev`.
+2. Open `http://localhost:3030`.
 
 ## Workspace Commands
 
-- `pnpm run dev` – start API, web app, and MongoDB
-- `pnpm run check-types` – TypeScript project references (server + shared)
+- `pnpm run dev` – start the web app
+- `pnpm run build` – build the web app
+- `pnpm run check-types` – run TypeScript checks
 - `pnpm run lint` – ESLint across the monorepo
-- `pnpm run prettier` – formatting audit (no write)
+- `pnpm run prettify` – formatting audit (no write)
 - `pnpm run prepare` – reinstall Husky hooks if they go missing
 - `pnpm test` – run all tests with Vitest
 
@@ -102,13 +88,12 @@ pnpm install
    ```
 - Typical fixes:
    - Missing deps: `pnpm install`
-   - Formatting issues: `pnpm run prettier` then re-stage
+   - Formatting issues: `pnpm run prettify` then re-stage
    - Lint errors: `pnpm run lint`
    - Type errors: `pnpm run check-types`
 
 ## Tips & Conventions
 
-- Keep `pnpm run dev` active regularly to refresh seeded Mongo data.
 - Avoid rebasing on `main`; prefer merging.
-- Use the shared contract utilities (`tanstackRPC` helpers, shared schemas) instead of duplicating types or query keys.
-- When extending the API, register new routes in `apps/server/src/routers/index.ts` and add error codes to `apps/server/src/enums/errors.ts`.
+- Keep implementation work aligned with [docs/roadmaps/active/character-card-creator.roadmap.md](d:\Coding\tenzo\docs\roadmaps\active\character-card-creator.roadmap.md).
+- Prefer feature-local types and utilities inside `apps/web/src/features/character-creator` as the roadmap phases land.

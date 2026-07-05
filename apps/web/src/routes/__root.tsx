@@ -12,21 +12,18 @@ import Header from '@~/components/header';
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';
 import { ThemeProvider } from '@~/components/themes/theme-provider';
 import ToasterContainer from '@~/components/toastifications/toaster-container';
-import { meQueryOptions } from '@~/features/user';
 import { seo } from '@~/utils/seo';
-import type { tanstackRPC } from '@~/utils/tanstack-orpc';
 
 import appCss from '../index.css?url';
 
 export interface iRouterAppContext {
-  tanstackRPC: typeof tanstackRPC;
   queryClient: QueryClient;
 }
 
 export const Route = createRootRouteWithContext<iRouterAppContext>()({
-  loader: async ({ context }) => {
+  loader: async () => {
     // keep this sucker here to make sure there are no hydration errors
-    const [, initialTheme] = await Promise.all([context.queryClient.ensureQueryData(meQueryOptions), getStoredTheme()]);
+    const initialTheme = await getStoredTheme();
     return { initialTheme };
   },
   component: RootComponent,
@@ -40,8 +37,8 @@ export const Route = createRootRouteWithContext<iRouterAppContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       ...seo({
-        title: 'startername',
-        description: 'startername is a web application',
+        title: 'Character Card Creator',
+        description: 'Standalone character card creation with import, export, and AI-assisted workflows.',
         image: '/social-preview.png',
       }),
     ],

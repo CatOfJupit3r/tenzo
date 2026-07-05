@@ -1,3 +1,0 @@
-/// <reference types="./globals" />
-
-export {};

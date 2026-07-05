@@ -1,5 +1,3 @@
-import { isDefinedError } from '@orpc/client';
-import type { ORPCErrorCode, ORPCError } from '@orpc/client';
 import { toast } from 'react-toastify';
 
 import type { iInfoToastData } from './custom-jsx-toasts';
@@ -60,10 +58,9 @@ export const toastORPCError = (title: string, error: unknown, options?: CustomTo
 
   if (typeof error === 'string') {
     message = error;
-  } else if (isDefinedError(error)) {
-    message = (error as ORPCError<ORPCErrorCode, unknown>).message;
   } else {
-    message = (error as Error)?.message ?? message;
+    const maybeError = error as { message?: string; cause?: { message?: string } } | null;
+    message = maybeError?.cause?.message ?? maybeError?.message ?? message;
   }
 
   toastError(title, message, options);

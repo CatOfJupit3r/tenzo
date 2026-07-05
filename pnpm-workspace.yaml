@@ -31,5 +31,3 @@ catalog:
   '@typescript/native-preview': 7.0.0-dev.20251231.1
 onlyBuiltDependencies:
   - '@swc/core'
-patchedDependencies:
-  better-auth: patches/better-auth.patch

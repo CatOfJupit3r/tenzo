@@ -7,7 +7,6 @@ import { NotFound } from './components/not-found';
 import PseudoPage from './components/pseudo-page';
 import { INTERVALS } from './constants/dates';
 import { routeTree } from './routeTree.gen';
-import { tanstackRPC } from './utils/tanstack-orpc';
 
 export const getRouter = () => {
   const queryClient = new QueryClient({
@@ -31,7 +30,7 @@ export const getRouter = () => {
     scrollRestoration: true,
     defaultPreload: 'intent',
     defaultPreloadStaleTime: 0,
-    context: { tanstackRPC, queryClient },
+    context: { queryClient },
     defaultPendingComponent: PseudoPage,
     defaultNotFoundComponent: NotFound,
     defaultErrorComponent: ErrorBoundary,

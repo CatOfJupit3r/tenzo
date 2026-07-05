@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 export interface iOptionType {
   label: string;
   value: string;
-  icon?: ReactNode | Nil;
+  icon?: ReactNode | null | undefined;
   description?: ReactNode;
   meta?: ReactNode;
 }

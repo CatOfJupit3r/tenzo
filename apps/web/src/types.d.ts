@@ -1,3 +1,3 @@
-/// <reference types="@startername/shared/globals" />
+/// <reference types="vite/client" />
 
 export {};

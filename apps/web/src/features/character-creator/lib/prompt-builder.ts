@@ -12,7 +12,7 @@ export interface iGenerationMessage {
 }
 
 export interface iPromptExampleCharacter {
-  name: string;
+  name?: string;
   description?: string;
   personality?: string;
   scenario?: string;
@@ -170,21 +170,89 @@ function buildExistingFieldsSection(card: CharacterCard, target: iFieldGeneratio
   return ['Current card context:', formatBulletList(lines)].join('\n');
 }
 
-function buildExamplesSection(exampleCharacters: iPromptExampleCharacter[]) {
+export const MAX_EXAMPLE_CONTEXT_CHARACTERS = 6_000;
+
+export interface iExampleContextSummary {
+  section: string;
+  totalCharacters: number;
+  usedCharacters: number;
+  omittedCharacters: number;
+  isTruncated: boolean;
+}
+
+export function buildExampleContextSummary(
+  exampleCharacters: iPromptExampleCharacter[],
+  maxCharacters = MAX_EXAMPLE_CONTEXT_CHARACTERS,
+): iExampleContextSummary {
   const nonEmptyExamples = exampleCharacters
     .map((exampleCharacter) => formatCharacterSnapshot(exampleCharacter))
     .filter((snapshot) => snapshot.length > 0);
 
   if (nonEmptyExamples.length === 0) {
-    return '';
+    return {
+      section: '',
+      totalCharacters: 0,
+      usedCharacters: 0,
+      omittedCharacters: 0,
+      isTruncated: false,
+    };
   }
 
-  return [
+  const exampleBlocks = nonEmptyExamples.map((snapshotLines, index) => ({
+    heading: `Example ${index + 1}:`,
+    snapshotLines,
+  }));
+
+  const fullSection = [
     'Reference characters:',
-    ...nonEmptyExamples.map((snapshotLines, index) =>
-      [`Example ${index + 1}:`, formatBulletList(snapshotLines)].join('\n'),
-    ),
+    ...exampleBlocks.map((block) => [block.heading, formatBulletList(block.snapshotLines)].join('\n')),
   ].join('\n\n');
+
+  if (fullSection.length <= maxCharacters) {
+    return {
+      section: fullSection,
+      totalCharacters: fullSection.length,
+      usedCharacters: fullSection.length,
+      omittedCharacters: 0,
+      isTruncated: false,
+    };
+  }
+
+  let truncatedSection = 'Reference characters:';
+
+  for (const [index, block] of exampleBlocks.entries()) {
+    const includedLines: string[] = [];
+
+    for (const snapshotLine of block.snapshotLines) {
+      const candidateLines = [...includedLines, snapshotLine];
+      const candidateBlock = [`Example ${index + 1}:`, formatBulletList(candidateLines)].join('\n');
+      const candidateSection = [truncatedSection, candidateBlock].join('\n\n');
+
+      if (candidateSection.length > maxCharacters) {
+        return {
+          section: truncatedSection,
+          totalCharacters: fullSection.length,
+          usedCharacters: truncatedSection.length,
+          omittedCharacters: fullSection.length - truncatedSection.length,
+          isTruncated: true,
+        };
+      }
+
+      includedLines.push(snapshotLine);
+    }
+
+    truncatedSection = [truncatedSection, [`Example ${index + 1}:`, formatBulletList(includedLines)].join('\n')].join(
+      '\n\n',
+    );
+  }
+
+  return {
+    section: truncatedSection,
+    totalCharacters: fullSection.length,
+    usedCharacters: truncatedSection.length,
+    omittedCharacters: fullSection.length - truncatedSection.length,
+    isTruncated: true,
+  };
 }
 
 function resolveOverride(overrideValue: string, fallbackValue: string) {
@@ -224,16 +292,20 @@ export function buildGenerationMessages({
     card.data.post_history_instructions,
     DEFAULT_POST_HISTORY_INSTRUCTIONS,
   );
+  const exampleContextSummary = buildExampleContextSummary(exampleCharacters);
 
   const sections = [
     buildExistingFieldsSection(card, target),
-    buildExamplesSection(exampleCharacters),
+    exampleContextSummary.section,
     [
       `Your task is to write the "${target.label}" field for a SillyTavern V2 character card.`,
       target.value.trim()
         ? `The current ${target.label} value is provided in the context above. Improve or continue it only when the request context implies that.`
         : `The current ${target.label} value is empty. Create it from scratch based on the available card context.`,
       'Keep the result consistent with the rest of the card.',
+      exampleContextSummary.isTruncated
+        ? `Reference example content was truncated to stay within the ${MAX_EXAMPLE_CONTEXT_CHARACTERS}-character context budget. Use only the included reference details.`
+        : '',
       userInstructions.trim() ? `Field-specific instructions: ${userInstructions.trim()}` : '',
       getFormatInstructions(outputFormat),
     ]

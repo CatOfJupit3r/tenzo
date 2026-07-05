@@ -363,17 +363,17 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 
 **Purpose:** Allow users to upload reference characters that inform AI generation.
 **Scope:**
-- [ ] Implement example character import (reuse import logic from Phase 2)
-- [ ] Implement example character list UI (show name, allow remove)
-- [ ] Integrate examples into prompt builder (include relevant fields as context)
-- [ ] Allow user to select which example fields to include in context
-- [ ] Limit context size (token counting or character counting with warning)
+- [x] Implement example character import (reuse import logic from Phase 2)
+- [x] Implement example character list UI (show name, allow remove)
+- [x] Integrate examples into prompt builder (include relevant fields as context)
+- [x] Allow user to select which example fields to include in context
+- [x] Limit context size (token counting or character counting with warning)
 
 **Exit criteria:**
-- [ ] User can load 1-5 example characters
-- [ ] Examples appear in generation prompts
+- [x] User can load 1-5 example characters
+- [x] Examples appear in generation prompts
 - [ ] Generation quality noticeably improves with good examples
-- [ ] Context overflow is handled (truncation with warning)
+- [x] Context overflow is handled (truncation with warning)
 
 **Can run in parallel:**
 - Can start after Phase 3 prompt builder exists

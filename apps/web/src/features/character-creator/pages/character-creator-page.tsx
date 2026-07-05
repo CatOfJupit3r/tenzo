@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { LuDownload, LuFileUp } from 'react-icons/lu';
 
 import { toastError, toastSuccess } from '@~/components/toastifications';
@@ -9,6 +9,7 @@ import { AlternateGreetings } from '../components/alternate-greetings';
 import { ApiSettings } from '../components/api-settings';
 import { CharacterField } from '../components/character-field';
 import { CustomFields } from '../components/custom-fields';
+import { ExampleCharacters } from '../components/example-characters';
 import { ExportDialog } from '../components/export-dialog';
 import { ImageUpload } from '../components/image-upload';
 import { ImportDialog } from '../components/import-dialog';
@@ -19,6 +20,13 @@ import { useCharacterSession } from '../hooks/use-character-session';
 import { useGeneration } from '../hooks/use-generation';
 import { exportCharacterCardJson, exportCharacterCardPng, importCharacterCardFile } from '../lib/card-files';
 import type { CharacterTextFieldKey } from '../lib/card-schema';
+import {
+  createStoredExampleCharacter,
+  getExampleCharacterDisplayName,
+  MAX_EXAMPLE_CHARACTER_COUNT,
+  toPromptExampleCharacter,
+} from '../lib/example-characters';
+import { buildExampleContextSummary } from '../lib/prompt-builder';
 import type { iFieldGenerationTarget } from '../lib/prompt-builder';
 
 function isAbortError(error: unknown) {
@@ -48,6 +56,10 @@ export function CharacterCreatorPage() {
     addCustomField,
     updateCustomField,
     removeCustomField,
+    exampleCharacters,
+    addExampleCharacters,
+    updateExampleCharacterIncludedFields,
+    removeExampleCharacter,
     replaceCard,
   } = useCharacterSession();
   const {
@@ -69,6 +81,14 @@ export function CharacterCreatorPage() {
     useCharacterPortrait();
 
   const { data } = card;
+  const promptExampleCharacters = useMemo(
+    () => exampleCharacters.map((exampleCharacter) => toPromptExampleCharacter(exampleCharacter)),
+    [exampleCharacters],
+  );
+  const exampleContextSummary = useMemo(
+    () => buildExampleContextSummary(promptExampleCharacters),
+    [promptExampleCharacters],
+  );
 
   const runGeneration = useCallback(
     async (target: iFieldGenerationTarget, onValueChange: (value: string) => unknown, isContinuation = false) => {
@@ -78,6 +98,7 @@ export function CharacterCreatorPage() {
           target,
           onValueChange,
           isContinuation,
+          exampleCharacters: promptExampleCharacters,
         });
       } catch (error) {
         if (isAbortError(error)) {
@@ -88,7 +109,7 @@ export function CharacterCreatorPage() {
         toastError('Generation failed', message);
       }
     },
-    [card, generateField],
+    [card, generateField, promptExampleCharacters],
   );
 
   const handlePortraitSelect = useCallback(
@@ -144,6 +165,58 @@ export function CharacterCreatorPage() {
       removeCustomFieldInstruction(id);
     },
     [removeCustomField, removeCustomFieldInstruction],
+  );
+
+  const handleImportExampleFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) {
+        return;
+      }
+
+      const availableSlots = MAX_EXAMPLE_CHARACTER_COUNT - exampleCharacters.length;
+
+      if (availableSlots <= 0) {
+        toastError('Example limit reached', `Remove an example before importing another.`);
+        return;
+      }
+
+      const importedExamples = [];
+      const failedImports: string[] = [];
+
+      for (const file of files.slice(0, availableSlots)) {
+        try {
+          const importedCardFile = await importCharacterCardFile(file);
+          importedExamples.push(createStoredExampleCharacter(importedCardFile));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Import failed.';
+          failedImports.push(`${file.name}: ${message}`);
+        }
+      }
+
+      if (importedExamples.length > 0) {
+        addExampleCharacters(importedExamples);
+        const firstImportedName = getExampleCharacterDisplayName(importedExamples[0]);
+
+        toastSuccess(
+          'Reference characters imported',
+          importedExamples.length === 1
+            ? `${firstImportedName} is ready for generation context.`
+            : `${importedExamples.length} examples are ready for generation context.`,
+        );
+      }
+
+      if (files.length > availableSlots) {
+        toastError(
+          'Example limit reached',
+          `Only ${availableSlots} of ${files.length} selected files were imported. The session supports up to ${MAX_EXAMPLE_CHARACTER_COUNT} examples.`,
+        );
+      }
+
+      if (failedImports.length > 0) {
+        toastError('Some examples were skipped', failedImports.join(' | '));
+      }
+    },
+    [addExampleCharacters, exampleCharacters.length],
   );
 
   const greetingGenerationStates = data.alternate_greetings.map((_, index) => {
@@ -235,6 +308,22 @@ export function CharacterCreatorPage() {
             apiKey={apiKey}
             onApiKeyChange={updateApiKey}
             onSettingsChange={updateGenerationSettings}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Reference Examples</CardTitle>
+          <CardDescription>Import 1-5 character cards and choose which fields feed AI generation.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ExampleCharacters
+            exampleCharacters={exampleCharacters}
+            contextSummary={exampleContextSummary}
+            onImportFiles={handleImportExampleFiles}
+            onRemove={removeExampleCharacter}
+            onIncludedFieldKeysChange={updateExampleCharacterIncludedFields}
           />
         </CardContent>
       </Card>

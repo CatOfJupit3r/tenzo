@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import { OUTPUT_FORMATS } from './generation-config';
-import { buildGenerationMessages } from './prompt-builder';
+import { buildExampleContextSummary, buildGenerationMessages } from './prompt-builder';
 
 describe('prompt-builder', () => {
   it('includes current card context, custom fields, and field instructions', () => {
@@ -52,5 +52,50 @@ describe('prompt-builder', () => {
     expect(messages[0]?.content).toContain('expert character card writing assistant');
     expect(messages[0]?.content).toContain('Suffix instructions.');
     expect(messages[2]?.content).toBe('Trailing reminder.');
+  });
+
+  it('includes example character context and filters it when over the character budget', () => {
+    const summary = buildExampleContextSummary(
+      [
+        {
+          name: 'Guide One',
+          description: 'Compact reference.',
+        },
+        {
+          name: 'Guide Two',
+          description: 'x'.repeat(120),
+        },
+      ],
+      90,
+    );
+
+    expect(summary.section).toContain('Reference characters:');
+    expect(summary.section).toContain('Example 1:');
+    expect(summary.section).not.toContain('Guide Two');
+    expect(summary.isTruncated).toBe(true);
+    expect(summary.usedCharacters).toBeLessThan(summary.totalCharacters);
+  });
+
+  it('adds a truncation warning when reference examples overflow the prompt budget', () => {
+    const card = createEmptyCharacterCard();
+
+    const messages = buildGenerationMessages({
+      card,
+      target: {
+        key: 'field:description',
+        label: 'Description',
+        value: '',
+        kind: 'field',
+      },
+      outputFormat: OUTPUT_FORMATS.none,
+      exampleCharacters: [
+        {
+          name: 'Dense Example',
+          description: 'y'.repeat(7_500),
+        },
+      ],
+    });
+
+    expect(messages[1]?.content).toContain('Reference example content was truncated');
   });
 });

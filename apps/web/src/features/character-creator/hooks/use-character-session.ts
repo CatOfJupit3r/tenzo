@@ -1,12 +1,15 @@
 import { useAtom } from 'jotai';
 import { useCallback } from 'react';
 
-import { characterCardAtom } from '../atoms/character-session.atom';
+import { characterCardAtom, exampleCharactersAtom } from '../atoms/character-session.atom';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import type { CharacterCard, CharacterTextFieldKey, CustomField } from '../lib/card-schema';
+import { sanitizeExampleCharacterIncludedFieldKeys } from '../lib/example-characters';
+import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/example-characters';
 
 export function useCharacterSession() {
   const [card, setCard] = useAtom(characterCardAtom);
+  const [exampleCharacters, setExampleCharacters] = useAtom(exampleCharactersAtom);
 
   const updateField = useCallback(
     (key: CharacterTextFieldKey, value: string) => {
@@ -117,6 +120,36 @@ export function useCharacterSession() {
     [setCard],
   );
 
+  const addExampleCharacters = useCallback(
+    (nextExampleCharacters: iStoredExampleCharacter[]) => {
+      setExampleCharacters((prev) => [...prev, ...nextExampleCharacters]);
+    },
+    [setExampleCharacters],
+  );
+
+  const updateExampleCharacterIncludedFields = useCallback(
+    (id: string, includedFieldKeys: ExampleCharacterContextFieldKey[]) => {
+      setExampleCharacters((prev) =>
+        prev.map((exampleCharacter) =>
+          exampleCharacter.id === id
+            ? {
+                ...exampleCharacter,
+                includedFieldKeys: sanitizeExampleCharacterIncludedFieldKeys(includedFieldKeys),
+              }
+            : exampleCharacter,
+        ),
+      );
+    },
+    [setExampleCharacters],
+  );
+
+  const removeExampleCharacter = useCallback(
+    (id: string) => {
+      setExampleCharacters((prev) => prev.filter((exampleCharacter) => exampleCharacter.id !== id));
+    },
+    [setExampleCharacters],
+  );
+
   const replaceCard = useCallback(
     (nextCard: CharacterCard) => {
       setCard(nextCard);
@@ -130,6 +163,7 @@ export function useCharacterSession() {
 
   return {
     card,
+    exampleCharacters,
     updateField,
     updateTags,
     addGreeting,
@@ -139,6 +173,9 @@ export function useCharacterSession() {
     addCustomField,
     updateCustomField,
     removeCustomField,
+    addExampleCharacters,
+    updateExampleCharacterIncludedFields,
+    removeExampleCharacter,
     replaceCard,
     resetCard,
   };

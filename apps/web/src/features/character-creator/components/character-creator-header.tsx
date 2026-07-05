@@ -16,6 +16,7 @@ import { getCharacterLibraryItemDisplayName } from '../lib/character-library';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/example-characters';
 import { ApiSettings } from './api-settings';
 import { ExampleCharacters } from './example-characters';
+import { TokenStats } from './token-stats';
 
 export interface iCharacterCreatorHeaderProps {
   isCharacterLibraryPanelOpen: boolean;
@@ -27,6 +28,7 @@ export function CharacterCreatorHeader({
   onCharacterLibraryPanelToggle,
 }: iCharacterCreatorHeaderProps) {
   const {
+    data,
     characterLibrary,
     activeCharacterId,
     generationSettings,
@@ -66,6 +68,7 @@ export function CharacterCreatorHeader({
             <p className="text-xs text-muted-foreground">
               Context budget: {maxExampleContextCharacters.toLocaleString()} chars
             </p>
+            <TokenStats data={data} />
           </div>
         </div>
 

@@ -75,7 +75,7 @@ export function ImageUpload({
   } else if (isPortraitReady) {
     portraitContent = (
       <div className="space-y-4">
-        <div className="overflow-hidden rounded-[20px] border bg-black/95 shadow-sm">
+        <div className="group overflow-hidden rounded-[20px] border bg-black/95 shadow-sm">
           <PortraitPreviewSurface
             alt={portraitFileName ?? 'Selected portrait preview'}
             className="w-full"
@@ -84,24 +84,21 @@ export function ImageUpload({
             portraitUrl={portraitUrl}
             style={{ aspectRatio: SILLY_TAVERN_PORTRAIT_ASPECT_RATIO }}
           />
-        </div>
-
-        <div className="rounded-2xl border bg-muted/20 p-4">
-          <p className="text-xs font-medium tracking-[0.24em] text-muted-foreground uppercase">Portrait Ready</p>
-          <p className="mt-2 text-sm font-medium">{portraitFileName ?? 'Portrait image selected.'}</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The exported PNG keeps this 2:3 crop, and avatar previews derive from the same framing.
-          </p>
+          <div className="absolute inset-0 flex w-full items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <Button type="button" variant="outline" onClick={() => setIsEditorOpen(true)}>
+              <LuFocus className="size-4" />
+            </Button>
+            <Button variant="outline">
+              <LuRefreshCw className="size-4" />
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleClear}>
+              <LuTrash2 className="size-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline">
-                <LuFocus className="size-4" />
-                Edit focal point & previews
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
               <DialogHeader>
                 <DialogTitle>Portrait & previews</DialogTitle>
@@ -126,22 +123,6 @@ export function ImageUpload({
               </div>
             </DialogContent>
           </Dialog>
-
-          <Button asChild variant="outline">
-            <label htmlFor={portraitFileInputId}>
-              <LuRefreshCw className="size-4" />
-              Replace portrait
-            </label>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={handleClear}
-          >
-            <LuTrash2 className="size-4" />
-            Clear portrait
-          </Button>
         </div>
       </div>
     );

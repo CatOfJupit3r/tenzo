@@ -350,6 +350,9 @@ export function CharacterCreatorPage() {
               <p className="text-xs text-muted-foreground">
                 {selectedRequestModeLabel} | {generationSettings.model || 'Model not set'}
               </p>
+              <p className="text-xs text-muted-foreground">
+                Context budget: {maxExampleContextCharacters.toLocaleString()} chars
+              </p>
             </div>
           </div>
 
@@ -357,7 +360,7 @@ export function CharacterCreatorPage() {
             <Dialog>
               <DialogTrigger asChild>
                 <Button type="button" size="sm" variant="outline">
-                  Reference Examples
+                  Reference Examples {exampleCharacters.length}/{MAX_EXAMPLE_CHARACTER_COUNT}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
@@ -415,29 +418,12 @@ export function CharacterCreatorPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 pt-8 pb-16 sm:px-6 lg:px-8">
-        <div className="space-y-3 pb-8">
-          <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
-            <span className="rounded-full border bg-background/80 px-3 py-1">
-              {hasLoadedExamples
-                ? `${exampleCharacters.length} reference examples loaded`
-                : 'No reference examples loaded'}
-            </span>
-            <span className="rounded-full border bg-background/80 px-3 py-1">
-              Context budget: {maxExampleContextCharacters.toLocaleString()} chars
-            </span>
-          </div>
-        </div>
-
+      <div className="mx-auto max-w-7xl px-4 pt-2 pb-16 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+          <div className="space-y-6 lg:sticky lg:self-start">
             <Card className="gap-4 bg-card/95 shadow-sm">
               <CardHeader>
                 <CardTitle>Portrait</CardTitle>
-                <CardDescription>
-                  Upload PNG, JPG, or WebP. Reframe the 2:3 export crop and preview avatar surfaces without leaving the
-                  page.
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <ImageUpload
@@ -494,7 +480,7 @@ export function CharacterCreatorPage() {
 
           <Tabs defaultValue={CHARACTER_CREATOR_TABS.core} className="gap-4">
             <Card className="gap-0 overflow-hidden bg-card/95 py-0 shadow-sm">
-              <div className="border-b px-4 py-4 sm:px-6">
+              <div className="border-b p-4 sm:px-6">
                 <TabsList className="h-auto w-full flex-wrap justify-start gap-2 rounded-none bg-transparent p-0 text-foreground">
                   <TabsTrigger
                     value={CHARACTER_CREATOR_TABS.core}

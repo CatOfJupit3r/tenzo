@@ -127,11 +127,11 @@ The project lives entirely in `apps/web` leveraging TanStack Start server functi
 **Current behavior:** Only available via ST extension with ST running
 **Target behavior:** Enter API key, select model, click generate on any field with optional user instructions
 **Acceptance criteria:**
-- [ ] User can configure API endpoint and key (stored locally, never sent to our server)
-- [ ] Each field has a "Generate" button that calls the LLM
-- [ ] User can provide per-field instructions/prompts to guide generation
-- [ ] Generation uses other filled fields as context
-- [ ] Streaming response display
+- [x] User can configure API endpoint and key (stored locally, never sent to our server)
+- [x] Each field has a "Generate" button that calls the LLM
+- [x] User can provide per-field instructions/prompts to guide generation
+- [x] Generation uses other filled fields as context
+- [x] Streaming response display
 
 ### UC3: Provide Example Characters for AI Context
 
@@ -151,9 +151,9 @@ The project lives entirely in `apps/web` leveraging TanStack Start server functi
 **Current behavior:** Not supported in most tools
 **Target behavior:** User can add named custom fields, optionally include them in AI context, export them in `extensions` object
 **Acceptance criteria:**
-- [ ] "Add Field" button creates a named custom field
-- [ ] Custom fields support AI generation
-- [ ] Custom fields are exported under `data.extensions.custom_fields` in the JSON
+- [x] "Add Field" button creates a named custom field
+- [x] Custom fields support AI generation
+- [x] Custom fields are exported under `data.extensions.custom_fields` in the JSON
 
 ### UC5: Image Upload and PNG Export
 
@@ -337,24 +337,24 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 
 **Purpose:** Add AI-assisted content generation for each character field.
 **Scope:**
-- [ ] Implement API settings panel (endpoint URL, API key, model name, max tokens)
-- [ ] Store API settings in localStorage (keys encrypted or at minimum not plaintext — warn user about security)
-- [ ] Implement OpenAI-compatible chat completions client (`api-client.ts`)
-- [ ] Implement prompt builder that assembles context from filled fields + custom fields + user instructions + examples (port the structure of as-extension's `DEFAULT_TASK_DESCRIPTION` / `DEFAULT_EXISTING_FIELDS_DEFINITION` templates; the "character card writing guide" system prompt in `constants.ts` is a proven default worth reusing)
-- [ ] Implement output-format modes (`xml` / `json` / `none`) and a response parser that unwraps `<response>` tags or `{"response": ...}` JSON, strips preamble/code fences (port of as-extension `parsers.ts`) — smaller models fail without a structured format
-- [ ] Implement per-field generation with streaming response display
-- [ ] Implement "Continue" action (append to existing content)
-- [ ] Support generating individual alternate greetings, not just core fields
-- [ ] Implement per-field user instructions (small textarea above each field)
-- [ ] Handle errors gracefully (network, auth, rate limit) + cancel button for in-flight generation
-- [ ] Implement TanStack Start server function as CORS proxy with streaming passthrough (expect this to be the DEFAULT path for major providers — api.openai.com and most first-party APIs do not send CORS headers for browser calls; direct browser fetch works mainly for OpenRouter and local endpoints)
+- [x] Implement API settings panel (endpoint URL, API key, model name, max tokens)
+- [x] Store API settings in localStorage (keys encrypted or at minimum not plaintext — warn user about security)
+- [x] Implement OpenAI-compatible chat completions client (`api-client.ts`)
+- [x] Implement prompt builder that assembles context from filled fields + custom fields + user instructions + examples (port the structure of as-extension's `DEFAULT_TASK_DESCRIPTION` / `DEFAULT_EXISTING_FIELDS_DEFINITION` templates; the "character card writing guide" system prompt in `constants.ts` is a proven default worth reusing)
+- [x] Implement output-format modes (`xml` / `json` / `none`) and a response parser that unwraps `<response>` tags or `{"response": ...}` JSON, strips preamble/code fences (port of as-extension `parsers.ts`) — smaller models fail without a structured format
+- [x] Implement per-field generation with streaming response display
+- [x] Implement "Continue" action (append to existing content)
+- [x] Support generating individual alternate greetings, not just core fields
+- [x] Implement per-field user instructions (small textarea above each field)
+- [x] Handle errors gracefully (network, auth, rate limit) + cancel button for in-flight generation
+- [x] Implement TanStack Start server function as CORS proxy with streaming passthrough (expect this to be the DEFAULT path for major providers — api.openai.com and most first-party APIs do not send CORS headers for browser calls; direct browser fetch works mainly for OpenRouter and local endpoints)
 
 **Exit criteria:**
-- [ ] User can generate content for any field using their own API key
-- [ ] Streaming text appears progressively in the field
-- [ ] Generated content respects context from other filled fields
-- [ ] Per-field instructions modify generation output
-- [ ] Error states are displayed clearly
+- [x] User can generate content for any field using their own API key
+- [x] Streaming text appears progressively in the field
+- [x] Generated content respects context from other filled fields
+- [x] Per-field instructions modify generation output
+- [x] Error states are displayed clearly
 
 **Must not start until:**
 - Phase 1 is complete (need fields to generate into)
@@ -402,20 +402,62 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 **Must not start until:**
 - Phases 1-4 core functionality is complete
 
+---
+
+### Future Expansion (not required for roadmap completion)
+
+The phases below are post-core expansion. They are NOT part of the archive criteria — this roadmap can be archived with these not started, provided they are either split into a follow-up roadmap or their deferral rationale in §14 still stands.
+
+### Phase 6: Revise Sessions (chat-based iterative editing)
+
+**Purpose:** Port as-extension's highest-value differentiator: a chat with the LLM that proposes structured edits to a single field or the whole card, which the user reviews and applies. This is conversational refinement ("make her colder, less verbose") on top of the one-shot generate/continue workflow.
+**Scope:**
+- [ ] Adopt a chat SDK for this phase instead of extending the hand-rolled client — evaluate Vercel AI SDK (`ai` v7 + `@ai-sdk/react` `useChat` + `@ai-sdk/openai-compatible`, has a dedicated TanStack Start guide) vs TanStack AI (`@tanstack/ai` + `@tanstack/ai-react`, Start-native but beta); see §14 decision
+- [ ] Chat panel UI: per-field session ("revise Personality") or whole-card session, with message history
+- [ ] Structured edit responses: model returns proposed field values in a strict schema (port `revise-prompt-builder.ts` / `DEFAULT_REVISE_JSON_PROMPT` from as-extension); reuse the Phase 3 response parser's fallback behavior for non-compliant models
+- [ ] Compare/apply flow: diff view of current vs proposed field values (as-extension's `CompareFieldPopup`/`CompareStatePopup`), apply per-field or all
+- [ ] Session persistence: revise chat history stored alongside the card session (localStorage/TanStack DB), cleared on new card
+- [ ] Reuse the existing bring-your-own-key settings (endpoint/key/model) and streaming proxy path from Phase 3
+
+**Exit criteria:**
+- [ ] User can open a revise session on a field, request a change conversationally, see a diff, and apply it
+- [ ] Whole-card revise sessions can modify multiple fields in one exchange
+- [ ] Rejecting a proposal leaves the card untouched
+- [ ] Works against the same endpoints as Phase 3 generation (OpenRouter, local models, first-party via proxy)
+
+**Must not start until:**
+- Phases 3-4 are complete and verified (revise builds on the prompt builder, parser, proxy, and example-context infrastructure)
+
+### Phase 7: Prompt Template Presets
+
+**Purpose:** Expose the Phase 3 hardcoded prompt templates (task description, context template, format instructions, revise prompts) as user-editable, saveable presets — as-extension's power-user customization layer.
+**Scope:**
+- [ ] Preset CRUD UI (create/rename/duplicate/delete, default preset)
+- [ ] Editable templates with variable documentation (`{{targetField}}`, `{{userInstructions}}`, etc.)
+- [ ] Preset persistence in localStorage/TanStack DB; include presets in a settings export/import
+- [ ] "Reset to default" per template
+
+**Exit criteria:**
+- [ ] User can fork the default preset, edit a template, and see it affect generation output
+- [ ] Malformed templates fail gracefully (validation before save, fallback to default at runtime)
+
+**Must not start until:**
+- Phase 3 templates are stable (churn in defaults would invalidate user forks)
+
 ## 10. Acceptance Criteria
 
 ### Product Behavior
 - [ ] User can create a V2 character card from scratch
 - [ ] User can import and edit existing cards (PNG and JSON)
 - [ ] User can export cards as PNG with embedded JSON and as standalone JSON
-- [ ] AI generation works with any OpenAI-compatible endpoint
+- [x] AI generation works with any OpenAI-compatible endpoint
 - [ ] Example characters improve generation quality
-- [ ] Custom fields are preserved in export
+- [x] Custom fields are preserved in export
 
 ### UI/UX
 - [ ] All V2 spec fields are editable
 - [ ] Image upload and preview works
-- [ ] Generation streaming is visible
+- [x] Generation streaming is visible
 - [ ] State persists across page reloads
 - [ ] Keyboard navigable
 
@@ -423,7 +465,7 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 - [ ] Zod schema validates correct V2 cards and rejects malformed ones (validate against all cards in `inspo/characters/`)
 - [ ] PNG embed/extract roundtrip produces identical JSON
 - [ ] Unknown `extensions` keys survive import/export round-trip
-- [ ] Response parser handles wrapped (`xml`/`json`) and raw outputs, including malformed model responses
+- [x] Response parser handles wrapped (`xml`/`json`) and raw outputs, including malformed model responses
 - [ ] Import handles V1, V2, and malformed cards gracefully
 - [ ] Export produces SillyTavern-importable files
 
@@ -501,17 +543,24 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 
 ### Deferral: Revise sessions (chat-based iterative editing)
 
-**Status:** deferred
+**Status:** deferred (now scoped as future-expansion Phase 6)
 **Date:** 2026-07-05
 **Rationale:** as-extension's biggest differentiator beyond per-field generate is its "revise session" — a chat with the LLM that proposes structured edits to a field or the whole card, with compare/diff popups (`ReviseSessionChat.tsx`, `revise-prompt-builder.ts`). It is high-value but a large feature; per-field generate + continue + instructions covers the core workflow first.
-**Effect on roadmap:** Not in Phases 1-5. Candidate for a follow-up roadmap once core generation ships.
+**Effect on roadmap:** Scoped as Phase 6 under Future Expansion in §9 — excluded from core completion and archive criteria.
 
 ### Deferral: User-editable prompt templates / presets
 
-**Status:** deferred
+**Status:** deferred (now scoped as future-expansion Phase 7)
 **Date:** 2026-07-05
 **Rationale:** as-extension exposes every prompt template (task description, context template, format instructions) as editable presets. Power-user feature; ship with good hardcoded defaults (ported from as-extension `constants.ts`) first.
-**Effect on roadmap:** Phase 3 uses hardcoded defaults; keep prompts in `constants/default-prompts.ts` so exposing them later is cheap.
+**Effect on roadmap:** Phase 3 uses hardcoded defaults; keep prompts in `constants/default-prompts.ts` so exposing them later is cheap. Scoped as Phase 7 under Future Expansion in §9.
+
+### Decision: Hand-rolled OpenAI-compatible client for core generation; adopt a chat SDK only for Phase 6
+
+**Status:** accepted (SDK choice itself deferred to Phase 6 start)
+**Date:** 2026-07-05
+**Rationale:** Phase 3's needs (one-shot per-field completion, bring-your-own endpoint/key/model, SSE streaming through a `createServerFn` proxy) are already implemented in ~4 small files (`api-client.ts`, `chat-completions-proxy.ts`, `response-parser.ts`, `prompt-builder.ts`); an SDK would replace working code without removing any risk. Chat-shaped revise sessions (Phase 6) are a different story — message state, streaming chat UI, and structured tool-style outputs are exactly what chat SDKs provide. Candidates evaluated 2026-07-05: **Vercel AI SDK** (`ai` v7, mature, `@ai-sdk/openai-compatible` supports runtime `baseURL`/`apiKey`, `useChat` in `@ai-sdk/react`, dedicated TanStack Start guide) and **TanStack AI** (`@tanstack/ai` + `@tanstack/ai-react`, Start-native `toServerSentEventsResponse` pattern and `@tanstack/ai-openai/compatible` adapter, but currently beta with fast release churn). Current lean: AI SDK for maturity; re-evaluate TanStack AI's stability when Phase 6 starts, since it fits the repo's TanStack-everything direction.
+**Effect on roadmap:** No SDK dependency in Phases 1-5. Phase 6 scope includes the SDK evaluation as its first item.
 
 ### Deferral: CharacterBook full editor
 
@@ -540,3 +589,5 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 | 2026-07-05 | Removed moonrepo orchestration in favor of direct pnpm workspace scripts and updated CI/docs to match the web-only repo. |
 | 2026-07-05 | Phase 1 complete: `character-creator` feature scaffolded under `apps/web/src/features/character-creator/` with a zod V2 card schema, Jotai + localStorage session state, and manual editors for all core/prompt-override/metadata fields, alternate greetings (add/remove/reorder), and custom fields. Root route (`/`) now renders the editor. |
 | 2026-07-05 | Phase 2 implementation landed: PNG/JSON import-export, portrait upload + IndexedDB persistence, V1/V2/hybrid normalization, chunk replacement logic, drag-and-drop import, and regression tests covering `main_fire-keeper_spec_v2.png`. |
+| 2026-07-05 | Phase 3 implementation landed: local generation settings, OpenAI-compatible browser/proxy streaming requests, per-field instructions plus generate/continue/cancel controls for core fields, alternate greetings, and custom fields, along with prompt/parser regression tests. |
+| 2026-07-05 | Added Future Expansion phases: Phase 6 (chat-based revise sessions) and Phase 7 (prompt template presets), both excluded from core completion. Recorded SDK decision: keep the hand-rolled OpenAI-compatible client for Phases 1-5; evaluate Vercel AI SDK vs TanStack AI when Phase 6 starts. |

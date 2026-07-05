@@ -4,15 +4,39 @@ import { LuChevronDown, LuChevronUp, LuPlus, LuTrash2 } from 'react-icons/lu';
 import { Button } from '@~/components/ui/button';
 import { Textarea } from '@~/components/ui/textarea';
 
+import { FieldGenerationControls } from './field-generation-controls';
+
+interface iAlternateGreetingGenerationState {
+  instructionValue: string;
+  errorMessage?: string | null;
+  isGenerating: boolean;
+}
+
 export interface iAlternateGreetingsProps {
   greetings: string[];
+  generationStates: iAlternateGreetingGenerationState[];
   onAdd: () => void;
   onChange: (index: number, value: string) => void;
   onRemove: (index: number) => void;
   onMove: (fromIndex: number, toIndex: number) => void;
+  onInstructionChange: (index: number, value: string) => void;
+  onGenerate: (index: number) => void;
+  onContinue: (index: number) => void;
+  onCancel: (index: number) => void;
 }
 
-export function AlternateGreetings({ greetings, onAdd, onChange, onRemove, onMove }: iAlternateGreetingsProps) {
+export function AlternateGreetings({
+  greetings,
+  generationStates,
+  onAdd,
+  onChange,
+  onRemove,
+  onMove,
+  onInstructionChange,
+  onGenerate,
+  onContinue,
+  onCancel,
+}: iAlternateGreetingsProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -29,7 +53,55 @@ export function AlternateGreetings({ greetings, onAdd, onChange, onRemove, onMov
         <div className="space-y-3">
           {greetings.map((greeting, index) => (
             // eslint-disable-next-line react/no-array-index-key
-            <div key={index} className="flex gap-2 rounded-md border p-3">
+            <div key={index} className="space-y-3 rounded-md border p-3">
+              <div className="flex items-start justify-between gap-3">
+                <span className="text-sm font-medium">Greeting {index + 1}</span>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={index === 0}
+                    tooltip="Move up"
+                    onClick={() => onMove(index, index - 1)}
+                  >
+                    <LuChevronUp className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={index === greetings.length - 1}
+                    tooltip="Move down"
+                    onClick={() => onMove(index, index + 1)}
+                  >
+                    <LuChevronDown className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    tooltip="Remove greeting"
+                    onClick={() => onRemove(index)}
+                  >
+                    <LuTrash2 className="size-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <FieldGenerationControls
+                fieldId={`alternate-greeting-${index}`}
+                label={`Alternate Greeting ${index + 1}`}
+                instructionValue={generationStates[index]?.instructionValue ?? ''}
+                errorMessage={generationStates[index]?.errorMessage ?? null}
+                hasExistingValue={greeting.trim().length > 0}
+                isGenerating={generationStates[index]?.isGenerating ?? false}
+                onInstructionChange={(value) => onInstructionChange(index, value)}
+                onGenerate={() => onGenerate(index)}
+                onContinue={() => onContinue(index)}
+                onCancel={() => onCancel(index)}
+              />
+
               <Textarea
                 aria-label={`Alternate greeting ${index + 1}`}
                 value={greeting}
@@ -37,37 +109,6 @@ export function AlternateGreetings({ greetings, onAdd, onChange, onRemove, onMov
                 className="flex-1"
                 onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(index, event.target.value)}
               />
-              <div className="flex flex-col gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === 0}
-                  tooltip="Move up"
-                  onClick={() => onMove(index, index - 1)}
-                >
-                  <LuChevronUp className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === greetings.length - 1}
-                  tooltip="Move down"
-                  onClick={() => onMove(index, index + 1)}
-                >
-                  <LuChevronDown className="size-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  tooltip="Remove greeting"
-                  onClick={() => onRemove(index)}
-                >
-                  <LuTrash2 className="size-4" />
-                </Button>
-              </div>
             </div>
           ))}
         </div>

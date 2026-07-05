@@ -3,9 +3,10 @@ import { LuDownload, LuFileUp } from 'react-icons/lu';
 
 import { toastError, toastSuccess } from '@~/components/toastifications';
 import { Button } from '@~/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@~/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@~/components/ui/card';
 
 import { AlternateGreetings } from '../components/alternate-greetings';
+import { ApiSettings } from '../components/api-settings';
 import { CharacterField } from '../components/character-field';
 import { CustomFields } from '../components/custom-fields';
 import { ExportDialog } from '../components/export-dialog';
@@ -15,7 +16,23 @@ import { TagsInput } from '../components/tags-input';
 import { CORE_FIELD_CONFIGS, METADATA_FIELD_CONFIGS, PROMPT_OVERRIDE_FIELD_CONFIGS } from '../constants/field-config';
 import { useCharacterPortrait } from '../hooks/use-character-portrait';
 import { useCharacterSession } from '../hooks/use-character-session';
+import { useGeneration } from '../hooks/use-generation';
 import { exportCharacterCardJson, exportCharacterCardPng, importCharacterCardFile } from '../lib/card-files';
+import type { CharacterTextFieldKey } from '../lib/card-schema';
+import type { iFieldGenerationTarget } from '../lib/prompt-builder';
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function createStandardFieldTarget(key: CharacterTextFieldKey, label: string, value: string): iFieldGenerationTarget {
+  return {
+    key: `field:${key}`,
+    label,
+    value,
+    kind: 'field',
+  };
+}
 
 export function CharacterCreatorPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -33,10 +50,46 @@ export function CharacterCreatorPage() {
     removeCustomField,
     replaceCard,
   } = useCharacterSession();
+  const {
+    generationSettings,
+    apiKey,
+    updateApiKey,
+    updateGenerationSettings,
+    getFieldInstruction,
+    updateFieldInstruction,
+    removeCustomFieldInstruction,
+    removeAlternateGreetingInstruction,
+    reorderAlternateGreetingInstructions,
+    clearDynamicFieldInstructions,
+    generateField,
+    cancelGeneration,
+    getFieldRuntime,
+  } = useGeneration();
   const { portraitReference, portraitBlob, portraitObjectUrl, isHydratingPortrait, setPortrait, clearPortrait } =
     useCharacterPortrait();
 
   const { data } = card;
+
+  const runGeneration = useCallback(
+    async (target: iFieldGenerationTarget, onValueChange: (value: string) => unknown, isContinuation = false) => {
+      try {
+        await generateField({
+          card,
+          target,
+          onValueChange,
+          isContinuation,
+        });
+      } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : 'The model request failed.';
+        toastError('Generation failed', message);
+      }
+    },
+    [card, generateField],
+  );
 
   const handlePortraitSelect = useCallback(
     async (file: File) => {
@@ -51,6 +104,7 @@ export function CharacterCreatorPage() {
       try {
         const importedCardFile = await importCharacterCardFile(file);
         replaceCard(importedCardFile.card);
+        clearDynamicFieldInstructions();
 
         if (importedCardFile.portraitBlob) {
           await setPortrait(importedCardFile.portraitBlob, importedCardFile.fileName);
@@ -65,7 +119,58 @@ export function CharacterCreatorPage() {
         throw error;
       }
     },
-    [clearPortrait, replaceCard, setPortrait],
+    [clearDynamicFieldInstructions, clearPortrait, replaceCard, setPortrait],
+  );
+
+  const handleRemoveGreeting = useCallback(
+    (index: number) => {
+      removeGreeting(index);
+      removeAlternateGreetingInstruction(index);
+    },
+    [removeAlternateGreetingInstruction, removeGreeting],
+  );
+
+  const handleReorderGreetings = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      reorderGreetings(fromIndex, toIndex);
+      reorderAlternateGreetingInstructions(fromIndex, toIndex);
+    },
+    [reorderAlternateGreetingInstructions, reorderGreetings],
+  );
+
+  const handleRemoveCustomField = useCallback(
+    (id: string) => {
+      removeCustomField(id);
+      removeCustomFieldInstruction(id);
+    },
+    [removeCustomField, removeCustomFieldInstruction],
+  );
+
+  const greetingGenerationStates = data.alternate_greetings.map((_, index) => {
+    const fieldKey = `alternate_greetings:${index}`;
+    const runtime = getFieldRuntime(fieldKey);
+
+    return {
+      instructionValue: getFieldInstruction(fieldKey),
+      errorMessage: runtime.errorMessage,
+      isGenerating: runtime.isGenerating,
+    };
+  });
+
+  const customFieldGenerationStates = Object.fromEntries(
+    data.extensions.custom_fields.map((field) => {
+      const fieldKey = `custom:${field.id}`;
+      const runtime = getFieldRuntime(fieldKey);
+
+      return [
+        field.id,
+        {
+          instructionValue: getFieldInstruction(fieldKey),
+          errorMessage: runtime.errorMessage,
+          isGenerating: runtime.isGenerating,
+        },
+      ];
+    }),
   );
 
   const handleExportJson = useCallback(async () => {
@@ -100,13 +205,11 @@ export function CharacterCreatorPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex-1 space-y-4">
           <p className="text-sm font-medium tracking-[0.3em] text-muted-foreground uppercase">Character Card Creator</p>
-          <CharacterField
-            fieldId="character-name"
-            label="Name"
-            value={data.name}
-            rows={1}
-            onValueChange={(value) => updateField('name', value)}
-          />
+          <h1 className="text-3xl font-semibold tracking-tight">Build and generate V2 character cards</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Configure your endpoint once, then generate, continue, or manually edit each field with full local
+            persistence.
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -120,6 +223,21 @@ export function CharacterCreatorPage() {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Generation Settings</CardTitle>
+          <CardDescription>OpenAI-compatible chat completions with optional proxy streaming.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ApiSettings
+            generationSettings={generationSettings}
+            apiKey={apiKey}
+            onApiKeyChange={updateApiKey}
+            onSettingsChange={updateGenerationSettings}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent>
@@ -143,7 +261,24 @@ export function CharacterCreatorPage() {
             label="Name"
             value={data.name}
             rows={1}
+            instructionValue={getFieldInstruction('field:name')}
+            generationErrorMessage={getFieldRuntime('field:name').errorMessage}
+            isGenerating={getFieldRuntime('field:name').isGenerating}
             onValueChange={(value) => updateField('name', value)}
+            onInstructionChange={(value) => updateFieldInstruction('field:name', value)}
+            onGenerate={() => {
+              runGeneration(createStandardFieldTarget('name', 'Name', data.name), (value) =>
+                updateField('name', value),
+              ).catch(() => undefined);
+            }}
+            onContinue={() => {
+              runGeneration(
+                createStandardFieldTarget('name', 'Name', data.name),
+                (value) => updateField('name', value),
+                true,
+              ).catch(() => undefined);
+            }}
+            onCancel={() => cancelGeneration('field:name')}
           />
         </CardContent>
       </Card>
@@ -161,7 +296,24 @@ export function CharacterCreatorPage() {
               value={data[config.key]}
               rows={config.rows}
               hint={config.hint}
+              instructionValue={getFieldInstruction(`field:${config.key}`)}
+              generationErrorMessage={getFieldRuntime(`field:${config.key}`).errorMessage}
+              isGenerating={getFieldRuntime(`field:${config.key}`).isGenerating}
               onValueChange={(value) => updateField(config.key, value)}
+              onInstructionChange={(value) => updateFieldInstruction(`field:${config.key}`, value)}
+              onGenerate={() => {
+                runGeneration(createStandardFieldTarget(config.key, config.label, data[config.key]), (value) =>
+                  updateField(config.key, value),
+                ).catch(() => undefined);
+              }}
+              onContinue={() => {
+                runGeneration(
+                  createStandardFieldTarget(config.key, config.label, data[config.key]),
+                  (value) => updateField(config.key, value),
+                  true,
+                ).catch(() => undefined);
+              }}
+              onCancel={() => cancelGeneration(`field:${config.key}`)}
             />
           ))}
         </CardContent>
@@ -183,10 +335,36 @@ export function CharacterCreatorPage() {
         <CardContent>
           <AlternateGreetings
             greetings={data.alternate_greetings}
+            generationStates={greetingGenerationStates}
             onAdd={addGreeting}
             onChange={updateGreeting}
-            onRemove={removeGreeting}
-            onMove={reorderGreetings}
+            onRemove={handleRemoveGreeting}
+            onMove={handleReorderGreetings}
+            onInstructionChange={(index, value) => updateFieldInstruction(`alternate_greetings:${index}`, value)}
+            onGenerate={(index) => {
+              runGeneration(
+                {
+                  key: `alternate_greetings:${index}`,
+                  label: `Alternate Greeting ${index + 1}`,
+                  value: data.alternate_greetings[index] ?? '',
+                  kind: 'alternate-greeting',
+                },
+                (value) => updateGreeting(index, value),
+              ).catch(() => undefined);
+            }}
+            onContinue={(index) => {
+              runGeneration(
+                {
+                  key: `alternate_greetings:${index}`,
+                  label: `Alternate Greeting ${index + 1}`,
+                  value: data.alternate_greetings[index] ?? '',
+                  kind: 'alternate-greeting',
+                },
+                (value) => updateGreeting(index, value),
+                true,
+              ).catch(() => undefined);
+            }}
+            onCancel={(index) => cancelGeneration(`alternate_greetings:${index}`)}
           />
         </CardContent>
       </Card>
@@ -204,7 +382,24 @@ export function CharacterCreatorPage() {
               value={data[config.key]}
               rows={config.rows}
               hint={config.hint}
+              instructionValue={getFieldInstruction(`field:${config.key}`)}
+              generationErrorMessage={getFieldRuntime(`field:${config.key}`).errorMessage}
+              isGenerating={getFieldRuntime(`field:${config.key}`).isGenerating}
               onValueChange={(value) => updateField(config.key, value)}
+              onInstructionChange={(value) => updateFieldInstruction(`field:${config.key}`, value)}
+              onGenerate={() => {
+                runGeneration(createStandardFieldTarget(config.key, config.label, data[config.key]), (value) =>
+                  updateField(config.key, value),
+                ).catch(() => undefined);
+              }}
+              onContinue={() => {
+                runGeneration(
+                  createStandardFieldTarget(config.key, config.label, data[config.key]),
+                  (value) => updateField(config.key, value),
+                  true,
+                ).catch(() => undefined);
+              }}
+              onCancel={() => cancelGeneration(`field:${config.key}`)}
             />
           ))}
         </CardContent>
@@ -223,7 +418,24 @@ export function CharacterCreatorPage() {
               value={data[config.key]}
               rows={config.rows}
               hint={config.hint}
+              instructionValue={getFieldInstruction(`field:${config.key}`)}
+              generationErrorMessage={getFieldRuntime(`field:${config.key}`).errorMessage}
+              isGenerating={getFieldRuntime(`field:${config.key}`).isGenerating}
               onValueChange={(value) => updateField(config.key, value)}
+              onInstructionChange={(value) => updateFieldInstruction(`field:${config.key}`, value)}
+              onGenerate={() => {
+                runGeneration(createStandardFieldTarget(config.key, config.label, data[config.key]), (value) =>
+                  updateField(config.key, value),
+                ).catch(() => undefined);
+              }}
+              onContinue={() => {
+                runGeneration(
+                  createStandardFieldTarget(config.key, config.label, data[config.key]),
+                  (value) => updateField(config.key, value),
+                  true,
+                ).catch(() => undefined);
+              }}
+              onCancel={() => cancelGeneration(`field:${config.key}`)}
             />
           ))}
           <TagsInput value={data.tags} onChange={updateTags} />
@@ -237,9 +449,45 @@ export function CharacterCreatorPage() {
         <CardContent>
           <CustomFields
             fields={data.extensions.custom_fields}
+            generationStates={customFieldGenerationStates}
             onAdd={addCustomField}
             onUpdate={updateCustomField}
-            onRemove={removeCustomField}
+            onRemove={handleRemoveCustomField}
+            onInstructionChange={(id, value) => updateFieldInstruction(`custom:${id}`, value)}
+            onGenerate={(id) => {
+              const customField = data.extensions.custom_fields.find((field) => field.id === id);
+              if (!customField) {
+                return;
+              }
+
+              runGeneration(
+                {
+                  key: `custom:${id}`,
+                  label: customField.label.trim() || 'Custom Field',
+                  value: customField.value,
+                  kind: 'custom-field',
+                },
+                (value) => updateCustomField(id, { value }),
+              ).catch(() => undefined);
+            }}
+            onContinue={(id) => {
+              const customField = data.extensions.custom_fields.find((field) => field.id === id);
+              if (!customField) {
+                return;
+              }
+
+              runGeneration(
+                {
+                  key: `custom:${id}`,
+                  label: customField.label.trim() || 'Custom Field',
+                  value: customField.value,
+                  kind: 'custom-field',
+                },
+                (value) => updateCustomField(id, { value }),
+                true,
+              ).catch(() => undefined);
+            }}
+            onCancel={(id) => cancelGeneration(`custom:${id}`)}
           />
         </CardContent>
       </Card>

@@ -25,18 +25,21 @@ export function PortraitPreviewSurface({
 }: iPortraitPreviewSurfaceProps) {
   return (
     <div className={cn('relative block overflow-hidden', className)} style={style}>
-      <img
-        alt={alt}
-        className={cn('absolute max-w-none object-none select-none', imageClassName)}
-        draggable={false}
-        src={portraitUrl}
-        style={{
-          width: `${(portraitDimensions.width / cropRect.width) * 100}%`,
-          height: `${(portraitDimensions.height / cropRect.height) * 100}%`,
-          left: `${(-cropRect.x / cropRect.width) * 100}%`,
-          top: `${(-cropRect.y / cropRect.height) * 100}%`,
-        }}
-      />
+      <svg
+        aria-label={alt}
+        className="block size-full select-none"
+        role="img"
+        viewBox={`${cropRect.x} ${cropRect.y} ${cropRect.width} ${cropRect.height}`}
+      >
+        <title>{alt}</title>
+        <image
+          className={cn('pointer-events-none', imageClassName)}
+          height={portraitDimensions.height}
+          href={portraitUrl}
+          preserveAspectRatio="none"
+          width={portraitDimensions.width}
+        />
+      </svg>
     </div>
   );
 }

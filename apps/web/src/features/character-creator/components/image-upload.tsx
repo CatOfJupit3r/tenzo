@@ -68,7 +68,7 @@ export function ImageUpload({
   } else if (isPortraitReady) {
     portraitContent = (
       <div className="space-y-4">
-        <div className="group overflow-hidden rounded-[20px] border bg-black/95 shadow-sm">
+        <div className="group relative overflow-hidden rounded-[20px] border bg-black/95 shadow-sm">
           <PortraitPreviewSurface
             alt={portraitFileName ?? 'Selected portrait preview'}
             className="w-full"

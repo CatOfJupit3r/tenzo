@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getDefaultPortraitCropRect,
   getPortraitCropRect,
+  getPortraitCropRectFromPercentages,
   getPortraitEditorTransform,
   getSillyTavernAvatarCropRect,
   SILLY_TAVERN_PORTRAIT_ASPECT_RATIO,
@@ -29,6 +30,20 @@ describe('portrait crop geometry', () => {
       y: 80,
       width: 800,
       height: 1200,
+    });
+  });
+
+  it('converts cropper percentages back into a precise portrait crop rectangle', () => {
+    const cropRect = getPortraitCropRectFromPercentages(
+      { width: 1600, height: 1200 },
+      { x: 37.5, y: 25, width: 25, height: 50 },
+    );
+
+    expect(cropRect).toEqual({
+      x: 600,
+      y: 300,
+      width: 400,
+      height: 600,
     });
   });
 

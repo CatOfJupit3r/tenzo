@@ -10,6 +10,7 @@ import {
   arePortraitCropRectsEqual,
   getDefaultPortraitCropRect,
   getPortraitCropRect,
+  getPortraitCropRectFromPercentages,
   getPortraitEditorTransform,
   MAX_PORTRAIT_EDITOR_ZOOM,
   MIN_PORTRAIT_EDITOR_ZOOM,
@@ -70,12 +71,12 @@ export function PortraitFocalPointEditor({
   }, [cropSize, hasInitializedEditor, mediaSize, portraitDimensions, safeCropRect]);
 
   const handleCropAreaChange = useCallback(
-    (_croppedArea: iArea, croppedAreaPixels: iArea) => {
+    (croppedArea: iArea) => {
       if (!hasInitializedEditor) {
         return;
       }
 
-      const nextCropRect = getPortraitCropRect(portraitDimensions, croppedAreaPixels);
+      const nextCropRect = getPortraitCropRectFromPercentages(portraitDimensions, croppedArea);
       const nextCropRectSignature = serializeCropRect(nextCropRect);
       if (lastAppliedCropRectSignatureRef.current === nextCropRectSignature) {
         return;
@@ -114,9 +115,6 @@ export function PortraitFocalPointEditor({
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-medium">Portrait crop</p>
-          <p className="text-sm text-muted-foreground">
-            Drag the image to reframe it. Use the mouse wheel or zoom slider to crop tighter around the subject.
-          </p>
         </div>
 
         <Button disabled={isDefaultCrop} type="button" variant="outline" onClick={handleResetCrop}>
@@ -125,7 +123,7 @@ export function PortraitFocalPointEditor({
         </Button>
       </div>
 
-      <div className="mx-auto w-full max-w-[440px] space-y-3">
+      <div className="mx-auto w-full max-w-110 space-y-3">
         <div
           className="relative overflow-hidden rounded-xl border bg-black/90"
           style={{ aspectRatio: `${SILLY_TAVERN_PORTRAIT_ASPECT_RATIO}` }}

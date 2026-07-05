@@ -20,6 +20,13 @@ import { useCharacterCreatorContext } from '../context/character-creator-context
 import type { iCharacterLibraryItem } from '../lib/character-library';
 import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/character-library';
 import { readCharacterAssetBlob } from '../lib/image-store';
+import {
+  getPortraitCropRect,
+  readPortraitDimensions,
+  SILLY_TAVERN_PORTRAIT_ASPECT_RATIO,
+} from '../lib/portrait-focal-point';
+import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
+import { PortraitPreviewSurface } from './portrait-preview-surface';
 
 interface iCharacterLibraryPanelProps {
   isOpen: boolean;
@@ -28,15 +35,21 @@ interface iCharacterLibraryPanelProps {
 
 interface iCharacterLibraryItemProps {
   character: iCharacterLibraryItem;
-  previewUrl: string | null;
+  preview: iCharacterLibraryPreview | null;
   isActiveCharacter: boolean;
   onSelect: (id: string) => void;
   onRemove: (id: string) => Promise<unknown>;
 }
 
+interface iCharacterLibraryPreview {
+  cropRect: iPortraitCropRect | null;
+  portraitDimensions: iPortraitDimensions | null;
+  previewUrl: string | null;
+}
+
 function useCharacterLibraryPreviewUrls() {
   const { characterLibrary } = useCharacterCreatorContext();
-  const [previewUrls, setPreviewUrls] = useState<Record<string, string | null>>({});
+  const [previewUrls, setPreviewUrls] = useState<Record<string, iCharacterLibraryPreview>>({});
 
   useEffect(() => {
     let isCancelled = false;
@@ -45,18 +58,40 @@ function useCharacterLibraryPreviewUrls() {
     Promise.all(
       characterLibrary.map(async (character) => {
         if (!character.portrait) {
-          return [character.id, null] as const;
+          return [
+            character.id,
+            {
+              cropRect: null,
+              portraitDimensions: null,
+              previewUrl: null,
+            },
+          ] as const;
         }
 
         const blob = await readCharacterAssetBlob(character.portrait.assetId);
 
         if (!blob) {
-          return [character.id, null] as const;
+          return [
+            character.id,
+            {
+              cropRect: null,
+              portraitDimensions: null,
+              previewUrl: null,
+            },
+          ] as const;
         }
 
+        const portraitDimensions = await readPortraitDimensions(blob);
         const objectUrl = URL.createObjectURL(blob);
         createdUrls.push(objectUrl);
-        return [character.id, objectUrl] as const;
+        return [
+          character.id,
+          {
+            cropRect: getPortraitCropRect(portraitDimensions, character.portrait.cropRect),
+            portraitDimensions,
+            previewUrl: objectUrl,
+          },
+        ] as const;
       }),
     )
       .then((entries) => {
@@ -84,7 +119,7 @@ function useCharacterLibraryPreviewUrls() {
 
 function CharacterLibraryItem({
   character,
-  previewUrl,
+  preview,
   isActiveCharacter,
   onSelect,
   onRemove,
@@ -107,13 +142,15 @@ function CharacterLibraryItem({
         aria-current={isActiveCharacter ? 'true' : undefined}
         onClick={() => onSelect(character.id)}
       >
-        <div className="flex h-24 w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
-          {previewUrl ? (
-            <img
+        <div className="flex h-24 w-18 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
+          {preview?.previewUrl && preview.cropRect && preview.portraitDimensions ? (
+            <PortraitPreviewSurface
               alt={`${displayName} portrait preview`}
-              className="size-full object-cover"
-              draggable={false}
-              src={previewUrl}
+              className="size-full"
+              cropRect={preview.cropRect}
+              portraitDimensions={preview.portraitDimensions}
+              portraitUrl={preview.previewUrl}
+              style={{ aspectRatio: SILLY_TAVERN_PORTRAIT_ASPECT_RATIO }}
             />
           ) : (
             <LuImage className="size-5 text-muted-foreground" />
@@ -256,7 +293,7 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
               <CharacterLibraryItem
                 key={character.id}
                 character={character}
-                previewUrl={previewUrls[character.id] ?? null}
+                preview={previewUrls[character.id] ?? null}
                 isActiveCharacter={character.id === activeCharacterId}
                 onSelect={handleSelectCharacterFromPanel}
                 onRemove={handleRemoveCharacter}

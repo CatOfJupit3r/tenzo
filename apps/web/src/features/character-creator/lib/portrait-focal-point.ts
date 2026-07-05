@@ -1,4 +1,4 @@
-import type { iMediaSize, iSize } from '@~/components/ui/cropper';
+import type { iArea, iMediaSize, iSize } from '@~/components/ui/cropper';
 
 export const SILLY_TAVERN_PORTRAIT_ASPECT_RATIO = 2 / 3;
 export const SILLY_TAVERN_PORTRAIT_WIDTH = 512;
@@ -120,6 +120,18 @@ export function getPortraitCropRect(
     width,
     height,
   };
+}
+
+export function getPortraitCropRectFromPercentages(
+  dimensions: iPortraitDimensions,
+  croppedAreaPercentages: Pick<iArea, 'x' | 'y' | 'width' | 'height'>,
+): iPortraitCropRect {
+  return getPortraitCropRect(dimensions, {
+    x: (dimensions.width * croppedAreaPercentages.x) / 100,
+    y: (dimensions.height * croppedAreaPercentages.y) / 100,
+    width: (dimensions.width * croppedAreaPercentages.width) / 100,
+    height: (dimensions.height * croppedAreaPercentages.height) / 100,
+  });
 }
 
 export function getPortraitEditorTransform(

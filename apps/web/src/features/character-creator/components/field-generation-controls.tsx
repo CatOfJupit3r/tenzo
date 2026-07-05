@@ -54,7 +54,7 @@ export function FieldGenerationControls({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-80 space-y-3">
+      <PopoverContent align="start" className="w-80 space-y-3" side="left">
         <div className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
           <div className="space-y-1">
             <p className="text-sm font-medium">Use General Character Idea</p>

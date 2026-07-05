@@ -5,6 +5,7 @@ import { localStorageApi } from '@~/db/storage';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import type { CharacterCard } from '../lib/card-schema';
 import type { iStoredExampleCharacter } from '../lib/example-characters';
+import type { iPortraitCropRect } from '../lib/portrait-focal-point';
 
 const characterCardStorage = createJSONStorage<CharacterCard>(() => localStorageApi);
 const characterPortraitStorage = createJSONStorage<iCharacterPortraitStorageValue | null>(() => localStorageApi);
@@ -14,6 +15,7 @@ export interface iCharacterPortraitStorageValue {
   assetId: string;
   fileName: string;
   mimeType: string;
+  cropRect: iPortraitCropRect | null;
 }
 
 export const characterCardAtom = atomWithStorage<CharacterCard>(

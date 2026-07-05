@@ -219,9 +219,11 @@ function truncateLineToFit(line: string, maxLength: number) {
   };
 }
 
-export function getExampleContextCharacterBudget(contextSize: number, maxTokens: number) {
+export function getExampleContextCharacterBudget(contextSize: number, maxTokens: number): number {
   const availableInputTokens = Math.max(512, contextSize - maxTokens - EXAMPLE_CONTEXT_TOKEN_RESERVE);
-  const estimatedCharacters = Math.floor(availableInputTokens * APPROXIMATE_CHARACTERS_PER_TOKEN * EXAMPLE_CONTEXT_INPUT_SHARE);
+  const estimatedCharacters = Math.floor(
+    availableInputTokens * APPROXIMATE_CHARACTERS_PER_TOKEN * EXAMPLE_CONTEXT_INPUT_SHARE,
+  );
 
   return Math.max(2_000, Math.min(MAX_DYNAMIC_EXAMPLE_CONTEXT_CHARACTERS, estimatedCharacters));
 }

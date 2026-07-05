@@ -1,7 +1,9 @@
 import { getCharacterCardFileStem, parseCharacterCardJson, serializeCharacterCard } from './card-format';
 import type { CharacterCard } from './card-schema';
-import { convertImageBlobToPng, downloadBlob, readBlobAsUint8Array, readFileAsText } from './image-utils';
+import { downloadBlob, readBlobAsUint8Array, readFileAsText } from './image-utils';
 import { embedCharacterCardInPng, readCharacterCardFromPng } from './png-embed';
+import { renderPortraitBlobWithCrop } from './portrait-focal-point';
+import type { iPortraitCropRect } from './portrait-focal-point';
 
 export interface iImportedCharacterCardFile {
   card: CharacterCard;
@@ -50,8 +52,12 @@ export async function exportCharacterCardJson(card: CharacterCard) {
   downloadBlob(jsonBlob, `${getCharacterCardFileStem(card)}.json`);
 }
 
-export async function exportCharacterCardPng(card: CharacterCard, portraitBlob: Blob) {
-  const basePngBlob = await convertImageBlobToPng(portraitBlob);
+export async function exportCharacterCardPng(
+  card: CharacterCard,
+  portraitBlob: Blob,
+  cropRect: iPortraitCropRect | null,
+) {
+  const basePngBlob = await renderPortraitBlobWithCrop(portraitBlob, cropRect);
   const pngBytes = await readBlobAsUint8Array(basePngBlob);
   const characterJson = serializeCharacterCard(card);
   const embeddedPngBytes = embedCharacterCardInPng(pngBytes, characterJson);

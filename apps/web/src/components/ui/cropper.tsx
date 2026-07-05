@@ -1,0 +1,1635 @@
+import { cva } from 'class-variance-authority';
+import type { VariantProps } from 'class-variance-authority';
+import { Slot } from 'radix-ui';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import type {
+  ComponentProps,
+  ComponentRef,
+  RefObject,
+  SyntheticEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  TouchEvent as ReactTouchEvent,
+  MouseEvent as ReactMouseEvent,
+} from 'react';
+
+import { useComposedRefs } from '@~/hooks/use-compose-refs';
+import { useIsomorphicLayoutEffect } from '@~/hooks/use-isomorphic-layout-effect';
+import { useLazyRef } from '@~/hooks/use-lazy-ref';
+import { cn } from '@~/lib/utils';
+
+const ROOT_NAME = 'Cropper';
+const ROOT_IMPL_NAME = 'CropperImpl';
+const IMAGE_NAME = 'CropperImage';
+const VIDEO_NAME = 'CropperVideo';
+const AREA_NAME = 'CropperArea';
+
+export interface iPoint {
+  x: number;
+  y: number;
+}
+
+interface iGestureEvent extends UIEvent {
+  rotation: number;
+  scale: number;
+  clientX: number;
+  clientY: number;
+}
+
+export interface iSize {
+  width: number;
+  height: number;
+}
+
+export interface iArea {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
+export interface iMediaSize {
+  width: number;
+  height: number;
+  naturalWidth: number;
+  naturalHeight: number;
+}
+
+type Shape = 'rectangle' | 'circle';
+type ObjectFit = 'contain' | 'cover' | 'horizontal-cover' | 'vertical-cover';
+
+interface iDivProps extends ComponentProps<'div'> {
+  asChild?: boolean;
+}
+
+const MAX_CACHE_SIZE = 200;
+const DPR = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+
+const rotationSizeCache = new Map<string, iSize>();
+const cropSizeCache = new Map<string, iSize>();
+const croppedAreaCache = new Map<string, { croppedAreaPercentages: iArea; croppedAreaPixels: iArea }>();
+const onPositionClampCache = new Map<string, iPoint>();
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function quantize(n: number, step = 2 / DPR): number {
+  return Math.round(n / step) * step;
+}
+
+function quantizePosition(n: number, step = 4 / DPR): number {
+  return Math.round(n / step) * step;
+}
+
+function quantizeZoom(n: number, step = 0.01): number {
+  return Math.round(n / step) * step;
+}
+
+function quantizeRotation(n: number, step = 1.0): number {
+  return Math.round(n / step) * step;
+}
+
+function snapToDevicePixel(n: number): number {
+  return Math.round(n * DPR) / DPR;
+}
+
+function lruGet<K, V>(map: Map<K, V>, key: K): V | undefined {
+  const v = map.get(key);
+  if (v !== undefined) {
+    map.delete(key);
+    map.set(key, v);
+  }
+  return v;
+}
+
+function lruSet<K, V>(map: Map<K, V>, key: K, val: V, max = MAX_CACHE_SIZE) {
+  if (map.has(key)) {
+    map.delete(key);
+  }
+  map.set(key, val);
+  if (map.size > max) {
+    const firstKey = map.keys().next().value;
+    if (firstKey !== undefined) {
+      map.delete(firstKey);
+    }
+  }
+}
+
+function getDistanceBetweenPoints(pointA: iPoint, pointB: iPoint): number {
+  return Math.sqrt((pointA.y - pointB.y) ** 2 + (pointA.x - pointB.x) ** 2);
+}
+
+function getCenter(a: iPoint, b: iPoint): iPoint {
+  return {
+    x: (b.x + a.x) * 0.5,
+    y: (b.y + a.y) * 0.5,
+  };
+}
+
+function getRotationBetweenPoints(pointA: iPoint, pointB: iPoint): number {
+  return (Math.atan2(pointB.y - pointA.y, pointB.x - pointA.x) * 180) / Math.PI;
+}
+
+function getRadianAngle(degreeValue: number): number {
+  return (degreeValue * Math.PI) / 180;
+}
+
+function rotateSize(width: number, height: number, rotation: number): iSize {
+  const cacheKey = `${quantize(width)}-${quantize(height)}-${quantizeRotation(rotation)}`;
+
+  const cached = lruGet(rotationSizeCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const rotRad = getRadianAngle(rotation);
+  const cosRot = Math.cos(rotRad);
+  const sinRot = Math.sin(rotRad);
+
+  const result: iSize = {
+    width: Math.abs(cosRot * width) + Math.abs(sinRot * height),
+    height: Math.abs(sinRot * width) + Math.abs(cosRot * height),
+  };
+
+  lruSet(rotationSizeCache, cacheKey, result, MAX_CACHE_SIZE);
+  return result;
+}
+
+function getCropSize(
+  mediaWidth: number,
+  mediaHeight: number,
+  contentWidth: number,
+  contentHeight: number,
+  aspect: number,
+  rotation = 0,
+): iSize {
+  const cacheKey = `${quantize(mediaWidth, 8)}-${quantize(mediaHeight, 8)}-${quantize(contentWidth, 8)}-${quantize(contentHeight, 8)}-${quantize(aspect, 0.01)}-${quantizeRotation(rotation)}`;
+
+  const cached = lruGet(cropSizeCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const { width, height } = rotateSize(mediaWidth, mediaHeight, rotation);
+  const fittingWidth = Math.min(width, contentWidth);
+  const fittingHeight = Math.min(height, contentHeight);
+
+  const result: iSize =
+    fittingWidth > fittingHeight * aspect
+      ? {
+          width: fittingHeight * aspect,
+          height: fittingHeight,
+        }
+      : {
+          width: fittingWidth,
+          height: fittingWidth / aspect,
+        };
+
+  lruSet(cropSizeCache, cacheKey, result, MAX_CACHE_SIZE);
+  return result;
+}
+
+function onPositionClamp(position: iPoint, mediaSize: iSize, cropSize: iSize, zoom: number, rotation = 0): iPoint {
+  const quantizedX = quantizePosition(position.x);
+  const quantizedY = quantizePosition(position.y);
+
+  const cacheKey = `${quantizedX}-${quantizedY}-${quantize(mediaSize.width)}-${quantize(mediaSize.height)}-${quantize(cropSize.width)}-${quantize(cropSize.height)}-${quantizeZoom(zoom)}-${quantizeRotation(rotation)}`;
+
+  const cached = lruGet(onPositionClampCache, cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const { width, height } = rotateSize(mediaSize.width, mediaSize.height, rotation);
+
+  const maxPositionX = width * zoom * 0.5 - cropSize.width * 0.5;
+  const maxPositionY = height * zoom * 0.5 - cropSize.height * 0.5;
+
+  const result: iPoint = {
+    x: clamp(position.x, -maxPositionX, maxPositionX),
+    y: clamp(position.y, -maxPositionY, maxPositionY),
+  };
+
+  lruSet(onPositionClampCache, cacheKey, result, MAX_CACHE_SIZE);
+  return result;
+}
+
+function getCroppedArea(
+  crop: iPoint,
+  mediaSize: iMediaSize,
+  cropSize: iSize,
+  aspect: number,
+  zoom: number,
+  rotation = 0,
+  shouldAllowOverflow = false,
+): { croppedAreaPercentages: iArea; croppedAreaPixels: iArea } {
+  const cacheKey = `${quantizePosition(crop.x)}-${quantizePosition(crop.y)}-${quantize(mediaSize.width)}-${quantize(mediaSize.height)}-${quantize(mediaSize.naturalWidth)}-${quantize(mediaSize.naturalHeight)}-${quantize(cropSize.width)}-${quantize(cropSize.height)}-${quantize(aspect, 0.01)}-${quantizeZoom(zoom)}-${quantizeRotation(rotation)}-${shouldAllowOverflow}`;
+
+  const cached = lruGet(croppedAreaCache, cacheKey);
+
+  if (cached) return cached;
+
+  const onAreaLimit = !shouldAllowOverflow
+    ? (max: number, value: number) => Math.min(max, Math.max(0, value))
+    : (_max: number, value: number) => value;
+
+  const mediaBBoxSize = rotateSize(mediaSize.width, mediaSize.height, rotation);
+  const mediaNaturalBBoxSize = rotateSize(mediaSize.naturalWidth, mediaSize.naturalHeight, rotation);
+
+  const croppedAreaPercentages: iArea = {
+    x: onAreaLimit(
+      100,
+      (((mediaBBoxSize.width - cropSize.width / zoom) / 2 - crop.x / zoom) / mediaBBoxSize.width) * 100,
+    ),
+    y: onAreaLimit(
+      100,
+      (((mediaBBoxSize.height - cropSize.height / zoom) / 2 - crop.y / zoom) / mediaBBoxSize.height) * 100,
+    ),
+    width: onAreaLimit(100, ((cropSize.width / mediaBBoxSize.width) * 100) / zoom),
+    height: onAreaLimit(100, ((cropSize.height / mediaBBoxSize.height) * 100) / zoom),
+  };
+
+  const widthInPixels = Math.round(
+    onAreaLimit(mediaNaturalBBoxSize.width, (croppedAreaPercentages.width * mediaNaturalBBoxSize.width) / 100),
+  );
+  const heightInPixels = Math.round(
+    onAreaLimit(mediaNaturalBBoxSize.height, (croppedAreaPercentages.height * mediaNaturalBBoxSize.height) / 100),
+  );
+  const isImageWiderThanHigh = mediaNaturalBBoxSize.width >= mediaNaturalBBoxSize.height * aspect;
+
+  const sizePixels: iSize = isImageWiderThanHigh
+    ? {
+        width: Math.round(heightInPixels * aspect),
+        height: heightInPixels,
+      }
+    : {
+        width: widthInPixels,
+        height: Math.round(widthInPixels / aspect),
+      };
+
+  const croppedAreaPixels: iArea = {
+    ...sizePixels,
+    x: Math.round(
+      onAreaLimit(
+        mediaNaturalBBoxSize.width - sizePixels.width,
+        (croppedAreaPercentages.x * mediaNaturalBBoxSize.width) / 100,
+      ),
+    ),
+    y: Math.round(
+      onAreaLimit(
+        mediaNaturalBBoxSize.height - sizePixels.height,
+        (croppedAreaPercentages.y * mediaNaturalBBoxSize.height) / 100,
+      ),
+    ),
+  };
+
+  const result = { croppedAreaPercentages, croppedAreaPixels };
+
+  lruSet(croppedAreaCache, cacheKey, result, MAX_CACHE_SIZE);
+  return result;
+}
+
+interface iStoreState {
+  crop: iPoint;
+  zoom: number;
+  rotation: number;
+  mediaSize: iMediaSize | null;
+  cropSize: iSize | null;
+  isDragging: boolean;
+  isWheelZooming: boolean;
+}
+
+interface iStore {
+  subscribe: (callback: () => unknown) => () => unknown;
+  getState: () => iStoreState;
+  setState: <K extends keyof iStoreState>(key: K, value: iStoreState[K]) => unknown;
+  notify: () => unknown;
+  batch: (fn: () => unknown) => unknown;
+}
+
+const StoreContext = createContext<iStore | null>(null);
+
+function useStoreContext(consumerName: string) {
+  const context = useContext(StoreContext);
+  if (!context) {
+    throw new Error(`\`${consumerName}\` must be used within \`${ROOT_NAME}\``);
+  }
+  return context;
+}
+
+function useStore<T>(selector: (state: iStoreState) => T): T {
+  const store = useStoreContext('useStore');
+
+  const getSnapshot = useCallback(() => selector(store.getState()), [store, selector]);
+
+  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+}
+
+type RootElement = ComponentRef<typeof CropperImpl>;
+
+interface iCropperContextValue {
+  aspectRatio: number;
+  minZoom: number;
+  maxZoom: number;
+  zoomSpeed: number;
+  keyboardStep: number;
+  shape: Shape;
+  objectFit: ObjectFit;
+  rootRef: RefObject<RootElement | null>;
+  shouldAllowOverflow: boolean;
+  shouldPreventScrollZoom: boolean;
+  shouldHaveGrid: boolean;
+}
+
+const CropperContext = createContext<iCropperContextValue | null>(null);
+
+function useCropperContext(consumerName: string) {
+  const context = useContext(CropperContext);
+  if (!context) {
+    throw new Error(`\`${consumerName}\` must be used within \`${ROOT_NAME}\``);
+  }
+  return context;
+}
+
+interface iCropperProps extends iDivProps {
+  crop?: iPoint;
+  zoom?: number;
+  minZoom?: number;
+  maxZoom?: number;
+  zoomSpeed?: number;
+  rotation?: number;
+  keyboardStep?: number;
+  aspectRatio?: number;
+  shape?: Shape;
+  objectFit?: ObjectFit;
+  shouldAllowOverflow?: boolean;
+  shouldPreventScrollZoom?: boolean;
+  shouldHaveGrid?: boolean;
+  onCropChange?: (crop: iPoint) => unknown;
+  onCropSizeChange?: (cropSize: iSize) => unknown;
+  onCropAreaChange?: (croppedArea: iArea, croppedAreaPixels: iArea) => unknown;
+  onCropComplete?: (croppedArea: iArea, croppedAreaPixels: iArea) => unknown;
+  onZoomChange?: (zoom: number) => unknown;
+  onRotationChange?: (rotation: number) => unknown;
+  onMediaLoaded?: (mediaSize: iMediaSize) => unknown;
+  onInteractionStart?: () => unknown;
+  onInteractionEnd?: () => unknown;
+  onWheelZoom?: (event: WheelEvent) => unknown;
+}
+
+export function Cropper(props: iCropperProps) {
+  const {
+    crop = { x: 0, y: 0 },
+    zoom = 1,
+    minZoom = 1,
+    maxZoom = 3,
+    zoomSpeed = 1,
+    rotation = 0,
+    keyboardStep = 1,
+    aspectRatio = 4 / 3,
+    shape = 'rectangle',
+    objectFit = 'contain',
+    shouldAllowOverflow = false,
+    shouldPreventScrollZoom = false,
+    shouldHaveGrid = false,
+    onCropChange,
+    onCropSizeChange,
+    onCropAreaChange,
+    onCropComplete,
+    onZoomChange,
+    onRotationChange,
+    onMediaLoaded,
+    onInteractionStart,
+    onInteractionEnd,
+    className,
+    ...rootProps
+  } = props;
+
+  const listenersRef = useLazyRef(() => new Set<() => unknown>());
+  const stateRef = useLazyRef<iStoreState>(() => ({
+    crop,
+    zoom,
+    rotation,
+    mediaSize: null,
+    cropSize: null,
+    isDragging: false,
+    isWheelZooming: false,
+  }));
+
+  const propsRef = useRef({
+    onCropChange,
+    onCropSizeChange,
+    onCropAreaChange,
+    onCropComplete,
+    onZoomChange,
+    onRotationChange,
+    onMediaLoaded,
+    onInteractionStart,
+    onInteractionEnd,
+  });
+
+  useIsomorphicLayoutEffect(() => {
+    propsRef.current = {
+      onCropChange,
+      onCropSizeChange,
+      onCropAreaChange,
+      onCropComplete,
+      onZoomChange,
+      onRotationChange,
+      onMediaLoaded,
+      onInteractionStart,
+      onInteractionEnd,
+    };
+  }, [
+    onCropChange,
+    onCropSizeChange,
+    onCropAreaChange,
+    onCropComplete,
+    onZoomChange,
+    onRotationChange,
+    onMediaLoaded,
+    onInteractionStart,
+    onInteractionEnd,
+  ]);
+
+  const rootRef = useRef<RootElement | null>(null);
+
+  const store = useMemo<iStore>(() => {
+    let isBatching = false;
+    let raf: number | null = null;
+
+    function notifyCropAreaChange() {
+      if (raf != null) return;
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        const s = stateRef.current;
+        if (s?.mediaSize && s.cropSize && propsRef.current.onCropAreaChange) {
+          const { croppedAreaPercentages, croppedAreaPixels } = getCroppedArea(
+            s.crop,
+            s.mediaSize,
+            s.cropSize,
+            aspectRatio,
+            s.zoom,
+            s.rotation,
+          );
+          propsRef.current.onCropAreaChange(croppedAreaPercentages, croppedAreaPixels);
+        }
+      });
+    }
+
+    return {
+      subscribe: (cb) => {
+        listenersRef.current.add(cb);
+        return () => listenersRef.current.delete(cb);
+      },
+      getState: () => stateRef.current,
+      setState: (key, value) => {
+        if (Object.is(stateRef.current[key], value)) return;
+
+        stateRef.current[key] = value;
+
+        if (key === 'crop' && typeof value === 'object' && value && 'x' in value) {
+          propsRef.current.onCropChange?.(value);
+        } else if (key === 'zoom' && typeof value === 'number') {
+          propsRef.current.onZoomChange?.(value);
+        } else if (key === 'rotation' && typeof value === 'number') {
+          propsRef.current.onRotationChange?.(value);
+        } else if (key === 'cropSize' && typeof value === 'object' && value && 'width' in value) {
+          propsRef.current.onCropSizeChange?.(value);
+        } else if (key === 'mediaSize' && typeof value === 'object' && value && 'naturalWidth' in value) {
+          propsRef.current.onMediaLoaded?.(value);
+        } else if (key === 'isDragging') {
+          if (value) {
+            propsRef.current.onInteractionStart?.();
+          } else {
+            propsRef.current.onInteractionEnd?.();
+            const currentState = stateRef.current;
+            if (currentState?.mediaSize && currentState.cropSize && propsRef.current.onCropComplete) {
+              const { croppedAreaPercentages, croppedAreaPixels } = getCroppedArea(
+                currentState.crop,
+                currentState.mediaSize,
+                currentState.cropSize,
+                aspectRatio,
+                currentState.zoom,
+                currentState.rotation,
+              );
+              propsRef.current.onCropComplete(croppedAreaPercentages, croppedAreaPixels);
+            }
+          }
+        }
+
+        if (
+          (key === 'crop' || key === 'zoom' || key === 'rotation' || key === 'mediaSize' || key === 'cropSize') &&
+          propsRef.current.onCropAreaChange
+        ) {
+          notifyCropAreaChange();
+        }
+
+        if (!isBatching) {
+          store.notify();
+        }
+      },
+      notify: () => {
+        for (const cb of listenersRef.current) {
+          cb();
+        }
+      },
+      batch: (fn: () => unknown) => {
+        if (isBatching) {
+          fn();
+          return;
+        }
+        isBatching = true;
+        try {
+          fn();
+        } finally {
+          isBatching = false;
+          store.notify();
+        }
+      },
+    };
+  }, [listenersRef, stateRef, propsRef, aspectRatio]);
+
+  useIsomorphicLayoutEffect(() => {
+    const updates: Partial<iStoreState> = {};
+    let hasUpdates = false;
+    let shouldRecompute = false;
+
+    if (crop !== undefined) {
+      const currentState = store.getState();
+      if (!Object.is(currentState.crop, crop)) {
+        updates.crop = crop;
+        hasUpdates = true;
+      }
+    }
+
+    if (zoom !== undefined) {
+      const currentState = store.getState();
+      if (currentState.zoom !== zoom) {
+        updates.zoom = zoom;
+        hasUpdates = true;
+        shouldRecompute = true;
+      }
+    }
+
+    if (rotation !== undefined) {
+      const currentState = store.getState();
+      if (currentState.rotation !== rotation) {
+        updates.rotation = rotation;
+        hasUpdates = true;
+        shouldRecompute = true;
+      }
+    }
+
+    if (hasUpdates) {
+      store.batch(() => {
+        Object.entries(updates).forEach(([key, value]) => {
+          store.setState(key as keyof iStoreState, value);
+        });
+      });
+
+      if (shouldRecompute && rootRef.current) {
+        requestAnimationFrame(() => {
+          const currentState = store.getState();
+          if (currentState.cropSize && currentState.mediaSize) {
+            const newPosition = !shouldAllowOverflow
+              ? onPositionClamp(
+                  currentState.crop,
+                  currentState.mediaSize,
+                  currentState.cropSize,
+                  currentState.zoom,
+                  currentState.rotation,
+                )
+              : currentState.crop;
+
+            if (
+              Math.abs(newPosition.x - currentState.crop.x) > 0.001 ||
+              Math.abs(newPosition.y - currentState.crop.y) > 0.001
+            ) {
+              store.setState('crop', newPosition);
+            }
+          }
+        });
+      }
+    }
+  }, [crop, zoom, rotation, store, shouldAllowOverflow]);
+
+  const contextValue = useMemo<iCropperContextValue>(
+    () => ({
+      minZoom,
+      maxZoom,
+      zoomSpeed,
+      keyboardStep,
+      aspectRatio,
+      shape,
+      objectFit,
+      shouldPreventScrollZoom,
+      shouldAllowOverflow,
+      shouldHaveGrid,
+      rootRef,
+    }),
+    [
+      minZoom,
+      maxZoom,
+      zoomSpeed,
+      keyboardStep,
+      aspectRatio,
+      shape,
+      objectFit,
+      shouldPreventScrollZoom,
+      shouldAllowOverflow,
+      shouldHaveGrid,
+    ],
+  );
+
+  return (
+    <StoreContext.Provider value={store}>
+      <CropperContext.Provider value={contextValue}>
+        <div data-slot="cropper-wrapper" className={cn('relative size-full overflow-hidden', className)}>
+          <CropperImpl {...rootProps} />
+        </div>
+      </CropperContext.Provider>
+    </StoreContext.Provider>
+  );
+}
+
+interface iCropperImplProps extends iCropperProps {
+  onWheelZoom?: (event: WheelEvent) => unknown;
+}
+
+function CropperImpl(props: iCropperImplProps) {
+  const {
+    onWheelZoom: onWheelZoomProp,
+    onKeyUp: onKeyUpProp,
+    onKeyDown: onKeyDownProp,
+    onMouseDown: onMouseDownProp,
+    onTouchStart: onTouchStartProp,
+    asChild: isAsChild,
+    className,
+    ref,
+    ...rootImplProps
+  } = props;
+
+  const context = useCropperContext(ROOT_IMPL_NAME);
+  const store = useStoreContext(ROOT_IMPL_NAME);
+  const crop = useStore((state) => state.crop);
+  const zoom = useStore((state) => state.zoom);
+  const rotation = useStore((state) => state.rotation);
+  const mediaSize = useStore((state) => state.mediaSize);
+  const cropSize = useStore((state) => state.cropSize);
+
+  const propsRef = useRef({
+    onWheelZoom: onWheelZoomProp,
+    onKeyUp: onKeyUpProp,
+    onKeyDown: onKeyDownProp,
+    onMouseDown: onMouseDownProp,
+    onTouchStart: onTouchStartProp,
+  });
+
+  useIsomorphicLayoutEffect(() => {
+    propsRef.current = {
+      onWheelZoom: onWheelZoomProp,
+      onKeyUp: onKeyUpProp,
+      onKeyDown: onKeyDownProp,
+      onMouseDown: onMouseDownProp,
+      onTouchStart: onTouchStartProp,
+    };
+  }, [onKeyDownProp, onKeyUpProp, onMouseDownProp, onTouchStartProp, onWheelZoomProp]);
+
+  const composedRef = useComposedRefs(ref, context.rootRef);
+  const dragStartPositionRef = useRef<iPoint>({ x: 0, y: 0 });
+  const dragStartCropRef = useRef<iPoint>({ x: 0, y: 0 });
+  const contentPositionRef = useRef<iPoint>({ x: 0, y: 0 });
+  const lastPinchDistanceRef = useRef(0);
+  const lastPinchRotationRef = useRef(0);
+  const rafDragTimeoutRef = useRef<number | null>(null);
+  const rafPinchTimeoutRef = useRef<number | null>(null);
+  const wheelTimerRef = useRef<number | null>(null);
+  const isTouchingRef = useRef(false);
+  const gestureZoomStartRef = useRef(0);
+  const gestureRotationStartRef = useRef(0);
+
+  const onRefsCleanup = useCallback(() => {
+    if (rafDragTimeoutRef.current) {
+      cancelAnimationFrame(rafDragTimeoutRef.current);
+      rafDragTimeoutRef.current = null;
+    }
+    if (rafPinchTimeoutRef.current) {
+      cancelAnimationFrame(rafPinchTimeoutRef.current);
+      rafPinchTimeoutRef.current = null;
+    }
+    if (wheelTimerRef.current) {
+      clearTimeout(wheelTimerRef.current);
+      wheelTimerRef.current = null;
+    }
+    isTouchingRef.current = false;
+  }, []);
+
+  const onCacheCleanup = useCallback(() => {
+    if (onPositionClampCache.size > MAX_CACHE_SIZE * 1.5) {
+      onPositionClampCache.clear();
+    }
+    if (croppedAreaCache.size > MAX_CACHE_SIZE * 1.5) {
+      croppedAreaCache.clear();
+    }
+  }, []);
+
+  const getMousePoint = useCallback(
+    (event: { clientX: number; clientY: number }) => ({
+      x: Number(event.clientX),
+      y: Number(event.clientY),
+    }),
+    [],
+  );
+
+  const getTouchPoint = useCallback(
+    (touch: { clientX: number; clientY: number }) => ({
+      x: Number(touch.clientX),
+      y: Number(touch.clientY),
+    }),
+    [],
+  );
+
+  const onContentPositionChange = useCallback(() => {
+    if (context.rootRef?.current) {
+      const bounds = context.rootRef.current.getBoundingClientRect();
+      contentPositionRef.current = { x: bounds.left, y: bounds.top };
+    }
+  }, [context.rootRef]);
+
+  const getPointOnContent = useCallback(
+    ({ x, y }: iPoint, contentTopLeft: iPoint): iPoint => {
+      if (!context.rootRef?.current) {
+        return { x: 0, y: 0 };
+      }
+      const contentRect = context.rootRef.current.getBoundingClientRect();
+      return {
+        x: contentRect.width / 2 - (x - contentTopLeft.x),
+        y: contentRect.height / 2 - (y - contentTopLeft.y),
+      };
+    },
+    [context.rootRef],
+  );
+
+  const getPointOnMedia = useCallback(
+    ({ x, y }: iPoint) => ({
+      x: (x + crop.x) / zoom,
+      y: (y + crop.y) / zoom,
+    }),
+    [crop, zoom],
+  );
+
+  const recomputeCropPosition = useCallback(() => {
+    if (!cropSize || !mediaSize) return;
+
+    const newPosition = !context.shouldAllowOverflow
+      ? onPositionClamp(crop, mediaSize, cropSize, zoom, rotation)
+      : crop;
+
+    if (Math.abs(newPosition.x - crop.x) > 0.001 || Math.abs(newPosition.y - crop.y) > 0.001) {
+      store.setState('crop', newPosition);
+    }
+  }, [cropSize, mediaSize, context.shouldAllowOverflow, crop, zoom, rotation, store]);
+
+  const onZoomChange = useCallback(
+    (newZoom: number, point: iPoint, shouldUpdatePosition = true) => {
+      if (!cropSize || !mediaSize) return;
+
+      const clampedZoom = clamp(newZoom, context.minZoom, context.maxZoom);
+
+      store.batch(() => {
+        if (shouldUpdatePosition) {
+          const zoomPoint = getPointOnContent(point, contentPositionRef.current);
+          const zoomTarget = getPointOnMedia(zoomPoint);
+          const requestedPosition = {
+            x: zoomTarget.x * clampedZoom - zoomPoint.x,
+            y: zoomTarget.y * clampedZoom - zoomPoint.y,
+          };
+
+          const newPosition = !context.shouldAllowOverflow
+            ? onPositionClamp(requestedPosition, mediaSize, cropSize, clampedZoom, rotation)
+            : requestedPosition;
+
+          store.setState('crop', newPosition);
+        }
+        store.setState('zoom', clampedZoom);
+      });
+
+      requestAnimationFrame(() => {
+        recomputeCropPosition();
+      });
+    },
+    [
+      cropSize,
+      mediaSize,
+      context.minZoom,
+      context.maxZoom,
+      context.shouldAllowOverflow,
+      getPointOnContent,
+      getPointOnMedia,
+      rotation,
+      store,
+      recomputeCropPosition,
+    ],
+  );
+
+  const onDragStart = useCallback(
+    ({ x, y }: iPoint) => {
+      dragStartPositionRef.current = { x, y };
+      dragStartCropRef.current = { ...crop };
+      store.setState('isDragging', true);
+    },
+    [crop, store],
+  );
+
+  const onDrag = useCallback(
+    ({ x, y }: iPoint) => {
+      if (rafDragTimeoutRef.current) {
+        cancelAnimationFrame(rafDragTimeoutRef.current);
+      }
+
+      rafDragTimeoutRef.current = requestAnimationFrame(() => {
+        if (!cropSize || !mediaSize) return;
+        if (x === undefined || y === undefined) return;
+
+        const offsetX = x - dragStartPositionRef.current.x;
+        const offsetY = y - dragStartPositionRef.current.y;
+
+        if (Math.abs(offsetX) < 2 && Math.abs(offsetY) < 2) {
+          return;
+        }
+
+        const requestedPosition = {
+          x: dragStartCropRef.current.x + offsetX,
+          y: dragStartCropRef.current.y + offsetY,
+        };
+
+        const newPosition = !context.shouldAllowOverflow
+          ? onPositionClamp(requestedPosition, mediaSize, cropSize, zoom, rotation)
+          : requestedPosition;
+
+        const currentCrop = store.getState().crop;
+        if (Math.abs(newPosition.x - currentCrop.x) > 1 || Math.abs(newPosition.y - currentCrop.y) > 1) {
+          store.setState('crop', newPosition);
+        }
+      });
+    },
+    [cropSize, mediaSize, context.shouldAllowOverflow, zoom, rotation, store],
+  );
+
+  const onMouseMove = useCallback(
+    (event: globalThis.MouseEvent) => onDrag(getMousePoint(event)),
+    [getMousePoint, onDrag],
+  );
+
+  const onTouchMove = useCallback(
+    (event: globalThis.TouchEvent) => {
+      event.preventDefault();
+      if (event.touches.length === 2) {
+        const firstTouch = event.touches[0];
+        const secondTouch = event.touches[1];
+        if (firstTouch && secondTouch) {
+          const pointA = getTouchPoint(firstTouch);
+          const pointB = getTouchPoint(secondTouch);
+          const center = getCenter(pointA, pointB);
+          onDrag(center);
+
+          if (rafPinchTimeoutRef.current) {
+            cancelAnimationFrame(rafPinchTimeoutRef.current);
+          }
+
+          rafPinchTimeoutRef.current = requestAnimationFrame(() => {
+            const distance = getDistanceBetweenPoints(pointA, pointB);
+            const distanceRatio = distance / lastPinchDistanceRef.current;
+
+            if (Math.abs(distanceRatio - 1) > 0.01) {
+              const newZoom = zoom * distanceRatio;
+              onZoomChange(newZoom, center, false);
+              lastPinchDistanceRef.current = distance;
+            }
+
+            const rotationAngle = getRotationBetweenPoints(pointA, pointB);
+            const rotationDiff = rotationAngle - lastPinchRotationRef.current;
+
+            if (Math.abs(rotationDiff) > 0.5) {
+              const newRotation = rotation + rotationDiff;
+              store.setState('rotation', newRotation);
+              lastPinchRotationRef.current = rotationAngle;
+            }
+          });
+        }
+      } else if (event.touches.length === 1) {
+        const firstTouch = event.touches[0];
+        if (firstTouch) {
+          onDrag(getTouchPoint(firstTouch));
+        }
+      }
+    },
+    [getTouchPoint, onDrag, zoom, onZoomChange, rotation, store],
+  );
+
+  const onGestureChange = useCallback(
+    (event: iGestureEvent) => {
+      event.preventDefault();
+      if (isTouchingRef.current) {
+        return;
+      }
+
+      const point = { x: Number(event.clientX), y: Number(event.clientY) };
+      const newZoom = gestureZoomStartRef.current - 1 + event.scale;
+      onZoomChange(newZoom, point, true);
+
+      const newRotation = gestureRotationStartRef.current + event.rotation;
+      store.setState('rotation', newRotation);
+    },
+    [onZoomChange, store],
+  );
+
+  const onGestureEnd = useCallback(() => {
+    document.removeEventListener('gesturechange', onGestureChange as EventListener);
+    document.removeEventListener('gestureend', onGestureEnd as EventListener);
+  }, [onGestureChange]);
+
+  const onGestureStart = useCallback(
+    (event: iGestureEvent) => {
+      event.preventDefault();
+      document.addEventListener('gesturechange', onGestureChange as EventListener);
+      document.addEventListener('gestureend', onGestureEnd as EventListener);
+      gestureZoomStartRef.current = zoom;
+      gestureRotationStartRef.current = rotation;
+    },
+    [zoom, rotation, onGestureChange, onGestureEnd],
+  );
+
+  const onSafariZoomPrevent = useCallback((event: Event) => event.preventDefault(), []);
+
+  const onEventsCleanup = useCallback(() => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('gesturechange', onGestureChange as EventListener);
+    document.removeEventListener('gestureend', onGestureEnd as EventListener);
+  }, [onMouseMove, onTouchMove, onGestureChange, onGestureEnd]);
+
+  const onDragStopped = useCallback(() => {
+    isTouchingRef.current = false;
+    store.setState('isDragging', false);
+    onRefsCleanup();
+    document.removeEventListener('mouseup', onDragStopped);
+    document.removeEventListener('touchend', onDragStopped);
+    onEventsCleanup();
+  }, [store, onEventsCleanup, onRefsCleanup]);
+
+  const getWheelDelta = useCallback((event: WheelEvent) => {
+    let { deltaX } = event;
+    let { deltaY } = event;
+    let { deltaZ } = event;
+
+    if (event.deltaMode === 1) {
+      deltaX *= 16;
+      deltaY *= 16;
+      deltaZ *= 16;
+    } else if (event.deltaMode === 2) {
+      deltaX *= 400;
+      deltaY *= 400;
+      deltaZ *= 400;
+    }
+
+    return { deltaX, deltaY, deltaZ };
+  }, []);
+
+  const onWheelZoom = useCallback(
+    (event: WheelEvent) => {
+      propsRef.current.onWheelZoom?.(event);
+      if (event.defaultPrevented) return;
+
+      event.preventDefault();
+      const point = getMousePoint(event);
+      const { deltaY } = getWheelDelta(event);
+      const newZoom = zoom - (deltaY * context.zoomSpeed) / 200;
+      onZoomChange(newZoom, point, true);
+
+      store.batch(() => {
+        const currentState = store.getState();
+        if (!currentState.isWheelZooming) {
+          store.setState('isWheelZooming', true);
+        }
+        if (!currentState.isDragging) {
+          store.setState('isDragging', true);
+        }
+      });
+
+      if (wheelTimerRef.current) {
+        clearTimeout(wheelTimerRef.current);
+      }
+      wheelTimerRef.current = window.setTimeout(() => {
+        store.batch(() => {
+          store.setState('isWheelZooming', false);
+          store.setState('isDragging', false);
+        });
+      }, 250);
+    },
+    [propsRef, getMousePoint, zoom, context.zoomSpeed, onZoomChange, getWheelDelta, store],
+  );
+
+  const onKeyUp = useCallback(
+    (event: ReactKeyboardEvent<RootElement>) => {
+      propsRef.current.onKeyUp?.(event);
+      if (event.defaultPrevented) return;
+
+      const arrowKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+      if (arrowKeys.has(event.key)) {
+        event.preventDefault();
+        store.setState('isDragging', false);
+      }
+    },
+    [propsRef, store],
+  );
+
+  const onKeyDown = useCallback(
+    (event: ReactKeyboardEvent<RootElement>) => {
+      propsRef.current.onKeyDown?.(event);
+      if (event.defaultPrevented || !cropSize || !mediaSize) return;
+
+      let step = context.keyboardStep;
+      if (event.shiftKey) {
+        step *= 0.2;
+      }
+
+      const keyCallbacks: Record<string, () => iPoint> = {
+        ArrowUp: () => ({ ...crop, y: crop.y - step }),
+        ArrowDown: () => ({ ...crop, y: crop.y + step }),
+        ArrowLeft: () => ({ ...crop, x: crop.x - step }),
+        ArrowRight: () => ({ ...crop, x: crop.x + step }),
+      } as const;
+
+      const callback = keyCallbacks[event.key];
+      if (!callback) return;
+
+      event.preventDefault();
+
+      let newCrop = callback();
+
+      if (!context.shouldAllowOverflow) {
+        newCrop = onPositionClamp(newCrop, mediaSize, cropSize, zoom, rotation);
+      }
+
+      if (!event.repeat) {
+        store.setState('isDragging', true);
+      }
+
+      store.setState('crop', newCrop);
+    },
+    [propsRef, cropSize, mediaSize, context.keyboardStep, context.shouldAllowOverflow, crop, zoom, rotation, store],
+  );
+
+  const onMouseDown = useCallback(
+    (event: ReactMouseEvent<RootElement>) => {
+      propsRef.current.onMouseDown?.(event);
+      if (event.defaultPrevented) return;
+
+      event.preventDefault();
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onDragStopped);
+      onContentPositionChange();
+      onDragStart(getMousePoint(event));
+    },
+    [propsRef, getMousePoint, onDragStart, onDragStopped, onMouseMove, onContentPositionChange],
+  );
+
+  const onTouchStart = useCallback(
+    (event: ReactTouchEvent<RootElement>) => {
+      propsRef.current.onTouchStart?.(event);
+      if (event.defaultPrevented) return;
+
+      isTouchingRef.current = true;
+      document.addEventListener('touchmove', onTouchMove, { passive: false });
+      document.addEventListener('touchend', onDragStopped);
+      onContentPositionChange();
+
+      if (event.touches.length === 2) {
+        const [firstTouch, secondTouch] = event.touches ? Array.from(event.touches) : [];
+        if (firstTouch && secondTouch) {
+          const pointA = getTouchPoint(firstTouch);
+          const pointB = getTouchPoint(secondTouch);
+          lastPinchDistanceRef.current = getDistanceBetweenPoints(pointA, pointB);
+          lastPinchRotationRef.current = getRotationBetweenPoints(pointA, pointB);
+          onDragStart(getCenter(pointA, pointB));
+        }
+      } else if (event.touches.length === 1) {
+        const firstTouch = event.touches[0];
+        if (firstTouch) {
+          onDragStart(getTouchPoint(firstTouch));
+        }
+      }
+    },
+    [propsRef, onDragStopped, onTouchMove, onContentPositionChange, getTouchPoint, onDragStart],
+  );
+
+  useEffect(() => {
+    const content = context.rootRef?.current;
+    if (!content) return undefined;
+
+    if (!context.shouldPreventScrollZoom) {
+      content.addEventListener('wheel', onWheelZoom, { passive: false });
+    }
+
+    content.addEventListener('gesturestart', onSafariZoomPrevent);
+    content.addEventListener('gesturestart', onGestureStart as EventListener);
+
+    return () => {
+      if (!context.shouldPreventScrollZoom) {
+        content.removeEventListener('wheel', onWheelZoom);
+      }
+      content.removeEventListener('gesturestart', onSafariZoomPrevent);
+      content.removeEventListener('gesturestart', onGestureStart as EventListener);
+      onRefsCleanup();
+    };
+  }, [
+    context.rootRef,
+    context.shouldPreventScrollZoom,
+    onWheelZoom,
+    onRefsCleanup,
+    onSafariZoomPrevent,
+    onGestureStart,
+  ]);
+
+  useEffect(
+    () => () => {
+      onRefsCleanup();
+      onCacheCleanup();
+    },
+    [onRefsCleanup, onCacheCleanup],
+  );
+
+  const RootPrimitive = isAsChild ? Slot.Slot : 'div';
+
+  return (
+    <RootPrimitive
+      data-slot="cropper"
+      tabIndex={0}
+      {...rootImplProps}
+      ref={composedRef}
+      className={cn(
+        'absolute inset-0 flex cursor-move touch-none items-center justify-center overflow-hidden outline-none select-none',
+        className,
+      )}
+      onKeyUp={onKeyUp}
+      onKeyDown={onKeyDown}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
+    />
+  );
+}
+
+const cropperMediaVariants = cva('will-change-transform', {
+  variants: {
+    objectFit: {
+      contain: 'absolute inset-0 m-auto max-h-full max-w-full',
+      cover: 'h-auto w-full',
+      'horizontal-cover': 'h-auto w-full',
+      'vertical-cover': 'h-full w-auto',
+    },
+  },
+  defaultVariants: {
+    objectFit: 'contain',
+  },
+});
+
+interface iUseMediaComputationProps<T extends HTMLImageElement | HTMLVideoElement> {
+  mediaRef: RefObject<T | null>;
+  context: iCropperContextValue;
+  store: iStore;
+  rotation: number;
+  getNaturalDimensions: (media: T) => iSize;
+}
+
+function useMediaComputation<T extends HTMLImageElement | HTMLVideoElement>({
+  mediaRef,
+  context,
+  store,
+  rotation,
+  getNaturalDimensions,
+}: iUseMediaComputationProps<T>) {
+  const computeSizes = useCallback(() => {
+    const media = mediaRef.current;
+    const content = context.rootRef?.current;
+    if (!media || !content) return;
+
+    const contentRect = content.getBoundingClientRect();
+    const containerAspect = contentRect.width / contentRect.height;
+    const { width: naturalWidth, height: naturalHeight } = getNaturalDimensions(media);
+    const isScaledDown = media.offsetWidth < naturalWidth || media.offsetHeight < naturalHeight;
+    const mediaAspect = naturalWidth / naturalHeight;
+
+    let renderedMediaSize: iSize;
+
+    if (isScaledDown) {
+      const objectFitCallbacks = {
+        contain: () =>
+          containerAspect > mediaAspect
+            ? {
+                width: contentRect.height * mediaAspect,
+                height: contentRect.height,
+              }
+            : {
+                width: contentRect.width,
+                height: contentRect.width / mediaAspect,
+              },
+        'horizontal-cover': () => ({
+          width: contentRect.width,
+          height: contentRect.width / mediaAspect,
+        }),
+        'vertical-cover': () => ({
+          width: contentRect.height * mediaAspect,
+          height: contentRect.height,
+        }),
+        cover: () =>
+          containerAspect < mediaAspect
+            ? {
+                width: contentRect.width,
+                height: contentRect.width / mediaAspect,
+              }
+            : {
+                width: contentRect.height * mediaAspect,
+                height: contentRect.height,
+              },
+      } as const;
+
+      const callback = objectFitCallbacks[context.objectFit];
+      // eslint-disable-next-line no-nested-ternary
+      renderedMediaSize = callback
+        ? callback()
+        : containerAspect > mediaAspect
+          ? {
+              width: contentRect.height * mediaAspect,
+              height: contentRect.height,
+            }
+          : {
+              width: contentRect.width,
+              height: contentRect.width / mediaAspect,
+            };
+    } else {
+      renderedMediaSize = {
+        width: media.offsetWidth,
+        height: media.offsetHeight,
+      };
+    }
+
+    const mediaSize: iMediaSize = {
+      ...renderedMediaSize,
+      naturalWidth,
+      naturalHeight,
+    };
+
+    store.setState('mediaSize', mediaSize);
+
+    const cropSize = getCropSize(
+      mediaSize.width,
+      mediaSize.height,
+      contentRect.width,
+      contentRect.height,
+      context.aspectRatio,
+      rotation,
+    );
+
+    store.setState('cropSize', cropSize);
+
+    requestAnimationFrame(() => {
+      const currentState = store.getState();
+      if (currentState.cropSize && currentState.mediaSize) {
+        const newPosition = onPositionClamp(
+          currentState.crop,
+          currentState.mediaSize,
+          currentState.cropSize,
+          currentState.zoom,
+          currentState.rotation,
+        );
+
+        if (
+          Math.abs(newPosition.x - currentState.crop.x) > 0.001 ||
+          Math.abs(newPosition.y - currentState.crop.y) > 0.001
+        ) {
+          store.setState('crop', newPosition);
+        }
+      }
+    });
+  }, [mediaRef, context.aspectRatio, context.rootRef, context.objectFit, store, rotation, getNaturalDimensions]);
+
+  return { computeSizes };
+}
+
+interface iCropperImageProps extends ComponentProps<'img'>, VariantProps<typeof cropperMediaVariants> {
+  asChild?: boolean;
+  snapPixels?: boolean;
+}
+
+export function CropperImage(props: iCropperImageProps) {
+  const {
+    className,
+    style,
+    asChild: isAsChild,
+    ref,
+    onLoad,
+    objectFit,
+    snapPixels: shouldSnapPixels = false,
+    ...imageProps
+  } = props;
+
+  const context = useCropperContext(IMAGE_NAME);
+  const store = useStoreContext(IMAGE_NAME);
+  const crop = useStore((state) => state.crop);
+  const zoom = useStore((state) => state.zoom);
+  const rotation = useStore((state) => state.rotation);
+
+  const imageRef = useRef<HTMLImageElement>(null);
+  const composedRef = useComposedRefs(ref, imageRef);
+
+  const getNaturalDimensions = useCallback(
+    (image: HTMLImageElement) => ({
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    }),
+    [],
+  );
+
+  const { computeSizes } = useMediaComputation({
+    mediaRef: imageRef,
+    context,
+    store,
+    rotation,
+    getNaturalDimensions,
+  });
+
+  const onMediaLoad = useCallback(() => {
+    const image = imageRef.current;
+    if (!image) return;
+
+    computeSizes();
+
+    onLoad?.(new Event('load') as unknown as SyntheticEvent<HTMLImageElement>);
+  }, [computeSizes, onLoad]);
+
+  useEffect(() => {
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth > 0) {
+      onMediaLoad();
+    }
+  }, [onMediaLoad]);
+
+  useEffect(() => {
+    const content = context.rootRef?.current;
+    if (!content) return undefined;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      let isFirstResize = true;
+      const resizeObserver = new ResizeObserver(() => {
+        if (isFirstResize) {
+          isFirstResize = false;
+          return;
+        }
+
+        const callback = () => {
+          const image = imageRef.current;
+          if (image?.complete && image.naturalWidth > 0) {
+            computeSizes();
+          }
+        };
+
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(callback);
+        } else {
+          setTimeout(callback, 16);
+        }
+      });
+
+      resizeObserver.observe(content);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }
+
+    const onWindowResize = () => {
+      const image = imageRef.current;
+      if (image?.complete && image.naturalWidth > 0) {
+        computeSizes();
+      }
+    };
+
+    window.addEventListener('resize', onWindowResize);
+    return () => {
+      window.removeEventListener('resize', onWindowResize);
+    };
+  }, [context.rootRef, computeSizes]);
+
+  const ImagePrimitive = isAsChild ? Slot.Slot : 'img';
+
+  return (
+    <ImagePrimitive
+      data-slot="cropper-image"
+      {...imageProps}
+      ref={composedRef}
+      className={cn(
+        cropperMediaVariants({
+          objectFit: objectFit ?? context.objectFit,
+          className,
+        }),
+      )}
+      style={{
+        transform: shouldSnapPixels
+          ? `translate(${snapToDevicePixel(crop.x)}px, ${snapToDevicePixel(crop.y)}px) rotate(${rotation}deg) scale(${zoom})`
+          : `translate(${crop.x}px, ${crop.y}px) rotate(${rotation}deg) scale(${zoom})`,
+        ...style,
+      }}
+      onLoad={onMediaLoad}
+    />
+  );
+}
+
+interface iCropperVideoProps extends ComponentProps<'video'>, VariantProps<typeof cropperMediaVariants> {
+  asChild?: boolean;
+  snapPixels?: boolean;
+}
+
+export function CropperVideo(props: iCropperVideoProps) {
+  const {
+    className,
+    style,
+    asChild: isAsChild,
+    ref,
+    onLoadedMetadata,
+    objectFit,
+    snapPixels: shouldSnapPixels = false,
+    ...videoProps
+  } = props;
+
+  const context = useCropperContext(VIDEO_NAME);
+  const store = useStoreContext(VIDEO_NAME);
+  const crop = useStore((state) => state.crop);
+  const zoom = useStore((state) => state.zoom);
+  const rotation = useStore((state) => state.rotation);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const composedRef = useComposedRefs(ref, videoRef);
+
+  const getNaturalDimensions = useCallback(
+    (video: HTMLVideoElement) => ({
+      width: video.videoWidth,
+      height: video.videoHeight,
+    }),
+    [],
+  );
+
+  const { computeSizes } = useMediaComputation({
+    mediaRef: videoRef,
+    context,
+    store,
+    rotation,
+    getNaturalDimensions,
+  });
+
+  const onMediaLoad = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    computeSizes();
+
+    onLoadedMetadata?.(new Event('loadedmetadata') as unknown as SyntheticEvent<HTMLVideoElement>);
+  }, [computeSizes, onLoadedMetadata]);
+
+  useEffect(() => {
+    const content = context.rootRef?.current;
+    if (!content) return undefined;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      let isFirstResize = true;
+      const resizeObserver = new ResizeObserver(() => {
+        if (isFirstResize) {
+          isFirstResize = false;
+          return;
+        }
+
+        const callback = () => {
+          const video = videoRef.current;
+          if (video && video.videoWidth > 0 && video.videoHeight > 0) {
+            computeSizes();
+          }
+        };
+
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(callback);
+        } else {
+          setTimeout(callback, 16);
+        }
+      });
+
+      resizeObserver.observe(content);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }
+
+    const onWindowResize = () => {
+      const video = videoRef.current;
+      if (video && video.videoWidth > 0 && video.videoHeight > 0) {
+        computeSizes();
+      }
+    };
+
+    window.addEventListener('resize', onWindowResize);
+    return () => {
+      window.removeEventListener('resize', onWindowResize);
+    };
+  }, [context.rootRef, computeSizes]);
+
+  const VideoPrimitive = isAsChild ? Slot.Slot : 'video';
+
+  return (
+    <VideoPrimitive
+      data-slot="cropper-video"
+      autoPlay
+      playsInline
+      loop
+      muted
+      controls={false}
+      {...videoProps}
+      ref={composedRef}
+      className={cn(
+        cropperMediaVariants({
+          objectFit: objectFit ?? context.objectFit,
+          className,
+        }),
+      )}
+      style={{
+        transform: shouldSnapPixels
+          ? `translate(${snapToDevicePixel(crop.x)}px, ${snapToDevicePixel(crop.y)}px) rotate(${rotation}deg) scale(${zoom})`
+          : `translate(${crop.x}px, ${crop.y}px) rotate(${rotation}deg) scale(${zoom})`,
+        ...style,
+      }}
+      onLoadedMetadata={onMediaLoad}
+    />
+  );
+}
+
+const cropperAreaVariants = cva(
+  'absolute top-1/2 left-1/2 box-border -translate-1/2 overflow-hidden border-[2.5px] border-white/90 shadow-[0_0_0_9999em_rgba(0,0,0,0.5)]',
+  {
+    variants: {
+      shape: {
+        rectangle: '',
+        circle: 'rounded-full',
+      },
+      shouldHaveGrid: {
+        true: "before:absolute before:inset-x-1/3 before:inset-y-0 before:box-border before:border before:border-y-0 before:border-white/50 before:content-[''] after:absolute after:inset-x-0 after:inset-y-1/3 after:box-border after:border after:border-x-0 after:border-white/50 after:content-['']",
+        false: '',
+      },
+    },
+    defaultVariants: {
+      shape: 'rectangle',
+      shouldHaveGrid: false,
+    },
+  },
+);
+
+interface iCropperAreaProps extends iDivProps, VariantProps<typeof cropperAreaVariants> {
+  snapPixels?: boolean;
+}
+
+export function CropperArea(props: iCropperAreaProps) {
+  const {
+    className,
+    style,
+    asChild: isAsChild,
+    ref,
+    snapPixels: shouldSnapPixels = false,
+    shape,
+    shouldHaveGrid,
+    ...areaProps
+  } = props;
+
+  const context = useCropperContext(AREA_NAME);
+  const cropSize = useStore((state) => state.cropSize);
+
+  if (!cropSize) return null;
+
+  const AreaPrimitive = isAsChild ? Slot.Slot : 'div';
+
+  return (
+    <AreaPrimitive
+      data-slot="cropper-area"
+      {...areaProps}
+      ref={ref}
+      className={cn(
+        cropperAreaVariants({
+          shape: shape ?? context.shape,
+          shouldHaveGrid: shouldHaveGrid ?? context.shouldHaveGrid,
+          className,
+        }),
+      )}
+      style={{
+        width: shouldSnapPixels ? Math.round(cropSize.width) : cropSize.width,
+        height: shouldSnapPixels ? Math.round(cropSize.height) : cropSize.height,
+        ...style,
+      }}
+    />
+  );
+}

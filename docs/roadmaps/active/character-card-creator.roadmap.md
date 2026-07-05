@@ -388,7 +388,7 @@ No IDAT decompression is needed: chunks are spliced without touching image data,
 - [ ] Keyboard shortcuts (Ctrl+G to generate, Ctrl+S to save/export)
 - [ ] Toast notifications for save/export/import success/failure
 - [ ] Session management (new card, load previous sessions)
-- [ ] Character preview panel (rendered card view)
+- [x] Character preview panel (rendered card view)
 - [ ] Basic CharacterBook editor (add/remove entries with keys + content)
 - [ ] Responsive layout improvements
 - [ ] Accessibility audit (ARIA, focus management, contrast)
@@ -590,4 +590,5 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 | 2026-07-05 | Phase 1 complete: `character-creator` feature scaffolded under `apps/web/src/features/character-creator/` with a zod V2 card schema, Jotai + localStorage session state, and manual editors for all core/prompt-override/metadata fields, alternate greetings (add/remove/reorder), and custom fields. Root route (`/`) now renders the editor. |
 | 2026-07-05 | Phase 2 implementation landed: PNG/JSON import-export, portrait upload + IndexedDB persistence, V1/V2/hybrid normalization, chunk replacement logic, drag-and-drop import, and regression tests covering `main_fire-keeper_spec_v2.png`. |
 | 2026-07-05 | Phase 3 implementation landed: local generation settings, OpenAI-compatible browser/proxy streaming requests, per-field instructions plus generate/continue/cancel controls for core fields, alternate greetings, and custom fields, along with prompt/parser regression tests. |
+| 2026-07-05 | Portrait editor now supports a persisted focal point, SillyTavern-style avatar previews, and export-time portrait cropping that follows the selected focal point. |
 | 2026-07-05 | Added Future Expansion phases: Phase 6 (chat-based revise sessions) and Phase 7 (prompt template presets), both excluded from core completion. Recorded SDK decision: keep the hand-rolled OpenAI-compatible client for Phases 1-5; evaluate Vercel AI SDK vs TanStack AI when Phase 6 starts. |

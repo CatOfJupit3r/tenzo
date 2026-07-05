@@ -26,7 +26,7 @@ import {
   MAX_EXAMPLE_CHARACTER_COUNT,
   toPromptExampleCharacter,
 } from '../lib/example-characters';
-import { buildExampleContextSummary, getExampleContextCharacterBudget  } from '../lib/prompt-builder';
+import { buildExampleContextSummary, getExampleContextCharacterBudget } from '../lib/prompt-builder';
 import type { iFieldGenerationTarget } from '../lib/prompt-builder';
 
 function isAbortError(error: unknown) {
@@ -79,13 +79,22 @@ export function CharacterCreatorPage() {
     getFieldRuntime,
     probeConnection,
   } = useGeneration();
-  const { portraitReference, portraitBlob, portraitObjectUrl, isHydratingPortrait, setPortrait, clearPortrait } =
-    useCharacterPortrait();
+  const {
+    portraitReference,
+    portraitBlob,
+    portraitDimensions,
+    portraitObjectUrl,
+    isHydratingPortrait,
+    portraitCropRect,
+    setPortrait,
+    updatePortraitCropRect,
+    clearPortrait,
+  } = useCharacterPortrait();
 
   const { data } = card;
-  const maxExampleContextCharacters = useMemo(
-    () => getExampleContextCharacterBudget(generationSettings.contextSize, generationSettings.maxTokens),
-    [generationSettings.contextSize, generationSettings.maxTokens],
+  const maxExampleContextCharacters = getExampleContextCharacterBudget(
+    generationSettings.contextSize,
+    generationSettings.maxTokens,
   );
   const promptExampleCharacters = useMemo(
     () => exampleCharacters.map((exampleCharacter) => toPromptExampleCharacter(exampleCharacter)),
@@ -129,7 +138,7 @@ export function CharacterCreatorPage() {
 
       toastSuccess(
         'Endpoint checked',
-        detailParts.length > 0 ? detailParts.join(' | ') : result.providerName ?? 'Provider metadata inferred.',
+        detailParts.length > 0 ? detailParts.join(' | ') : (result.providerName ?? 'Provider metadata inferred.'),
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Health check failed.';
@@ -289,14 +298,14 @@ export function CharacterCreatorPage() {
     }
 
     try {
-      await exportCharacterCardPng(card, portraitBlob);
+      await exportCharacterCardPng(card, portraitBlob, portraitCropRect);
       toastSuccess('PNG exported', 'The portrait now contains an updated `chara` metadata chunk.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The character card could not be exported as PNG.';
       toastError('PNG export failed', message);
       throw error;
     }
-  }, [card, portraitBlob]);
+  }, [card, portraitBlob, portraitCropRect]);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -359,9 +368,12 @@ export function CharacterCreatorPage() {
         <CardContent>
           <ImageUpload
             portraitFileName={portraitReference?.fileName ?? null}
+            portraitDimensions={portraitDimensions}
+            portraitCropRect={portraitCropRect}
             portraitUrl={portraitObjectUrl}
             isHydratingPortrait={isHydratingPortrait}
             onSelectFile={handlePortraitSelect}
+            onCropRectChange={updatePortraitCropRect}
             onClear={clearPortrait}
           />
         </CardContent>

@@ -3,22 +3,16 @@ import { LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
 import { Input } from '@~/components/ui/input';
-import { Textarea } from '@~/components/ui/textarea';
 
+import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
 import type { CustomField } from '../lib/card-schema';
+import { MarkdownFieldEditor } from './editor/markdown-field-editor';
+import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';
-
-interface iCustomFieldGenerationState {
-  shouldUseGeneralCharacterIdea: boolean;
-  instructionValue: string;
-  errorMessage?: string | null;
-  isGenerating: boolean;
-  hasRewriteBackup: boolean;
-}
 
 export interface iCustomFieldsProps {
   fields: CustomField[];
-  generationStates: Record<string, iCustomFieldGenerationState>;
+  generationStates: Record<string, iFieldGenerationState>;
   onAdd: () => void;
   onUpdate: (id: string, patch: Partial<Pick<CustomField, 'label' | 'value'>>) => void;
   onRemove: (id: string) => void;
@@ -28,6 +22,8 @@ export interface iCustomFieldsProps {
   onContinue: (id: string) => void;
   onRewrite: (id: string) => void;
   onRevertRewrite: (id: string) => void;
+  onAcceptRewrite: (id: string) => void;
+  onResolveRewriteReview: (id: string, mergedValue: string) => void;
   onCancel: (id: string) => void;
 }
 
@@ -43,6 +39,8 @@ export function CustomFields({
   onContinue,
   onRewrite,
   onRevertRewrite,
+  onAcceptRewrite,
+  onResolveRewriteReview,
   onCancel,
 }: iCustomFieldsProps) {
   return (
@@ -59,59 +57,79 @@ export function CustomFields({
         <p className="text-sm text-muted-foreground">No custom fields yet.</p>
       ) : (
         <div className="space-y-3">
-          {fields.map((field) => (
-            <div key={field.id} className="space-y-3 rounded-md border p-3">
-              <div className="flex items-start gap-2">
-                <Input
-                  aria-label="Custom field name"
-                  placeholder="Field name"
-                  value={field.label}
-                  className="w-52 shrink-0"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => onUpdate(field.id, { label: event.target.value })}
+          {fields.map((field) => {
+            const generationState = generationStates[field.id];
+            const isGenerating = generationState?.isGenerating ?? false;
+            const shouldShowRewriteReview =
+              (generationState?.isRewriteReviewPending ?? false) &&
+              generationState?.rewriteBackupValue != null &&
+              !isGenerating;
+
+            return (
+              <div key={field.id} className="space-y-3 rounded-md border p-3">
+                <div className="flex items-start gap-2">
+                  <Input
+                    aria-label="Custom field name"
+                    placeholder="Field name"
+                    value={field.label}
+                    className="w-52 shrink-0"
+                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                      onUpdate(field.id, { label: event.target.value })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    tooltip="Remove field"
+                    onClick={() => onRemove(field.id)}
+                  >
+                    <LuTrash2 className="size-4" />
+                  </Button>
+                </div>
+
+                <FieldGenerationControls
+                  fieldId={`custom-field-${field.id}`}
+                  label={field.label.trim() || 'Custom Field'}
+                  shouldUseGeneralCharacterIdea={generationState?.shouldUseGeneralCharacterIdea ?? true}
+                  instructionValue={generationState?.instructionValue ?? ''}
+                  errorMessage={generationState?.errorMessage ?? null}
+                  hasExistingValue={field.value.trim().length > 0}
+                  hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
+                  isGenerating={isGenerating}
+                  onShouldUseGeneralCharacterIdeaChange={(value) =>
+                    onShouldUseGeneralCharacterIdeaChange(field.id, value)
+                  }
+                  onInstructionChange={(value) => onInstructionChange(field.id, value)}
+                  onGenerate={() => onGenerate(field.id)}
+                  onContinue={() => onContinue(field.id)}
+                  onRewrite={() => onRewrite(field.id)}
+                  onRevertRewrite={() => onRevertRewrite(field.id)}
+                  onCancel={() => onCancel(field.id)}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  tooltip="Remove field"
-                  onClick={() => onRemove(field.id)}
-                >
-                  <LuTrash2 className="size-4" />
-                </Button>
+
+                {shouldShowRewriteReview ? (
+                  <RewriteDiffReview
+                    oldValue={generationState?.rewriteBackupValue ?? ''}
+                    newValue={field.value}
+                    onResolve={(mergedValue) => onResolveRewriteReview(field.id, mergedValue)}
+                    onAcceptAll={() => onAcceptRewrite(field.id)}
+                    onRevertAll={() => onRevertRewrite(field.id)}
+                  />
+                ) : (
+                  <MarkdownFieldEditor
+                    fieldId={`custom-field-${field.id}-editor`}
+                    value={field.value}
+                    rows={3}
+                    placeholder="Value"
+                    isReadOnly={isGenerating}
+                    isStreaming={isGenerating}
+                    onValueChange={(value) => onUpdate(field.id, { value })}
+                  />
+                )}
               </div>
-
-              <FieldGenerationControls
-                fieldId={`custom-field-${field.id}`}
-                label={field.label.trim() || 'Custom Field'}
-                shouldUseGeneralCharacterIdea={generationStates[field.id]?.shouldUseGeneralCharacterIdea ?? true}
-                instructionValue={generationStates[field.id]?.instructionValue ?? ''}
-                errorMessage={generationStates[field.id]?.errorMessage ?? null}
-                hasExistingValue={field.value.trim().length > 0}
-                hasRewriteBackup={generationStates[field.id]?.hasRewriteBackup ?? false}
-                isGenerating={generationStates[field.id]?.isGenerating ?? false}
-                onShouldUseGeneralCharacterIdeaChange={(value) =>
-                  onShouldUseGeneralCharacterIdeaChange(field.id, value)
-                }
-                onInstructionChange={(value) => onInstructionChange(field.id, value)}
-                onGenerate={() => onGenerate(field.id)}
-                onContinue={() => onContinue(field.id)}
-                onRewrite={() => onRewrite(field.id)}
-                onRevertRewrite={() => onRevertRewrite(field.id)}
-                onCancel={() => onCancel(field.id)}
-              />
-
-              <Textarea
-                aria-label="Custom field value"
-                placeholder="Value"
-                value={field.value}
-                rows={3}
-                className="flex-1"
-                onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-                  onUpdate(field.id, { value: event.target.value })
-                }
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

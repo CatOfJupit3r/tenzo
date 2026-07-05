@@ -1,4 +1,4 @@
-import { METADATA_FIELD_CONFIGS } from '../../constants/field-config';
+import { FIELD_EDITOR_VARIANTS, METADATA_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
 import { GENERATION_MODES } from '../../lib/prompt-builder';
 import { CharacterField } from '../character-field';
@@ -22,6 +22,8 @@ export function MetadataTab() {
     generateCustomField,
     cancelCustomFieldGeneration,
     revertCustomFieldRewrite,
+    resolveCustomFieldRewriteReview,
+    acceptCustomFieldRewrite,
   } = useCharacterCreatorContext();
 
   return (
@@ -32,6 +34,7 @@ export function MetadataTab() {
           label="General Character Idea"
           value={generalCharacterIdea}
           rows={4}
+          editorVariant={FIELD_EDITOR_VARIANTS.markdown}
           hint="Shared concept, tone, or high-level direction available to every field generation."
           onValueChange={updateGeneralCharacterIdea}
         />
@@ -64,6 +67,8 @@ export function MetadataTab() {
             void generateCustomField(id, GENERATION_MODES.rewrite);
           }}
           onRevertRewrite={revertCustomFieldRewrite}
+          onAcceptRewrite={acceptCustomFieldRewrite}
+          onResolveRewriteReview={resolveCustomFieldRewriteReview}
           onCancel={cancelCustomFieldGeneration}
         />
       </div>

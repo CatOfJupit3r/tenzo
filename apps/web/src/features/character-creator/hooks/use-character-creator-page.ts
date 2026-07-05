@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastSuccess } from '@~/components/toastifications';
 
@@ -25,6 +25,8 @@ export interface iFieldGenerationState {
   errorMessage: string | null | undefined;
   isGenerating: boolean;
   hasRewriteBackup: boolean;
+  isRewriteReviewPending: boolean;
+  rewriteBackupValue: string | null;
 }
 
 function isAbortError(error: unknown) {
@@ -34,6 +36,10 @@ function isAbortError(error: unknown) {
 function removeRewriteBackup(backups: Record<string, string>, fieldKey: string) {
   const { [fieldKey]: _removedBackup, ...remainingBackups } = backups;
   return remainingBackups;
+}
+
+function removePendingReviewKey(pendingKeys: Record<string, boolean>, fieldKey: string) {
+  return Object.fromEntries(Object.entries(pendingKeys).filter(([key]) => key !== fieldKey));
 }
 
 function createStandardFieldTarget(key: CharacterTextFieldKey, label: string, value: string): iFieldGenerationTarget {
@@ -49,6 +55,7 @@ export function useCharacterCreatorPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [rewriteBackups, setRewriteBackups] = useState<Record<string, string>>({});
+  const [pendingRewriteReviewKeys, setPendingRewriteReviewKeys] = useState<Record<string, boolean>>({});
 
   const {
     characterLibrary,
@@ -105,6 +112,12 @@ export function useCharacterCreatorPage() {
     clearPortrait,
   } = useCharacterPortrait();
 
+  useEffect(() => {
+    // Backups belong to the character they were captured from; drop them on switch.
+    setRewriteBackups({});
+    setPendingRewriteReviewKeys({});
+  }, [activeCharacterId]);
+
   const { data } = card;
   const generalCharacterIdea = getGeneralCharacterIdea();
   const selectedRequestModeLabel =
@@ -137,9 +150,11 @@ export function useCharacterCreatorPage() {
         errorMessage: runtime.errorMessage,
         isGenerating: runtime.isGenerating,
         hasRewriteBackup: rewriteBackups[fieldKey] !== undefined,
+        isRewriteReviewPending: Boolean(pendingRewriteReviewKeys[fieldKey]) && rewriteBackups[fieldKey] !== undefined,
+        rewriteBackupValue: rewriteBackups[fieldKey] ?? null,
       };
     },
-    [getFieldInstruction, getFieldRuntime, rewriteBackups, shouldUseGeneralCharacterIdea],
+    [getFieldInstruction, getFieldRuntime, pendingRewriteReviewKeys, rewriteBackups, shouldUseGeneralCharacterIdea],
   );
 
   const getStandardFieldGenerationState = useCallback(
@@ -164,6 +179,8 @@ export function useCharacterCreatorPage() {
 
         return removeRewriteBackup(prev, target.key);
       });
+      // Starting any generation implicitly settles a pending review for the field.
+      setPendingRewriteReviewKeys((prev) => removePendingReviewKey(prev, target.key));
 
       try {
         await generateField({
@@ -174,6 +191,10 @@ export function useCharacterCreatorPage() {
           exampleCharacters: promptExampleCharacters,
           maxExampleContextCharacters,
         });
+
+        if (mode === GENERATION_MODES.rewrite) {
+          setPendingRewriteReviewKeys((prev) => ({ ...prev, [target.key]: true }));
+        }
       } catch (error) {
         if (isAbortError(error)) {
           return;
@@ -196,9 +217,24 @@ export function useCharacterCreatorPage() {
 
       onValueChange(backupValue);
       setRewriteBackups((prev) => removeRewriteBackup(prev, fieldKey));
+      setPendingRewriteReviewKeys((prev) => removePendingReviewKey(prev, fieldKey));
     },
     [rewriteBackups],
   );
+
+  const resolveFieldRewriteReview = useCallback(
+    (fieldKey: string, mergedValue: string, onValueChange: (value: string) => unknown) => {
+      onValueChange(mergedValue);
+      setRewriteBackups((prev) => removeRewriteBackup(prev, fieldKey));
+      setPendingRewriteReviewKeys((prev) => removePendingReviewKey(prev, fieldKey));
+    },
+    [],
+  );
+
+  const acceptFieldRewrite = useCallback((fieldKey: string) => {
+    setRewriteBackups((prev) => removeRewriteBackup(prev, fieldKey));
+    setPendingRewriteReviewKeys((prev) => removePendingReviewKey(prev, fieldKey));
+  }, []);
 
   const generateStandardField = useCallback(
     async (key: CharacterTextFieldKey, label: string, mode: GenerationMode = GENERATION_MODES.generate) => {
@@ -215,6 +251,17 @@ export function useCharacterCreatorPage() {
   const revertStandardFieldRewrite = useCallback(
     (key: CharacterTextFieldKey) => revertFieldRewrite(`field:${key}`, (value) => updateField(key, value)),
     [revertFieldRewrite, updateField],
+  );
+
+  const resolveStandardFieldRewriteReview = useCallback(
+    (key: CharacterTextFieldKey, mergedValue: string) =>
+      resolveFieldRewriteReview(`field:${key}`, mergedValue, (value) => updateField(key, value)),
+    [resolveFieldRewriteReview, updateField],
+  );
+
+  const acceptStandardFieldRewrite = useCallback(
+    (key: CharacterTextFieldKey) => acceptFieldRewrite(`field:${key}`),
+    [acceptFieldRewrite],
   );
 
   const updateStandardFieldShouldUseGeneralCharacterIdea = useCallback(
@@ -366,6 +413,17 @@ export function useCharacterCreatorPage() {
     [revertFieldRewrite, updateGreeting],
   );
 
+  const resolveAlternateGreetingRewriteReview = useCallback(
+    (index: number, mergedValue: string) =>
+      resolveFieldRewriteReview(`alternate_greetings:${index}`, mergedValue, (value) => updateGreeting(index, value)),
+    [resolveFieldRewriteReview, updateGreeting],
+  );
+
+  const acceptAlternateGreetingRewrite = useCallback(
+    (index: number) => acceptFieldRewrite(`alternate_greetings:${index}`),
+    [acceptFieldRewrite],
+  );
+
   const handleRemoveCustomField = useCallback(
     (id: string) => {
       removeCustomField(id);
@@ -395,7 +453,7 @@ export function useCharacterCreatorPage() {
       await runGeneration(
         {
           key: `custom:${id}`,
-          label: customField.label.trim() || 'Custom Field',
+          label: customField.label.trim() ?? 'Custom Field',
           value: customField.value,
           kind: 'custom-field',
         },
@@ -411,6 +469,17 @@ export function useCharacterCreatorPage() {
   const revertCustomFieldRewrite = useCallback(
     (id: string) => revertFieldRewrite(`custom:${id}`, (value) => updateCustomField(id, { value })),
     [revertFieldRewrite, updateCustomField],
+  );
+
+  const resolveCustomFieldRewriteReview = useCallback(
+    (id: string, mergedValue: string) =>
+      resolveFieldRewriteReview(`custom:${id}`, mergedValue, (value) => updateCustomField(id, { value })),
+    [resolveFieldRewriteReview, updateCustomField],
+  );
+
+  const acceptCustomFieldRewrite = useCallback(
+    (id: string) => acceptFieldRewrite(`custom:${id}`),
+    [acceptFieldRewrite],
   );
 
   const handleImportExampleFiles = useCallback(
@@ -541,6 +610,8 @@ export function useCharacterCreatorPage() {
     generateStandardField,
     cancelStandardFieldGeneration,
     revertStandardFieldRewrite,
+    resolveStandardFieldRewriteReview,
+    acceptStandardFieldRewrite,
     updateStandardFieldShouldUseGeneralCharacterIdea,
     updateStandardFieldInstruction,
 
@@ -550,6 +621,8 @@ export function useCharacterCreatorPage() {
     generateAlternateGreeting,
     cancelAlternateGreetingGeneration,
     revertAlternateGreetingRewrite,
+    resolveAlternateGreetingRewriteReview,
+    acceptAlternateGreetingRewrite,
 
     customFieldGenerationStates,
     updateCustomFieldShouldUseGeneralCharacterIdea,
@@ -557,6 +630,8 @@ export function useCharacterCreatorPage() {
     generateCustomField,
     cancelCustomFieldGeneration,
     revertCustomFieldRewrite,
+    resolveCustomFieldRewriteReview,
+    acceptCustomFieldRewrite,
 
     portraitReference,
     portraitBlob,

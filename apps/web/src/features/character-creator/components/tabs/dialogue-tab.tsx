@@ -20,6 +20,8 @@ export function DialogueTab() {
     generateAlternateGreeting,
     cancelAlternateGreetingGeneration,
     revertAlternateGreetingRewrite,
+    resolveAlternateGreetingRewriteReview,
+    acceptAlternateGreetingRewrite,
   } = useCharacterCreatorContext();
 
   return (
@@ -48,6 +50,8 @@ export function DialogueTab() {
             void generateAlternateGreeting(index, GENERATION_MODES.rewrite);
           }}
           onRevertRewrite={revertAlternateGreetingRewrite}
+          onAcceptRewrite={acceptAlternateGreetingRewrite}
+          onResolveRewriteReview={resolveAlternateGreetingRewriteReview}
           onCancel={cancelAlternateGreetingGeneration}
         />
       </div>

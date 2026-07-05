@@ -2,8 +2,12 @@ import type { ChangeEvent } from 'react';
 
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
-import { Textarea } from '@~/components/ui/textarea';
 
+import type { FieldEditorVariant } from '../constants/field-config';
+import { FIELD_EDITOR_VARIANTS } from '../constants/field-config';
+import { MarkdownFieldEditor } from './editor/markdown-field-editor';
+import { MesExampleEditor } from './editor/mes-example-editor';
+import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';
 
 export interface iCharacterFieldProps {
@@ -12,11 +16,15 @@ export interface iCharacterFieldProps {
   value: string;
   rows?: number;
   hint?: string;
+  editorVariant?: FieldEditorVariant;
+  doesAllowOriginalMacro?: boolean;
   shouldUseGeneralCharacterIdea?: boolean;
   instructionValue?: string;
   generationErrorMessage?: string | null;
   isGenerating?: boolean;
   hasRewriteBackup?: boolean;
+  isRewriteReviewPending?: boolean;
+  rewriteBackupValue?: string | null;
   onValueChange: (value: string) => void;
   onShouldUseGeneralCharacterIdeaChange?: (value: boolean) => void;
   onInstructionChange?: (value: string) => void;
@@ -24,6 +32,8 @@ export interface iCharacterFieldProps {
   onContinue?: () => void;
   onRewrite?: () => void;
   onRevertRewrite?: () => void;
+  onAcceptRewrite?: () => void;
+  onResolveRewriteReview?: (mergedValue: string) => void;
   onCancel?: () => void;
 }
 
@@ -33,11 +43,15 @@ export function CharacterField({
   value,
   rows = 4,
   hint,
+  editorVariant,
+  doesAllowOriginalMacro = false,
   shouldUseGeneralCharacterIdea = true,
   instructionValue = '',
   generationErrorMessage = null,
   isGenerating = false,
   hasRewriteBackup = false,
+  isRewriteReviewPending = false,
+  rewriteBackupValue = null,
   onValueChange,
   onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
@@ -45,10 +59,66 @@ export function CharacterField({
   onContinue,
   onRewrite,
   onRevertRewrite,
+  onAcceptRewrite,
+  onResolveRewriteReview,
   onCancel,
 }: iCharacterFieldProps) {
   const hasGenerationControls =
     onShouldUseGeneralCharacterIdeaChange && onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
+
+  const resolvedVariant = editorVariant ?? (rows <= 1 ? FIELD_EDITOR_VARIANTS.plain : FIELD_EDITOR_VARIANTS.markdown);
+  const hintId = hint ? `${fieldId}-hint` : undefined;
+  const shouldShowRewriteReview =
+    isRewriteReviewPending && rewriteBackupValue !== null && !isGenerating && onResolveRewriteReview && onAcceptRewrite;
+
+  const renderFieldBody = () => {
+    if (shouldShowRewriteReview) {
+      return (
+        <RewriteDiffReview
+          oldValue={rewriteBackupValue}
+          newValue={value}
+          onResolve={onResolveRewriteReview}
+          onAcceptAll={onAcceptRewrite}
+          onRevertAll={onRevertRewrite ?? (() => undefined)}
+        />
+      );
+    }
+    if (resolvedVariant === FIELD_EDITOR_VARIANTS.plain || rows <= 1) {
+      return (
+        <Input
+          id={fieldId}
+          aria-describedby={hintId}
+          value={value}
+          onChange={(event: ChangeEvent<HTMLInputElement>) => onValueChange(event.target.value)}
+        />
+      );
+    }
+    if (resolvedVariant === FIELD_EDITOR_VARIANTS.mesExample) {
+      return (
+        <MesExampleEditor
+          fieldId={fieldId}
+          value={value}
+          rows={rows}
+          isReadOnly={isGenerating}
+          isStreaming={isGenerating}
+          ariaDescribedBy={hintId}
+          onValueChange={onValueChange}
+        />
+      );
+    }
+    return (
+      <MarkdownFieldEditor
+        fieldId={fieldId}
+        value={value}
+        rows={rows}
+        isReadOnly={isGenerating}
+        isStreaming={isGenerating}
+        doesAllowOriginalMacro={doesAllowOriginalMacro}
+        ariaDescribedBy={hintId}
+        onValueChange={onValueChange}
+      />
+    );
+  };
 
   return (
     <div className="space-y-3">
@@ -72,22 +142,7 @@ export function CharacterField({
           onCancel={onCancel}
         />
       ) : null}
-      {rows <= 1 ? (
-        <Input
-          id={fieldId}
-          aria-describedby={hint ? `${fieldId}-hint` : undefined}
-          value={value}
-          onChange={(event: ChangeEvent<HTMLInputElement>) => onValueChange(event.target.value)}
-        />
-      ) : (
-        <Textarea
-          id={fieldId}
-          aria-describedby={hint ? `${fieldId}-hint` : undefined}
-          value={value}
-          rows={rows}
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onValueChange(event.target.value)}
-        />
-      )}
+      {renderFieldBody()}
       {hint ? (
         <p id={`${fieldId}-hint`} className="text-sm text-muted-foreground">
           {hint}

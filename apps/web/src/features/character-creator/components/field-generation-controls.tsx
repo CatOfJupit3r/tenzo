@@ -114,7 +114,7 @@ export function FieldGenerationControls({
           {hasRewriteBackup ? (
             <Button type="button" size="sm" variant="outline" disabled={isGenerating} onClick={onRevertRewrite}>
               <LuUndo2 className="size-4" />
-              Undo rewrite
+              Revert rewrite
             </Button>
           ) : null}
           <Button type="button" size="sm" variant="ghost" disabled={!isGenerating} onClick={onCancel}>

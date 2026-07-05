@@ -137,3 +137,88 @@ body {
 .higher-than-radix-modal {
   z-index: 1050 !important;
 }
+
+.character-markdown-editor .ProseMirror {
+  @apply min-h-full px-3 py-2 text-base outline-none md:text-sm;
+}
+
+.character-markdown-editor .ProseMirror > * + * {
+  @apply mt-2;
+}
+
+.character-markdown-editor .ProseMirror h1 {
+  @apply text-xl font-semibold;
+}
+
+.character-markdown-editor .ProseMirror h2 {
+  @apply text-lg font-semibold;
+}
+
+.character-markdown-editor .ProseMirror h3 {
+  @apply text-base font-semibold;
+}
+
+.character-markdown-editor .ProseMirror ul {
+  @apply list-disc pl-5;
+}
+
+.character-markdown-editor .ProseMirror ol {
+  @apply list-decimal pl-5;
+}
+
+.character-markdown-editor .ProseMirror blockquote {
+  @apply border-l-2 border-border pl-3 text-muted-foreground;
+}
+
+.character-markdown-editor .ProseMirror code {
+  @apply rounded bg-muted px-1 py-0.5 font-mono text-sm;
+}
+
+.character-markdown-editor .ProseMirror pre {
+  @apply rounded-md bg-muted p-3 font-mono text-sm;
+}
+
+.character-markdown-editor .ProseMirror pre code {
+  @apply bg-transparent p-0;
+}
+
+.character-markdown-editor .ProseMirror a {
+  @apply text-primary underline underline-offset-2;
+}
+
+.character-markdown-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-left h-0 text-muted-foreground;
+}
+
+.macro-chip {
+  @apply rounded-sm px-0.5 font-mono text-[0.9em];
+}
+
+.macro-chip-char {
+  @apply bg-chart-1/15 text-chart-1;
+}
+
+.macro-chip-user {
+  @apply bg-chart-2/15 text-chart-2;
+}
+
+.macro-chip-original {
+  @apply bg-chart-4/20 text-chart-5;
+}
+
+.macro-chip-unknown {
+  @apply bg-muted text-muted-foreground;
+}
+
+.mes-example-start-line {
+  @apply my-1 block rounded-sm border border-dashed border-border bg-muted/50 px-2 py-0.5 text-center font-mono text-xs tracking-widest text-muted-foreground uppercase;
+}
+
+.mes-example-speaker-char {
+  @apply font-semibold text-chart-1;
+}
+
+.mes-example-speaker-user {
+  @apply font-semibold text-chart-2;
+}

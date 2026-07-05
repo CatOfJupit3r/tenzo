@@ -1,0 +1,66 @@
+import { METADATA_FIELD_CONFIGS } from '../../constants/field-config';
+import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
+import { CharacterField } from '../character-field';
+import { CharacterFieldPanel } from '../character-field-panel';
+import { CustomFields } from '../custom-fields';
+import { TagsInput } from '../tags-input';
+import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
+
+export function MetadataTab() {
+  const {
+    data,
+    updateTags,
+    generalCharacterIdea,
+    updateGeneralCharacterIdea,
+    addCustomField,
+    updateCustomField,
+    handleRemoveCustomField,
+    customFieldGenerationStates,
+    updateCustomFieldShouldUseGeneralCharacterIdea,
+    updateCustomFieldInstruction,
+    generateCustomField,
+    cancelCustomFieldGeneration,
+  } = useCharacterCreatorContext();
+
+  return (
+    <div className="space-y-4">
+      <div className={FIELD_PANEL_CLASS_NAME}>
+        <CharacterField
+          fieldId="general-character-idea"
+          label="General Character Idea"
+          value={generalCharacterIdea}
+          rows={4}
+          hint="Shared concept, tone, or high-level direction available to every field generation."
+          onValueChange={updateGeneralCharacterIdea}
+        />
+      </div>
+
+      <TagsInput value={data.tags} onChange={updateTags} />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {METADATA_FIELD_CONFIGS.map((config) => (
+          <CharacterFieldPanel key={config.key} config={config} isWide={config.key === 'creator_notes'} />
+        ))}
+      </div>
+
+      <div className={FIELD_PANEL_CLASS_NAME}>
+        <CustomFields
+          fields={data.extensions.custom_fields}
+          generationStates={customFieldGenerationStates}
+          onAdd={addCustomField}
+          onUpdate={updateCustomField}
+          onRemove={handleRemoveCustomField}
+          onShouldUseGeneralCharacterIdeaChange={updateCustomFieldShouldUseGeneralCharacterIdea}
+          onInstructionChange={updateCustomFieldInstruction}
+          onGenerate={(id) => {
+            void generateCustomField(id);
+          }}
+          onContinue={(id) => {
+            void generateCustomField(id, true);
+          }}
+          onCancel={cancelCustomFieldGeneration}
+        />
+      </div>
+    </div>
+  );
+}

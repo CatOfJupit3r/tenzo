@@ -1,13 +1,22 @@
 import type { ChangeEvent, ReactNode } from 'react';
-import { useCallback, useId } from 'react';
-import { LuImagePlus, LuRefreshCw, LuTrash2 } from 'react-icons/lu';
+import { useCallback, useId, useState } from 'react';
+import { LuFocus, LuImagePlus, LuRefreshCw, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
-import { CardDescription, CardHeader, CardTitle } from '@~/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@~/components/ui/dialog';
 
+import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
 import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
 import { PortraitAvatarPreview } from './portrait-avatar-preview';
 import { PortraitFocalPointEditor } from './portrait-focal-point-editor';
+import { PortraitPreviewSurface } from './portrait-preview-surface';
 
 export interface iImageUploadProps {
   portraitUrl: string | null;
@@ -30,6 +39,7 @@ export function ImageUpload({
   onCropRectChange,
   onClear,
 }: iImageUploadProps) {
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const portraitFileInputId = useId();
   const isPortraitLoading = isHydratingPortrait || (portraitUrl !== null && portraitDimensions === null);
   const isPortraitReady = portraitUrl !== null && portraitDimensions !== null && portraitCropRect !== null;
@@ -58,39 +68,92 @@ export function ImageUpload({
 
   if (isPortraitLoading) {
     portraitContent = (
-      <div className="flex min-h-96 items-center justify-center rounded-xl border bg-muted/20 px-4 text-center text-sm text-muted-foreground">
+      <div className="flex aspect-2/3 w-full items-center justify-center rounded-[20px] border bg-muted/20 px-4 text-center text-sm text-muted-foreground">
         Loading saved portrait...
       </div>
     );
   } else if (isPortraitReady) {
     portraitContent = (
-      <div className="space-y-3">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)] xl:items-start">
-          <PortraitFocalPointEditor
-            cropRect={portraitCropRect}
-            onCropRectChange={onCropRectChange}
-            portraitDimensions={portraitDimensions}
-            portraitUrl={portraitUrl}
-          />
-          <PortraitAvatarPreview
+      <div className="space-y-4">
+        <div className="overflow-hidden rounded-[20px] border bg-black/95 shadow-sm">
+          <PortraitPreviewSurface
+            alt={portraitFileName ?? 'Selected portrait preview'}
+            className="w-full"
             cropRect={portraitCropRect}
             portraitDimensions={portraitDimensions}
             portraitUrl={portraitUrl}
+            style={{ aspectRatio: SILLY_TAVERN_PORTRAIT_ASPECT_RATIO }}
           />
         </div>
 
-        <p className="text-sm text-muted-foreground">{portraitFileName ?? 'Portrait image selected.'}</p>
+        <div className="rounded-2xl border bg-muted/20 p-4">
+          <p className="text-xs font-medium tracking-[0.24em] text-muted-foreground uppercase">Portrait Ready</p>
+          <p className="mt-2 text-sm font-medium">{portraitFileName ?? 'Portrait image selected.'}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The exported PNG keeps this 2:3 crop, and avatar previews derive from the same framing.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+            <DialogTrigger asChild>
+              <Button type="button" variant="outline">
+                <LuFocus className="size-4" />
+                Edit focal point & previews
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+              <DialogHeader>
+                <DialogTitle>Portrait & previews</DialogTitle>
+                <DialogDescription>
+                  Drag to choose which part stays centered in the exported crop, then confirm how it reads in portrait
+                  and avatar surfaces.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)] lg:items-start">
+                <PortraitFocalPointEditor
+                  cropRect={portraitCropRect}
+                  onCropRectChange={onCropRectChange}
+                  portraitDimensions={portraitDimensions}
+                  portraitUrl={portraitUrl}
+                />
+                <PortraitAvatarPreview
+                  cropRect={portraitCropRect}
+                  portraitDimensions={portraitDimensions}
+                  portraitUrl={portraitUrl}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Button asChild variant="outline">
+            <label htmlFor={portraitFileInputId}>
+              <LuRefreshCw className="size-4" />
+              Replace portrait
+            </label>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            onClick={handleClear}
+          >
+            <LuTrash2 className="size-4" />
+            Clear portrait
+          </Button>
+        </div>
       </div>
     );
   } else {
     portraitContent = (
       <label
         htmlFor={portraitFileInputId}
-        className="flex min-h-96 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center transition-colors hover:border-foreground/40 hover:bg-muted/50"
+        className="flex aspect-2/3 w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-[20px] border border-dashed border-border bg-muted/30 p-6 text-center transition-colors hover:border-foreground/40 hover:bg-muted/50"
       >
         <LuImagePlus className="size-5" />
         <div className="space-y-1">
-          <p className="text-sm font-medium">Choose portrait image</p>
+          <p className="text-sm font-medium">Drop portrait here</p>
           <p className="max-w-sm text-sm text-muted-foreground">
             The portrait stays local. You can zoom, pan, and export the final crop directly into the PNG card.
           </p>
@@ -108,34 +171,6 @@ export function ImageUpload({
         accept="image/png,image/jpeg,image/webp"
         onChange={handleFileChange}
       />
-
-      <CardHeader className="px-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle>Portrait</CardTitle>
-            <CardDescription>
-              Upload PNG, JPG, or WebP. Drag to reframe the 2:3 export crop, then preview how the avatar will look in
-              chat and character lists.
-            </CardDescription>
-          </div>
-
-          {isPortraitReady ? (
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <label htmlFor={portraitFileInputId}>
-                  <LuRefreshCw className="size-4" />
-                  Replace portrait
-                </label>
-              </Button>
-              <Button type="button" variant="outline" onClick={handleClear}>
-                <LuTrash2 className="size-4" />
-                Clear portrait
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </CardHeader>
-
       {portraitContent}
     </div>
   );

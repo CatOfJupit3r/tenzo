@@ -9,7 +9,7 @@ import {
 } from './prompt-builder';
 
 describe('prompt-builder', () => {
-  it('includes current card context, custom fields, and field instructions', () => {
+  it('includes current card context, the general character idea, and field instructions', () => {
     const card = createEmptyCharacterCard();
     card.data.name = 'Fire Keeper';
     card.data.description = 'A quiet guardian of the kiln.';
@@ -26,14 +26,37 @@ describe('prompt-builder', () => {
         kind: 'field',
       },
       outputFormat: OUTPUT_FORMATS.xml,
+      generalCharacterIdea: 'A quietly devout firekeeper with ceremonial language.',
       userInstructions: 'Open with a tactile sensory detail.',
     });
 
     expect(messages[0]?.role).toBe('system');
     expect(messages[1]?.content).toContain('Name: Fire Keeper');
     expect(messages[1]?.content).toContain('Custom Field Weapon: Lantern spear');
+    expect(messages[1]?.content).toContain(
+      'General character idea: A quietly devout firekeeper with ceremonial language.',
+    );
     expect(messages[1]?.content).toContain('Field-specific instructions: Open with a tactile sensory detail.');
     expect(messages[1]?.content).toContain('Return the answer wrapped in a single <response> tag.');
+  });
+
+  it('omits the general character idea when the field switch is off', () => {
+    const card = createEmptyCharacterCard();
+
+    const messages = buildGenerationMessages({
+      card,
+      target: {
+        key: 'field:description',
+        label: 'Description',
+        value: '',
+        kind: 'field',
+      },
+      outputFormat: OUTPUT_FORMATS.none,
+      generalCharacterIdea: 'A knight who masks grief with ritual politeness.',
+      shouldUseGeneralCharacterIdea: false,
+    });
+
+    expect(messages[1]?.content).not.toContain('General character idea:');
   });
 
   it('applies system prompt overrides through the original placeholder', () => {

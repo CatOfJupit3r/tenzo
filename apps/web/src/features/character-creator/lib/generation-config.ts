@@ -18,7 +18,9 @@ export interface iCharacterGenerationSettings {
   maxTokens: number;
   outputFormat: OutputFormat;
   requestMode: RequestMode;
+  generalCharacterIdea: string;
   fieldInstructions: Record<string, string>;
+  fieldShouldUseGeneralCharacterIdea: Record<string, boolean>;
 }
 
 export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings = {
@@ -29,7 +31,9 @@ export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings
   maxTokens: 600,
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
+  generalCharacterIdea: '',
   fieldInstructions: {},
+  fieldShouldUseGeneralCharacterIdea: {},
 };
 
 function readString(value: unknown, fallbackValue: string) {
@@ -52,6 +56,18 @@ function readFieldInstructions(value: unknown) {
   );
 }
 
+function readFieldShouldUseGeneralCharacterIdea(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return DEFAULT_CHARACTER_GENERATION_SETTINGS.fieldShouldUseGeneralCharacterIdea;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, boolean] => typeof entry[0] === 'string' && typeof entry[1] === 'boolean',
+    ),
+  );
+}
+
 export function sanitizeCharacterGenerationSettings(value: unknown): iCharacterGenerationSettings {
   const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
@@ -67,7 +83,14 @@ export function sanitizeCharacterGenerationSettings(value: unknown): iCharacterG
     requestMode: REQUEST_MODE_SCHEMA.safeParse(candidate.requestMode).success
       ? (candidate.requestMode as RequestMode)
       : DEFAULT_CHARACTER_GENERATION_SETTINGS.requestMode,
+    generalCharacterIdea: readString(
+      candidate.generalCharacterIdea,
+      DEFAULT_CHARACTER_GENERATION_SETTINGS.generalCharacterIdea,
+    ),
     fieldInstructions: readFieldInstructions(candidate.fieldInstructions),
+    fieldShouldUseGeneralCharacterIdea: readFieldShouldUseGeneralCharacterIdea(
+      candidate.fieldShouldUseGeneralCharacterIdea,
+    ),
   };
 }
 

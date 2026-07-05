@@ -17,10 +17,10 @@ import {
   sanitizeCharacterGenerationSettings,
 } from '../lib/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
-import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
-import { probeProviderMetadata } from '../lib/provider-health';
 import { buildGenerationMessages, getGenerationTargetKey } from '../lib/prompt-builder';
 import type { iFieldGenerationTarget, iPromptExampleCharacter } from '../lib/prompt-builder';
+import { probeProviderMetadata } from '../lib/provider-health';
+import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
 import { getPrefilled, parseResponse } from '../lib/response-parser';
 
 interface iFieldGenerationRuntimeState {
@@ -50,6 +50,15 @@ interface iConnectionHealthState {
 function removeFieldInstruction(instructions: Record<string, string>, instructionKey: string) {
   const { [instructionKey]: _removedInstruction, ...remainingInstructions } = instructions;
   return remainingInstructions;
+}
+
+function removeFieldShouldUseGeneralCharacterIdea(
+  fieldShouldUseGeneralCharacterIdea: Record<string, boolean>,
+  instructionKey: string,
+) {
+  const { [instructionKey]: shouldRemovePreference, ...remainingPreferences } = fieldShouldUseGeneralCharacterIdea;
+  void shouldRemovePreference;
+  return remainingPreferences;
 }
 
 export function useGeneration() {
@@ -82,7 +91,14 @@ export function useGeneration() {
   }, []);
 
   const updateGenerationSettings = useCallback(
-    (patch: Partial<Omit<iCharacterGenerationSettings, 'fieldInstructions' | 'apiKeyCiphertext'>>) => {
+    (
+      patch: Partial<
+        Omit<
+          iCharacterGenerationSettings,
+          'apiKeyCiphertext' | 'fieldInstructions' | 'fieldShouldUseGeneralCharacterIdea' | 'generalCharacterIdea'
+        >
+      >,
+    ) => {
       setGenerationSettings((prev) => ({ ...sanitizeCharacterGenerationSettings(prev), ...patch }));
     },
     [setGenerationSettings],
@@ -115,12 +131,45 @@ export function useGeneration() {
     [setGenerationSettings],
   );
 
+  const getGeneralCharacterIdea = useCallback(() => generationSettings.generalCharacterIdea, [generationSettings]);
+
+  const updateGeneralCharacterIdea = useCallback(
+    (value: string) => {
+      setGenerationSettings((prev) => ({
+        ...sanitizeCharacterGenerationSettings(prev),
+        generalCharacterIdea: value,
+      }));
+    },
+    [setGenerationSettings],
+  );
+
+  const shouldUseGeneralCharacterIdea = useCallback(
+    (fieldKey: string) => generationSettings.fieldShouldUseGeneralCharacterIdea[fieldKey] ?? true,
+    [generationSettings.fieldShouldUseGeneralCharacterIdea],
+  );
+
+  const updateFieldShouldUseGeneralCharacterIdea = useCallback(
+    (fieldKey: string, value: boolean) => {
+      setGenerationSettings((prev) => ({
+        ...sanitizeCharacterGenerationSettings(prev),
+        fieldShouldUseGeneralCharacterIdea: value
+          ? removeFieldShouldUseGeneralCharacterIdea(prev.fieldShouldUseGeneralCharacterIdea, fieldKey)
+          : { ...prev.fieldShouldUseGeneralCharacterIdea, [fieldKey]: false },
+      }));
+    },
+    [setGenerationSettings],
+  );
+
   const removeCustomFieldInstruction = useCallback(
     (customFieldId: string) => {
       const instructionKey = `custom:${customFieldId}`;
       setGenerationSettings((prev) => ({
         ...sanitizeCharacterGenerationSettings(prev),
         fieldInstructions: removeFieldInstruction(prev.fieldInstructions, instructionKey),
+        fieldShouldUseGeneralCharacterIdea: removeFieldShouldUseGeneralCharacterIdea(
+          prev.fieldShouldUseGeneralCharacterIdea,
+          instructionKey,
+        ),
       }));
     },
     [setGenerationSettings],
@@ -147,8 +196,29 @@ export function useGeneration() {
           },
           {},
         );
+        const nextFieldShouldUseGeneralCharacterIdea = Object.entries(prev.fieldShouldUseGeneralCharacterIdea).reduce<
+          Record<string, boolean>
+        >((acc, [key, value]) => {
+          if (!key.startsWith('alternate_greetings:')) {
+            acc[key] = value;
+            return acc;
+          }
 
-        return { ...sanitizeCharacterGenerationSettings(prev), fieldInstructions: nextInstructions };
+          const instructionIndex = Number.parseInt(key.split(':')[1] ?? '', 10);
+          if (Number.isNaN(instructionIndex) || instructionIndex === index) {
+            return acc;
+          }
+
+          const nextKey = instructionIndex > index ? `alternate_greetings:${instructionIndex - 1}` : key;
+          acc[nextKey] = value;
+          return acc;
+        }, {});
+
+        return {
+          ...sanitizeCharacterGenerationSettings(prev),
+          fieldInstructions: nextInstructions,
+          fieldShouldUseGeneralCharacterIdea: nextFieldShouldUseGeneralCharacterIdea,
+        };
       });
     },
     [setGenerationSettings],
@@ -158,12 +228,20 @@ export function useGeneration() {
     (fromIndex: number, toIndex: number) => {
       setGenerationSettings((prev) => {
         const nextInstructions = { ...prev.fieldInstructions };
+        const nextFieldShouldUseGeneralCharacterIdea = { ...prev.fieldShouldUseGeneralCharacterIdea };
         const fromKey = `alternate_greetings:${fromIndex}`;
         const toKey = `alternate_greetings:${toIndex}`;
         const fromValue = nextInstructions[fromKey];
         const toValue = nextInstructions[toKey];
+        const shouldUseGeneralIdeaFromSourceField = nextFieldShouldUseGeneralCharacterIdea[fromKey];
+        const shouldUseGeneralIdeaFromTargetField = nextFieldShouldUseGeneralCharacterIdea[toKey];
 
-        if (fromValue === undefined && toValue === undefined) {
+        if (
+          fromValue === undefined &&
+          toValue === undefined &&
+          shouldUseGeneralIdeaFromSourceField === undefined &&
+          shouldUseGeneralIdeaFromTargetField === undefined
+        ) {
           return prev;
         }
 
@@ -179,7 +257,23 @@ export function useGeneration() {
           nextInstructions[fromKey] = toValue;
         }
 
-        return { ...sanitizeCharacterGenerationSettings(prev), fieldInstructions: nextInstructions };
+        if (shouldUseGeneralIdeaFromSourceField === undefined) {
+          delete nextFieldShouldUseGeneralCharacterIdea[toKey];
+        } else {
+          nextFieldShouldUseGeneralCharacterIdea[toKey] = shouldUseGeneralIdeaFromSourceField;
+        }
+
+        if (shouldUseGeneralIdeaFromTargetField === undefined) {
+          delete nextFieldShouldUseGeneralCharacterIdea[fromKey];
+        } else {
+          nextFieldShouldUseGeneralCharacterIdea[fromKey] = shouldUseGeneralIdeaFromTargetField;
+        }
+
+        return {
+          ...sanitizeCharacterGenerationSettings(prev),
+          fieldInstructions: nextInstructions,
+          fieldShouldUseGeneralCharacterIdea: nextFieldShouldUseGeneralCharacterIdea,
+        };
       });
     },
     [setGenerationSettings],
@@ -190,6 +284,11 @@ export function useGeneration() {
       ...sanitizeCharacterGenerationSettings(prev),
       fieldInstructions: Object.fromEntries(
         Object.entries(prev.fieldInstructions).filter(
+          ([key]) => !key.startsWith('alternate_greetings:') && !key.startsWith('custom:'),
+        ),
+      ),
+      fieldShouldUseGeneralCharacterIdea: Object.fromEntries(
+        Object.entries(prev.fieldShouldUseGeneralCharacterIdea).filter(
           ([key]) => !key.startsWith('alternate_greetings:') && !key.startsWith('custom:'),
         ),
       ),
@@ -226,7 +325,7 @@ export function useGeneration() {
         result.currentModel ??
         (generationSettings.model.trim() && result.models.includes(generationSettings.model.trim())
           ? generationSettings.model.trim()
-          : result.models[0] ?? null);
+          : (result.models[0] ?? null));
 
       setConnectionHealth({
         isChecking: false,
@@ -254,7 +353,14 @@ export function useGeneration() {
       }));
       throw error;
     }
-  }, [apiKey, generationSettings.endpoint, generationSettings.model, generationSettings.requestMode, requestProviderHealth, setGenerationSettings]);
+  }, [
+    apiKey,
+    generationSettings.endpoint,
+    generationSettings.model,
+    generationSettings.requestMode,
+    requestProviderHealth,
+    setGenerationSettings,
+  ]);
 
   const generateField = useCallback(
     async ({
@@ -300,6 +406,8 @@ export function useGeneration() {
             card,
             target,
             outputFormat: generationSettings.outputFormat,
+            generalCharacterIdea: generationSettings.generalCharacterIdea,
+            shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
             userInstructions: getFieldInstruction(fieldKey),
             exampleCharacters,
             maxExampleContextCharacters,
@@ -358,7 +466,14 @@ export function useGeneration() {
         delete abortControllersRef.current[fieldKey];
       }
     },
-    [apiKey, generationSettings, getFieldInstruction, requestProxy, setFieldRuntimeState],
+    [
+      apiKey,
+      generationSettings,
+      getFieldInstruction,
+      requestProxy,
+      setFieldRuntimeState,
+      shouldUseGeneralCharacterIdea,
+    ],
   );
 
   const getFieldRuntime = useCallback(
@@ -372,8 +487,12 @@ export function useGeneration() {
     apiKey,
     updateApiKey,
     updateGenerationSettings,
+    getGeneralCharacterIdea,
+    updateGeneralCharacterIdea,
     getFieldInstruction,
     updateFieldInstruction,
+    shouldUseGeneralCharacterIdea,
+    updateFieldShouldUseGeneralCharacterIdea,
     removeCustomFieldInstruction,
     removeAlternateGreetingInstruction,
     reorderAlternateGreetingInstructions,

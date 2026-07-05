@@ -47,7 +47,12 @@ export interface iApiSettingsProps {
   onApiKeyChange: (value: string) => void;
   onHealthCheck: () => Promise<void>;
   onSettingsChange: (
-    patch: Partial<Omit<iCharacterGenerationSettings, 'apiKeyCiphertext' | 'fieldInstructions'>>,
+    patch: Partial<
+      Omit<
+        iCharacterGenerationSettings,
+        'apiKeyCiphertext' | 'fieldInstructions' | 'fieldShouldUseGeneralCharacterIdea' | 'generalCharacterIdea'
+      >
+    >,
   ) => void;
 }
 
@@ -197,12 +202,19 @@ export function ApiSettings({
           <AlertDescription className="space-y-1">
             <p>
               Provider:{' '}
-              <span className={cn('font-medium', connectionHealth.providerKind === 'koboldcpp' ? 'text-foreground' : undefined)}>
+              <span
+                className={cn(
+                  'font-medium',
+                  connectionHealth.providerKind === 'koboldcpp' ? 'text-foreground' : undefined,
+                )}
+              >
                 {connectionHealth.providerName ?? 'Unknown provider'}
               </span>
             </p>
             {connectionHealth.detectedModel ? <p>Selected model: {connectionHealth.detectedModel}</p> : null}
-            {connectionHealth.detectedContextSize ? <p>Detected context size: {connectionHealth.detectedContextSize}</p> : null}
+            {connectionHealth.detectedContextSize ? (
+              <p>Detected context size: {connectionHealth.detectedContextSize}</p>
+            ) : null}
           </AlertDescription>
         </Alert>
       ) : null}

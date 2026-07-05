@@ -348,6 +348,8 @@ export interface iBuildGenerationMessagesOptions {
   card: CharacterCard;
   target: iFieldGenerationTarget;
   outputFormat: OutputFormat;
+  generalCharacterIdea?: string;
+  shouldUseGeneralCharacterIdea?: boolean;
   userInstructions?: string;
   exampleCharacters?: iPromptExampleCharacter[];
   maxExampleContextCharacters?: number;
@@ -357,6 +359,8 @@ export function buildGenerationMessages({
   card,
   target,
   outputFormat,
+  generalCharacterIdea = '',
+  shouldUseGeneralCharacterIdea = true,
   userInstructions = '',
   exampleCharacters = [],
   maxExampleContextCharacters = MAX_EXAMPLE_CONTEXT_CHARACTERS,
@@ -379,6 +383,9 @@ export function buildGenerationMessages({
       'Keep the result consistent with the rest of the card.',
       exampleContextSummary.isTruncated
         ? `Reference example content was truncated to stay within the ${maxExampleContextCharacters}-character context budget. Use only the included reference details.`
+        : '',
+      shouldUseGeneralCharacterIdea && generalCharacterIdea.trim()
+        ? `General character idea: ${generalCharacterIdea.trim()}`
         : '',
       userInstructions.trim() ? `Field-specific instructions: ${userInstructions.trim()}` : '',
       getFormatInstructions(outputFormat),

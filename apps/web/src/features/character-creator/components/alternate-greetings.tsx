@@ -7,6 +7,7 @@ import { Textarea } from '@~/components/ui/textarea';
 import { FieldGenerationControls } from './field-generation-controls';
 
 interface iAlternateGreetingGenerationState {
+  shouldUseGeneralCharacterIdea: boolean;
   instructionValue: string;
   errorMessage?: string | null;
   isGenerating: boolean;
@@ -19,6 +20,7 @@ export interface iAlternateGreetingsProps {
   onChange: (index: number, value: string) => void;
   onRemove: (index: number) => void;
   onMove: (fromIndex: number, toIndex: number) => void;
+  onShouldUseGeneralCharacterIdeaChange: (index: number, value: boolean) => void;
   onInstructionChange: (index: number, value: string) => void;
   onGenerate: (index: number) => void;
   onContinue: (index: number) => void;
@@ -32,6 +34,7 @@ export function AlternateGreetings({
   onChange,
   onRemove,
   onMove,
+  onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
   onGenerate,
   onContinue,
@@ -92,10 +95,12 @@ export function AlternateGreetings({
               <FieldGenerationControls
                 fieldId={`alternate-greeting-${index}`}
                 label={`Alternate Greeting ${index + 1}`}
+                shouldUseGeneralCharacterIdea={generationStates[index]?.shouldUseGeneralCharacterIdea ?? true}
                 instructionValue={generationStates[index]?.instructionValue ?? ''}
                 errorMessage={generationStates[index]?.errorMessage ?? null}
                 hasExistingValue={greeting.trim().length > 0}
                 isGenerating={generationStates[index]?.isGenerating ?? false}
+                onShouldUseGeneralCharacterIdeaChange={(value) => onShouldUseGeneralCharacterIdeaChange(index, value)}
                 onInstructionChange={(value) => onInstructionChange(index, value)}
                 onGenerate={() => onGenerate(index)}
                 onContinue={() => onContinue(index)}

@@ -8,7 +8,6 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { NuqsAdapter } from 'nuqs/adapters/react';
 import type { ComponentProps } from 'react';
 
-import Header from '@~/components/header';
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';
 import { ThemeProvider } from '@~/components/themes/theme-provider';
 import ToasterContainer from '@~/components/toastifications/toaster-container';
@@ -80,7 +79,6 @@ function RootComponent() {
         <ThemeProvider initialTheme={initialTheme}>
           <NuqsAdapter>
             <div className="grid h-svh grid-rows-[auto_1fr]">
-              <Header />
               <Outlet />
             </div>
             <ToasterContainer />

@@ -9,6 +9,7 @@ import type { CustomField } from '../lib/card-schema';
 import { FieldGenerationControls } from './field-generation-controls';
 
 interface iCustomFieldGenerationState {
+  shouldUseGeneralCharacterIdea: boolean;
   instructionValue: string;
   errorMessage?: string | null;
   isGenerating: boolean;
@@ -20,6 +21,7 @@ export interface iCustomFieldsProps {
   onAdd: () => void;
   onUpdate: (id: string, patch: Partial<Pick<CustomField, 'label' | 'value'>>) => void;
   onRemove: (id: string) => void;
+  onShouldUseGeneralCharacterIdeaChange: (id: string, value: boolean) => void;
   onInstructionChange: (id: string, value: string) => void;
   onGenerate: (id: string) => void;
   onContinue: (id: string) => void;
@@ -32,6 +34,7 @@ export function CustomFields({
   onAdd,
   onUpdate,
   onRemove,
+  onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
   onGenerate,
   onContinue,
@@ -75,10 +78,14 @@ export function CustomFields({
               <FieldGenerationControls
                 fieldId={`custom-field-${field.id}`}
                 label={field.label.trim() || 'Custom Field'}
+                shouldUseGeneralCharacterIdea={generationStates[field.id]?.shouldUseGeneralCharacterIdea ?? true}
                 instructionValue={generationStates[field.id]?.instructionValue ?? ''}
                 errorMessage={generationStates[field.id]?.errorMessage ?? null}
                 hasExistingValue={field.value.trim().length > 0}
                 isGenerating={generationStates[field.id]?.isGenerating ?? false}
+                onShouldUseGeneralCharacterIdeaChange={(value) =>
+                  onShouldUseGeneralCharacterIdeaChange(field.id, value)
+                }
                 onInstructionChange={(value) => onInstructionChange(field.id, value)}
                 onGenerate={() => onGenerate(field.id)}
                 onContinue={() => onContinue(field.id)}

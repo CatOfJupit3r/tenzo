@@ -12,10 +12,12 @@ export interface iCharacterFieldProps {
   value: string;
   rows?: number;
   hint?: string;
+  shouldUseGeneralCharacterIdea?: boolean;
   instructionValue?: string;
   generationErrorMessage?: string | null;
   isGenerating?: boolean;
   onValueChange: (value: string) => void;
+  onShouldUseGeneralCharacterIdeaChange?: (value: boolean) => void;
   onInstructionChange?: (value: string) => void;
   onGenerate?: () => void;
   onContinue?: () => void;
@@ -28,16 +30,19 @@ export function CharacterField({
   value,
   rows = 4,
   hint,
+  shouldUseGeneralCharacterIdea = true,
   instructionValue = '',
   generationErrorMessage = null,
   isGenerating = false,
   onValueChange,
+  onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
   onGenerate,
   onContinue,
   onCancel,
 }: iCharacterFieldProps) {
-  const hasGenerationControls = onInstructionChange && onGenerate && onContinue && onCancel;
+  const hasGenerationControls =
+    onShouldUseGeneralCharacterIdeaChange && onInstructionChange && onGenerate && onContinue && onCancel;
 
   return (
     <div className="space-y-3">
@@ -46,10 +51,12 @@ export function CharacterField({
         <FieldGenerationControls
           fieldId={fieldId}
           label={label}
+          shouldUseGeneralCharacterIdea={shouldUseGeneralCharacterIdea}
           instructionValue={instructionValue}
           errorMessage={generationErrorMessage}
           hasExistingValue={value.trim().length > 0}
           isGenerating={isGenerating}
+          onShouldUseGeneralCharacterIdeaChange={onShouldUseGeneralCharacterIdeaChange}
           onInstructionChange={onInstructionChange}
           onGenerate={onGenerate}
           onContinue={onContinue}

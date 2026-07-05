@@ -180,6 +180,52 @@ export interface iExampleContextSummary {
   isTruncated: boolean;
 }
 
+const APPROXIMATE_CHARACTERS_PER_TOKEN = 4;
+const EXAMPLE_CONTEXT_INPUT_SHARE = 0.6;
+const EXAMPLE_CONTEXT_TOKEN_RESERVE = 1_024;
+const MAX_DYNAMIC_EXAMPLE_CONTEXT_CHARACTERS = 48_000;
+
+function truncateLineToFit(line: string, maxLength: number) {
+  if (line.length <= maxLength) {
+    return {
+      text: line,
+      usedSourceCharacters: line.length,
+      isTruncated: false,
+    };
+  }
+
+  if (maxLength <= 3) {
+    return null;
+  }
+
+  const maxSliceLength = Math.max(1, maxLength - 3);
+  let slice = line.slice(0, maxSliceLength);
+  const lastWhitespaceIndex = slice.lastIndexOf(' ');
+
+  if (lastWhitespaceIndex >= Math.floor(maxSliceLength * 0.6)) {
+    slice = slice.slice(0, lastWhitespaceIndex);
+  }
+
+  slice = slice.trimEnd();
+
+  if (slice === '') {
+    return null;
+  }
+
+  return {
+    text: `${slice}...`,
+    usedSourceCharacters: slice.length,
+    isTruncated: true,
+  };
+}
+
+export function getExampleContextCharacterBudget(contextSize: number, maxTokens: number) {
+  const availableInputTokens = Math.max(512, contextSize - maxTokens - EXAMPLE_CONTEXT_TOKEN_RESERVE);
+  const estimatedCharacters = Math.floor(availableInputTokens * APPROXIMATE_CHARACTERS_PER_TOKEN * EXAMPLE_CONTEXT_INPUT_SHARE);
+
+  return Math.max(2_000, Math.min(MAX_DYNAMIC_EXAMPLE_CONTEXT_CHARACTERS, estimatedCharacters));
+}
+
 export function buildExampleContextSummary(
   exampleCharacters: iPromptExampleCharacter[],
   maxCharacters = MAX_EXAMPLE_CONTEXT_CHARACTERS,
@@ -202,6 +248,10 @@ export function buildExampleContextSummary(
     heading: `Example ${index + 1}:`,
     snapshotLines,
   }));
+  const totalSourceCharacters = exampleBlocks.reduce(
+    (sum, block) => sum + block.snapshotLines.reduce((lineSum, line) => lineSum + line.length, 0),
+    0,
+  );
 
   const fullSection = [
     'Reference characters:',
@@ -211,47 +261,67 @@ export function buildExampleContextSummary(
   if (fullSection.length <= maxCharacters) {
     return {
       section: fullSection,
-      totalCharacters: fullSection.length,
-      usedCharacters: fullSection.length,
+      totalCharacters: totalSourceCharacters,
+      usedCharacters: totalSourceCharacters,
       omittedCharacters: 0,
       isTruncated: false,
     };
   }
 
   let truncatedSection = 'Reference characters:';
+  let usedSourceCharacters = 0;
 
   for (const [index, block] of exampleBlocks.entries()) {
-    const includedLines: string[] = [];
+    let hasStartedBlock = false;
 
     for (const snapshotLine of block.snapshotLines) {
-      const candidateLines = [...includedLines, snapshotLine];
-      const candidateBlock = [`Example ${index + 1}:`, formatBulletList(candidateLines)].join('\n');
-      const candidateSection = [truncatedSection, candidateBlock].join('\n\n');
+      const linePrefix = hasStartedBlock ? '\n- ' : `\n\nExample ${index + 1}:\n- `;
+      const remainingCharacters = maxCharacters - truncatedSection.length - linePrefix.length;
 
-      if (candidateSection.length > maxCharacters) {
+      if (remainingCharacters <= 0) {
         return {
           section: truncatedSection,
-          totalCharacters: fullSection.length,
-          usedCharacters: truncatedSection.length,
-          omittedCharacters: fullSection.length - truncatedSection.length,
+          totalCharacters: totalSourceCharacters,
+          usedCharacters: usedSourceCharacters,
+          omittedCharacters: totalSourceCharacters - usedSourceCharacters,
           isTruncated: true,
         };
       }
 
-      includedLines.push(snapshotLine);
-    }
+      const fittedLine = truncateLineToFit(snapshotLine, remainingCharacters);
 
-    truncatedSection = [truncatedSection, [`Example ${index + 1}:`, formatBulletList(includedLines)].join('\n')].join(
-      '\n\n',
-    );
+      if (!fittedLine) {
+        return {
+          section: truncatedSection,
+          totalCharacters: totalSourceCharacters,
+          usedCharacters: usedSourceCharacters,
+          omittedCharacters: totalSourceCharacters - usedSourceCharacters,
+          isTruncated: true,
+        };
+      }
+
+      truncatedSection += `${linePrefix}${fittedLine.text}`;
+      usedSourceCharacters += fittedLine.usedSourceCharacters;
+      hasStartedBlock = true;
+
+      if (fittedLine.isTruncated) {
+        return {
+          section: truncatedSection,
+          totalCharacters: totalSourceCharacters,
+          usedCharacters: usedSourceCharacters,
+          omittedCharacters: totalSourceCharacters - usedSourceCharacters,
+          isTruncated: true,
+        };
+      }
+    }
   }
 
   return {
     section: truncatedSection,
-    totalCharacters: fullSection.length,
-    usedCharacters: truncatedSection.length,
-    omittedCharacters: fullSection.length - truncatedSection.length,
-    isTruncated: true,
+    totalCharacters: totalSourceCharacters,
+    usedCharacters: usedSourceCharacters,
+    omittedCharacters: totalSourceCharacters - usedSourceCharacters,
+    isTruncated: usedSourceCharacters < totalSourceCharacters,
   };
 }
 
@@ -278,6 +348,7 @@ export interface iBuildGenerationMessagesOptions {
   outputFormat: OutputFormat;
   userInstructions?: string;
   exampleCharacters?: iPromptExampleCharacter[];
+  maxExampleContextCharacters?: number;
 }
 
 export function buildGenerationMessages({
@@ -286,13 +357,14 @@ export function buildGenerationMessages({
   outputFormat,
   userInstructions = '',
   exampleCharacters = [],
+  maxExampleContextCharacters = MAX_EXAMPLE_CONTEXT_CHARACTERS,
 }: iBuildGenerationMessagesOptions): iGenerationMessage[] {
   const systemPrompt = resolveOverride(card.data.system_prompt, DEFAULT_CHARACTER_CARD_WRITING_GUIDE);
   const postHistoryInstructions = resolveOverride(
     card.data.post_history_instructions,
     DEFAULT_POST_HISTORY_INSTRUCTIONS,
   );
-  const exampleContextSummary = buildExampleContextSummary(exampleCharacters);
+  const exampleContextSummary = buildExampleContextSummary(exampleCharacters, maxExampleContextCharacters);
 
   const sections = [
     buildExistingFieldsSection(card, target),
@@ -304,7 +376,7 @@ export function buildGenerationMessages({
         : `The current ${target.label} value is empty. Create it from scratch based on the available card context.`,
       'Keep the result consistent with the rest of the card.',
       exampleContextSummary.isTruncated
-        ? `Reference example content was truncated to stay within the ${MAX_EXAMPLE_CONTEXT_CHARACTERS}-character context budget. Use only the included reference details.`
+        ? `Reference example content was truncated to stay within the ${maxExampleContextCharacters}-character context budget. Use only the included reference details.`
         : '',
       userInstructions.trim() ? `Field-specific instructions: ${userInstructions.trim()}` : '',
       getFormatInstructions(outputFormat),

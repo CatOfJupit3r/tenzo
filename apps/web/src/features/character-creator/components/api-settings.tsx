@@ -1,12 +1,26 @@
+import { LuActivity, LuLoaderCircle } from 'react-icons/lu';
+
 import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
+import { Button } from '@~/components/ui/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 import { SingleSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
+import { cn } from '@~/lib/utils';
 
 import { OUTPUT_FORMATS, REQUEST_MODES } from '../lib/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
+
+export interface iConnectionHealthViewModel {
+  isChecking: boolean;
+  errorMessage: string | null;
+  providerName: string | null;
+  providerKind: 'koboldcpp' | 'openai-compatible' | 'unknown' | null;
+  availableModels: string[];
+  detectedModel: string | null;
+  detectedContextSize: number | null;
+}
 
 const outputFormatOptions: iOptionType[] = [
   {
@@ -29,14 +43,27 @@ const outputFormatOptions: iOptionType[] = [
 export interface iApiSettingsProps {
   generationSettings: iCharacterGenerationSettings;
   apiKey: string;
+  connectionHealth: iConnectionHealthViewModel;
   onApiKeyChange: (value: string) => void;
+  onHealthCheck: () => Promise<void>;
   onSettingsChange: (
     patch: Partial<Omit<iCharacterGenerationSettings, 'apiKeyCiphertext' | 'fieldInstructions'>>,
   ) => void;
 }
 
-export function ApiSettings({ generationSettings, apiKey, onApiKeyChange, onSettingsChange }: iApiSettingsProps) {
+export function ApiSettings({
+  generationSettings,
+  apiKey,
+  connectionHealth,
+  onApiKeyChange,
+  onHealthCheck,
+  onSettingsChange,
+}: iApiSettingsProps) {
   const isUsingProxy = generationSettings.requestMode === REQUEST_MODES.proxy;
+  const hasDetectedModels = connectionHealth.availableModels.length > 0;
+  const modelHelperText = hasDetectedModels
+    ? `Detected models: ${connectionHealth.availableModels.join(', ')}`
+    : 'Run health check to infer available models from the endpoint.';
 
   return (
     <div className="space-y-4">
@@ -60,6 +87,7 @@ export function ApiSettings({ generationSettings, apiKey, onApiKeyChange, onSett
             value={generationSettings.model}
             onChange={(event) => onSettingsChange({ model: event.target.value })}
           />
+          <p className="text-sm text-muted-foreground">{modelHelperText}</p>
         </div>
 
         <div className="space-y-1.5">
@@ -75,6 +103,42 @@ export function ApiSettings({ generationSettings, apiKey, onApiKeyChange, onSett
               onSettingsChange({ maxTokens: Number.isNaN(nextValue) ? 1 : nextValue });
             }}
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="api-context-size">Context size</Label>
+          <Input
+            id="api-context-size"
+            type="number"
+            min={1}
+            step={1}
+            value={String(generationSettings.contextSize)}
+            onChange={(event) => {
+              const nextValue = Number.parseInt(event.target.value, 10);
+              onSettingsChange({ contextSize: Number.isNaN(nextValue) ? 1 : nextValue });
+            }}
+          />
+          <p className="text-sm text-muted-foreground">Used to budget how much example context can be sent.</p>
+        </div>
+
+        <div className="flex items-end">
+          <Button
+            aria-label="Run endpoint health check"
+            className="w-full"
+            disabled={connectionHealth.isChecking}
+            type="button"
+            variant="outline"
+            onClick={() => {
+              onHealthCheck().catch(() => undefined);
+            }}
+          >
+            {connectionHealth.isChecking ? (
+              <LuLoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <LuActivity className="size-4" />
+            )}
+            {connectionHealth.isChecking ? 'Checking endpoint...' : 'Run health check'}
+          </Button>
         </div>
 
         <div className="space-y-1.5 md:col-span-2">
@@ -119,6 +183,29 @@ export function ApiSettings({ generationSettings, apiKey, onApiKeyChange, onSett
           />
         </div>
       </div>
+
+      {connectionHealth.errorMessage ? (
+        <Alert variant="destructive">
+          <AlertTitle>Health check failed</AlertTitle>
+          <AlertDescription>{connectionHealth.errorMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {connectionHealth.providerName || connectionHealth.detectedContextSize || connectionHealth.detectedModel ? (
+        <Alert>
+          <AlertTitle>Detected endpoint capabilities</AlertTitle>
+          <AlertDescription className="space-y-1">
+            <p>
+              Provider:{' '}
+              <span className={cn('font-medium', connectionHealth.providerKind === 'koboldcpp' ? 'text-foreground' : undefined)}>
+                {connectionHealth.providerName ?? 'Unknown provider'}
+              </span>
+            </p>
+            {connectionHealth.detectedModel ? <p>Selected model: {connectionHealth.detectedModel}</p> : null}
+            {connectionHealth.detectedContextSize ? <p>Detected context size: {connectionHealth.detectedContextSize}</p> : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Alert>
         <AlertTitle>Key handling</AlertTitle>

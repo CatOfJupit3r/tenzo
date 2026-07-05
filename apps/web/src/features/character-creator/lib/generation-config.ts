@@ -8,10 +8,13 @@ export const REQUEST_MODE_SCHEMA = z.enum(['proxy', 'browser']);
 export const REQUEST_MODES = REQUEST_MODE_SCHEMA.enum;
 export type RequestMode = z.infer<typeof REQUEST_MODE_SCHEMA>;
 
+export const DEFAULT_CONTEXT_SIZE = 8_192;
+
 export interface iCharacterGenerationSettings {
   endpoint: string;
   model: string;
   apiKeyCiphertext: string;
+  contextSize: number;
   maxTokens: number;
   outputFormat: OutputFormat;
   requestMode: RequestMode;
@@ -22,11 +25,51 @@ export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings
   endpoint: 'https://api.openai.com',
   model: 'gpt-4.1-mini',
   apiKeyCiphertext: '',
+  contextSize: DEFAULT_CONTEXT_SIZE,
   maxTokens: 600,
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
   fieldInstructions: {},
 };
+
+function readString(value: unknown, fallbackValue: string) {
+  return typeof value === 'string' ? value : fallbackValue;
+}
+
+function readPositiveInteger(value: unknown, fallbackValue: number) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallbackValue;
+}
+
+function readFieldInstructions(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return DEFAULT_CHARACTER_GENERATION_SETTINGS.fieldInstructions;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[0] === 'string' && typeof entry[1] === 'string',
+    ),
+  );
+}
+
+export function sanitizeCharacterGenerationSettings(value: unknown): iCharacterGenerationSettings {
+  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
+  return {
+    endpoint: readString(candidate.endpoint, DEFAULT_CHARACTER_GENERATION_SETTINGS.endpoint),
+    model: readString(candidate.model, DEFAULT_CHARACTER_GENERATION_SETTINGS.model),
+    apiKeyCiphertext: readString(candidate.apiKeyCiphertext, DEFAULT_CHARACTER_GENERATION_SETTINGS.apiKeyCiphertext),
+    contextSize: readPositiveInteger(candidate.contextSize, DEFAULT_CHARACTER_GENERATION_SETTINGS.contextSize),
+    maxTokens: readPositiveInteger(candidate.maxTokens, DEFAULT_CHARACTER_GENERATION_SETTINGS.maxTokens),
+    outputFormat: OUTPUT_FORMAT_SCHEMA.safeParse(candidate.outputFormat).success
+      ? (candidate.outputFormat as OutputFormat)
+      : DEFAULT_CHARACTER_GENERATION_SETTINGS.outputFormat,
+    requestMode: REQUEST_MODE_SCHEMA.safeParse(candidate.requestMode).success
+      ? (candidate.requestMode as RequestMode)
+      : DEFAULT_CHARACTER_GENERATION_SETTINGS.requestMode,
+    fieldInstructions: readFieldInstructions(candidate.fieldInstructions),
+  };
+}
 
 function encodeBase64(value: string) {
   const bytes = new TextEncoder().encode(value);

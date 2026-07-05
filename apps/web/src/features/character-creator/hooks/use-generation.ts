@@ -10,8 +10,15 @@ import {
 } from '../lib/api-client';
 import type { CharacterCard } from '../lib/card-schema';
 import { requestChatCompletionsProxy } from '../lib/chat-completions-proxy';
-import { decodeStoredSecret, encodeStoredSecret, REQUEST_MODES } from '../lib/generation-config';
+import {
+  decodeStoredSecret,
+  encodeStoredSecret,
+  REQUEST_MODES,
+  sanitizeCharacterGenerationSettings,
+} from '../lib/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
+import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
+import { probeProviderMetadata } from '../lib/provider-health';
 import { buildGenerationMessages, getGenerationTargetKey } from '../lib/prompt-builder';
 import type { iFieldGenerationTarget, iPromptExampleCharacter } from '../lib/prompt-builder';
 import { getPrefilled, parseResponse } from '../lib/response-parser';
@@ -27,6 +34,17 @@ interface iGenerateFieldOptions {
   onValueChange: (value: string) => void;
   isContinuation?: boolean;
   exampleCharacters?: iPromptExampleCharacter[];
+  maxExampleContextCharacters?: number;
+}
+
+interface iConnectionHealthState {
+  isChecking: boolean;
+  errorMessage: string | null;
+  providerName: string | null;
+  providerKind: 'koboldcpp' | 'openai-compatible' | 'unknown' | null;
+  availableModels: string[];
+  detectedModel: string | null;
+  detectedContextSize: number | null;
 }
 
 function removeFieldInstruction(instructions: Record<string, string>, instructionKey: string) {
@@ -35,9 +53,23 @@ function removeFieldInstruction(instructions: Record<string, string>, instructio
 }
 
 export function useGeneration() {
-  const [generationSettings, setGenerationSettings] = useAtom(characterGenerationSettingsAtom);
+  const [storedGenerationSettings, setGenerationSettings] = useAtom(characterGenerationSettingsAtom);
+  const generationSettings = useMemo(
+    () => sanitizeCharacterGenerationSettings(storedGenerationSettings),
+    [storedGenerationSettings],
+  );
   const requestProxy = useServerFn(requestChatCompletionsProxy);
+  const requestProviderHealth = useServerFn(requestProviderHealthProxy);
   const [runtimeStates, setRuntimeStates] = useState<Record<string, iFieldGenerationRuntimeState>>({});
+  const [connectionHealth, setConnectionHealth] = useState<iConnectionHealthState>({
+    isChecking: false,
+    errorMessage: null,
+    providerName: null,
+    providerKind: null,
+    availableModels: [],
+    detectedModel: null,
+    detectedContextSize: null,
+  });
   const abortControllersRef = useRef<Record<string, AbortController>>({});
 
   const apiKey = useMemo(
@@ -51,7 +83,7 @@ export function useGeneration() {
 
   const updateGenerationSettings = useCallback(
     (patch: Partial<Omit<iCharacterGenerationSettings, 'fieldInstructions' | 'apiKeyCiphertext'>>) => {
-      setGenerationSettings((prev) => ({ ...prev, ...patch }));
+      setGenerationSettings((prev) => ({ ...sanitizeCharacterGenerationSettings(prev), ...patch }));
     },
     [setGenerationSettings],
   );
@@ -59,7 +91,7 @@ export function useGeneration() {
   const updateApiKey = useCallback(
     (nextApiKey: string) => {
       setGenerationSettings((prev) => ({
-        ...prev,
+        ...sanitizeCharacterGenerationSettings(prev),
         apiKeyCiphertext: encodeStoredSecret(nextApiKey.trim()),
       }));
     },
@@ -74,7 +106,7 @@ export function useGeneration() {
   const updateFieldInstruction = useCallback(
     (fieldKey: string, value: string) => {
       setGenerationSettings((prev) => ({
-        ...prev,
+        ...sanitizeCharacterGenerationSettings(prev),
         fieldInstructions: value.trim()
           ? { ...prev.fieldInstructions, [fieldKey]: value }
           : removeFieldInstruction(prev.fieldInstructions, fieldKey),
@@ -87,7 +119,7 @@ export function useGeneration() {
     (customFieldId: string) => {
       const instructionKey = `custom:${customFieldId}`;
       setGenerationSettings((prev) => ({
-        ...prev,
+        ...sanitizeCharacterGenerationSettings(prev),
         fieldInstructions: removeFieldInstruction(prev.fieldInstructions, instructionKey),
       }));
     },
@@ -116,7 +148,7 @@ export function useGeneration() {
           {},
         );
 
-        return { ...prev, fieldInstructions: nextInstructions };
+        return { ...sanitizeCharacterGenerationSettings(prev), fieldInstructions: nextInstructions };
       });
     },
     [setGenerationSettings],
@@ -147,7 +179,7 @@ export function useGeneration() {
           nextInstructions[fromKey] = toValue;
         }
 
-        return { ...prev, fieldInstructions: nextInstructions };
+        return { ...sanitizeCharacterGenerationSettings(prev), fieldInstructions: nextInstructions };
       });
     },
     [setGenerationSettings],
@@ -155,7 +187,7 @@ export function useGeneration() {
 
   const clearDynamicFieldInstructions = useCallback(() => {
     setGenerationSettings((prev) => ({
-      ...prev,
+      ...sanitizeCharacterGenerationSettings(prev),
       fieldInstructions: Object.fromEntries(
         Object.entries(prev.fieldInstructions).filter(
           ([key]) => !key.startsWith('alternate_greetings:') && !key.startsWith('custom:'),
@@ -168,8 +200,71 @@ export function useGeneration() {
     abortControllersRef.current[fieldKey]?.abort();
   }, []);
 
+  const probeConnection = useCallback(async () => {
+    if (!generationSettings.endpoint.trim()) {
+      throw new Error('Set an API endpoint before running a health check.');
+    }
+
+    setConnectionHealth((prev) => ({
+      ...prev,
+      isChecking: true,
+      errorMessage: null,
+    }));
+
+    try {
+      const requestData = {
+        endpoint: generationSettings.endpoint,
+        apiKey,
+        requestMode: generationSettings.requestMode,
+      };
+      const result =
+        generationSettings.requestMode === REQUEST_MODES.browser
+          ? await probeProviderMetadata(requestData)
+          : await requestProviderHealth({ data: requestData });
+
+      const nextModel =
+        result.currentModel ??
+        (generationSettings.model.trim() && result.models.includes(generationSettings.model.trim())
+          ? generationSettings.model.trim()
+          : result.models[0] ?? null);
+
+      setConnectionHealth({
+        isChecking: false,
+        errorMessage: null,
+        providerName: result.providerName,
+        providerKind: result.providerKind,
+        availableModels: result.models,
+        detectedModel: nextModel,
+        detectedContextSize: result.contextSize,
+      });
+
+      setGenerationSettings((prev) => ({
+        ...sanitizeCharacterGenerationSettings(prev),
+        model: nextModel ?? sanitizeCharacterGenerationSettings(prev).model,
+        contextSize: result.contextSize ?? sanitizeCharacterGenerationSettings(prev).contextSize,
+      }));
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Health check failed.';
+      setConnectionHealth((prev) => ({
+        ...prev,
+        isChecking: false,
+        errorMessage,
+      }));
+      throw error;
+    }
+  }, [apiKey, generationSettings.endpoint, generationSettings.model, generationSettings.requestMode, requestProviderHealth, setGenerationSettings]);
+
   const generateField = useCallback(
-    async ({ card, target, onValueChange, isContinuation = false, exampleCharacters = [] }: iGenerateFieldOptions) => {
+    async ({
+      card,
+      target,
+      onValueChange,
+      isContinuation = false,
+      exampleCharacters = [],
+      maxExampleContextCharacters,
+    }: iGenerateFieldOptions) => {
       if (!generationSettings.endpoint.trim()) {
         throw new Error('Set an API endpoint before generating.');
       }
@@ -207,6 +302,7 @@ export function useGeneration() {
             outputFormat: generationSettings.outputFormat,
             userInstructions: getFieldInstruction(fieldKey),
             exampleCharacters,
+            maxExampleContextCharacters,
           }),
         };
 
@@ -282,6 +378,8 @@ export function useGeneration() {
     removeAlternateGreetingInstruction,
     reorderAlternateGreetingInstructions,
     clearDynamicFieldInstructions,
+    connectionHealth,
+    probeConnection,
     generateField,
     cancelGeneration,
     getFieldRuntime,

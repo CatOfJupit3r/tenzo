@@ -26,7 +26,7 @@ import {
   MAX_EXAMPLE_CHARACTER_COUNT,
   toPromptExampleCharacter,
 } from '../lib/example-characters';
-import { buildExampleContextSummary } from '../lib/prompt-builder';
+import { buildExampleContextSummary, getExampleContextCharacterBudget  } from '../lib/prompt-builder';
 import type { iFieldGenerationTarget } from '../lib/prompt-builder';
 
 function isAbortError(error: unknown) {
@@ -73,21 +73,27 @@ export function CharacterCreatorPage() {
     removeAlternateGreetingInstruction,
     reorderAlternateGreetingInstructions,
     clearDynamicFieldInstructions,
+    connectionHealth,
     generateField,
     cancelGeneration,
     getFieldRuntime,
+    probeConnection,
   } = useGeneration();
   const { portraitReference, portraitBlob, portraitObjectUrl, isHydratingPortrait, setPortrait, clearPortrait } =
     useCharacterPortrait();
 
   const { data } = card;
+  const maxExampleContextCharacters = useMemo(
+    () => getExampleContextCharacterBudget(generationSettings.contextSize, generationSettings.maxTokens),
+    [generationSettings.contextSize, generationSettings.maxTokens],
+  );
   const promptExampleCharacters = useMemo(
     () => exampleCharacters.map((exampleCharacter) => toPromptExampleCharacter(exampleCharacter)),
     [exampleCharacters],
   );
   const exampleContextSummary = useMemo(
-    () => buildExampleContextSummary(promptExampleCharacters),
-    [promptExampleCharacters],
+    () => buildExampleContextSummary(promptExampleCharacters, maxExampleContextCharacters),
+    [maxExampleContextCharacters, promptExampleCharacters],
   );
 
   const runGeneration = useCallback(
@@ -99,6 +105,7 @@ export function CharacterCreatorPage() {
           onValueChange,
           isContinuation,
           exampleCharacters: promptExampleCharacters,
+          maxExampleContextCharacters,
         });
       } catch (error) {
         if (isAbortError(error)) {
@@ -109,8 +116,26 @@ export function CharacterCreatorPage() {
         toastError('Generation failed', message);
       }
     },
-    [card, generateField, promptExampleCharacters],
+    [card, generateField, maxExampleContextCharacters, promptExampleCharacters],
   );
+
+  const handleHealthCheck = useCallback(async () => {
+    try {
+      const result = await probeConnection();
+      const detailParts = [
+        result.currentModel ?? result.models[0] ?? null,
+        result.contextSize ? `${result.contextSize} context` : null,
+      ].filter((value): value is string => Boolean(value));
+
+      toastSuccess(
+        'Endpoint checked',
+        detailParts.length > 0 ? detailParts.join(' | ') : result.providerName ?? 'Provider metadata inferred.',
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Health check failed.';
+      toastError('Health check failed', message);
+    }
+  }, [probeConnection]);
 
   const handlePortraitSelect = useCallback(
     async (file: File) => {
@@ -306,7 +331,9 @@ export function CharacterCreatorPage() {
           <ApiSettings
             generationSettings={generationSettings}
             apiKey={apiKey}
+            connectionHealth={connectionHealth}
             onApiKeyChange={updateApiKey}
+            onHealthCheck={handleHealthCheck}
             onSettingsChange={updateGenerationSettings}
           />
         </CardContent>

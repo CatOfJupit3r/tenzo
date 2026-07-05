@@ -161,8 +161,8 @@ export function ExampleCharacters({
               )}
             >
               <p>
-                Using {contextSummary.usedCharacters} of {contextSummary.totalCharacters} reference characters in prompt
-                context.
+                Using {contextSummary.usedCharacters} of {contextSummary.totalCharacters} characters from reference
+                examples in prompt context.
               </p>
               {contextSummary.isTruncated ? (
                 <p className="mt-1">

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import { OUTPUT_FORMATS } from './generation-config';
-import { buildExampleContextSummary, buildGenerationMessages } from './prompt-builder';
+import {
+  buildExampleContextSummary,
+  buildGenerationMessages,
+  getExampleContextCharacterBudget,
+} from './prompt-builder';
 
 describe('prompt-builder', () => {
   it('includes current card context, custom fields, and field instructions', () => {
@@ -54,26 +58,23 @@ describe('prompt-builder', () => {
     expect(messages[2]?.content).toBe('Trailing reminder.');
   });
 
-  it('includes example character context and filters it when over the character budget', () => {
+  it('includes partial reference content when an example field exceeds the character budget', () => {
     const summary = buildExampleContextSummary(
       [
         {
-          name: 'Guide One',
-          description: 'Compact reference.',
-        },
-        {
-          name: 'Guide Two',
           description: 'x'.repeat(120),
         },
       ],
-      90,
+      60,
     );
 
     expect(summary.section).toContain('Reference characters:');
     expect(summary.section).toContain('Example 1:');
-    expect(summary.section).not.toContain('Guide Two');
+    expect(summary.section).toContain('Description:');
+    expect(summary.section).toContain('...');
     expect(summary.isTruncated).toBe(true);
     expect(summary.usedCharacters).toBeLessThan(summary.totalCharacters);
+    expect(summary.usedCharacters).toBeGreaterThan(0);
   });
 
   it('adds a truncation warning when reference examples overflow the prompt budget', () => {
@@ -97,5 +98,13 @@ describe('prompt-builder', () => {
     });
 
     expect(messages[1]?.content).toContain('Reference example content was truncated');
+  });
+
+  it('scales the example budget with larger context windows', () => {
+    const smallBudget = getExampleContextCharacterBudget(4_096, 600);
+    const largeBudget = getExampleContextCharacterBudget(32_768, 600);
+
+    expect(largeBudget).toBeGreaterThan(smallBudget);
+    expect(smallBudget).toBeGreaterThanOrEqual(2_000);
   });
 });

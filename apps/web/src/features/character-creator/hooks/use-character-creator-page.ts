@@ -17,12 +17,14 @@ import { REQUEST_MODES } from '../lib/generation-config';
 import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import { invalidatePortraitAsset } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
-import { buildExampleContextSummary, getExampleContextCharacterBudget } from '../lib/prompt/example-context-service';
+import { ExampleContextService } from '../lib/prompt/example-context-service';
 import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
 import type { GenerationMode, iFieldGenerationTarget } from '../lib/prompt/generation-contracts';
 import { useCharacterPortrait } from './use-character-portrait';
 import { useCharacterSession } from './use-character-session';
 import { useGeneration } from './use-generation';
+
+const exampleContextService = new ExampleContextService();
 
 export interface iFieldGenerationState {
   shouldUseGeneralCharacterIdea: boolean;
@@ -129,7 +131,7 @@ export function useCharacterCreatorPage() {
   const generalCharacterIdea = getGeneralCharacterIdea();
   const selectedRequestModeLabel =
     generationSettings.requestMode === REQUEST_MODES.proxy ? 'Server proxy' : 'Browser request';
-  const maxExampleContextCharacters = getExampleContextCharacterBudget(
+  const maxExampleContextCharacters = exampleContextService.getCharacterBudget(
     generationSettings.contextSize,
     generationSettings.maxTokens,
   );
@@ -141,7 +143,7 @@ export function useCharacterCreatorPage() {
 
   const exampleContextSummary = useMemo(
     () =>
-      buildExampleContextSummary({
+      exampleContextService.buildSummary({
         exampleCharacters: promptExampleCharacters,
         maxCharacters: maxExampleContextCharacters,
       }),

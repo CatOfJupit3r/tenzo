@@ -27,31 +27,33 @@ const FIELD_FORMAT_GUIDANCE: Partial<Record<CharacterTextFieldKey, string>> = {
   post_history_instructions: `Write this as a meta-instruction reinforced after the chat history, telling the roleplay AI how to keep portraying {{char}} — not as in-character content.`,
 };
 
-export function getFieldFormatGuidance(target: iFieldGenerationTarget) {
-  if (target.kind === GENERATION_TARGET_KINDS['alternate-greeting']) {
-    return GREETING_FORMAT_GUIDANCE;
+export class TaskInstructionService {
+  getFieldFormatGuidance(target: iFieldGenerationTarget): string {
+    if (target.kind === GENERATION_TARGET_KINDS['alternate-greeting']) {
+      return GREETING_FORMAT_GUIDANCE;
+    }
+
+    if (target.kind === GENERATION_TARGET_KINDS.field) {
+      const fieldKey = target.key.replace(/^field:/, '') as CharacterTextFieldKey;
+      return FIELD_FORMAT_GUIDANCE[fieldKey] ?? '';
+    }
+
+    return '';
   }
 
-  if (target.kind === GENERATION_TARGET_KINDS.field) {
-    const fieldKey = target.key.replace(/^field:/, '') as CharacterTextFieldKey;
-    return FIELD_FORMAT_GUIDANCE[fieldKey] ?? '';
+  getTaskInstruction(target: iFieldGenerationTarget, mode: GenerationMode): string {
+    if (!target.value.trim()) {
+      return `The current ${target.label} value is empty. Create it from scratch based on the available card context.`;
+    }
+
+    if (mode === GENERATION_MODES.rewrite) {
+      return `Rewrite the current ${target.label} value provided in the context above according to the instructions below. Replace it entirely instead of continuing or appending to it.`;
+    }
+
+    if (mode === GENERATION_MODES.continue) {
+      return `The current ${target.label} value is provided in the context above and has already been started as your reply below. Continue it directly from where it leaves off; do not restart, summarize, or repeat it.`;
+    }
+
+    return `The current ${target.label} value is provided in the context above. Improve or continue it only when the request context implies that.`;
   }
-
-  return '';
-}
-
-export function getTaskInstruction(target: iFieldGenerationTarget, mode: GenerationMode) {
-  if (!target.value.trim()) {
-    return `The current ${target.label} value is empty. Create it from scratch based on the available card context.`;
-  }
-
-  if (mode === GENERATION_MODES.rewrite) {
-    return `Rewrite the current ${target.label} value provided in the context above according to the instructions below. Replace it entirely instead of continuing or appending to it.`;
-  }
-
-  if (mode === GENERATION_MODES.continue) {
-    return `The current ${target.label} value is provided in the context above and has already been started as your reply below. Continue it directly from where it leaves off; do not restart, summarize, or repeat it.`;
-  }
-
-  return `The current ${target.label} value is provided in the context above. Improve or continue it only when the request context implies that.`;
 }

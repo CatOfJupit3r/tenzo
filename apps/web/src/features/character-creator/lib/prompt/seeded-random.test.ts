@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { createGenerationSeed, createSeededRandom, GENERATION_SEED_MODULUS } from './seeded-random';
+import { SeededRandom } from './seeded-random';
 
-describe('seeded-random', () => {
+describe('SeededRandom', () => {
   it('produces the same sequence for the same seed', () => {
-    const first = createSeededRandom(123);
-    const second = createSeededRandom(123);
+    const first = new SeededRandom(123);
+    const second = new SeededRandom(123);
 
     const firstSequence = [first.next(), first.next(), first.next()];
     const secondSequence = [second.next(), second.next(), second.next()];
@@ -18,15 +18,15 @@ describe('seeded-random', () => {
   });
 
   it('produces different sequences for different seeds', () => {
-    const first = createSeededRandom(1);
-    const second = createSeededRandom(2);
+    const first = new SeededRandom(1);
+    const second = new SeededRandom(2);
 
     expect([first.next(), first.next()]).not.toEqual([second.next(), second.next()]);
   });
 
   it('shuffles into a permutation of the input without mutating it', () => {
     const items = [1, 2, 3, 4, 5, 6, 7, 8];
-    const random = createSeededRandom(9);
+    const random = new SeededRandom(9);
     const shuffled = random.shuffle(items);
 
     expect(items).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
@@ -34,7 +34,7 @@ describe('seeded-random', () => {
   });
 
   it('picks only values present in the source list', () => {
-    const random = createSeededRandom(5);
+    const random = new SeededRandom(5);
     const options = ['a', 'b', 'c'];
 
     for (let iteration = 0; iteration < 20; iteration += 1) {
@@ -45,10 +45,10 @@ describe('seeded-random', () => {
   });
 
   it('generates seeds within the 32-bit range', () => {
-    const seed = createGenerationSeed();
+    const seed = SeededRandom.generateSeed();
 
     expect(Number.isInteger(seed)).toBe(true);
     expect(seed).toBeGreaterThanOrEqual(0);
-    expect(seed).toBeLessThan(GENERATION_SEED_MODULUS);
+    expect(seed).toBeLessThan(SeededRandom.MODULUS);
   });
 });

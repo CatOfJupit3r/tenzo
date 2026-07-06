@@ -1,16 +1,14 @@
-import { z } from 'zod';
-
 import {
   DEFAULT_CHARACTER_CARD_WRITING_GUIDE,
   DEFAULT_POST_HISTORY_INSTRUCTIONS,
-  getContinuationFormatInstructions,
-  getFormatInstructions,
 } from '../../constants/default-prompts';
 import type { CharacterCard } from '../card-schema';
 import type { OutputFormat } from '../generation-config';
 import { getPrefilled } from '../response-parser';
-import { buildCardContextSection } from './card-context-service';
-import { buildExampleContextSummary, MAX_EXAMPLE_CONTEXT_CHARACTERS } from './example-context-service';
+import { CardContextSectionStrategy } from './card-context-section-strategy';
+import { CardContextService } from './card-context-service';
+import { ExampleContextSectionStrategy } from './example-context-section-strategy';
+import { ExampleContextService, MAX_EXAMPLE_CONTEXT_CHARACTERS } from './example-context-service';
 import type { iExampleContextSummary } from './example-context-service';
 import { GENERATION_MODES } from './generation-contracts';
 import type {
@@ -19,13 +17,11 @@ import type {
   iGenerationMessage,
   iPromptExampleCharacter,
 } from './generation-contracts';
-import { createSeededRandom } from './seeded-random';
-import { getFieldFormatGuidance, getTaskInstruction } from './task-instruction-service';
-import { buildVariationSection } from './variation-service';
-
-export const PROMPT_SECTION_NAME_SCHEMA = z.enum(['card-context', 'example-context', 'task']);
-export const PROMPT_SECTION_NAMES = PROMPT_SECTION_NAME_SCHEMA.enum;
-export type PromptSectionName = z.infer<typeof PROMPT_SECTION_NAME_SCHEMA>;
+import type { iPromptPipelineContext, iPromptSectionStrategy } from './prompt-section-strategy';
+import { SeededRandom } from './seeded-random';
+import { TaskInstructionService } from './task-instruction-service';
+import { TaskSectionStrategy } from './task-section-strategy';
+import { VariationService } from './variation-service';
 
 export interface iPromptPipelineInput {
   card: CharacterCard;
@@ -41,73 +37,12 @@ export interface iPromptPipelineInput {
   maxExampleContextCharacters?: number;
 }
 
-export interface iPromptPipelineContext {
-  card: CharacterCard;
-  target: iFieldGenerationTarget;
-  outputFormat: OutputFormat;
-  mode: GenerationMode;
-  seed: number;
-  generalCharacterIdea: string;
-  shouldUseGeneralCharacterIdea: boolean;
-  userInstructions: string;
-  maxExampleContextCharacters: number;
-  exampleContextSummary: iExampleContextSummary;
-  variationSection: string;
-  isContinuation: boolean;
-}
-
-export interface iPromptSectionStrategy {
-  name: PromptSectionName;
-  build: (context: iPromptPipelineContext) => string;
-}
-
 export interface iPromptPipelineResult {
   messages: iGenerationMessage[];
   seed: number;
   exampleContextSummary: iExampleContextSummary;
   variationSection: string;
 }
-
-export const cardContextSectionStrategy: iPromptSectionStrategy = {
-  name: PROMPT_SECTION_NAMES['card-context'],
-  build: (context) => buildCardContextSection(context.card, context.target),
-};
-
-export const exampleContextSectionStrategy: iPromptSectionStrategy = {
-  name: PROMPT_SECTION_NAMES['example-context'],
-  build: (context) => context.exampleContextSummary.section,
-};
-
-export const taskSectionStrategy: iPromptSectionStrategy = {
-  name: PROMPT_SECTION_NAMES.task,
-  build: (context) => {
-    const { target, mode, outputFormat, exampleContextSummary, isContinuation } = context;
-
-    return [
-      `Your task is to write the "${target.label}" field for a SillyTavern V2 character card.`,
-      getTaskInstruction(target, mode),
-      'Keep the result consistent with the rest of the card.',
-      getFieldFormatGuidance(target),
-      exampleContextSummary.isTruncated
-        ? `Reference example content was truncated to stay within the ${context.maxExampleContextCharacters}-character context budget. Use only the included reference details.`
-        : '',
-      context.shouldUseGeneralCharacterIdea && context.generalCharacterIdea.trim()
-        ? `General character idea: ${context.generalCharacterIdea.trim()}`
-        : '',
-      context.userInstructions.trim() ? `Field-specific instructions: ${context.userInstructions.trim()}` : '',
-      context.variationSection,
-      isContinuation ? getContinuationFormatInstructions(outputFormat) : getFormatInstructions(outputFormat),
-    ]
-      .filter(Boolean)
-      .join('\n');
-  },
-};
-
-export const DEFAULT_PROMPT_SECTION_STRATEGIES: readonly iPromptSectionStrategy[] = [
-  cardContextSectionStrategy,
-  exampleContextSectionStrategy,
-  taskSectionStrategy,
-];
 
 function resolveOverride(overrideValue: string, fallbackValue: string) {
   const trimmedOverride = overrideValue.trim();
@@ -124,7 +59,13 @@ function resolveOverride(overrideValue: string, fallbackValue: string) {
 
 export class CharacterPromptPipeline {
   constructor(
-    private readonly sectionStrategies: readonly iPromptSectionStrategy[] = DEFAULT_PROMPT_SECTION_STRATEGIES,
+    private readonly exampleContextService: ExampleContextService = new ExampleContextService(),
+    private readonly variationService: VariationService = new VariationService(),
+    private readonly sectionStrategies: readonly iPromptSectionStrategy[] = [
+      new CardContextSectionStrategy(new CardContextService()),
+      new ExampleContextSectionStrategy(),
+      new TaskSectionStrategy(new TaskInstructionService()),
+    ],
   ) {}
 
   build(input: iPromptPipelineInput): iPromptPipelineResult {
@@ -172,13 +113,13 @@ export class CharacterPromptPipeline {
   }: iPromptPipelineInput): iPromptPipelineContext {
     // A single seeded source consumed in a fixed order keeps the whole prompt
     // reproducible for a given seed.
-    const random = createSeededRandom(seed);
-    const exampleContextSummary = buildExampleContextSummary({
+    const random = new SeededRandom(seed);
+    const exampleContextSummary = this.exampleContextService.buildSummary({
       exampleCharacters,
       maxCharacters: maxExampleContextCharacters,
       random,
     });
-    const variationSection = buildVariationSection({ random, seed, target, mode });
+    const variationSection = this.variationService.buildSection({ random, seed, target, mode });
 
     return {
       card,

@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { OUTPUT_FORMATS } from '../generation-config';
-import { buildExampleContextSummary, getExampleContextCharacterBudget } from './example-context-service';
+import { ExampleContextService } from './example-context-service';
 import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { iFieldGenerationTarget, iPromptExampleCharacter } from './generation-contracts';
 import { characterPromptPipeline } from './prompt-pipeline';
-import { createSeededRandom } from './seeded-random';
+import { SeededRandom } from './seeded-random';
+
+const exampleContextService = new ExampleContextService();
 
 function createDescriptionTarget(value = ''): iFieldGenerationTarget {
   return {
@@ -197,7 +199,7 @@ describe('prompt-pipeline', () => {
 
 describe('example-context-service', () => {
   it('includes partial reference content when an example field exceeds the character budget', () => {
-    const summary = buildExampleContextSummary({
+    const summary = exampleContextService.buildSummary({
       exampleCharacters: [
         {
           description: 'x'.repeat(400),
@@ -216,8 +218,8 @@ describe('example-context-service', () => {
   });
 
   it('scales the example budget with larger context windows', () => {
-    const smallBudget = getExampleContextCharacterBudget(4_096, 600);
-    const largeBudget = getExampleContextCharacterBudget(32_768, 600);
+    const smallBudget = exampleContextService.getCharacterBudget(4_096, 600);
+    const largeBudget = exampleContextService.getCharacterBudget(32_768, 600);
 
     expect(largeBudget).toBeGreaterThan(smallBudget);
     expect(smallBudget).toBeGreaterThanOrEqual(2_000);
@@ -225,9 +227,9 @@ describe('example-context-service', () => {
 
   it('shuffles example order deterministically from the seeded source', () => {
     const summaryForSeed = (seed: number) =>
-      buildExampleContextSummary({
+      exampleContextService.buildSummary({
         exampleCharacters: MANY_EXAMPLES,
-        random: createSeededRandom(seed),
+        random: new SeededRandom(seed),
       }).section;
 
     expect(summaryForSeed(3)).toBe(summaryForSeed(3));

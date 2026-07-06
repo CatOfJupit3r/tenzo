@@ -25,7 +25,7 @@ import type {
   iPromptExampleCharacter,
 } from '../lib/prompt/generation-contracts';
 import { characterPromptPipeline } from '../lib/prompt/prompt-pipeline';
-import { createGenerationSeed } from '../lib/prompt/seeded-random';
+import { SeededRandom } from '../lib/prompt/seeded-random';
 import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider-health';
 import type { ProviderKind } from '../lib/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
@@ -420,7 +420,7 @@ export function useGeneration() {
           card,
           target,
           outputFormat: connectionSettings.outputFormat,
-          seed: createGenerationSeed(),
+          seed: SeededRandom.generateSeed(),
           mode,
           generalCharacterIdea: promptSettings.generalCharacterIdea,
           shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),

@@ -1,7 +1,7 @@
 import type { CharacterTextFieldKey } from '../card-schema';
 import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { GenerationMode, iFieldGenerationTarget } from './generation-contracts';
-import type { iSeededRandom } from './seeded-random';
+import type { SeededRandom } from './seeded-random';
 
 export const VARIATION_DIRECTIVES: readonly string[] = [
   'Lean into one unexpected contradiction in the character.',
@@ -26,21 +26,8 @@ const META_FIELD_KEYS: CharacterTextFieldKey[] = [
   'post_history_instructions',
 ];
 
-function isVariationEligible(target: iFieldGenerationTarget, mode: GenerationMode) {
-  if (mode === GENERATION_MODES.continue) {
-    return false;
-  }
-
-  if (target.kind !== GENERATION_TARGET_KINDS.field) {
-    return true;
-  }
-
-  const fieldKey = target.key.replace(/^field:/, '') as CharacterTextFieldKey;
-  return !META_FIELD_KEYS.includes(fieldKey);
-}
-
 export interface iBuildVariationSectionOptions {
-  random: iSeededRandom;
+  random: SeededRandom;
   seed: number;
   target: iFieldGenerationTarget;
   mode: GenerationMode;
@@ -50,16 +37,33 @@ export interface iBuildVariationSectionOptions {
  * Produces a per-generation variation directive so identical requests still
  * diverge, while staying fully reproducible for a given seed.
  */
-export function buildVariationSection({ random, seed, target, mode }: iBuildVariationSectionOptions) {
-  if (!isVariationEligible(target, mode)) {
-    return '';
+export class VariationService {
+  constructor(private readonly directives: readonly string[] = VARIATION_DIRECTIVES) {}
+
+  buildSection({ random, seed, target, mode }: iBuildVariationSectionOptions): string {
+    if (!this.isEligible(target, mode)) {
+      return '';
+    }
+
+    const directive = random.pickFrom(this.directives);
+
+    if (!directive) {
+      return '';
+    }
+
+    return [`Variation seed: ${seed}.`, `Creative direction for this generation: ${directive}`].join('\n');
   }
 
-  const directive = random.pickFrom(VARIATION_DIRECTIVES);
+  private isEligible(target: iFieldGenerationTarget, mode: GenerationMode) {
+    if (mode === GENERATION_MODES.continue) {
+      return false;
+    }
 
-  if (!directive) {
-    return '';
+    if (target.kind !== GENERATION_TARGET_KINDS.field) {
+      return true;
+    }
+
+    const fieldKey = target.key.replace(/^field:/, '') as CharacterTextFieldKey;
+    return !META_FIELD_KEYS.includes(fieldKey);
   }
-
-  return [`Variation seed: ${seed}.`, `Creative direction for this generation: ${directive}`].join('\n');
 }

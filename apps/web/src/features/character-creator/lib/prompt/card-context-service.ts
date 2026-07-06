@@ -1,7 +1,7 @@
 import type { CharacterCard, CharacterTextFieldKey } from '../card-schema';
 import { GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { iFieldGenerationTarget } from './generation-contracts';
-import { formatBulletList } from './prompt-formatting';
+import { PromptFormatter } from './prompt-formatting';
 
 export const STANDARD_FIELD_LABELS = {
   name: 'Name',
@@ -29,52 +29,57 @@ const CORE_CONTEXT_KEYS: CharacterTextFieldKey[] = [
   'character_version',
 ];
 
-export function buildCardContextSection(card: CharacterCard, target: iFieldGenerationTarget) {
-  const { data } = card;
-  const lines: string[] = [];
+export class CardContextService {
+  constructor(private readonly formatter: PromptFormatter = new PromptFormatter()) {}
 
-  CORE_CONTEXT_KEYS.forEach((key) => {
-    const value = data[key]?.trim();
-    if (!value) {
-      return;
+  buildSection(card: CharacterCard, target: iFieldGenerationTarget): string {
+    const { data } = card;
+    const lines: string[] = [];
+
+    CORE_CONTEXT_KEYS.forEach((key) => {
+      const value = data[key]?.trim();
+      if (!value) {
+        return;
+      }
+
+      lines.push(`${STANDARD_FIELD_LABELS[key]}: ${value}`);
+    });
+
+    if (data.tags.length > 0) {
+      lines.push(`Tags: ${data.tags.join(', ')}`);
     }
 
-    lines.push(`${STANDARD_FIELD_LABELS[key]}: ${value}`);
-  });
+    if (data.alternate_greetings.length > 0) {
+      data.alternate_greetings.forEach((greeting, index) => {
+        if (!greeting.trim()) {
+          return;
+        }
 
-  if (data.tags.length > 0) {
-    lines.push(`Tags: ${data.tags.join(', ')}`);
+        const isTargetGreeting =
+          target.kind === GENERATION_TARGET_KINDS['alternate-greeting'] &&
+          target.key === `alternate_greetings:${index}`;
+        lines.push(`Alternate Greeting ${index + 1}${isTargetGreeting ? ' (target)' : ''}: ${greeting.trim()}`);
+      });
+    }
+
+    if (data.extensions.custom_fields.length > 0) {
+      data.extensions.custom_fields.forEach((field) => {
+        if (!field.label.trim() && !field.value.trim()) {
+          return;
+        }
+
+        const isTargetCustomField =
+          target.kind === GENERATION_TARGET_KINDS['custom-field'] && target.key === `custom:${field.id}`;
+        lines.push(
+          `Custom Field ${field.label.trim() !== '' ? field.label.trim() : 'Untitled'}${isTargetCustomField ? ' (target)' : ''}: ${field.value.trim() !== '' ? field.value.trim() : '(empty)'}`,
+        );
+      });
+    }
+
+    if (lines.length === 0) {
+      return '';
+    }
+
+    return ['Current card context:', this.formatter.formatBulletList(lines)].join('\n');
   }
-
-  if (data.alternate_greetings.length > 0) {
-    data.alternate_greetings.forEach((greeting, index) => {
-      if (!greeting.trim()) {
-        return;
-      }
-
-      const isTargetGreeting =
-        target.kind === GENERATION_TARGET_KINDS['alternate-greeting'] && target.key === `alternate_greetings:${index}`;
-      lines.push(`Alternate Greeting ${index + 1}${isTargetGreeting ? ' (target)' : ''}: ${greeting.trim()}`);
-    });
-  }
-
-  if (data.extensions.custom_fields.length > 0) {
-    data.extensions.custom_fields.forEach((field) => {
-      if (!field.label.trim() && !field.value.trim()) {
-        return;
-      }
-
-      const isTargetCustomField =
-        target.kind === GENERATION_TARGET_KINDS['custom-field'] && target.key === `custom:${field.id}`;
-      lines.push(
-        `Custom Field ${field.label.trim() !== '' ? field.label.trim() : 'Untitled'}${isTargetCustomField ? ' (target)' : ''}: ${field.value.trim() !== '' ? field.value.trim() : '(empty)'}`,
-      );
-    });
-  }
-
-  if (lines.length === 0) {
-    return '';
-  }
-
-  return ['Current card context:', formatBulletList(lines)].join('\n');
 }

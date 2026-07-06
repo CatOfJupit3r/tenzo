@@ -1,3 +1,5 @@
-export function formatBulletList(lines: string[]) {
-  return lines.map((line) => `- ${line}`).join('\n');
+export class PromptFormatter {
+  formatBulletList(lines: string[]): string {
+    return lines.map((line) => `- ${line}`).join('\n');
+  }
 }

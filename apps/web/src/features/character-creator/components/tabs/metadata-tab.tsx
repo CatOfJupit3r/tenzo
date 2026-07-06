@@ -1,6 +1,6 @@
 import { FIELD_EDITOR_VARIANTS, METADATA_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
-import { GENERATION_MODES } from '../../lib/prompt-builder';
+import { GENERATION_MODES } from '../../lib/prompt/generation-contracts';
 import { CharacterField } from '../character-field';
 import { CharacterFieldPanel } from '../character-field-panel';
 import { CustomFields } from '../custom-fields';

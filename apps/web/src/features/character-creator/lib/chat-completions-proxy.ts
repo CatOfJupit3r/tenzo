@@ -6,7 +6,14 @@ import {
   buildChatCompletionsPayload,
   normalizeChatCompletionsEndpoint,
 } from './api-client';
-import { FREQUENCY_PENALTY_RANGE, PRESENCE_PENALTY_RANGE, TEMPERATURE_RANGE, TOP_P_RANGE } from './generation-config';
+import {
+  FREQUENCY_PENALTY_RANGE,
+  MIN_P_RANGE,
+  PRESENCE_PENALTY_RANGE,
+  TEMPERATURE_RANGE,
+  TOP_K_RANGE,
+  TOP_P_RANGE,
+} from './generation-config';
 
 const generationMessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
@@ -23,6 +30,9 @@ const chatCompletionsProxyInputSchema = z.object({
   topP: z.number().min(TOP_P_RANGE.min).max(TOP_P_RANGE.max),
   frequencyPenalty: z.number().min(FREQUENCY_PENALTY_RANGE.min).max(FREQUENCY_PENALTY_RANGE.max),
   presencePenalty: z.number().min(PRESENCE_PENALTY_RANGE.min).max(PRESENCE_PENALTY_RANGE.max),
+  topK: z.number().min(TOP_K_RANGE.min).max(TOP_K_RANGE.max),
+  minP: z.number().min(MIN_P_RANGE.min).max(MIN_P_RANGE.max),
+  shouldSendDisabledSamplers: z.boolean().optional(),
 });
 
 export const requestChatCompletionsProxy = createServerFn({ method: 'POST' })

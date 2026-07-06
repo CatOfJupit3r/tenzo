@@ -2,7 +2,7 @@ import { cn } from '@~/lib/utils';
 
 import type { iCharacterFieldConfig } from '../constants/field-config';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
-import { GENERATION_MODES } from '../lib/prompt-builder';
+import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
 import { CharacterField } from './character-field';
 import { FIELD_PANEL_CLASS_NAME } from './tabs/tabs.constants';
 

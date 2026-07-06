@@ -1,4 +1,4 @@
-import type { iGenerationMessage } from './prompt-builder';
+import type { iGenerationMessage } from './prompt/generation-contracts';
 
 export interface iChatCompletionsRequest {
   endpoint: string;
@@ -10,6 +10,15 @@ export interface iChatCompletionsRequest {
   topP: number;
   frequencyPenalty: number;
   presencePenalty: number;
+  topK: number;
+  minP: number;
+  /**
+   * When true, top_k/min_p are sent even at their disabled values (0). Providers
+   * like KoboldCpp substitute their own defaults for omitted samplers, so an
+   * explicit 0 is required to actually disable them. Keep false for providers
+   * that reject unknown parameters (e.g. OpenAI).
+   */
+  shouldSendDisabledSamplers?: boolean;
 }
 
 interface iChatCompletionsRequestPayload {
@@ -21,6 +30,8 @@ interface iChatCompletionsRequestPayload {
   top_p: number;
   frequency_penalty: number;
   presence_penalty: number;
+  top_k?: number;
+  min_p?: number;
 }
 
 function normalizeProviderTextPart(value: unknown): string {
@@ -115,6 +126,9 @@ export function buildChatCompletionsPayload({
   topP,
   frequencyPenalty,
   presencePenalty,
+  topK,
+  minP,
+  shouldSendDisabledSamplers = false,
 }: iChatCompletionsRequest): iChatCompletionsRequestPayload {
   return {
     model: model.trim(),
@@ -125,6 +139,8 @@ export function buildChatCompletionsPayload({
     top_p: topP,
     frequency_penalty: frequencyPenalty,
     presence_penalty: presencePenalty,
+    ...(topK > 0 || shouldSendDisabledSamplers ? { top_k: topK } : {}),
+    ...(minP > 0 || shouldSendDisabledSamplers ? { min_p: minP } : {}),
   };
 }
 

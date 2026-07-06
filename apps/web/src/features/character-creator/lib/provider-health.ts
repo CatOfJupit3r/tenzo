@@ -1,5 +1,11 @@
+import { z } from 'zod';
+
 import { REQUEST_MODES } from './generation-config';
 import type { RequestMode } from './generation-config';
+
+export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openai-compatible', 'unknown']);
+export const PROVIDER_KINDS = PROVIDER_KIND_SCHEMA.enum;
+export type ProviderKind = z.infer<typeof PROVIDER_KIND_SCHEMA>;
 
 export interface iConnectionHealthRequest {
   endpoint: string;
@@ -9,7 +15,7 @@ export interface iConnectionHealthRequest {
 
 export interface iConnectionHealthResult {
   providerName: string | null;
-  providerKind: 'koboldcpp' | 'openai-compatible' | 'unknown';
+  providerKind: ProviderKind;
   models: string[];
   currentModel: string | null;
   contextSize: number | null;
@@ -34,10 +40,10 @@ interface iEndpointCandidates {
 }
 
 const PROVIDER_KIND_LABELS = {
-  koboldcpp: 'KoboldCpp',
-  'openai-compatible': 'OpenAI-compatible',
-  unknown: 'Unknown provider',
-} as const;
+  [PROVIDER_KINDS.koboldcpp]: 'KoboldCpp',
+  [PROVIDER_KINDS['openai-compatible']]: 'OpenAI-compatible',
+  [PROVIDER_KINDS.unknown]: 'Unknown provider',
+} satisfies Record<ProviderKind, string>;
 
 function normalizeBaseUrl(endpoint: string) {
   const trimmedEndpoint = endpoint.trim().replace(/\/$/, '');
@@ -201,21 +207,25 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     headers,
   } satisfies RequestInit;
 
-  const [modelsResponse, koboldModelResponse, koboldContextResponse, koboldPublicContextResponse, propsResponse, serviceInfoResponse] =
-    await Promise.all([
-      jsonFetcher(candidates.modelsUrl, requestInit).catch(() => null),
-      jsonFetcher(candidates.koboldModelUrl, requestInit).catch(() => null),
-      jsonFetcher(candidates.koboldContextUrl, requestInit).catch(() => null),
-      jsonFetcher(candidates.koboldPublicContextUrl, requestInit).catch(() => null),
-      jsonFetcher(candidates.propsUrl, requestInit).catch(() => null),
-      jsonFetcher(candidates.serviceInfoUrl, requestInit).catch(() => null),
-    ]);
+  const [
+    modelsResponse,
+    koboldModelResponse,
+    koboldContextResponse,
+    koboldPublicContextResponse,
+    propsResponse,
+    serviceInfoResponse,
+  ] = await Promise.all([
+    jsonFetcher(candidates.modelsUrl, requestInit).catch(() => null),
+    jsonFetcher(candidates.koboldModelUrl, requestInit).catch(() => null),
+    jsonFetcher(candidates.koboldContextUrl, requestInit).catch(() => null),
+    jsonFetcher(candidates.koboldPublicContextUrl, requestInit).catch(() => null),
+    jsonFetcher(candidates.propsUrl, requestInit).catch(() => null),
+    jsonFetcher(candidates.serviceInfoUrl, requestInit).catch(() => null),
+  ]);
 
   const models = modelsResponse?.isOk ? extractModels(modelsResponse.data) : [];
   const currentModel =
-    (koboldModelResponse?.isOk ? extractCurrentModel(koboldModelResponse.data) : null) ??
-    models[0] ??
-    null;
+    (koboldModelResponse?.isOk ? extractCurrentModel(koboldModelResponse.data) : null) ?? models[0] ?? null;
   const contextSize =
     (koboldContextResponse?.isOk ? extractContextSize(koboldContextResponse.data) : null) ??
     (koboldPublicContextResponse?.isOk ? extractContextSize(koboldPublicContextResponse.data) : null) ??
@@ -227,9 +237,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     koboldModelResponse?.isOk === true ||
     koboldContextResponse?.isOk === true ||
     koboldPublicContextResponse?.isOk === true;
-  const isKoboldCpp =
-    (providerName?.toLowerCase().includes('koboldcpp') ?? false) ||
-    hasKoboldMetadata;
+  const isKoboldCpp = (providerName?.toLowerCase().includes('koboldcpp') ?? false) || hasKoboldMetadata;
   const hasOpenAiSurface = Boolean(modelsResponse?.isOk);
 
   if (!isKoboldCpp && !hasOpenAiSurface && !contextSize) {
@@ -246,18 +254,18 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
 
   if (!resolvedProviderName) {
     if (isKoboldCpp) {
-      resolvedProviderName = PROVIDER_KIND_LABELS.koboldcpp;
+      resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS.koboldcpp];
     } else if (hasOpenAiSurface) {
-      resolvedProviderName = PROVIDER_KIND_LABELS['openai-compatible'];
+      resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS['openai-compatible']];
     }
   }
 
-  let providerKind: iConnectionHealthResult['providerKind'] = 'unknown';
+  let providerKind: ProviderKind = PROVIDER_KINDS.unknown;
 
   if (isKoboldCpp) {
-    providerKind = 'koboldcpp';
+    providerKind = PROVIDER_KINDS.koboldcpp;
   } else if (hasOpenAiSurface) {
-    providerKind = 'openai-compatible';
+    providerKind = PROVIDER_KINDS['openai-compatible'];
   }
 
   return {

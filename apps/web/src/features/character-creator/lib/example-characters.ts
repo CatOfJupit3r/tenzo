@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { iImportedCharacterCardFile } from './card-files';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
 import type { CharacterCard } from './card-schema';
-import type { iPromptExampleCharacter } from './prompt-builder';
+import type { iPromptExampleCharacter } from './prompt/generation-contracts';
 
 export const EXAMPLE_CHARACTER_CONTEXT_FIELD_KEYS = [
   'name',

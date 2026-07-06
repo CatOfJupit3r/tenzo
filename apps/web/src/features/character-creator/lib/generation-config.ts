@@ -14,6 +14,8 @@ export const TEMPERATURE_RANGE = { min: 0, max: 2 } as const;
 export const TOP_P_RANGE = { min: 0, max: 1 } as const;
 export const FREQUENCY_PENALTY_RANGE = { min: -2, max: 2 } as const;
 export const PRESENCE_PENALTY_RANGE = { min: -2, max: 2 } as const;
+export const TOP_K_RANGE = { min: 0, max: 200 } as const;
+export const MIN_P_RANGE = { min: 0, max: 1 } as const;
 
 export interface iCharacterGenerationConnectionSettings {
   endpoint: string;
@@ -27,6 +29,8 @@ export interface iCharacterGenerationConnectionSettings {
   topP: number;
   frequencyPenalty: number;
   presencePenalty: number;
+  topK: number;
+  minP: number;
 }
 
 export const CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA = z.object({
@@ -52,6 +56,8 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   topP: 1,
   frequencyPenalty: 0,
   presencePenalty: 0,
+  topK: 0,
+  minP: 0,
 };
 
 export const DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS: iCharacterGenerationPromptSettings = {
@@ -79,6 +85,14 @@ function readFloatInRange(value: unknown, range: { min: number; max: number }, f
   }
 
   return Math.min(range.max, Math.max(range.min, value));
+}
+
+function readIntegerInRange(value: unknown, range: { min: number; max: number }, fallbackValue: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallbackValue;
+  }
+
+  return Math.min(range.max, Math.max(range.min, Math.round(value)));
 }
 
 function readFieldInstructions(value: unknown) {
@@ -142,6 +156,8 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
       PRESENCE_PENALTY_RANGE,
       DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.presencePenalty,
     ),
+    topK: readIntegerInRange(candidate.topK, TOP_K_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topK),
+    minP: readFloatInRange(candidate.minP, MIN_P_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.minP),
   };
 }
 

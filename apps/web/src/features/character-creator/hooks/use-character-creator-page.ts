@@ -17,8 +17,9 @@ import { REQUEST_MODES } from '../lib/generation-config';
 import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import { invalidatePortraitAsset } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
-import { buildExampleContextSummary, GENERATION_MODES, getExampleContextCharacterBudget } from '../lib/prompt-builder';
-import type { GenerationMode, iFieldGenerationTarget } from '../lib/prompt-builder';
+import { buildExampleContextSummary, getExampleContextCharacterBudget } from '../lib/prompt/example-context-service';
+import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
+import type { GenerationMode, iFieldGenerationTarget } from '../lib/prompt/generation-contracts';
 import { useCharacterPortrait } from './use-character-portrait';
 import { useCharacterSession } from './use-character-session';
 import { useGeneration } from './use-generation';
@@ -139,7 +140,11 @@ export function useCharacterCreatorPage() {
   );
 
   const exampleContextSummary = useMemo(
-    () => buildExampleContextSummary(promptExampleCharacters, maxExampleContextCharacters),
+    () =>
+      buildExampleContextSummary({
+        exampleCharacters: promptExampleCharacters,
+        maxCharacters: maxExampleContextCharacters,
+      }),
     [maxExampleContextCharacters, promptExampleCharacters],
   );
 

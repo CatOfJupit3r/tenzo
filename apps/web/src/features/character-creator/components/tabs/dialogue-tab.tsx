@@ -1,6 +1,6 @@
 import { CORE_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
-import { GENERATION_MODES } from '../../lib/prompt-builder';
+import { GENERATION_MODES } from '../../lib/prompt/generation-contracts';
 import { AlternateGreetings } from '../alternate-greetings';
 import { CharacterFieldPanel } from '../character-field-panel';
 import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';

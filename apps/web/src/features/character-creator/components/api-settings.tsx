@@ -11,10 +11,12 @@ import { cn } from '@~/lib/utils';
 
 import {
   FREQUENCY_PENALTY_RANGE,
+  MIN_P_RANGE,
   OUTPUT_FORMATS,
   PRESENCE_PENALTY_RANGE,
   REQUEST_MODES,
   TEMPERATURE_RANGE,
+  TOP_K_RANGE,
   TOP_P_RANGE,
 } from '../lib/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
@@ -216,6 +218,53 @@ export function ApiSettings({
           />
           <p className="text-sm text-muted-foreground">
             Penalizes tokens that already appeared at all, encouraging new topics.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="api-top-k">Top K</Label>
+          <Input
+            id="api-top-k"
+            type="number"
+            min={TOP_K_RANGE.min}
+            max={TOP_K_RANGE.max}
+            step={1}
+            value={String(generationSettings.topK)}
+            onChange={(event) => {
+              const nextValue = Number.parseInt(event.target.value, 10);
+              onSettingsChange({
+                topK: Number.isNaN(nextValue)
+                  ? TOP_K_RANGE.min
+                  : Math.min(TOP_K_RANGE.max, Math.max(TOP_K_RANGE.min, nextValue)),
+              });
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Only used by koboldcpp/llama.cpp-style backends. 0 leaves the provider default in place; a restrictive
+            provider default here is a common cause of low variance regardless of temperature.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="api-min-p">Min P</Label>
+          <Input
+            id="api-min-p"
+            type="number"
+            min={MIN_P_RANGE.min}
+            max={MIN_P_RANGE.max}
+            step={0.01}
+            value={String(generationSettings.minP)}
+            onChange={(event) => {
+              const nextValue = Number.parseFloat(event.target.value);
+              onSettingsChange({
+                minP: Number.isNaN(nextValue)
+                  ? MIN_P_RANGE.min
+                  : Math.min(MIN_P_RANGE.max, Math.max(MIN_P_RANGE.min, nextValue)),
+              });
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Only used by koboldcpp/llama.cpp-style backends. 0 leaves the provider default in place.
           </p>
         </div>
 

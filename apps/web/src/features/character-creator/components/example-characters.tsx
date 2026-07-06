@@ -16,7 +16,7 @@ import {
   hasExampleCharacterContextField,
 } from '../lib/example-characters';
 import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/example-characters';
-import type { iExampleContextSummary } from '../lib/prompt-builder';
+import type { iExampleContextSummary } from '../lib/prompt/example-context-service';
 
 export interface iExampleCharactersProps {
   exampleCharacters: iStoredExampleCharacter[];

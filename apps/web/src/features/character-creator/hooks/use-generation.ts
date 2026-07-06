@@ -18,9 +18,16 @@ import {
   sanitizeCharacterGenerationSettings,
 } from '../lib/generation-config';
 import type { iCharacterGenerationConnectionSettings } from '../lib/generation-config';
-import { buildGenerationMessages, GENERATION_MODES, getGenerationTargetKey } from '../lib/prompt-builder';
-import type { GenerationMode, iFieldGenerationTarget, iPromptExampleCharacter } from '../lib/prompt-builder';
-import { probeProviderMetadata } from '../lib/provider-health';
+import { GENERATION_MODES, getGenerationTargetKey } from '../lib/prompt/generation-contracts';
+import type {
+  GenerationMode,
+  iFieldGenerationTarget,
+  iPromptExampleCharacter,
+} from '../lib/prompt/generation-contracts';
+import { characterPromptPipeline } from '../lib/prompt/prompt-pipeline';
+import { createGenerationSeed } from '../lib/prompt/seeded-random';
+import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider-health';
+import type { ProviderKind } from '../lib/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
 import { getPrefilled, parseResponse } from '../lib/response-parser';
 import { useCharacterSession } from './use-character-session';
@@ -43,7 +50,7 @@ interface iConnectionHealthState {
   isChecking: boolean;
   errorMessage: string | null;
   providerName: string | null;
-  providerKind: 'koboldcpp' | 'openai-compatible' | 'unknown' | null;
+  providerKind: ProviderKind | null;
   availableModels: string[];
   detectedModel: string | null;
   detectedContextSize: number | null;
@@ -409,6 +416,18 @@ export function useGeneration() {
       let streamedAssistantText = '';
 
       try {
+        const promptResult = characterPromptPipeline.build({
+          card,
+          target,
+          outputFormat: connectionSettings.outputFormat,
+          seed: createGenerationSeed(),
+          mode,
+          generalCharacterIdea: promptSettings.generalCharacterIdea,
+          shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
+          userInstructions: getFieldInstruction(fieldKey),
+          exampleCharacters,
+          maxExampleContextCharacters,
+        });
         const requestData = {
           endpoint: connectionSettings.endpoint,
           apiKey,
@@ -418,17 +437,10 @@ export function useGeneration() {
           topP: connectionSettings.topP,
           frequencyPenalty: connectionSettings.frequencyPenalty,
           presencePenalty: connectionSettings.presencePenalty,
-          messages: buildGenerationMessages({
-            card,
-            target,
-            outputFormat: connectionSettings.outputFormat,
-            mode,
-            generalCharacterIdea: promptSettings.generalCharacterIdea,
-            shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
-            userInstructions: getFieldInstruction(fieldKey),
-            exampleCharacters,
-            maxExampleContextCharacters,
-          }),
+          topK: connectionSettings.topK,
+          minP: connectionSettings.minP,
+          shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
+          messages: promptResult.messages,
         };
 
         const response =
@@ -486,6 +498,7 @@ export function useGeneration() {
     },
     [
       apiKey,
+      connectionHealth.providerKind,
       connectionSettings,
       getFieldInstruction,
       promptSettings.generalCharacterIdea,

@@ -10,8 +10,13 @@ export function PageDialogs() {
     isExportDialogOpen,
     setIsExportDialogOpen,
     portraitBlob,
+    characterLibrary,
+    exportSettings,
+    updateExportSettings,
     handleExportJson,
     handleExportPng,
+    handleBulkExport,
+    handleExportAll,
   } = useCharacterCreatorContext();
 
   return (
@@ -21,8 +26,13 @@ export function PageDialogs() {
         isOpen={isExportDialogOpen}
         onOpenChange={setIsExportDialogOpen}
         hasPortrait={portraitBlob !== null}
+        characters={characterLibrary}
+        exportSettings={exportSettings}
+        onExportSettingsChange={updateExportSettings}
         onExportJson={handleExportJson}
         onExportPng={handleExportPng}
+        onBulkExport={handleBulkExport}
+        onExportAll={handleExportAll}
       />
     </>
   );

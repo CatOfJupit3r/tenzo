@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { generateUuid } from '@~/utils/uuid';
+
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
@@ -99,7 +101,7 @@ export function createCharacterLibraryItem({
   const timestamp = getTimestamp();
 
   return {
-    id: id ?? crypto.randomUUID(),
+    id: id ?? generateUuid(),
     card: card ?? createEmptyCharacterCard(),
     promptSettings: sanitizeCharacterGenerationPromptSettings(promptSettings),
     portrait,

@@ -2,6 +2,8 @@ import { useLiveQuery } from '@tanstack/react-db';
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { generateUuid } from '@~/utils/uuid';
+
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { characterLibraryCollection } from '../collections/character-library.collection';
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
@@ -167,7 +169,7 @@ export function useCharacterSession() {
 
   const addCustomField = useCallback(() => {
     mutateActiveCharacter((draft) => {
-      const customField: CustomField = { id: crypto.randomUUID(), label: '', value: '' };
+      const customField: CustomField = { id: generateUuid(), label: '', value: '' };
       draft.card.data.extensions.custom_fields.push(customField);
     });
   }, [mutateActiveCharacter]);

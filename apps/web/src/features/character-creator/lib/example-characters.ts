@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { generateUuid } from '@~/utils/uuid';
+
 import type { iImportedCharacterCardFile } from './card-files';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
 import type { CharacterCard } from './card-schema';
@@ -77,7 +79,7 @@ export function sanitizeExampleCharacterIncludedFieldKeys(
 
 export function createStoredExampleCharacter(importedCardFile: iImportedCharacterCardFile): iStoredExampleCharacter {
   return {
-    id: crypto.randomUUID(),
+    id: generateUuid(),
     fileName: importedCardFile.fileName,
     sourceKind: importedCardFile.sourceKind,
     card: importedCardFile.card,

@@ -1,19 +1,36 @@
+import { useAtom, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastSuccess } from '@~/components/toastifications';
+import { generateUuid } from '@~/utils/uuid';
 
+import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
+import { exportSettingsAtom } from '../atoms/export-settings.atom';
 import { characterLibraryCollection } from '../collections/character-library.collection';
+import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import type { iCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.constants';
-import { exportCharacterCardJson, exportCharacterCardPng, importCharacterCardFile } from '../lib/card-files';
+import type { iBackupPortraitAsset, iTenzoBackup } from '../lib/backup';
+import {
+  exportCharacterCardJson,
+  exportCharacterCardPng,
+  exportCharactersArchive,
+  exportFullBackupArchive,
+  importArchiveFile,
+  importCharacterCardFile,
+  isArchiveFile,
+} from '../lib/card-files';
+import type { iBulkExportCharacter, iImportedCharacterCardFile } from '../lib/card-files';
 import type { CharacterTextFieldKey } from '../lib/card-schema';
-import { CHARACTER_LIBRARY_SOURCES } from '../lib/character-library';
+import { CHARACTER_LIBRARY_SOURCES, createCharacterLibraryItem } from '../lib/character-library';
+import type { iCharacterPortraitReference } from '../lib/character-library';
 import {
   createStoredExampleCharacter,
   getExampleCharacterDisplayName,
   MAX_EXAMPLE_CHARACTER_COUNT,
   toPromptExampleCharacter,
 } from '../lib/example-characters';
-import { REQUEST_MODES } from '../lib/generation-config';
+import type { iExportSettings } from '../lib/export-settings';
+import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation-config';
 import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import { invalidatePortraitAsset } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
@@ -25,6 +42,26 @@ import { useCharacterSession } from './use-character-session';
 import { useGeneration } from './use-generation';
 
 const exampleContextService = new ExampleContextService();
+
+async function createImportedPortraitReference(
+  importedCardFile: iImportedCharacterCardFile,
+): Promise<iCharacterPortraitReference | null> {
+  if (!importedCardFile.portraitBlob) {
+    return null;
+  }
+
+  const { cropRect } = importedCardFile.tenzoMetadata;
+  const portrait: iCharacterPortraitReference = {
+    assetId: generateUuid(),
+    fileName: importedCardFile.fileName,
+    mimeType: importedCardFile.portraitBlob.type || 'application/octet-stream',
+    cropRect,
+    thumbnailDataUrl: await renderPortraitThumbnailDataUrl(importedCardFile.portraitBlob, cropRect),
+  };
+
+  await writeCharacterAssetBlob(portrait.assetId, importedCardFile.portraitBlob);
+  return portrait;
+}
 
 export interface iFieldGenerationState {
   shouldUseGeneralCharacterIdea: boolean;
@@ -61,6 +98,8 @@ function createStandardFieldTarget(key: CharacterTextFieldKey, label: string, va
 export function useCharacterCreatorPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportSettings, setExportSettings] = useAtom(exportSettingsAtom);
+  const setStoredGenerationSettings = useSetAtom(characterGenerationSettingsAtom);
   const [rewriteBackups, setRewriteBackups] = useState<Record<string, string>>({});
   const [pendingRewriteReviewKeys, setPendingRewriteReviewKeys] = useState<Record<string, boolean>>({});
 
@@ -313,32 +352,98 @@ export function useCharacterCreatorPage() {
     [setPortrait],
   );
 
+  const importCardAsCharacter = useCallback(
+    async (importedCardFile: iImportedCharacterCardFile) => {
+      const portrait = await createImportedPortraitReference(importedCardFile);
+
+      createCharacter({
+        card: importedCardFile.card,
+        portrait,
+        promptSettings: importedCardFile.tenzoMetadata.promptSettings ?? undefined,
+        source: importedCardFile.sourceKind === 'png' ? CHARACTER_LIBRARY_SOURCES.png : CHARACTER_LIBRARY_SOURCES.json,
+      });
+    },
+    [createCharacter],
+  );
+
+  const restoreFullBackup = useCallback(
+    async (backup: iTenzoBackup) => {
+      await Promise.all(
+        backup.assets.map(async (asset) =>
+          writeCharacterAssetBlob(asset.assetId, new Blob([asset.bytes.slice()], { type: asset.mimeType })),
+        ),
+      );
+
+      backup.characters.forEach((character) => {
+        const restoredCharacter = characterLibraryCollection.has(character.id)
+          ? createCharacterLibraryItem({ ...character, id: generateUuid() })
+          : character;
+
+        characterLibraryCollection.insert(restoredCharacter);
+      });
+
+      let importedExampleCount = 0;
+      backup.exampleCharacters.forEach((exampleCharacter) => {
+        if (
+          !exampleCharactersCollection.has(exampleCharacter.id) &&
+          exampleCharactersCollection.size < MAX_EXAMPLE_CHARACTER_COUNT
+        ) {
+          exampleCharactersCollection.insert(exampleCharacter);
+          importedExampleCount += 1;
+        }
+      });
+
+      if (backup.connectionSettings) {
+        const restoredSettings = backup.connectionSettings;
+        // The backup never contains API credentials; keep whatever key is already stored.
+        setStoredGenerationSettings((previousSettings) => ({
+          ...restoredSettings,
+          apiKeyCiphertext: sanitizeCharacterGenerationConnectionSettings(previousSettings).apiKeyCiphertext,
+        }));
+      }
+
+      const summaryParts = [
+        `${backup.characters.length} characters`,
+        `${importedExampleCount} examples`,
+        backup.connectionSettings ? 'settings applied' : null,
+      ].filter((part): part is string => part !== null);
+
+      toastSuccess('Backup restored', summaryParts.join(' | '));
+    },
+    [setStoredGenerationSettings],
+  );
+
   const handleImport = useCallback(
     async (file: File) => {
       try {
-        const importedCardFile = await importCharacterCardFile(file);
-        const portrait =
-          importedCardFile.portraitBlob === null
-            ? null
-            : {
-                assetId: crypto.randomUUID(),
-                fileName: importedCardFile.fileName,
-                mimeType: importedCardFile.portraitBlob.type || 'application/octet-stream',
-                cropRect: null,
-                thumbnailDataUrl: await renderPortraitThumbnailDataUrl(importedCardFile.portraitBlob, null),
-              };
+        if (isArchiveFile(file)) {
+          const importedArchive = await importArchiveFile(file);
 
-        if (portrait && importedCardFile.portraitBlob) {
-          await writeCharacterAssetBlob(portrait.assetId, importedCardFile.portraitBlob);
+          if (importedArchive.kind === 'backup') {
+            await restoreFullBackup(importedArchive.backup);
+            return;
+          }
+
+          for (const importedCardFile of importedArchive.cards) {
+            await importCardAsCharacter(importedCardFile);
+          }
+
+          toastSuccess(
+            'Characters imported',
+            importedArchive.cards.length === 1
+              ? importedArchive.cards[0].fileName
+              : `${importedArchive.cards.length} characters were imported from the archive.`,
+          );
+
+          if (importedArchive.failedPaths.length > 0) {
+            toastError('Some archive entries were skipped', importedArchive.failedPaths.join(' | '));
+          }
+
+          return;
         }
 
-        createCharacter({
-          card: importedCardFile.card,
-          portrait,
-          source:
-            importedCardFile.sourceKind === 'png' ? CHARACTER_LIBRARY_SOURCES.png : CHARACTER_LIBRARY_SOURCES.json,
-        });
-
+        const importedCardFile = await importCharacterCardFile(file);
+        await importCardAsCharacter(importedCardFile);
         toastSuccess('Character imported', importedCardFile.fileName);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'The selected file could not be imported.';
@@ -346,7 +451,7 @@ export function useCharacterCreatorPage() {
         throw error;
       }
     },
-    [createCharacter],
+    [importCardAsCharacter, restoreFullBackup],
   );
 
   const handleCreateCharacter = useCallback(() => {
@@ -376,7 +481,7 @@ export function useCharacterCreatorPage() {
         const duplicatedPortraitBlob = await readCharacterAssetBlob(character.portrait.assetId);
 
         if (duplicatedPortraitBlob) {
-          const assetId = crypto.randomUUID();
+          const assetId = generateUuid();
           await writeCharacterAssetBlob(assetId, duplicatedPortraitBlob);
           nextPortrait = {
             ...character.portrait,
@@ -604,16 +709,32 @@ export function useCharacterCreatorPage() {
     [data.extensions.custom_fields, getGenerationState],
   );
 
+  const updateExportSettings = useCallback(
+    (patch: Partial<iExportSettings>) => {
+      setExportSettings((previousSettings) => ({ ...previousSettings, ...patch }));
+    },
+    [setExportSettings],
+  );
+
+  const getActiveCardExportOptions = useCallback(
+    () => ({
+      detailLevel: exportSettings.detailLevel,
+      promptSettings: characterLibraryCollection.get(activeCharacterId)?.promptSettings ?? null,
+      portraitCropRect,
+    }),
+    [activeCharacterId, exportSettings.detailLevel, portraitCropRect],
+  );
+
   const handleExportJson = useCallback(async () => {
     try {
-      await exportCharacterCardJson(card);
+      await exportCharacterCardJson(card, getActiveCardExportOptions());
       toastSuccess('JSON exported', 'The hybrid V1+V2 card file has been downloaded.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The character card could not be exported as JSON.';
       toastError('JSON export failed', message);
       throw error;
     }
-  }, [card]);
+  }, [card, getActiveCardExportOptions]);
 
   const handleExportPng = useCallback(async () => {
     if (!portraitBlob) {
@@ -622,14 +743,87 @@ export function useCharacterCreatorPage() {
     }
 
     try {
-      await exportCharacterCardPng(card, portraitBlob, portraitCropRect);
+      await exportCharacterCardPng(card, portraitBlob, portraitCropRect, getActiveCardExportOptions());
       toastSuccess('PNG exported', 'The portrait now contains an updated `chara` metadata chunk.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The character card could not be exported as PNG.';
       toastError('PNG export failed', message);
       throw error;
     }
-  }, [card, portraitBlob, portraitCropRect]);
+  }, [card, getActiveCardExportOptions, portraitBlob, portraitCropRect]);
+
+  const handleBulkExport = useCallback(
+    async (characterIds: string[]) => {
+      try {
+        const bulkCharacters: iBulkExportCharacter[] = [];
+
+        for (const characterId of characterIds) {
+          const item = characterLibraryCollection.get(characterId);
+
+          if (!item) {
+            continue;
+          }
+
+          const characterPortraitBlob = item.portrait ? await readCharacterAssetBlob(item.portrait.assetId) : null;
+          bulkCharacters.push({ item, portraitBlob: characterPortraitBlob });
+        }
+
+        if (bulkCharacters.length === 0) {
+          toastError('Bulk export failed', 'Select at least one character to export.');
+          return;
+        }
+
+        await exportCharactersArchive(bulkCharacters, exportSettings.detailLevel, exportSettings.archiveFormat);
+        toastSuccess(
+          'Characters exported',
+          `${bulkCharacters.length} ${bulkCharacters.length === 1 ? 'character card' : 'character cards'} were bundled into the archive.`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'The selected characters could not be exported.';
+        toastError('Bulk export failed', message);
+        throw error;
+      }
+    },
+    [exportSettings.archiveFormat, exportSettings.detailLevel],
+  );
+
+  const handleExportAll = useCallback(async () => {
+    try {
+      const assets: iBackupPortraitAsset[] = [];
+
+      for (const character of characterLibrary) {
+        if (!character.portrait) {
+          continue;
+        }
+
+        const assetBlob = await readCharacterAssetBlob(character.portrait.assetId);
+
+        if (assetBlob) {
+          assets.push({
+            assetId: character.portrait.assetId,
+            mimeType: character.portrait.mimeType,
+            bytes: new Uint8Array(await assetBlob.arrayBuffer()),
+          });
+        }
+      }
+
+      await exportFullBackupArchive(
+        {
+          characters: characterLibrary,
+          exampleCharacters,
+          connectionSettings: sanitizeCharacterGenerationConnectionSettings(generationSettings),
+          assets,
+        },
+        exportSettings.archiveFormat,
+      );
+
+      toastSuccess('Backup exported', 'The archive contains every character, portrait, example, and setting.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The backup archive could not be created.';
+      toastError('Backup export failed', message);
+      throw error;
+    }
+  }, [characterLibrary, exampleCharacters, exportSettings.archiveFormat, generationSettings]);
 
   const actions = useMemo<iCharacterCreatorActions>(
     () => ({
@@ -730,6 +924,10 @@ export function useCharacterCreatorPage() {
     handleImport,
     handleExportJson,
     handleExportPng,
+    handleBulkExport,
+    handleExportAll,
+    exportSettings,
+    updateExportSettings,
     handleCreateCharacter,
     handleSelectCharacter,
     handleDuplicateCharacter,

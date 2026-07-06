@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { generateUuid } from '@~/utils/uuid';
+
 import type { iCharacterPortraitReference } from '../lib/character-library';
 import { deleteCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import { invalidatePortraitAsset, PORTRAIT_ASSET_STATUSES, primePortraitAsset } from '../lib/portrait-asset-cache';
@@ -11,8 +13,8 @@ import {
   sanitizeStoredPortraitCropRect,
 } from '../lib/portrait-focal-point';
 import type { iPortraitCropRect } from '../lib/portrait-focal-point';
-import { isPortraitAssetHydrating, usePortraitAsset } from './use-portrait-asset';
 import { useCharacterSession } from './use-character-session';
+import { isPortraitAssetHydrating, usePortraitAsset } from './use-portrait-asset';
 
 const THUMBNAIL_REGENERATION_DELAY_MS = 200;
 
@@ -139,7 +141,7 @@ export function useCharacterPortrait() {
   const setPortrait = useCallback(
     async (blob: Blob, fileName: string, cropRect: iPortraitCropRect | null = null) => {
       const dimensions = await readPortraitDimensions(blob);
-      const assetId = crypto.randomUUID();
+      const assetId = generateUuid();
       const nextCropRect = getPortraitCropRect(dimensions, cropRect);
       const thumbnailDataUrl = await renderPortraitThumbnailDataUrl(blob, nextCropRect);
 

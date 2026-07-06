@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseCharacterCardJson, serializeCharacterCard, toHybridCharacterCard } from './card-format';
+import {
+  buildExportedCharacterCard,
+  extractTenzoCardMetadata,
+  parseCharacterCardJson,
+  serializeCharacterCard,
+  TENZO_CARD_EXTENSION_KEY,
+  toHybridCharacterCard,
+} from './card-format';
+import type { CharacterCard } from './card-schema';
+import { EXPORT_DETAIL_LEVELS } from './export-settings';
+import type { iCharacterGenerationPromptSettings } from './generation-config';
 
 describe('card-format', () => {
   it('normalizes V1 cards into V2 shape with defaults', () => {
@@ -73,5 +83,77 @@ describe('card-format', () => {
     expect(roundTripCard.data.extensions.unknown_extension).toEqual({ keep: true });
     expect(roundTripCard.data.character_book?.extensions).toEqual({ keep_book: true });
     expect(roundTripCard.data.character_book?.entries[0]?.extensions).toEqual({ keep_entry: true });
+  });
+});
+
+describe('card export detail levels', () => {
+  function createCardWithTenzoData(): CharacterCard {
+    return parseCharacterCardJson(
+      JSON.stringify({
+        spec: 'chara_card_v2',
+        spec_version: '2.0',
+        data: {
+          name: 'Fire Keeper',
+          description: 'A quiet guide.',
+          extensions: {
+            custom_fields: [{ id: 'field-1', label: 'Weapon', value: 'Lantern spear' }],
+            unknown_extension: { keep: true },
+          },
+        },
+      }),
+    );
+  }
+
+  const promptSettings: iCharacterGenerationPromptSettings = {
+    generalCharacterIdea: 'A calm guardian of embers.',
+    fieldInstructions: { 'field:description': 'Keep it short.' },
+    fieldShouldUseGeneralCharacterIdea: { 'field:description': true },
+  };
+  const cropRect = { x: 10, y: 20, width: 200, height: 300 };
+
+  it('strips tenzo-specific data on minimal export', () => {
+    const exportedCard = buildExportedCharacterCard(createCardWithTenzoData(), {
+      detailLevel: EXPORT_DETAIL_LEVELS.minimal,
+      promptSettings,
+      portraitCropRect: cropRect,
+    });
+
+    expect(exportedCard.data.extensions).toEqual({ unknown_extension: { keep: true } });
+  });
+
+  it('keeps custom fields and common metadata but not per-field guidance on tenzo_metadata export', () => {
+    const exportedCard = buildExportedCharacterCard(createCardWithTenzoData(), {
+      detailLevel: EXPORT_DETAIL_LEVELS.tenzo_metadata,
+      promptSettings,
+      portraitCropRect: cropRect,
+    });
+
+    const tenzoExtension = exportedCard.data.extensions[TENZO_CARD_EXTENSION_KEY] as Record<string, unknown>;
+    expect(exportedCard.data.extensions.unknown_extension).toEqual({ keep: true });
+    expect(exportedCard.data.extensions.custom_fields).toBeUndefined();
+    expect(tenzoExtension.custom_fields).toEqual([{ id: 'field-1', label: 'Weapon', value: 'Lantern spear' }]);
+    expect(tenzoExtension.portrait_crop_rect).toEqual(cropRect);
+    expect(tenzoExtension.general_character_idea).toBe(promptSettings.generalCharacterIdea);
+    expect(tenzoExtension.field_instructions).toBeUndefined();
+  });
+
+  it('round-trips custom fields, crop rect, and generation guidance through a full export', () => {
+    const jsonText = serializeCharacterCard(createCardWithTenzoData(), {
+      detailLevel: EXPORT_DETAIL_LEVELS.full,
+      promptSettings,
+      portraitCropRect: cropRect,
+    });
+
+    const rawCard: unknown = JSON.parse(jsonText);
+    const importedCard = parseCharacterCardJson(jsonText);
+    const tenzoMetadata = extractTenzoCardMetadata(rawCard);
+
+    expect(importedCard.data.extensions.custom_fields).toEqual([
+      { id: 'field-1', label: 'Weapon', value: 'Lantern spear' },
+    ]);
+    expect(importedCard.data.extensions[TENZO_CARD_EXTENSION_KEY]).toBeUndefined();
+    expect(importedCard.data.extensions.unknown_extension).toEqual({ keep: true });
+    expect(tenzoMetadata.cropRect).toEqual(cropRect);
+    expect(tenzoMetadata.promptSettings).toEqual(promptSettings);
   });
 });

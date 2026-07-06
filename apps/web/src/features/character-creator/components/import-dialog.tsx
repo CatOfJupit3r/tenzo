@@ -48,7 +48,8 @@ export function ImportDialog({ isOpen, onOpenChange, onImportFile }: iImportDial
         <DialogHeader>
           <DialogTitle>Import Character Card</DialogTitle>
           <DialogDescription>
-            Drop a PNG or JSON card here, or choose a file manually. PNG imports keep the original portrait image.
+            Drop a PNG or JSON card, a card archive, or a Tenzo backup here. PNG imports keep the original portrait
+            image, and backups restore the whole library. Everything is processed locally in your browser.
           </DialogDescription>
         </DialogHeader>
 
@@ -82,7 +83,7 @@ export function ImportDialog({ isOpen, onOpenChange, onImportFile }: iImportDial
             ref={inputRef}
             className="sr-only"
             type="file"
-            accept=".json,.png,application/json,image/png"
+            accept=".json,.png,.zip,.tar.gz,.tgz,application/json,image/png,application/zip,application/gzip"
             onChange={async (event: ChangeEvent<HTMLInputElement>) => {
               const selectedFile = event.target.files?.[0];
               await handleImport(selectedFile);
@@ -93,7 +94,8 @@ export function ImportDialog({ isOpen, onOpenChange, onImportFile }: iImportDial
           <div className="space-y-1">
             <p className="text-sm font-medium">Drop card file to import</p>
             <p className="text-sm text-muted-foreground">
-              Accepted formats: PNG with embedded metadata, or standalone JSON.
+              Accepted formats: PNG with embedded metadata, standalone JSON, or a ZIP / tar.gz archive of cards or a
+              full Tenzo backup.
             </p>
           </div>
         </button>

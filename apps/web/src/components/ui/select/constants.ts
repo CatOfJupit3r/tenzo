@@ -14,7 +14,7 @@ const selectStyles = {
     disabled: 'cursor-not-allowed opacity-50',
   },
   placeholderStyles: 'text-muted-foreground text-sm ml-1 font-medium',
-  valueContainerStyles: 'gap-1',
+  valueContainerStyles: 'gap-1 min-w-0',
   multiValueStyles:
     'inline-flex items-center gap-2 rounded-md border border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 px-1.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   indicatorsContainerStyles: 'gap-1',
@@ -75,7 +75,7 @@ export const createClassNames = (
       classNames?.option?.(state),
     ),
   placeholder: (state) => cn(selectStyles.placeholderStyles, classNames?.placeholder?.(state)),
-  singleValue: (state) => cn('flex-1', classNames?.singleValue?.(state)),
+  singleValue: (state) => cn('min-w-0 flex-1', classNames?.singleValue?.(state)),
   valueContainer: (state) => cn(selectStyles.valueContainerStyles, classNames?.valueContainer?.(state)),
 });
 

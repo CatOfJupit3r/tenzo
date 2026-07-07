@@ -207,6 +207,10 @@ body {
   @apply bg-chart-4/20 text-chart-5;
 }
 
+.macro-chip-slot {
+  @apply bg-chart-3/15 text-chart-3;
+}
+
 .macro-chip-unknown {
   @apply bg-muted text-muted-foreground;
 }

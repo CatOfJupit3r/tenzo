@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { CustomField } from '../card-schema';
+import type { TemplateMode } from '../field-templates';
 
 export const GENERATION_MODE_SCHEMA = z.enum(['generate', 'continue', 'rewrite']);
 export const GENERATION_MODES = GENERATION_MODE_SCHEMA.enum;
@@ -31,6 +32,12 @@ export interface iPromptExampleCharacter {
   mes_example?: string;
   alternate_greetings?: string[];
   custom_fields?: CustomField[];
+}
+
+export interface iPromptFieldTemplate {
+  name: string;
+  mode: TemplateMode;
+  content: string;
 }
 
 export function getGenerationTargetKey(target: iFieldGenerationTarget) {

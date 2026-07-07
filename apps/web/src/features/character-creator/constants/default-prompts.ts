@@ -1,3 +1,4 @@
+import type { iTemplateSlot } from '../lib/field-templates';
 import { OUTPUT_FORMATS } from '../lib/generation-config';
 import type { OutputFormat } from '../lib/generation-config';
 
@@ -41,6 +42,17 @@ export function getFormatInstructions(outputFormat: OutputFormat) {
     default:
       return DEFAULT_XML_FORMAT_INSTRUCTIONS;
   }
+}
+
+export function getStrictTemplateFormatInstructions(slots: iTemplateSlot[]) {
+  const exampleSlotName = slots[0]?.label ?? 'slot-name';
+
+  return `Return one <slot> tag per template slot and nothing else. Do not repeat the skeleton, do not add commentary, and do not invent slots that are not listed.
+
+Format:
+<slot name="${exampleSlotName}">Written value for this slot.</slot>
+
+Write the slots in the order they are listed, one tag per slot: ${slots.map((slot) => slot.label).join(', ')}.`;
 }
 
 export const DEFAULT_XML_CONTINUATION_INSTRUCTIONS = `Your reply has already been started for you with an opening <response> tag followed by the existing field value. That partial reply is the last message in this conversation — you are not starting a new turn, you are finishing that one.

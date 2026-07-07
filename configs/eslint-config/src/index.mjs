@@ -32,6 +32,23 @@ const createWorkspaceIgnorePattern = (workspaceName) => {
  * Common base configuration shared across all project types
  */
 const getBaseConfig = (options) => {
+
+const booleanPrefixes = [
+  'is',
+  'should',
+  'has',
+  'can',
+  'did',
+  'will',
+  'have',
+  'might',
+  'was',
+];
+
+  const booleanNameRegex = `^(?:${booleanPrefixes.join('|')})[A-Z][a-zA-Z0-9]*$|^(?:${booleanPrefixes
+    .map((prefix) => prefix.toUpperCase())
+    .join('|')})_[A-Z0-9_]+$`;
+
   const { tsconfigRootDir, gitignorePath } = options;
 
   const jsConfig = [
@@ -139,24 +156,19 @@ const getBaseConfig = (options) => {
       'class-methods-use-this': 'off',
       '@typescript-eslint/naming-convention': [
         'error',
+
         {
           selector: 'interface',
           format: ['PascalCase'],
           prefix: ['i'],
         },
+
         {
           selector: 'variable',
           types: ['boolean'],
-          format: ['PascalCase', 'camelCase', 'UPPER_CASE'],
-          prefix: ['is', 'should', 'has', 'can', 'did', 'will', 'have', 'might'],
-        },
-        {
-          selector: 'variable',
-          types: ['boolean'],
-          modifiers: ['const'],
           format: null,
           custom: {
-            regex: '^(is|should|has|can|did|will|have|might|was)[A-Z][a-zA-Z]*$|^(IS|SHOULD|HAS|CAN|DID|WILL|HAVE|MIGHT|WAS)_[A-Z_]+$',
+            regex: booleanNameRegex,
             match: true,
           },
         },
@@ -296,7 +308,8 @@ export const createWebConfig = async (options = {}) => {
   const base = getBaseConfig({ tsconfigRootDir, gitignorePath });
 
   // Dynamic imports for web-specific plugins
-  const tailwindcssPlugin = await importPlugin('eslint-plugin-better-tailwindcss');
+  const tailwindcssPlugin = undefined;
+  // const tailwindcssPlugin = await importPlugin('eslint-plugin-better-tailwindcss');
   const pluginRouter = await importPlugin('@tanstack/eslint-plugin-router');
   const queryPlugin = await importPlugin('@tanstack/eslint-plugin-query');
   const reactRefreshPlugin = await importPlugin('eslint-plugin-react-refresh');

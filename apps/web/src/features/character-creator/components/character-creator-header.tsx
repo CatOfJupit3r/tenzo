@@ -1,21 +1,15 @@
-import { LuChevronRight, LuDownload, LuFileUp } from 'react-icons/lu';
+import { useState } from 'react';
+import { LuChevronRight, LuDownload, LuFileUp, LuSettings } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@~/components/ui/dialog';
 import { cn } from '@~/lib/utils';
 
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { getCharacterLibraryItemDisplayName } from '../lib/character-library';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/example-characters';
-import { ApiSettings } from './api-settings';
-import { ExampleCharacters } from './example-characters';
+import { SettingsDialog } from './settings-dialog';
+import { SETTINGS_DIALOG_TABS } from './settings-dialog-tabs';
+import type { SettingsDialogTab } from './settings-dialog-tabs';
 import { TokenStats } from './token-stats';
 
 export interface iCharacterCreatorHeaderProps {
@@ -33,21 +27,14 @@ export function CharacterCreatorHeader({
     characterLibrary,
     activeCharacterId,
     generationSettings,
-    apiKey,
-    connectionHealth,
     selectedRequestModeLabel,
     maxExampleContextCharacters,
     exampleCharacters,
-    exampleContextSummary,
-    handleImportExampleFiles,
-    removeExampleCharacter,
-    updateExampleCharacterIncludedFields,
-    updateApiKey,
-    updateGenerationSettings,
-    handleHealthCheck,
     openImportDialog,
     openExportDialog,
   } = useCharacterCreatorContext();
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsDialogTab>(SETTINGS_DIALOG_TABS.connection);
   const activeCharacter =
     characterLibrary.find((character) => character.id === activeCharacterId) ?? characterLibrary[0];
 
@@ -60,6 +47,11 @@ export function CharacterCreatorHeader({
   };
 
   const activeCharacterLabel = resolveActiveCharacterLabel();
+
+  const openSettingsDialog = (tab: SettingsDialogTab) => {
+    setActiveSettingsTab(tab);
+    setIsSettingsDialogOpen(true);
+  };
 
   return (
     <header className="sticky top-0 z-20 border-b bg-background/92 backdrop-blur-sm">
@@ -96,50 +88,24 @@ export function CharacterCreatorHeader({
             Library
           </Button>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button type="button" size="sm" variant="outline">
-                Reference Examples {exampleCharacters.length}/{MAX_EXAMPLE_CHARACTER_COUNT}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-              <DialogHeader>
-                <DialogTitle>Reference Examples</DialogTitle>
-                <DialogDescription>
-                  Import 1-5 character cards and choose which fields feed AI generation.
-                </DialogDescription>
-              </DialogHeader>
-              <ExampleCharacters
-                exampleCharacters={exampleCharacters}
-                contextSummary={exampleContextSummary}
-                onImportFiles={handleImportExampleFiles}
-                onRemove={removeExampleCharacter}
-                onIncludedFieldKeysChange={updateExampleCharacterIncludedFields}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => openSettingsDialog(SETTINGS_DIALOG_TABS.examples)}
+          >
+            Reference Examples {exampleCharacters.length}/{MAX_EXAMPLE_CHARACTER_COUNT}
+          </Button>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button type="button" size="sm" variant="outline">
-                Generation Settings
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Generation Settings</DialogTitle>
-                <DialogDescription>OpenAI-compatible chat completions with optional proxy streaming.</DialogDescription>
-              </DialogHeader>
-              <ApiSettings
-                generationSettings={generationSettings}
-                apiKey={apiKey}
-                connectionHealth={connectionHealth}
-                onApiKeyChange={updateApiKey}
-                onHealthCheck={handleHealthCheck}
-                onSettingsChange={updateGenerationSettings}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => openSettingsDialog(SETTINGS_DIALOG_TABS.connection)}
+          >
+            <LuSettings className="size-4" />
+            Settings
+          </Button>
 
           <div className="hidden h-5 w-px bg-border sm:block" />
 
@@ -153,6 +119,13 @@ export function CharacterCreatorHeader({
           </Button>
         </div>
       </div>
+
+      <SettingsDialog
+        isOpen={isSettingsDialogOpen}
+        activeTab={activeSettingsTab}
+        onOpenChange={setIsSettingsDialogOpen}
+        onTabChange={setActiveSettingsTab}
+      />
     </header>
   );
 }

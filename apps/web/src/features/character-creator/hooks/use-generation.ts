@@ -10,6 +10,7 @@ import {
 } from '../lib/api-client';
 import type { CharacterCard } from '../lib/card-schema';
 import { requestChatCompletionsProxy } from '../lib/chat-completions-proxy';
+import { TEMPLATE_MODES } from '../lib/field-templates';
 import {
   decodeStoredSecret,
   encodeStoredSecret,
@@ -23,6 +24,7 @@ import type {
   GenerationMode,
   iFieldGenerationTarget,
   iPromptExampleCharacter,
+  iPromptFieldTemplate,
 } from '../lib/prompt/generation-contracts';
 import { characterPromptPipeline } from '../lib/prompt/prompt-pipeline';
 import { SeededRandom } from '../lib/prompt/seeded-random';
@@ -30,6 +32,7 @@ import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider-health';
 import type { ProviderKind } from '../lib/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
 import { getPrefilled, parseResponse } from '../lib/response-parser';
+import { parseSlotResponse, renderStrictTemplate } from '../lib/strict-template-renderer';
 import { useCharacterSession } from './use-character-session';
 
 interface iFieldGenerationRuntimeState {
@@ -42,6 +45,7 @@ interface iGenerateFieldOptions {
   target: iFieldGenerationTarget;
   onValueChange: (value: string) => void;
   mode?: GenerationMode;
+  fieldTemplate?: iPromptFieldTemplate | null;
   exampleCharacters?: iPromptExampleCharacter[];
   maxExampleContextCharacters?: number;
 }
@@ -68,6 +72,45 @@ function removeFieldShouldUseGeneralCharacterIdea(
   const { [instructionKey]: shouldRemovePreference, ...remainingPreferences } = fieldShouldUseGeneralCharacterIdea;
   void shouldRemovePreference;
   return remainingPreferences;
+}
+
+function reindexAlternateGreetingRecord<T>(record: Record<string, T>, removedIndex: number) {
+  return Object.entries(record).reduce<Record<string, T>>((acc, [key, value]) => {
+    if (!key.startsWith('alternate_greetings:')) {
+      acc[key] = value;
+      return acc;
+    }
+
+    const instructionIndex = Number.parseInt(key.split(':')[1] ?? '', 10);
+
+    if (Number.isNaN(instructionIndex) || instructionIndex === removedIndex) {
+      return acc;
+    }
+
+    const nextKey = instructionIndex > removedIndex ? `alternate_greetings:${instructionIndex - 1}` : key;
+    acc[nextKey] = value;
+    return acc;
+  }, {});
+}
+
+function swapRecordKeys<T>(record: Record<string, T>, fromKey: string, toKey: string) {
+  const nextRecord = { ...record };
+  const fromValue = nextRecord[fromKey];
+  const toValue = nextRecord[toKey];
+
+  if (fromValue === undefined) {
+    delete nextRecord[toKey];
+  } else {
+    nextRecord[toKey] = fromValue;
+  }
+
+  if (toValue === undefined) {
+    delete nextRecord[fromKey];
+  } else {
+    nextRecord[fromKey] = toValue;
+  }
+
+  return nextRecord;
 }
 
 export function useGeneration() {
@@ -145,6 +188,23 @@ export function useGeneration() {
     [updatePromptSettings],
   );
 
+  const getFieldTemplateId = useCallback(
+    (fieldKey: string) => generationSettings.fieldTemplateIds[fieldKey] ?? null,
+    [generationSettings.fieldTemplateIds],
+  );
+
+  const updateFieldTemplateId = useCallback(
+    (fieldKey: string, templateId: string | null) => {
+      updatePromptSettings((prev) => ({
+        ...prev,
+        fieldTemplateIds: templateId
+          ? { ...prev.fieldTemplateIds, [fieldKey]: templateId }
+          : removeFieldInstruction(prev.fieldTemplateIds, fieldKey),
+      }));
+    },
+    [updatePromptSettings],
+  );
+
   const getGeneralCharacterIdea = useCallback(() => generationSettings.generalCharacterIdea, [generationSettings]);
 
   const updateGeneralCharacterIdea = useCallback(
@@ -185,6 +245,7 @@ export function useGeneration() {
           prev.fieldShouldUseGeneralCharacterIdea,
           instructionKey,
         ),
+        fieldTemplateIds: removeFieldInstruction(prev.fieldTemplateIds, instructionKey),
       }));
     },
     [updatePromptSettings],
@@ -192,51 +253,15 @@ export function useGeneration() {
 
   const removeAlternateGreetingInstruction = useCallback(
     (index: number) => {
-      updatePromptSettings((prev) => {
-        const nextInstructions = Object.entries(prev.fieldInstructions).reduce<Record<string, string>>(
-          (acc, [key, value]) => {
-            if (!key.startsWith('alternate_greetings:')) {
-              acc[key] = value;
-              return acc;
-            }
-
-            const instructionIndex = Number.parseInt(key.split(':')[1] ?? '', 10);
-
-            if (Number.isNaN(instructionIndex) || instructionIndex === index) {
-              return acc;
-            }
-
-            const nextKey = instructionIndex > index ? `alternate_greetings:${instructionIndex - 1}` : key;
-            acc[nextKey] = value;
-            return acc;
-          },
-          {},
-        );
-        const nextFieldShouldUseGeneralCharacterIdea = Object.entries(prev.fieldShouldUseGeneralCharacterIdea).reduce<
-          Record<string, boolean>
-        >((acc, [key, value]) => {
-          if (!key.startsWith('alternate_greetings:')) {
-            acc[key] = value;
-            return acc;
-          }
-
-          const instructionIndex = Number.parseInt(key.split(':')[1] ?? '', 10);
-
-          if (Number.isNaN(instructionIndex) || instructionIndex === index) {
-            return acc;
-          }
-
-          const nextKey = instructionIndex > index ? `alternate_greetings:${instructionIndex - 1}` : key;
-          acc[nextKey] = value;
-          return acc;
-        }, {});
-
-        return {
-          ...prev,
-          fieldInstructions: nextInstructions,
-          fieldShouldUseGeneralCharacterIdea: nextFieldShouldUseGeneralCharacterIdea,
-        };
-      });
+      updatePromptSettings((prev) => ({
+        ...prev,
+        fieldInstructions: reindexAlternateGreetingRecord(prev.fieldInstructions, index),
+        fieldShouldUseGeneralCharacterIdea: reindexAlternateGreetingRecord(
+          prev.fieldShouldUseGeneralCharacterIdea,
+          index,
+        ),
+        fieldTemplateIds: reindexAlternateGreetingRecord(prev.fieldTemplateIds, index),
+      }));
     },
     [updatePromptSettings],
   );
@@ -244,52 +269,14 @@ export function useGeneration() {
   const reorderAlternateGreetingInstructions = useCallback(
     (fromIndex: number, toIndex: number) => {
       updatePromptSettings((prev) => {
-        const nextInstructions = { ...prev.fieldInstructions };
-        const nextFieldShouldUseGeneralCharacterIdea = { ...prev.fieldShouldUseGeneralCharacterIdea };
         const fromKey = `alternate_greetings:${fromIndex}`;
         const toKey = `alternate_greetings:${toIndex}`;
-        const fromValue = nextInstructions[fromKey];
-        const toValue = nextInstructions[toKey];
-        const shouldUseGeneralIdeaFromSourceField = nextFieldShouldUseGeneralCharacterIdea[fromKey];
-        const shouldUseGeneralIdeaFromTargetField = nextFieldShouldUseGeneralCharacterIdea[toKey];
-
-        if (
-          fromValue === undefined &&
-          toValue === undefined &&
-          shouldUseGeneralIdeaFromSourceField === undefined &&
-          shouldUseGeneralIdeaFromTargetField === undefined
-        ) {
-          return prev;
-        }
-
-        if (fromValue === undefined) {
-          delete nextInstructions[toKey];
-        } else {
-          nextInstructions[toKey] = fromValue;
-        }
-
-        if (toValue === undefined) {
-          delete nextInstructions[fromKey];
-        } else {
-          nextInstructions[fromKey] = toValue;
-        }
-
-        if (shouldUseGeneralIdeaFromSourceField === undefined) {
-          delete nextFieldShouldUseGeneralCharacterIdea[toKey];
-        } else {
-          nextFieldShouldUseGeneralCharacterIdea[toKey] = shouldUseGeneralIdeaFromSourceField;
-        }
-
-        if (shouldUseGeneralIdeaFromTargetField === undefined) {
-          delete nextFieldShouldUseGeneralCharacterIdea[fromKey];
-        } else {
-          nextFieldShouldUseGeneralCharacterIdea[fromKey] = shouldUseGeneralIdeaFromTargetField;
-        }
 
         return {
           ...prev,
-          fieldInstructions: nextInstructions,
-          fieldShouldUseGeneralCharacterIdea: nextFieldShouldUseGeneralCharacterIdea,
+          fieldInstructions: swapRecordKeys(prev.fieldInstructions, fromKey, toKey),
+          fieldShouldUseGeneralCharacterIdea: swapRecordKeys(prev.fieldShouldUseGeneralCharacterIdea, fromKey, toKey),
+          fieldTemplateIds: swapRecordKeys(prev.fieldTemplateIds, fromKey, toKey),
         };
       });
     },
@@ -306,6 +293,11 @@ export function useGeneration() {
       ),
       fieldShouldUseGeneralCharacterIdea: Object.fromEntries(
         Object.entries(prev.fieldShouldUseGeneralCharacterIdea).filter(
+          ([key]) => !key.startsWith('alternate_greetings:') && !key.startsWith('custom:'),
+        ),
+      ),
+      fieldTemplateIds: Object.fromEntries(
+        Object.entries(prev.fieldTemplateIds).filter(
           ([key]) => !key.startsWith('alternate_greetings:') && !key.startsWith('custom:'),
         ),
       ),
@@ -385,6 +377,7 @@ export function useGeneration() {
       target,
       onValueChange,
       mode = GENERATION_MODES.generate,
+      fieldTemplate = null,
       exampleCharacters = [],
       maxExampleContextCharacters,
     }: iGenerateFieldOptions) => {
@@ -406,12 +399,24 @@ export function useGeneration() {
       setFieldRuntimeState(fieldKey, { isGenerating: true, errorMessage: null });
 
       const isContinuation = mode === GENERATION_MODES.continue;
+      const strictTemplate = !isContinuation && fieldTemplate?.mode === TEMPLATE_MODES.strict ? fieldTemplate : null;
 
       if (!isContinuation) {
         startTransition(() => {
           onValueChange('');
         });
       }
+
+      const parseStreamedResponse = (streamedText: string) => {
+        if (strictTemplate) {
+          return renderStrictTemplate(strictTemplate.content, parseSlotResponse(streamedText));
+        }
+
+        const rawResponse = isContinuation
+          ? `${getPrefilled(target.value, connectionSettings.outputFormat)}${streamedText}`
+          : streamedText;
+        return parseResponse(rawResponse, connectionSettings.outputFormat);
+      };
 
       let streamedAssistantText = '';
 
@@ -425,6 +430,7 @@ export function useGeneration() {
           generalCharacterIdea: promptSettings.generalCharacterIdea,
           shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
           userInstructions: getFieldInstruction(fieldKey),
+          fieldTemplate,
           exampleCharacters,
           maxExampleContextCharacters,
         });
@@ -459,10 +465,7 @@ export function useGeneration() {
             streamedAssistantText += content;
 
             try {
-              const rawResponse = isContinuation
-                ? `${getPrefilled(target.value, connectionSettings.outputFormat)}${streamedAssistantText}`
-                : streamedAssistantText;
-              const parsedResponse = parseResponse(rawResponse, connectionSettings.outputFormat);
+              const parsedResponse = parseStreamedResponse(streamedAssistantText);
 
               startTransition(() => {
                 onValueChange(parsedResponse);
@@ -473,10 +476,7 @@ export function useGeneration() {
           },
         });
 
-        const finalRawResponse = isContinuation
-          ? `${getPrefilled(target.value, connectionSettings.outputFormat)}${streamedAssistantText}`
-          : streamedAssistantText;
-        const finalParsedResponse = parseResponse(finalRawResponse, connectionSettings.outputFormat);
+        const finalParsedResponse = parseStreamedResponse(streamedAssistantText);
 
         startTransition(() => {
           onValueChange(finalParsedResponse);
@@ -523,6 +523,8 @@ export function useGeneration() {
     updateGeneralCharacterIdea,
     getFieldInstruction,
     updateFieldInstruction,
+    getFieldTemplateId,
+    updateFieldTemplateId,
     shouldUseGeneralCharacterIdea,
     updateFieldShouldUseGeneralCharacterIdea,
     removeCustomFieldInstruction,

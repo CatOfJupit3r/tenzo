@@ -7,6 +7,7 @@ import { findMacroRanges } from './macro-tokens';
 
 export interface iMacroHighlightOptions {
   doesAllowOriginalMacro: boolean;
+  doesHighlightTemplateSlots: boolean;
 }
 
 const macroHighlightPluginKey = new PluginKey<DecorationSet>('characterMacroHighlight');
@@ -35,6 +36,7 @@ export const MacroHighlight = Extension.create<iMacroHighlightOptions>({
   addOptions() {
     return {
       doesAllowOriginalMacro: false,
+      doesHighlightTemplateSlots: false,
     };
   },
 

@@ -16,11 +16,14 @@ import type {
   iFieldGenerationTarget,
   iGenerationMessage,
   iPromptExampleCharacter,
+  iPromptFieldTemplate,
 } from './generation-contracts';
 import type { iPromptPipelineContext, iPromptSectionStrategy } from './prompt-section-strategy';
 import { SeededRandom } from './seeded-random';
 import { TaskInstructionService } from './task-instruction-service';
 import { TaskSectionStrategy } from './task-section-strategy';
+import { TemplateSectionStrategy } from './template-section-strategy';
+import { TemplateService } from './template-service';
 import { VariationService } from './variation-service';
 
 export interface iPromptPipelineInput {
@@ -33,6 +36,7 @@ export interface iPromptPipelineInput {
   generalCharacterIdea?: string;
   shouldUseGeneralCharacterIdea?: boolean;
   userInstructions?: string;
+  fieldTemplate?: iPromptFieldTemplate | null;
   exampleCharacters?: iPromptExampleCharacter[];
   maxExampleContextCharacters?: number;
 }
@@ -64,6 +68,7 @@ export class CharacterPromptPipeline {
     private readonly sectionStrategies: readonly iPromptSectionStrategy[] = [
       new CardContextSectionStrategy(new CardContextService()),
       new ExampleContextSectionStrategy(),
+      new TemplateSectionStrategy(new TemplateService()),
       new TaskSectionStrategy(new TaskInstructionService()),
     ],
   ) {}
@@ -108,6 +113,7 @@ export class CharacterPromptPipeline {
     generalCharacterIdea = '',
     shouldUseGeneralCharacterIdea = true,
     userInstructions = '',
+    fieldTemplate = null,
     exampleCharacters = [],
     maxExampleContextCharacters = MAX_EXAMPLE_CONTEXT_CHARACTERS,
   }: iPromptPipelineInput): iPromptPipelineContext {
@@ -120,6 +126,7 @@ export class CharacterPromptPipeline {
       random,
     });
     const variationSection = this.variationService.buildSection({ random, seed, target, mode });
+    const isContinuation = mode === GENERATION_MODES.continue && Boolean(target.value.trim());
 
     return {
       card,
@@ -130,10 +137,12 @@ export class CharacterPromptPipeline {
       generalCharacterIdea,
       shouldUseGeneralCharacterIdea,
       userInstructions,
+      // Continuation appends to already-shaped text, so slot-based generation cannot apply.
+      fieldTemplate: isContinuation ? null : fieldTemplate,
       maxExampleContextCharacters,
       exampleContextSummary,
       variationSection,
-      isContinuation: mode === GENERATION_MODES.continue && Boolean(target.value.trim()),
+      isContinuation,
     };
   }
 }

@@ -1,5 +1,6 @@
 import { FIELD_EDITOR_VARIANTS, METADATA_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
+import { TEMPLATE_FIELD_KEYS } from '../../lib/field-templates';
 import { GENERATION_MODES } from '../../lib/prompt/generation-contracts';
 import { CharacterField } from '../character-field';
 import { CharacterFieldPanel } from '../character-field-panel';
@@ -19,6 +20,9 @@ export function MetadataTab() {
     customFieldGenerationStates,
     updateCustomFieldShouldUseGeneralCharacterIdea,
     updateCustomFieldInstruction,
+    updateCustomFieldTemplateId,
+    getTemplatesForField,
+    addFieldTemplate,
     generateCustomField,
     cancelCustomFieldGeneration,
     revertCustomFieldRewrite,
@@ -52,9 +56,12 @@ export function MetadataTab() {
         <CustomFields
           fields={data.extensions.custom_fields}
           generationStates={customFieldGenerationStates}
+          templateOptions={getTemplatesForField(TEMPLATE_FIELD_KEYS.custom_field)}
           onAdd={addCustomField}
           onUpdate={updateCustomField}
           onRemove={handleRemoveCustomField}
+          onTemplateIdChange={updateCustomFieldTemplateId}
+          onSaveTemplate={addFieldTemplate}
           onShouldUseGeneralCharacterIdeaChange={updateCustomFieldShouldUseGeneralCharacterIdea}
           onInstructionChange={updateCustomFieldInstruction}
           onGenerate={(id) => {

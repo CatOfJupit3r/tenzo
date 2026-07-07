@@ -37,6 +37,7 @@ export const CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA = z.object({
   generalCharacterIdea: z.string(),
   fieldInstructions: z.record(z.string(), z.string()),
   fieldShouldUseGeneralCharacterIdea: z.record(z.string(), z.boolean()),
+  fieldTemplateIds: z.record(z.string(), z.string()),
 });
 
 export type iCharacterGenerationPromptSettings = z.infer<typeof CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA>;
@@ -64,6 +65,7 @@ export const DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS: iCharacterGenerationP
   generalCharacterIdea: '',
   fieldInstructions: {},
   fieldShouldUseGeneralCharacterIdea: {},
+  fieldTemplateIds: {},
 };
 
 export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings = {
@@ -95,9 +97,9 @@ function readIntegerInRange(value: unknown, range: { min: number; max: number },
   return Math.min(range.max, Math.max(range.min, Math.round(value)));
 }
 
-function readFieldInstructions(value: unknown) {
+function readStringRecord(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldInstructions;
+    return null;
   }
 
   return Object.fromEntries(
@@ -105,6 +107,14 @@ function readFieldInstructions(value: unknown) {
       (entry): entry is [string, string] => typeof entry[0] === 'string' && typeof entry[1] === 'string',
     ),
   );
+}
+
+function readFieldInstructions(value: unknown) {
+  return readStringRecord(value) ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldInstructions;
+}
+
+function readFieldTemplateIds(value: unknown) {
+  return readStringRecord(value) ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldTemplateIds;
 }
 
 function readFieldShouldUseGeneralCharacterIdea(value: unknown) {
@@ -173,6 +183,7 @@ export function sanitizeCharacterGenerationPromptSettings(value: unknown): iChar
     fieldShouldUseGeneralCharacterIdea: readFieldShouldUseGeneralCharacterIdea(
       candidate.fieldShouldUseGeneralCharacterIdea,
     ),
+    fieldTemplateIds: readFieldTemplateIds(candidate.fieldTemplateIds),
   };
 }
 

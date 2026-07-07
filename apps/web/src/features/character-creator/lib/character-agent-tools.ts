@@ -51,11 +51,12 @@ export function createCharacterAgentTools(store: iCharacterAgentDraftStore) {
     description:
       'Read the current editable character draft before making changes. Use this to inspect the whole card state.',
     inputSchema: z.object({}),
-    execute: async () => {
+    execute: async (_input, { toolCallId }) => {
       const draftCard = store.getDraftCard();
 
       store.appendToolEvent(
         createCharacterAgentToolEvent({
+          toolCallId,
           toolName: CHARACTER_AGENT_TOOL_NAMES.read_character,
           inputSummary: 'Read the current draft',
           outputSummary: summarizeDraftCard(draftCard),
@@ -74,7 +75,7 @@ export function createCharacterAgentTools(store: iCharacterAgentDraftStore) {
     inputSchema: z.object({
       changes: z.array(CHARACTER_FIELD_CHANGE_SCHEMA).min(1),
     }),
-    execute: async ({ changes }) => {
+    execute: async ({ changes }, { toolCallId }) => {
       const nextDraftCard = structuredClone(store.getDraftCard());
 
       changes.forEach((change) => {
@@ -84,6 +85,7 @@ export function createCharacterAgentTools(store: iCharacterAgentDraftStore) {
       store.replaceDraftCard(nextDraftCard);
       store.appendToolEvent(
         createCharacterAgentToolEvent({
+          toolCallId,
           toolName: CHARACTER_AGENT_TOOL_NAMES.update_character_fields,
           inputSummary: summarizeFieldChanges(changes),
           outputSummary: `Updated ${changes.length} standard fields`,
@@ -102,13 +104,14 @@ export function createCharacterAgentTools(store: iCharacterAgentDraftStore) {
     inputSchema: z.object({
       tags: z.array(z.string()),
     }),
-    execute: async ({ tags }) => {
+    execute: async ({ tags }, { toolCallId }) => {
       const nextDraftCard = structuredClone(store.getDraftCard());
       nextDraftCard.data.tags = tags;
 
       store.replaceDraftCard(nextDraftCard);
       store.appendToolEvent(
         createCharacterAgentToolEvent({
+          toolCallId,
           toolName: CHARACTER_AGENT_TOOL_NAMES.replace_tags,
           inputSummary: `Set ${tags.length} tags`,
           outputSummary: tags.length > 0 ? tags.join(', ') : 'Cleared all tags',
@@ -127,13 +130,14 @@ export function createCharacterAgentTools(store: iCharacterAgentDraftStore) {
     inputSchema: z.object({
       greetings: z.array(z.string()),
     }),
-    execute: async ({ greetings }) => {
+    execute: async ({ greetings }, { toolCallId }) => {
       const nextDraftCard = structuredClone(store.getDraftCard());
       nextDraftCard.data.alternate_greetings = greetings;
 
       store.replaceDraftCard(nextDraftCard);
       store.appendToolEvent(
         createCharacterAgentToolEvent({
+          toolCallId,
           toolName: CHARACTER_AGENT_TOOL_NAMES.replace_alternate_greetings,
           inputSummary: `Set ${greetings.length} alternate greetings`,
           outputSummary: greetings.length > 0 ? `First greeting: ${greetings[0]}` : 'Cleared all alternate greetings',
@@ -153,13 +157,14 @@ export function createCharacterAgentTools(store: iCharacterAgentDraftStore) {
     inputSchema: z.object({
       fields: z.array(CUSTOM_FIELD_INPUT_SCHEMA),
     }),
-    execute: async ({ fields }) => {
+    execute: async ({ fields }, { toolCallId }) => {
       const nextDraftCard = structuredClone(store.getDraftCard());
       nextDraftCard.data.extensions.custom_fields = fields.map(normalizeCustomField);
 
       store.replaceDraftCard(nextDraftCard);
       store.appendToolEvent(
         createCharacterAgentToolEvent({
+          toolCallId,
           toolName: CHARACTER_AGENT_TOOL_NAMES.replace_custom_fields,
           inputSummary: `Set ${fields.length} custom fields`,
           outputSummary:

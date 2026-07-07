@@ -6,9 +6,15 @@ import {
   CHARACTER_AGENT_ERROR_EVENT_SCHEMA,
   CHARACTER_AGENT_STREAM_REQUEST_SCHEMA,
   CHARACTER_AGENT_STREAM_EVENT_TYPES,
+  CHARACTER_AGENT_TOOL_CALL_START_EVENT_SCHEMA,
+  CHARACTER_AGENT_TOOL_CALL_ERROR_EVENT_SCHEMA,
 } from '@~/features/character-creator/lib/character-agent-contracts';
 import { createCharacterAgentMastra } from '@~/features/character-creator/lib/character-agent-mastra.server';
-import type { iCharacterAgentToolEvent } from '@~/features/character-creator/lib/character-agent-session';
+import { CHARACTER_AGENT_TOOL_NAME_SCHEMA } from '@~/features/character-creator/lib/character-agent-session';
+import type {
+  CharacterAgentToolName,
+  iCharacterAgentToolEvent,
+} from '@~/features/character-creator/lib/character-agent-session';
 
 const MAX_CHARACTER_AGENT_STEPS = 8;
 const textEncoder = new TextEncoder();
@@ -31,6 +37,27 @@ function toMastraMessage(
 function createErrorEventPayload(message: string) {
   return CHARACTER_AGENT_ERROR_EVENT_SCHEMA.parse({
     type: CHARACTER_AGENT_STREAM_EVENT_TYPES.error,
+    message,
+  });
+}
+
+function isCharacterAgentToolName(toolName: string): toolName is CharacterAgentToolName {
+  return CHARACTER_AGENT_TOOL_NAME_SCHEMA.safeParse(toolName).success;
+}
+
+function createToolCallStartEventPayload(toolCallId: string, toolName: CharacterAgentToolName) {
+  return CHARACTER_AGENT_TOOL_CALL_START_EVENT_SCHEMA.parse({
+    type: CHARACTER_AGENT_STREAM_EVENT_TYPES['tool-call-start'],
+    toolCallId,
+    toolName,
+  });
+}
+
+function createToolCallErrorEventPayload(toolCallId: string, toolName: CharacterAgentToolName, message: string) {
+  return CHARACTER_AGENT_TOOL_CALL_ERROR_EVENT_SCHEMA.parse({
+    type: CHARACTER_AGENT_STREAM_EVENT_TYPES['tool-call-error'],
+    toolCallId,
+    toolName,
     message,
   });
 }
@@ -94,19 +121,33 @@ export const Route = createFileRoute('/api/character-agent')({
                   },
                   abortSignal: request.signal,
                 });
-                const textReader = output.textStream.getReader();
-
-                while (true) {
-                  const readResult = await textReader.read();
-
-                  if (readResult.done) {
-                    break;
+                for await (const chunk of output.fullStream) {
+                  if (chunk.type === 'text-delta') {
+                    enqueueEvent(CHARACTER_AGENT_STREAM_EVENT_TYPES['text-delta'], {
+                      type: CHARACTER_AGENT_STREAM_EVENT_TYPES['text-delta'],
+                      textDelta: chunk.payload.text,
+                    });
+                    continue;
                   }
 
-                  enqueueEvent(CHARACTER_AGENT_STREAM_EVENT_TYPES['text-delta'], {
-                    type: CHARACTER_AGENT_STREAM_EVENT_TYPES['text-delta'],
-                    textDelta: readResult.value,
-                  });
+                  if (chunk.type === 'tool-call' && isCharacterAgentToolName(chunk.payload.toolName)) {
+                    enqueueEvent(
+                      CHARACTER_AGENT_STREAM_EVENT_TYPES['tool-call-start'],
+                      createToolCallStartEventPayload(chunk.payload.toolCallId, chunk.payload.toolName),
+                    );
+                    continue;
+                  }
+
+                  if (chunk.type === 'tool-error' && isCharacterAgentToolName(chunk.payload.toolName)) {
+                    enqueueEvent(
+                      CHARACTER_AGENT_STREAM_EVENT_TYPES['tool-call-error'],
+                      createToolCallErrorEventPayload(
+                        chunk.payload.toolCallId,
+                        chunk.payload.toolName,
+                        chunk.payload.error instanceof Error ? chunk.payload.error.message : 'Tool call failed.',
+                      ),
+                    );
+                  }
                 }
 
                 const fullOutput = await output.getFullOutput();

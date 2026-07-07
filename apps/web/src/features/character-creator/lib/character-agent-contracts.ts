@@ -28,7 +28,14 @@ export const CHARACTER_AGENT_STREAM_REQUEST_SCHEMA = z.object({
   messages: z.array(CHARACTER_AGENT_MESSAGE_SCHEMA).min(1),
 });
 
-export const CHARACTER_AGENT_STREAM_EVENT_TYPE_SCHEMA = z.enum(['text-delta', 'tool-event', 'complete', 'error']);
+export const CHARACTER_AGENT_STREAM_EVENT_TYPE_SCHEMA = z.enum([
+  'text-delta',
+  'tool-call-start',
+  'tool-event',
+  'tool-call-error',
+  'complete',
+  'error',
+]);
 export const CHARACTER_AGENT_STREAM_EVENT_TYPES = CHARACTER_AGENT_STREAM_EVENT_TYPE_SCHEMA.enum;
 
 export const CHARACTER_AGENT_TEXT_DELTA_EVENT_SCHEMA = z.object({
@@ -36,10 +43,23 @@ export const CHARACTER_AGENT_TEXT_DELTA_EVENT_SCHEMA = z.object({
   textDelta: z.string(),
 });
 
+export const CHARACTER_AGENT_TOOL_CALL_START_EVENT_SCHEMA = z.object({
+  type: z.literal(CHARACTER_AGENT_STREAM_EVENT_TYPES['tool-call-start']),
+  toolCallId: z.string(),
+  toolName: CHARACTER_AGENT_TOOL_EVENT_SCHEMA.shape.toolName,
+});
+
 export const CHARACTER_AGENT_TOOL_EVENT_STREAM_SCHEMA = z.object({
   type: z.literal(CHARACTER_AGENT_STREAM_EVENT_TYPES['tool-event']),
   toolEvent: CHARACTER_AGENT_TOOL_EVENT_SCHEMA,
   draftCard: CHARACTER_CARD_SCHEMA,
+});
+
+export const CHARACTER_AGENT_TOOL_CALL_ERROR_EVENT_SCHEMA = z.object({
+  type: z.literal(CHARACTER_AGENT_STREAM_EVENT_TYPES['tool-call-error']),
+  toolCallId: z.string(),
+  toolName: CHARACTER_AGENT_TOOL_EVENT_SCHEMA.shape.toolName,
+  message: z.string(),
 });
 
 export const CHARACTER_AGENT_COMPLETE_EVENT_SCHEMA = z.object({
@@ -55,7 +75,9 @@ export const CHARACTER_AGENT_ERROR_EVENT_SCHEMA = z.object({
 
 export const CHARACTER_AGENT_STREAM_EVENT_SCHEMA = z.discriminatedUnion('type', [
   CHARACTER_AGENT_TEXT_DELTA_EVENT_SCHEMA,
+  CHARACTER_AGENT_TOOL_CALL_START_EVENT_SCHEMA,
   CHARACTER_AGENT_TOOL_EVENT_STREAM_SCHEMA,
+  CHARACTER_AGENT_TOOL_CALL_ERROR_EVENT_SCHEMA,
   CHARACTER_AGENT_COMPLETE_EVENT_SCHEMA,
   CHARACTER_AGENT_ERROR_EVENT_SCHEMA,
 ]);

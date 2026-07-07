@@ -25,9 +25,15 @@ export const CHARACTER_AGENT_MESSAGE_SCHEMA = z.object({
   createdAt: z.string(),
 });
 
+export const CHARACTER_AGENT_TOOL_EVENT_STATUS_SCHEMA = z.enum(['pending', 'done', 'error']);
+export const CHARACTER_AGENT_TOOL_EVENT_STATUSES = CHARACTER_AGENT_TOOL_EVENT_STATUS_SCHEMA.enum;
+export type CharacterAgentToolEventStatus = z.infer<typeof CHARACTER_AGENT_TOOL_EVENT_STATUS_SCHEMA>;
+
 export const CHARACTER_AGENT_TOOL_EVENT_SCHEMA = z.object({
   id: z.string(),
+  toolCallId: z.string(),
   toolName: CHARACTER_AGENT_TOOL_NAME_SCHEMA,
+  status: CHARACTER_AGENT_TOOL_EVENT_STATUS_SCHEMA,
   inputSummary: z.string(),
   outputSummary: z.string(),
   createdAt: z.string(),
@@ -83,19 +89,61 @@ export function createCharacterAgentMessage({
 }
 
 export function createCharacterAgentToolEvent({
+  toolCallId,
   toolName,
   inputSummary,
   outputSummary,
 }: {
+  toolCallId: string;
   toolName: CharacterAgentToolName;
   inputSummary: string;
   outputSummary: string;
 }): iCharacterAgentToolEvent {
   return {
     id: generateUuid(),
+    toolCallId,
     toolName,
+    status: CHARACTER_AGENT_TOOL_EVENT_STATUSES.done,
     inputSummary,
     outputSummary,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function createPendingCharacterAgentToolEvent({
+  toolCallId,
+  toolName,
+}: {
+  toolCallId: string;
+  toolName: CharacterAgentToolName;
+}): iCharacterAgentToolEvent {
+  return {
+    id: generateUuid(),
+    toolCallId,
+    toolName,
+    status: CHARACTER_AGENT_TOOL_EVENT_STATUSES.pending,
+    inputSummary: '',
+    outputSummary: '',
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function createFailedCharacterAgentToolEvent({
+  toolCallId,
+  toolName,
+  message,
+}: {
+  toolCallId: string;
+  toolName: CharacterAgentToolName;
+  message: string;
+}): iCharacterAgentToolEvent {
+  return {
+    id: generateUuid(),
+    toolCallId,
+    toolName,
+    status: CHARACTER_AGENT_TOOL_EVENT_STATUSES.error,
+    inputSummary: '',
+    outputSummary: message,
     createdAt: new Date().toISOString(),
   };
 }

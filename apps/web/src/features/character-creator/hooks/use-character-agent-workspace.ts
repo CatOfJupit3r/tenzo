@@ -1,18 +1,22 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { toastError, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
+import { toastError, toastInfo, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
 
 import { characterAgentSessionsCollection } from '../collections/character-agent-sessions.collection';
-import { CHARACTER_TEXT_FIELD_KEYS } from '../lib/card-schema';
 import type { CharacterCard } from '../lib/card-schema';
 import { CHARACTER_AGENT_STREAM_EVENT_SCHEMA } from '../lib/character-agent-contracts';
 import {
   createCharacterAgentMessage,
   createCharacterAgentSession,
+  createFailedCharacterAgentToolEvent,
+  createPendingCharacterAgentToolEvent,
   CHARACTER_AGENT_MESSAGE_ROLES,
+  CHARACTER_AGENT_TOOL_EVENT_STATUSES,
 } from '../lib/character-agent-session';
 import type { iCharacterAgentSession } from '../lib/character-agent-session';
+import { applyCharacterCardFieldChanges, computeCharacterCardFieldDiffs } from '../lib/character-card-diff';
+import type { CharacterCardChangedFieldKey } from '../lib/character-card-diff';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
 
 interface iUseCharacterAgentWorkspaceOptions {
@@ -36,40 +40,8 @@ function cardsMatch(leftCard: CharacterCard, rightCard: CharacterCard) {
   return JSON.stringify(leftCard) === JSON.stringify(rightCard);
 }
 
-function summarizeChangedSections(liveCard: CharacterCard, draftCard: CharacterCard) {
-  const changedSections: string[] = CHARACTER_TEXT_FIELD_KEYS.filter(
-    (fieldKey) => liveCard.data[fieldKey] !== draftCard.data[fieldKey],
-  );
-
-  if (JSON.stringify(liveCard.data.tags) !== JSON.stringify(draftCard.data.tags)) {
-    changedSections.push('tags');
-  }
-
-  if (JSON.stringify(liveCard.data.alternate_greetings) !== JSON.stringify(draftCard.data.alternate_greetings)) {
-    changedSections.push('alternate_greetings');
-  }
-
-  if (
-    JSON.stringify(liveCard.data.extensions.custom_fields) !== JSON.stringify(draftCard.data.extensions.custom_fields)
-  ) {
-    changedSections.push('custom_fields');
-  }
-
-  return changedSections;
-}
-
-function buildDraftPreview(card: CharacterCard) {
-  return [
-    `Name: ${card.data.name}`,
-    '',
-    `Description:\n${card.data.description}`,
-    '',
-    `Personality:\n${card.data.personality}`,
-    '',
-    `Scenario:\n${card.data.scenario}`,
-    '',
-    `First Message:\n${card.data.first_mes}`,
-  ].join('\n');
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 function updateSessionTimestamp(session: { updatedAt: string }) {
@@ -233,12 +205,13 @@ export function useCharacterAgentWorkspace({
   }, [card, characterId, session]);
 
   const draftCard = session?.draftCard ?? card;
-  const changedSections = useMemo(() => summarizeChangedSections(card, draftCard), [card, draftCard]);
+  const fieldDiffs = useMemo(() => computeCharacterCardFieldDiffs(card, draftCard), [card, draftCard]);
+  const changedSections = useMemo(() => fieldDiffs.map((diff) => diff.fieldKey), [fieldDiffs]);
   const hasDraftChanges = changedSections.length > 0;
   const isConnectionConfigured = Boolean(
     generationSettings.endpoint.trim() && generationSettings.model.trim() && apiKey.trim(),
   );
-  const draftPreview = useMemo(() => buildDraftPreview(draftCard), [draftCard]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const resetSessionFromCharacter = useCallback(() => {
     const sessionId = ensureSessionId();
@@ -261,42 +234,41 @@ export function useCharacterAgentWorkspace({
     });
   }, [session, updateSession]);
 
-  const applyDraftToCharacter = useCallback(() => {
-    replaceCard(structuredClone(draftCard));
-    toastSuccess('Draft applied', 'The agent draft is now the active character card.');
-  }, [draftCard, replaceCard]);
+  const applyDraftFields = useCallback(
+    (fieldKeys?: CharacterCardChangedFieldKey[]) => {
+      const keysToApply = fieldKeys ?? changedSections;
 
-  const sendMessage = useCallback(
-    async (input: string) => {
-      const trimmedInput = input.trim();
-
-      if (!trimmedInput) {
+      if (keysToApply.length === 0) {
         return;
       }
 
-      if (!isConnectionConfigured) {
-        const errorMessage = 'Set an endpoint, model, and API key before running the character agent.';
-        setRuntimeState({
-          isRunning: false,
-          errorMessage,
-        });
-        throw new Error(errorMessage);
-      }
+      const mergedCard = applyCharacterCardFieldChanges(card, draftCard, keysToApply);
+      replaceCard(mergedCard);
 
-      const sessionId = ensureSessionId();
-      const userMessage = createCharacterAgentMessage({
-        role: CHARACTER_AGENT_MESSAGE_ROLES.user,
-        content: trimmedInput,
-      });
+      const isFullApply = keysToApply.length === changedSections.length;
+      toastSuccess(
+        isFullApply ? 'Draft applied' : 'Selected changes applied',
+        isFullApply
+          ? 'The agent draft is now the active character card.'
+          : `Applied ${keysToApply.length} of ${changedSections.length} changed field(s).`,
+      );
+    },
+    [card, changedSections, draftCard, replaceCard],
+  );
 
-      updateSession(sessionId, (draft) => {
-        draft.messages.push(userMessage);
-      });
+  const cancelRun = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
 
+  const runAgentTurn = useCallback(
+    async (sessionId: string) => {
       setRuntimeState({
         isRunning: true,
         errorMessage: null,
       });
+
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
       try {
         const sessionSnapshot = characterAgentSessionsCollection.get(sessionId);
@@ -312,6 +284,7 @@ export function useCharacterAgentWorkspace({
           headers: {
             'Content-Type': 'application/json',
           },
+          signal: abortController.signal,
           body: JSON.stringify({
             endpoint: generationSettings.endpoint,
             apiKey,
@@ -356,10 +329,57 @@ export function useCharacterAgentWorkspace({
             return;
           }
 
+          if (streamEvent.type === 'tool-call-start') {
+            updateSession(sessionId, (draft) => {
+              draft.toolEvents.push(
+                createPendingCharacterAgentToolEvent({
+                  toolCallId: streamEvent.toolCallId,
+                  toolName: streamEvent.toolName,
+                }),
+              );
+            });
+
+            return;
+          }
+
           if (streamEvent.type === 'tool-event') {
             updateSession(sessionId, (draft) => {
               draft.draftCard = structuredClone(streamEvent.draftCard);
+
+              const pendingToolEvent = draft.toolEvents.find(
+                (toolEvent) => toolEvent.toolCallId === streamEvent.toolEvent.toolCallId,
+              );
+
+              if (pendingToolEvent) {
+                Object.assign(pendingToolEvent, streamEvent.toolEvent);
+                return;
+              }
+
               draft.toolEvents.push(streamEvent.toolEvent);
+            });
+
+            return;
+          }
+
+          if (streamEvent.type === 'tool-call-error') {
+            updateSession(sessionId, (draft) => {
+              const pendingToolEvent = draft.toolEvents.find(
+                (toolEvent) => toolEvent.toolCallId === streamEvent.toolCallId,
+              );
+
+              if (pendingToolEvent) {
+                pendingToolEvent.status = CHARACTER_AGENT_TOOL_EVENT_STATUSES.error;
+                pendingToolEvent.outputSummary = streamEvent.message;
+                return;
+              }
+
+              draft.toolEvents.push(
+                createFailedCharacterAgentToolEvent({
+                  toolCallId: streamEvent.toolCallId,
+                  toolName: streamEvent.toolName,
+                  message: streamEvent.message,
+                }),
+              );
             });
 
             return;
@@ -400,6 +420,15 @@ export function useCharacterAgentWorkspace({
           errorMessage: null,
         });
       } catch (error) {
+        if (isAbortError(error)) {
+          setRuntimeState({
+            isRunning: false,
+            errorMessage: null,
+          });
+          toastInfo('Run cancelled', 'The character agent run was stopped.');
+          return;
+        }
+
         const errorMessage = error instanceof Error ? error.message : 'Character agent failed.';
 
         setRuntimeState({
@@ -408,22 +437,68 @@ export function useCharacterAgentWorkspace({
         });
         toastError('Character agent failed', errorMessage);
         throw error;
+      } finally {
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
       }
     },
-    [
-      apiKey,
-      ensureSessionId,
-      generalCharacterIdea,
-      generationSettings,
-      isConnectionConfigured,
-      shouldSendDisabledSamplers,
-      updateSession,
-    ],
+    [apiKey, generalCharacterIdea, generationSettings, shouldSendDisabledSamplers, updateSession],
   );
+
+  const sendMessage = useCallback(
+    async (input: string) => {
+      const trimmedInput = input.trim();
+
+      if (!trimmedInput) {
+        return;
+      }
+
+      if (!isConnectionConfigured) {
+        const errorMessage = 'Set an endpoint, model, and API key before running the character agent.';
+        setRuntimeState({
+          isRunning: false,
+          errorMessage,
+        });
+        throw new Error(errorMessage);
+      }
+
+      const sessionId = ensureSessionId();
+      const userMessage = createCharacterAgentMessage({
+        role: CHARACTER_AGENT_MESSAGE_ROLES.user,
+        content: trimmedInput,
+      });
+
+      updateSession(sessionId, (draft) => {
+        draft.messages.push(userMessage);
+      });
+
+      await runAgentTurn(sessionId);
+    },
+    [ensureSessionId, isConnectionConfigured, runAgentTurn, updateSession],
+  );
+
+  const retryLastRun = useCallback(async () => {
+    if (!session || runtimeState.isRunning) {
+      return;
+    }
+
+    const sessionId = session.id;
+
+    updateSession(sessionId, (draft) => {
+      const lastMessage = draft.messages.at(-1);
+
+      if (lastMessage?.role === CHARACTER_AGENT_MESSAGE_ROLES.assistant) {
+        draft.messages.pop();
+      }
+    });
+
+    await runAgentTurn(sessionId);
+  }, [runAgentTurn, runtimeState.isRunning, session, updateSession]);
 
   return {
     draftCard,
-    draftPreview,
+    fieldDiffs,
     changedSections,
     hasDraftChanges,
     isConnectionConfigured,
@@ -433,8 +508,10 @@ export function useCharacterAgentWorkspace({
     errorMessage: runtimeState.errorMessage,
     clearConversation,
     resetSessionFromCharacter,
-    applyDraftToCharacter,
+    applyDraftFields,
     sendMessage,
+    cancelRun,
+    retryLastRun,
     isDraftInSyncWithCharacter: cardsMatch(card, draftCard),
   };
 }

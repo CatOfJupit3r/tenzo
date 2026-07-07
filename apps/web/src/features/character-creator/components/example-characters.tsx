@@ -1,6 +1,6 @@
 import type { ChangeEvent, DragEvent } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { LuFileUp, LuTrash2 } from 'react-icons/lu';
+import { LuBookmarkPlus, LuFileUp, LuTrash2 } from 'react-icons/lu';
 
 import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button';
@@ -16,7 +16,32 @@ import {
   hasExampleCharacterContextField,
 } from '../lib/example-characters';
 import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/example-characters';
+import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
+import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/field-templates';
 import type { iExampleContextSummary } from '../lib/prompt/example-context-service';
+import { SaveTemplateDialog } from './save-template-dialog';
+
+const TEMPLATE_SOURCE_FIELD_KEYS = [
+  'description',
+  'personality',
+  'scenario',
+  'first_mes',
+  'mes_example',
+] as const satisfies readonly ExampleCharacterContextFieldKey[];
+
+const TEMPLATE_SOURCE_FIELD_KEY_MAP = {
+  description: TEMPLATE_FIELD_KEYS.description,
+  personality: TEMPLATE_FIELD_KEYS.personality,
+  scenario: TEMPLATE_FIELD_KEYS.scenario,
+  first_mes: TEMPLATE_FIELD_KEYS.first_mes,
+  mes_example: TEMPLATE_FIELD_KEYS.mes_example,
+} satisfies Record<(typeof TEMPLATE_SOURCE_FIELD_KEYS)[number], TemplateFieldKey>;
+
+interface iPendingTemplateSource {
+  name: string;
+  content: string;
+  fieldKey: TemplateFieldKey;
+}
 
 export interface iExampleCharactersProps {
   exampleCharacters: iStoredExampleCharacter[];
@@ -24,6 +49,7 @@ export interface iExampleCharactersProps {
   onImportFiles: (files: File[]) => Promise<void>;
   onRemove: (id: string) => void;
   onIncludedFieldKeysChange: (id: string, includedFieldKeys: ExampleCharacterContextFieldKey[]) => void;
+  onSaveTemplate?: (input: iCreateStoredFieldTemplateInput) => void;
 }
 
 export function ExampleCharacters({
@@ -32,10 +58,12 @@ export function ExampleCharacters({
   onImportFiles,
   onRemove,
   onIncludedFieldKeysChange,
+  onSaveTemplate,
 }: iExampleCharactersProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [pendingTemplateSource, setPendingTemplateSource] = useState<iPendingTemplateSource | null>(null);
 
   const remainingSlots = MAX_EXAMPLE_CHARACTER_COUNT - exampleCharacters.length;
   const isAtLimit = remainingSlots <= 0;
@@ -193,6 +221,34 @@ export function ExampleCharacters({
                   </Button>
                 </div>
 
+                {onSaveTemplate ? (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm font-medium">Save a field as a reusable template</p>
+                    <div className="flex flex-wrap gap-2">
+                      {TEMPLATE_SOURCE_FIELD_KEYS.filter((fieldKey) =>
+                        hasExampleCharacterContextField(exampleCharacter, fieldKey),
+                      ).map((fieldKey) => (
+                        <Button
+                          key={fieldKey}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setPendingTemplateSource({
+                              name: `${displayName} ${EXAMPLE_CHARACTER_CONTEXT_FIELD_LABELS[fieldKey]}`,
+                              content: exampleCharacter.card.data[fieldKey],
+                              fieldKey: TEMPLATE_SOURCE_FIELD_KEY_MAP[fieldKey],
+                            })
+                          }
+                        >
+                          <LuBookmarkPlus className="size-4" />
+                          {EXAMPLE_CHARACTER_CONTEXT_FIELD_LABELS[fieldKey]}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-4 space-y-2">
                   <p className="text-sm font-medium">Fields included in generation context</p>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -233,6 +289,21 @@ export function ExampleCharacters({
             );
           })}
         </div>
+      ) : null}
+
+      {onSaveTemplate ? (
+        <SaveTemplateDialog
+          isOpen={pendingTemplateSource !== null}
+          initialName={pendingTemplateSource?.name ?? ''}
+          initialContent={pendingTemplateSource?.content ?? ''}
+          initialFieldKeys={pendingTemplateSource ? [pendingTemplateSource.fieldKey] : []}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              setPendingTemplateSource(null);
+            }
+          }}
+          onSave={onSaveTemplate}
+        />
       ) : null}
     </div>
   );

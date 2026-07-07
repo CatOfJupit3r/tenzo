@@ -30,15 +30,17 @@ import {
   toPromptExampleCharacter,
 } from '../lib/example-characters';
 import type { iExportSettings } from '../lib/export-settings';
+import { getTemplateFieldKeyForTargetKey, TEMPLATE_MODES } from '../lib/field-templates';
 import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation-config';
 import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
 import { invalidatePortraitAsset } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
 import { ExampleContextService } from '../lib/prompt/example-context-service';
 import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
-import type { GenerationMode, iFieldGenerationTarget } from '../lib/prompt/generation-contracts';
+import type { GenerationMode, iFieldGenerationTarget, iPromptFieldTemplate } from '../lib/prompt/generation-contracts';
 import { useCharacterPortrait } from './use-character-portrait';
 import { useCharacterSession } from './use-character-session';
+import { useFieldTemplates } from './use-field-templates';
 import { useGeneration } from './use-generation';
 
 const exampleContextService = new ExampleContextService();
@@ -66,6 +68,8 @@ async function createImportedPortraitReference(
 export interface iFieldGenerationState {
   shouldUseGeneralCharacterIdea: boolean;
   instructionValue: string;
+  templateId: string | null;
+  isStrictTemplateSelected: boolean;
   errorMessage: string | null | undefined;
   isGenerating: boolean;
   hasRewriteBackup: boolean;
@@ -137,6 +141,8 @@ export function useCharacterCreatorPage() {
     updateGeneralCharacterIdea,
     getFieldInstruction,
     updateFieldInstruction,
+    getFieldTemplateId,
+    updateFieldTemplateId,
     shouldUseGeneralCharacterIdea,
     updateFieldShouldUseGeneralCharacterIdea,
     removeCustomFieldInstruction,
@@ -148,6 +154,16 @@ export function useCharacterCreatorPage() {
     getFieldRuntime,
     probeConnection,
   } = useGeneration();
+
+  const {
+    fieldTemplates,
+    getFieldTemplateById,
+    getTemplatesForField,
+    addFieldTemplate,
+    updateFieldTemplate,
+    removeFieldTemplate,
+    duplicateFieldTemplate,
+  } = useFieldTemplates();
 
   const {
     portraitBlob,
@@ -192,13 +208,22 @@ export function useCharacterCreatorPage() {
   const openImportDialog = useCallback(() => setIsImportDialogOpen(true), []);
   const openExportDialog = useCallback(() => setIsExportDialogOpen(true), []);
 
+  const resolveFieldTemplate = useCallback(
+    (fieldKey: string) => getFieldTemplateById(getFieldTemplateId(fieldKey)),
+    [getFieldTemplateById, getFieldTemplateId],
+  );
+
   const getGenerationState = useCallback(
     (fieldKey: string): iFieldGenerationState => {
       const runtime = getFieldRuntime(fieldKey);
+      // Dangling ids (deleted templates) resolve to no selection.
+      const selectedTemplate = resolveFieldTemplate(fieldKey);
 
       return {
         shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
         instructionValue: getFieldInstruction(fieldKey),
+        templateId: selectedTemplate?.id ?? null,
+        isStrictTemplateSelected: selectedTemplate?.mode === TEMPLATE_MODES.strict,
         errorMessage: runtime.errorMessage,
         isGenerating: runtime.isGenerating,
         hasRewriteBackup: rewriteBackups[fieldKey] !== undefined,
@@ -206,7 +231,14 @@ export function useCharacterCreatorPage() {
         rewriteBackupValue: rewriteBackups[fieldKey] ?? null,
       };
     },
-    [getFieldInstruction, getFieldRuntime, pendingRewriteReviewKeys, rewriteBackups, shouldUseGeneralCharacterIdea],
+    [
+      getFieldInstruction,
+      getFieldRuntime,
+      pendingRewriteReviewKeys,
+      resolveFieldTemplate,
+      rewriteBackups,
+      shouldUseGeneralCharacterIdea,
+    ],
   );
 
   const getStandardFieldGenerationState = useCallback(
@@ -234,12 +266,18 @@ export function useCharacterCreatorPage() {
       // Starting any generation implicitly settles a pending review for the field.
       setPendingRewriteReviewKeys((prev) => removePendingReviewKey(prev, target.key));
 
+      const selectedTemplate = resolveFieldTemplate(target.key);
+      const fieldTemplate: iPromptFieldTemplate | null = selectedTemplate
+        ? { name: selectedTemplate.name, mode: selectedTemplate.mode, content: selectedTemplate.content }
+        : null;
+
       try {
         await generateField({
           card,
           target,
           onValueChange,
           mode,
+          fieldTemplate,
           exampleCharacters: promptExampleCharacters,
           maxExampleContextCharacters,
         });
@@ -256,7 +294,7 @@ export function useCharacterCreatorPage() {
         toastError('Generation failed', message);
       }
     },
-    [card, generateField, maxExampleContextCharacters, promptExampleCharacters],
+    [card, generateField, maxExampleContextCharacters, promptExampleCharacters, resolveFieldTemplate],
   );
 
   const revertFieldRewrite = useCallback(
@@ -324,6 +362,19 @@ export function useCharacterCreatorPage() {
   const updateStandardFieldInstruction = useCallback(
     (key: CharacterTextFieldKey, value: string) => updateFieldInstruction(`field:${key}`, value),
     [updateFieldInstruction],
+  );
+
+  const updateStandardFieldTemplateId = useCallback(
+    (key: CharacterTextFieldKey, templateId: string | null) => updateFieldTemplateId(`field:${key}`, templateId),
+    [updateFieldTemplateId],
+  );
+
+  const getTemplateOptionsForTargetKey = useCallback(
+    (targetKey: string) => {
+      const templateFieldKey = getTemplateFieldKeyForTargetKey(targetKey);
+      return templateFieldKey ? getTemplatesForField(templateFieldKey) : [];
+    },
+    [getTemplatesForField],
   );
 
   const handleHealthCheck = useCallback(async () => {
@@ -549,6 +600,11 @@ export function useCharacterCreatorPage() {
     [updateFieldInstruction],
   );
 
+  const updateAlternateGreetingTemplateId = useCallback(
+    (index: number, templateId: string | null) => updateFieldTemplateId(`alternate_greetings:${index}`, templateId),
+    [updateFieldTemplateId],
+  );
+
   const generateAlternateGreeting = useCallback(
     async (index: number, mode: GenerationMode = GENERATION_MODES.generate) => {
       await runGeneration(
@@ -602,6 +658,11 @@ export function useCharacterCreatorPage() {
   const updateCustomFieldInstruction = useCallback(
     (id: string, value: string) => updateFieldInstruction(`custom:${id}`, value),
     [updateFieldInstruction],
+  );
+
+  const updateCustomFieldTemplateId = useCallback(
+    (id: string, templateId: string | null) => updateFieldTemplateId(`custom:${id}`, templateId),
+    [updateFieldTemplateId],
   );
 
   const generateCustomField = useCallback(
@@ -867,6 +928,14 @@ export function useCharacterCreatorPage() {
     updateExampleCharacterIncludedFields,
     removeExampleCharacter,
 
+    fieldTemplates,
+    getTemplateOptionsForTargetKey,
+    getTemplatesForField,
+    addFieldTemplate,
+    updateFieldTemplate,
+    removeFieldTemplate,
+    duplicateFieldTemplate,
+
     generationSettings,
     apiKey,
     updateApiKey,
@@ -886,10 +955,12 @@ export function useCharacterCreatorPage() {
     acceptStandardFieldRewrite,
     updateStandardFieldShouldUseGeneralCharacterIdea,
     updateStandardFieldInstruction,
+    updateStandardFieldTemplateId,
 
     greetingGenerationStates,
     updateAlternateGreetingShouldUseGeneralCharacterIdea,
     updateAlternateGreetingInstruction,
+    updateAlternateGreetingTemplateId,
     generateAlternateGreeting,
     cancelAlternateGreetingGeneration,
     revertAlternateGreetingRewrite,
@@ -899,6 +970,7 @@ export function useCharacterCreatorPage() {
     customFieldGenerationStates,
     updateCustomFieldShouldUseGeneralCharacterIdea,
     updateCustomFieldInstruction,
+    updateCustomFieldTemplateId,
     generateCustomField,
     cancelCustomFieldGeneration,
     revertCustomFieldRewrite,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import { TEMPLATE_MODES } from '../field-templates';
 import { OUTPUT_FORMATS } from '../generation-config';
 import { ExampleContextService } from './example-context-service';
 import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
@@ -176,6 +177,69 @@ describe('prompt-pipeline', () => {
     });
 
     expect(continueResult.messages[1]?.content).not.toContain('Variation seed:');
+  });
+
+  it('includes prompt-mode templates as structural guidance while keeping normal format instructions', () => {
+    const card = createEmptyCharacterCard();
+
+    const { messages } = characterPromptPipeline.build({
+      card,
+      target: createDescriptionTarget(),
+      outputFormat: OUTPUT_FORMATS.xml,
+      seed: 1,
+      fieldTemplate: {
+        name: 'Trait List',
+        mode: TEMPLATE_MODES.prompt,
+        content: 'core traits: trait1, trait2;',
+      },
+    });
+
+    expect(messages[1]?.content).toContain('Field structure template "Trait List"');
+    expect(messages[1]?.content).toContain('core traits: trait1, trait2;');
+    expect(messages[1]?.content).toContain('Return the answer wrapped in a single <response> tag.');
+  });
+
+  it('swaps format instructions for slot filling when a strict template is active', () => {
+    const card = createEmptyCharacterCard();
+
+    const { messages } = characterPromptPipeline.build({
+      card,
+      target: createDescriptionTarget(),
+      outputFormat: OUTPUT_FORMATS.xml,
+      seed: 1,
+      fieldTemplate: {
+        name: 'Structured Description',
+        mode: TEMPLATE_MODES.strict,
+        content: 'Appearance: {{gen:appearance:build}}\nBackground: {{gen:background}}',
+      },
+    });
+
+    const userContent = messages[1]?.content ?? '';
+    expect(userContent).toContain('Strict field template "Structured Description"');
+    expect(userContent).toContain('- appearance — build');
+    expect(userContent).toContain('<slot name="appearance">');
+    expect(userContent).toContain('one tag per slot: appearance, background.');
+    expect(userContent).not.toContain('Return the answer wrapped in a single <response> tag.');
+  });
+
+  it('ignores the field template when continuing existing text', () => {
+    const card = createEmptyCharacterCard();
+
+    const { messages } = characterPromptPipeline.build({
+      card,
+      target: createDescriptionTarget('Existing text to continue.'),
+      outputFormat: OUTPUT_FORMATS.xml,
+      seed: 1,
+      mode: GENERATION_MODES.continue,
+      fieldTemplate: {
+        name: 'Structured Description',
+        mode: TEMPLATE_MODES.strict,
+        content: 'Appearance: {{gen:appearance}}',
+      },
+    });
+
+    expect(messages[1]?.content).not.toContain('Strict field template');
+    expect(messages[1]?.content).not.toContain('<slot name=');
   });
 
   it('skips the variation directive for meta fields', () => {

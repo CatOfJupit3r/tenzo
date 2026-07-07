@@ -1,5 +1,6 @@
 import { CORE_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
+import { TEMPLATE_FIELD_KEYS } from '../../lib/field-templates';
 import { GENERATION_MODES } from '../../lib/prompt/generation-contracts';
 import { AlternateGreetings } from '../alternate-greetings';
 import { CharacterFieldPanel } from '../character-field-panel';
@@ -17,6 +18,9 @@ export function DialogueTab() {
     greetingGenerationStates,
     updateAlternateGreetingShouldUseGeneralCharacterIdea,
     updateAlternateGreetingInstruction,
+    updateAlternateGreetingTemplateId,
+    getTemplatesForField,
+    addFieldTemplate,
     generateAlternateGreeting,
     cancelAlternateGreetingGeneration,
     revertAlternateGreetingRewrite,
@@ -34,10 +38,13 @@ export function DialogueTab() {
         <AlternateGreetings
           greetings={data.alternate_greetings}
           generationStates={greetingGenerationStates}
+          templateOptions={getTemplatesForField(TEMPLATE_FIELD_KEYS.alternate_greeting)}
           onAdd={addGreeting}
           onChange={updateGreeting}
           onRemove={handleRemoveGreeting}
           onMove={handleReorderGreetings}
+          onTemplateIdChange={updateAlternateGreetingTemplateId}
+          onSaveTemplate={addFieldTemplate}
           onShouldUseGeneralCharacterIdeaChange={updateAlternateGreetingShouldUseGeneralCharacterIdea}
           onInstructionChange={updateAlternateGreetingInstruction}
           onGenerate={(index) => {

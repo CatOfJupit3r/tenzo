@@ -3,9 +3,9 @@ import { z } from 'zod';
 import type { CharacterCard } from '../card-schema';
 import type { OutputFormat } from '../generation-config';
 import type { iExampleContextSummary } from './example-context-service';
-import type { GenerationMode, iFieldGenerationTarget } from './generation-contracts';
+import type { GenerationMode, iFieldGenerationTarget, iPromptFieldTemplate } from './generation-contracts';
 
-export const PROMPT_SECTION_NAME_SCHEMA = z.enum(['card-context', 'example-context', 'task']);
+export const PROMPT_SECTION_NAME_SCHEMA = z.enum(['card-context', 'example-context', 'template', 'task']);
 export const PROMPT_SECTION_NAMES = PROMPT_SECTION_NAME_SCHEMA.enum;
 export type PromptSectionName = z.infer<typeof PROMPT_SECTION_NAME_SCHEMA>;
 
@@ -18,6 +18,7 @@ export interface iPromptPipelineContext {
   generalCharacterIdea: string;
   shouldUseGeneralCharacterIdea: boolean;
   userInstructions: string;
+  fieldTemplate: iPromptFieldTemplate | null;
   maxExampleContextCharacters: number;
   exampleContextSummary: iExampleContextSummary;
   variationSection: string;

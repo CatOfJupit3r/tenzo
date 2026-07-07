@@ -1,6 +1,8 @@
 import z from 'zod';
 
-export const macroKindSchema = z.enum(['char', 'user', 'original', 'unknown']);
+import { TEMPLATE_SLOT_PATTERN } from '../field-templates';
+
+export const macroKindSchema = z.enum(['char', 'user', 'original', 'slot', 'unknown']);
 export const MACRO_KINDS = macroKindSchema.enum;
 export type MacroKind = z.infer<typeof macroKindSchema>;
 
@@ -12,6 +14,7 @@ export interface iMacroRange {
 
 export interface iFindMacroRangesOptions {
   doesAllowOriginalMacro: boolean;
+  doesHighlightTemplateSlots?: boolean;
 }
 
 const MACRO_PATTERN = /\{\{\s*([a-zA-Z_][\w]*)\s*\}\}/g;
@@ -29,6 +32,13 @@ export function findMacroRanges(text: string, options: iFindMacroRangesOptions):
       kind = MACRO_KINDS.unknown;
     }
     ranges.push({ from: match.index, to: match.index + match[0].length, kind });
+  }
+  if (options.doesHighlightTemplateSlots) {
+    // Slot tokens contain ':' so they never overlap MACRO_PATTERN matches.
+    for (const match of text.matchAll(TEMPLATE_SLOT_PATTERN)) {
+      ranges.push({ from: match.index, to: match.index + match[0].length, kind: MACRO_KINDS.slot });
+    }
+    ranges.sort((a, b) => a.from - b.from);
   }
   return ranges;
 }

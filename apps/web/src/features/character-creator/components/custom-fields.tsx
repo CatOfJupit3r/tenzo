@@ -6,6 +6,8 @@ import { Input } from '@~/components/ui/input';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
 import type { CustomField } from '../lib/card-schema';
+import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
+import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';
@@ -13,9 +15,12 @@ import { FieldGenerationControls } from './field-generation-controls';
 export interface iCustomFieldsProps {
   fields: CustomField[];
   generationStates: Record<string, iFieldGenerationState>;
+  templateOptions: iFieldTemplateViewModel[];
   onAdd: () => void;
   onUpdate: (id: string, patch: Partial<Pick<CustomField, 'label' | 'value'>>) => void;
   onRemove: (id: string) => void;
+  onTemplateIdChange: (id: string, templateId: string | null) => void;
+  onSaveTemplate: (input: iCreateStoredFieldTemplateInput) => void;
   onShouldUseGeneralCharacterIdeaChange: (id: string, value: boolean) => void;
   onInstructionChange: (id: string, value: string) => void;
   onGenerate: (id: string) => void;
@@ -30,9 +35,12 @@ export interface iCustomFieldsProps {
 export function CustomFields({
   fields,
   generationStates,
+  templateOptions,
   onAdd,
   onUpdate,
   onRemove,
+  onTemplateIdChange,
+  onSaveTemplate,
   onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
   onGenerate,
@@ -97,6 +105,13 @@ export function CustomFields({
                   hasExistingValue={field.value.trim().length > 0}
                   hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
                   isGenerating={isGenerating}
+                  templateOptions={templateOptions}
+                  templateId={generationState?.templateId ?? null}
+                  isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
+                  fieldValue={field.value}
+                  templateFieldKey={TEMPLATE_FIELD_KEYS.custom_field}
+                  onTemplateIdChange={(templateId) => onTemplateIdChange(field.id, templateId)}
+                  onSaveTemplate={onSaveTemplate}
                   onShouldUseGeneralCharacterIdeaChange={(value) =>
                     onShouldUseGeneralCharacterIdeaChange(field.id, value)
                   }

@@ -10,6 +10,7 @@ export interface iUseMarkdownFieldEditorOptions {
   isStreaming?: boolean;
   placeholder?: string;
   doesAllowOriginalMacro?: boolean;
+  doesHighlightTemplateSlots?: boolean;
   editorAttributes?: Record<string, string>;
   onValueChange: (value: string) => void;
 }
@@ -24,12 +25,13 @@ export function useMarkdownFieldEditor({
   isStreaming = false,
   placeholder,
   doesAllowOriginalMacro = false,
+  doesHighlightTemplateSlots = false,
   editorAttributes = {},
   onValueChange,
 }: iUseMarkdownFieldEditorOptions) {
   const extensions = useMemo(
-    () => buildMarkdownEditorExtensions({ placeholder, doesAllowOriginalMacro }),
-    [placeholder, doesAllowOriginalMacro],
+    () => buildMarkdownEditorExtensions({ placeholder, doesAllowOriginalMacro, doesHighlightTemplateSlots }),
+    [placeholder, doesAllowOriginalMacro, doesHighlightTemplateSlots],
   );
 
   return useSyncedFieldEditor({

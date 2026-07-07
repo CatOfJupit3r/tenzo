@@ -13,6 +13,7 @@ export interface iMarkdownFieldEditorProps {
   isReadOnly?: boolean;
   isStreaming?: boolean;
   doesAllowOriginalMacro?: boolean;
+  doesHighlightTemplateSlots?: boolean;
   ariaDescribedBy?: string;
   onValueChange: (value: string) => void;
 }
@@ -29,6 +30,7 @@ export function MarkdownFieldEditor({
   isReadOnly = false,
   isStreaming = false,
   doesAllowOriginalMacro = false,
+  doesHighlightTemplateSlots = false,
   ariaDescribedBy,
   onValueChange,
 }: iMarkdownFieldEditorProps) {
@@ -38,6 +40,7 @@ export function MarkdownFieldEditor({
     isStreaming,
     placeholder,
     doesAllowOriginalMacro,
+    doesHighlightTemplateSlots,
     editorAttributes: {
       id: fieldId,
       role: 'textbox',

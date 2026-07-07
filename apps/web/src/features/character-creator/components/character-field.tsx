@@ -5,6 +5,11 @@ import { Label } from '@~/components/ui/label';
 
 import type { FieldEditorVariant } from '../constants/field-config';
 import { FIELD_EDITOR_VARIANTS } from '../constants/field-config';
+import type {
+  iCreateStoredFieldTemplateInput,
+  iFieldTemplateViewModel,
+  TemplateFieldKey,
+} from '../lib/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { MesExampleEditor } from './editor/mes-example-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
@@ -25,6 +30,12 @@ export interface iCharacterFieldProps {
   hasRewriteBackup?: boolean;
   isRewriteReviewPending?: boolean;
   rewriteBackupValue?: string | null;
+  templateOptions?: iFieldTemplateViewModel[];
+  templateId?: string | null;
+  isStrictTemplateSelected?: boolean;
+  templateFieldKey?: TemplateFieldKey | null;
+  onTemplateIdChange?: (templateId: string | null) => void;
+  onSaveTemplate?: (input: iCreateStoredFieldTemplateInput) => void;
   onValueChange: (value: string) => void;
   onShouldUseGeneralCharacterIdeaChange?: (value: boolean) => void;
   onInstructionChange?: (value: string) => void;
@@ -52,6 +63,12 @@ export function CharacterField({
   hasRewriteBackup = false,
   isRewriteReviewPending = false,
   rewriteBackupValue = null,
+  templateOptions = [],
+  templateId = null,
+  isStrictTemplateSelected = false,
+  templateFieldKey = null,
+  onTemplateIdChange,
+  onSaveTemplate,
   onValueChange,
   onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
@@ -133,6 +150,13 @@ export function CharacterField({
           hasExistingValue={value.trim().length > 0}
           hasRewriteBackup={hasRewriteBackup}
           isGenerating={isGenerating}
+          templateOptions={templateOptions}
+          templateId={templateId}
+          isStrictTemplateSelected={isStrictTemplateSelected}
+          fieldValue={value}
+          templateFieldKey={templateFieldKey}
+          onTemplateIdChange={onTemplateIdChange}
+          onSaveTemplate={onSaveTemplate}
           onShouldUseGeneralCharacterIdeaChange={onShouldUseGeneralCharacterIdeaChange}
           onInstructionChange={onInstructionChange}
           onGenerate={onGenerate}

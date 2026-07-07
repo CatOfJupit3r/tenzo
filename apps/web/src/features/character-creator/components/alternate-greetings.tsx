@@ -3,6 +3,8 @@ import { LuChevronDown, LuChevronUp, LuPlus, LuTrash2 } from 'react-icons/lu';
 import { Button } from '@~/components/ui/button';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
+import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
+import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';
@@ -10,10 +12,13 @@ import { FieldGenerationControls } from './field-generation-controls';
 export interface iAlternateGreetingsProps {
   greetings: string[];
   generationStates: iFieldGenerationState[];
+  templateOptions: iFieldTemplateViewModel[];
   onAdd: () => void;
   onChange: (index: number, value: string) => void;
   onRemove: (index: number) => void;
   onMove: (fromIndex: number, toIndex: number) => void;
+  onTemplateIdChange: (index: number, templateId: string | null) => void;
+  onSaveTemplate: (input: iCreateStoredFieldTemplateInput) => void;
   onShouldUseGeneralCharacterIdeaChange: (index: number, value: boolean) => void;
   onInstructionChange: (index: number, value: string) => void;
   onGenerate: (index: number) => void;
@@ -28,10 +33,13 @@ export interface iAlternateGreetingsProps {
 export function AlternateGreetings({
   greetings,
   generationStates,
+  templateOptions,
   onAdd,
   onChange,
   onRemove,
   onMove,
+  onTemplateIdChange,
+  onSaveTemplate,
   onShouldUseGeneralCharacterIdeaChange,
   onInstructionChange,
   onGenerate,
@@ -111,6 +119,13 @@ export function AlternateGreetings({
                   hasExistingValue={greeting.trim().length > 0}
                   hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
                   isGenerating={isGenerating}
+                  templateOptions={templateOptions}
+                  templateId={generationState?.templateId ?? null}
+                  isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
+                  fieldValue={greeting}
+                  templateFieldKey={TEMPLATE_FIELD_KEYS.alternate_greeting}
+                  onTemplateIdChange={(templateId) => onTemplateIdChange(index, templateId)}
+                  onSaveTemplate={onSaveTemplate}
                   onShouldUseGeneralCharacterIdeaChange={(value) => onShouldUseGeneralCharacterIdeaChange(index, value)}
                   onInstructionChange={(value) => onInstructionChange(index, value)}
                   onGenerate={() => onGenerate(index)}

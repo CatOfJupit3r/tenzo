@@ -2,6 +2,7 @@ import { cn } from '@~/lib/utils';
 
 import type { iCharacterFieldConfig } from '../constants/field-config';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
+import { getTemplateFieldKeyForTargetKey } from '../lib/field-templates';
 import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
 import { CharacterField } from './character-field';
 import { FIELD_PANEL_CLASS_NAME } from './tabs/tabs.constants';
@@ -23,8 +24,12 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
     acceptStandardFieldRewrite,
     updateStandardFieldShouldUseGeneralCharacterIdea,
     updateStandardFieldInstruction,
+    updateStandardFieldTemplateId,
+    getTemplateOptionsForTargetKey,
+    addFieldTemplate,
   } = useCharacterCreatorContext();
   const generationState = getStandardFieldGenerationState(config.key);
+  const templateFieldKey = getTemplateFieldKeyForTargetKey(`field:${config.key}`);
 
   return (
     <div className={cn(FIELD_PANEL_CLASS_NAME, isWide ? 'xl:col-span-2' : null)}>
@@ -43,6 +48,12 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
         hasRewriteBackup={generationState.hasRewriteBackup}
         isRewriteReviewPending={generationState.isRewriteReviewPending}
         rewriteBackupValue={generationState.rewriteBackupValue}
+        templateOptions={getTemplateOptionsForTargetKey(`field:${config.key}`)}
+        templateId={generationState.templateId}
+        isStrictTemplateSelected={generationState.isStrictTemplateSelected}
+        templateFieldKey={templateFieldKey}
+        onTemplateIdChange={(templateId) => updateStandardFieldTemplateId(config.key, templateId)}
+        onSaveTemplate={templateFieldKey ? addFieldTemplate : undefined}
         onValueChange={(value) => updateField(config.key, value)}
         onShouldUseGeneralCharacterIdeaChange={(value) =>
           updateStandardFieldShouldUseGeneralCharacterIdea(config.key, value)

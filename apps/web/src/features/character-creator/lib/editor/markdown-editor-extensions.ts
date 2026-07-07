@@ -8,6 +8,7 @@ import { MacroHighlight } from './macro-highlight-extension';
 export interface iBuildMarkdownEditorExtensionsOptions {
   placeholder?: string;
   doesAllowOriginalMacro?: boolean;
+  doesHighlightTemplateSlots?: boolean;
 }
 
 const INTRAWORD_ESCAPED_UNDERSCORE_PATTERN = /(?<=\w)\\_(?=\w)/g;
@@ -28,6 +29,9 @@ export function buildMarkdownEditorExtensions(options: iBuildMarkdownEditorExten
     }),
     Markdown,
     Placeholder.configure({ placeholder: options.placeholder ?? '' }),
-    MacroHighlight.configure({ doesAllowOriginalMacro: options.doesAllowOriginalMacro ?? false }),
+    MacroHighlight.configure({
+      doesAllowOriginalMacro: options.doesAllowOriginalMacro ?? false,
+      doesHighlightTemplateSlots: options.doesHighlightTemplateSlots ?? false,
+    }),
   ];
 }

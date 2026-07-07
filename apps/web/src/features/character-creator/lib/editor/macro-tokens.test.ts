@@ -40,4 +40,16 @@ describe('findMacroRanges', () => {
   it('returns no ranges for plain text', () => {
     expect(findMacroRanges('no macros here', { doesAllowOriginalMacro: false })).toEqual([]);
   });
+
+  it('marks template slots only when slot highlighting is enabled', () => {
+    const text = '{{char}}: {{gen:appearance:build and clothing}}';
+
+    expect(findMacroRanges(text, { doesAllowOriginalMacro: false })).toEqual([
+      { from: 0, to: 8, kind: MACRO_KINDS.char },
+    ]);
+    expect(findMacroRanges(text, { doesAllowOriginalMacro: false, doesHighlightTemplateSlots: true })).toEqual([
+      { from: 0, to: 8, kind: MACRO_KINDS.char },
+      { from: 10, to: 47, kind: MACRO_KINDS.slot },
+    ]);
+  });
 });

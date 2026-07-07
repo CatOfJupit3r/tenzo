@@ -60,8 +60,8 @@ export function CharacterAgentPanel() {
               </Badge>
             </div>
             <CardDescription>
-              This agent runs directly in the browser, edits a local draft through tools, and only changes the live
-              character when you apply the draft.
+              This agent keeps its session in browser-local storage, runs through a TanStack Start route, and only
+              changes the live character when you apply the draft.
             </CardDescription>
           </div>
 
@@ -144,7 +144,7 @@ export function CharacterAgentPanel() {
               />
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">
-                  The character agent always uses direct browser requests and keeps its session in local storage.
+                  The browser owns the session, draft, and history while the route executes the agent statelessly.
                 </p>
                 <Button type="submit" size="sm" disabled={isRunning || !inputValue.trim() || !isConnectionConfigured}>
                   {isRunning ? 'Running...' : 'Run agent'}
@@ -198,7 +198,7 @@ export function CharacterAgentPanel() {
             <div className="mb-3">
               <p className="text-sm font-medium">Tool activity</p>
               <p className="text-xs text-muted-foreground">
-                Each tool call updates the browser-local draft immediately and leaves a compact activity trail.
+                Each tool call updates the local draft snapshot and leaves a compact activity trail.
               </p>
             </div>
 

@@ -1,26 +1,36 @@
-import { generateText, stepCountIs } from 'ai';
-import type { ModelMessage } from 'ai';
+import { Agent } from '@mastra/core/agent';
+import type { ToolsInput } from '@mastra/core/agent';
+import { Mastra } from '@mastra/core/mastra';
 
 import { createCharacterLanguageModel } from './ai-sdk-text-generation';
 import type { CharacterCard } from './card-schema';
 import { createCharacterAgentTools } from './character-agent-tools';
-import type { iCharacterGenerationSettings } from './generation-config';
-
-interface iCreateCharacterAgentOptions {
-  card: CharacterCard;
-  apiKey: string;
-  generationSettings: iCharacterGenerationSettings;
-  shouldSendDisabledSamplers?: boolean;
-  generalCharacterIdea?: string;
-  store: Parameters<typeof createCharacterAgentTools>[0];
-}
 
 interface iCharacterAgentModelSettings {
-  maxOutputTokens: number;
+  endpoint: string;
+  model: string;
+  maxTokens: number;
   temperature: number;
   topP: number;
   frequencyPenalty: number;
   presencePenalty: number;
+  topK: number;
+  minP: number;
+}
+
+interface iCreateCharacterAgentStore {
+  getDraftCard: () => CharacterCard;
+  replaceDraftCard: (card: CharacterCard) => void;
+  appendToolEvent: Parameters<typeof createCharacterAgentTools>[0]['appendToolEvent'];
+}
+
+interface iCreateCharacterAgentMastraOptions {
+  card: CharacterCard;
+  apiKey: string;
+  generationSettings: iCharacterAgentModelSettings;
+  shouldSendDisabledSamplers?: boolean;
+  generalCharacterIdea?: string;
+  store: iCreateCharacterAgentStore;
 }
 
 function buildCharacterAgentInstructions({
@@ -47,44 +57,40 @@ function buildCharacterAgentInstructions({
     .join('\n');
 }
 
-export function createCharacterAgent({
+export function createCharacterAgentMastra({
   card,
   apiKey,
   generationSettings,
   shouldSendDisabledSamplers = false,
   generalCharacterIdea = '',
   store,
-}: iCreateCharacterAgentOptions) {
-  const tools = createCharacterAgentTools(store);
-  const model = createCharacterLanguageModel({
-    endpoint: generationSettings.endpoint,
-    apiKey,
-    model: generationSettings.model,
-    topK: generationSettings.topK,
-    minP: generationSettings.minP,
-    shouldSendDisabledSamplers,
+}: iCreateCharacterAgentMastraOptions) {
+  const agent = new Agent({
+    id: 'character-agent',
+    name: 'Character Agent',
+    instructions: buildCharacterAgentInstructions({
+      card,
+      generalCharacterIdea,
+    }),
+    model: createCharacterLanguageModel({
+      endpoint: generationSettings.endpoint,
+      apiKey,
+      model: generationSettings.model,
+      topK: generationSettings.topK,
+      minP: generationSettings.minP,
+      shouldSendDisabledSamplers,
+    }),
+    tools: createCharacterAgentTools(store) as ToolsInput,
   });
-  const system = buildCharacterAgentInstructions({
-    card,
-    generalCharacterIdea,
+
+  const mastra = new Mastra({
+    agents: {
+      characterAgent: agent,
+    },
   });
 
   return {
-    generate: async (
-      messages: ModelMessage[],
-      options: { maxSteps: number; modelSettings: iCharacterAgentModelSettings },
-    ) =>
-      generateText({
-        model,
-        system,
-        messages,
-        tools,
-        stopWhen: stepCountIs(options.maxSteps),
-        maxOutputTokens: options.modelSettings.maxOutputTokens,
-        temperature: options.modelSettings.temperature,
-        topP: options.modelSettings.topP,
-        frequencyPenalty: options.modelSettings.frequencyPenalty,
-        presencePenalty: options.modelSettings.presencePenalty,
-      }),
+    mastra,
+    agent: mastra.getAgent('characterAgent'),
   };
 }

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root';
 import { Route as IndexRouteImport } from './routes/index';
 import { Route as ApiCharacterReviseRouteImport } from './routes/api/character-revise';
 import { Route as ApiCharacterGenerateRouteImport } from './routes/api/character-generate';
+import { Route as ApiCharacterAgentRouteImport } from './routes/api/character-agent';
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,33 +29,55 @@ const ApiCharacterGenerateRoute = ApiCharacterGenerateRouteImport.update({
   path: '/api/character-generate',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiCharacterAgentRoute = ApiCharacterAgentRouteImport.update({
+  id: '/api/character-agent',
+  path: '/api/character-agent',
+  getParentRoute: () => rootRouteImport,
+} as any);
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
+  '/api/character-agent': typeof ApiCharacterAgentRoute;
   '/api/character-generate': typeof ApiCharacterGenerateRoute;
   '/api/character-revise': typeof ApiCharacterReviseRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
+  '/api/character-agent': typeof ApiCharacterAgentRoute;
   '/api/character-generate': typeof ApiCharacterGenerateRoute;
   '/api/character-revise': typeof ApiCharacterReviseRoute;
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
+  '/api/character-agent': typeof ApiCharacterAgentRoute;
   '/api/character-generate': typeof ApiCharacterGenerateRoute;
   '/api/character-revise': typeof ApiCharacterReviseRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/api/character-generate' | '/api/character-revise';
+  fullPaths:
+    | '/'
+    | '/api/character-agent'
+    | '/api/character-generate'
+    | '/api/character-revise';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/' | '/api/character-generate' | '/api/character-revise';
-  id: '__root__' | '/' | '/api/character-generate' | '/api/character-revise';
+  to:
+    | '/'
+    | '/api/character-agent'
+    | '/api/character-generate'
+    | '/api/character-revise';
+  id:
+    | '__root__'
+    | '/'
+    | '/api/character-agent'
+    | '/api/character-generate'
+    | '/api/character-revise';
   fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
+  ApiCharacterAgentRoute: typeof ApiCharacterAgentRoute;
   ApiCharacterGenerateRoute: typeof ApiCharacterGenerateRoute;
   ApiCharacterReviseRoute: typeof ApiCharacterReviseRoute;
 }
@@ -82,11 +105,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCharacterGenerateRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/api/character-agent': {
+      id: '/api/character-agent';
+      path: '/api/character-agent';
+      fullPath: '/api/character-agent';
+      preLoaderRoute: typeof ApiCharacterAgentRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiCharacterAgentRoute: ApiCharacterAgentRoute,
   ApiCharacterGenerateRoute: ApiCharacterGenerateRoute,
   ApiCharacterReviseRoute: ApiCharacterReviseRoute,
 };

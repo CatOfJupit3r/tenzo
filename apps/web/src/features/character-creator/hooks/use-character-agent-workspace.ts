@@ -1,5 +1,4 @@
 import { useLiveQuery } from '@tanstack/react-db';
-import type { ModelMessage } from 'ai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
@@ -7,13 +6,13 @@ import { toastError, toastSuccess } from '@~/components/toastifications/create-j
 import { characterAgentSessionsCollection } from '../collections/character-agent-sessions.collection';
 import { CHARACTER_TEXT_FIELD_KEYS } from '../lib/card-schema';
 import type { CharacterCard } from '../lib/card-schema';
-import { createCharacterAgent } from '../lib/character-agent';
+import { CHARACTER_AGENT_STREAM_EVENT_SCHEMA } from '../lib/character-agent-contracts';
 import {
   createCharacterAgentMessage,
   createCharacterAgentSession,
   CHARACTER_AGENT_MESSAGE_ROLES,
 } from '../lib/character-agent-session';
-import type { iCharacterAgentSession, iCharacterAgentToolEvent } from '../lib/character-agent-session';
+import type { iCharacterAgentSession } from '../lib/character-agent-session';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
 
 interface iUseCharacterAgentWorkspaceOptions {
@@ -31,7 +30,7 @@ interface iCharacterAgentRuntimeState {
   errorMessage: string | null;
 }
 
-const MAX_CHARACTER_AGENT_STEPS = 8;
+const textDecoder = new TextDecoder();
 
 function cardsMatch(leftCard: CharacterCard, rightCard: CharacterCard) {
   return JSON.stringify(leftCard) === JSON.stringify(rightCard);
@@ -75,6 +74,103 @@ function buildDraftPreview(card: CharacterCard) {
 
 function updateSessionTimestamp(session: { updatedAt: string }) {
   session.updatedAt = new Date().toISOString();
+}
+
+async function readErrorMessage(response: Response) {
+  const responseText = await response.text();
+
+  return responseText.trim() || 'Character agent failed.';
+}
+
+function parseServerEventChunk(eventChunk: string) {
+  const lines = eventChunk.split(/\r?\n/);
+  let eventType = '';
+  const dataLines: string[] = [];
+
+  lines.forEach((line) => {
+    if (line.startsWith('event:')) {
+      eventType = line.slice('event:'.length).trim();
+      return;
+    }
+
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice('data:'.length).trim());
+    }
+  });
+
+  if (!eventType || dataLines.length === 0) {
+    return null;
+  }
+
+  const eventPayload = JSON.parse(dataLines.join('\n')) as unknown;
+  const parsedEvent = CHARACTER_AGENT_STREAM_EVENT_SCHEMA.parse(eventPayload);
+
+  if (parsedEvent.type !== eventType) {
+    throw new Error('Character agent stream event type mismatch.');
+  }
+
+  return parsedEvent;
+}
+
+async function consumeCharacterAgentStream(
+  response: Response,
+  onEvent: (event: NonNullable<ReturnType<typeof parseServerEventChunk>>) => unknown,
+) {
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  const reader = response.body?.getReader();
+
+  if (!reader) {
+    throw new Error('Character agent response stream is unavailable.');
+  }
+
+  let buffer = '';
+
+  while (true) {
+    const readResult = await reader.read();
+
+    if (readResult.done) {
+      break;
+    }
+
+    buffer += textDecoder.decode(readResult.value, { stream: true });
+
+    while (true) {
+      const delimiterIndex = buffer.indexOf('\n\n');
+
+      if (delimiterIndex === -1) {
+        break;
+      }
+
+      const eventChunk = buffer.slice(0, delimiterIndex);
+
+      buffer = buffer.slice(delimiterIndex + 2);
+
+      if (!eventChunk.trim()) {
+        continue;
+      }
+
+      const parsedEvent = parseServerEventChunk(eventChunk);
+
+      if (parsedEvent) {
+        onEvent(parsedEvent);
+      }
+    }
+  }
+
+  const trailingChunk = buffer.trim();
+
+  if (!trailingChunk) {
+    return;
+  }
+
+  const parsedEvent = parseServerEventChunk(trailingChunk);
+
+  if (parsedEvent) {
+    onEvent(parsedEvent);
+  }
 }
 
 export function useCharacterAgentWorkspace({
@@ -175,7 +271,7 @@ export function useCharacterAgentWorkspace({
       const trimmedInput = input.trim();
 
       if (!trimmedInput) {
-        return undefined;
+        return;
       }
 
       if (!isConnectionConfigured) {
@@ -203,58 +299,106 @@ export function useCharacterAgentWorkspace({
       });
 
       try {
-        const store = {
-          getDraftCard: () =>
-            structuredClone(characterAgentSessionsCollection.get(sessionId)?.draftCard ?? structuredClone(card)),
-          replaceDraftCard: (nextCard: CharacterCard) => {
-            updateSession(sessionId, (draft) => {
-              draft.draftCard = structuredClone(nextCard);
-            });
+        const sessionSnapshot = characterAgentSessionsCollection.get(sessionId);
+
+        if (!sessionSnapshot) {
+          throw new Error('Character agent session is unavailable.');
+        }
+
+        let assistantMessageId: string | null = null;
+        let assistantMessageText = '';
+        const response = await fetch('/api/character-agent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          appendToolEvent: (event: iCharacterAgentToolEvent) => {
-            updateSession(sessionId, (draft) => {
-              draft.toolEvents.push(event);
-            });
-          },
-        };
-        const agent = createCharacterAgent({
-          card: store.getDraftCard(),
-          apiKey,
-          generationSettings,
-          generalCharacterIdea,
-          shouldSendDisabledSamplers,
-          store,
-        });
-        const currentMessages: ModelMessage[] =
-          characterAgentSessionsCollection.get(sessionId)?.messages.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })) ?? [];
-        const result = await agent.generate(currentMessages, {
-          maxSteps: MAX_CHARACTER_AGENT_STEPS,
-          modelSettings: {
-            maxOutputTokens: Math.max(1, Math.floor(generationSettings.maxTokens)),
+          body: JSON.stringify({
+            endpoint: generationSettings.endpoint,
+            apiKey,
+            model: generationSettings.model,
+            maxTokens: generationSettings.maxTokens,
             temperature: generationSettings.temperature,
             topP: generationSettings.topP,
             frequencyPenalty: generationSettings.frequencyPenalty,
             presencePenalty: generationSettings.presencePenalty,
-          },
-        });
-        const assistantMessage = createCharacterAgentMessage({
-          role: CHARACTER_AGENT_MESSAGE_ROLES.assistant,
-          content: result.text.trim() || 'The draft is ready for review.',
+            topK: generationSettings.topK,
+            minP: generationSettings.minP,
+            shouldSendDisabledSamplers,
+            generalCharacterIdea,
+            draftCard: sessionSnapshot.draftCard,
+            messages: sessionSnapshot.messages,
+          }),
         });
 
-        updateSession(sessionId, (draft) => {
-          draft.messages.push(assistantMessage);
+        await consumeCharacterAgentStream(response, (streamEvent) => {
+          if (streamEvent.type === 'text-delta') {
+            assistantMessageText += streamEvent.textDelta;
+
+            updateSession(sessionId, (draft) => {
+              const existingAssistantMessage = assistantMessageId
+                ? draft.messages.find((message) => message.id === assistantMessageId)
+                : null;
+
+              if (existingAssistantMessage) {
+                existingAssistantMessage.content = assistantMessageText;
+                return;
+              }
+
+              const assistantMessage = createCharacterAgentMessage({
+                role: CHARACTER_AGENT_MESSAGE_ROLES.assistant,
+                content: assistantMessageText,
+              });
+
+              assistantMessageId = assistantMessage.id;
+              draft.messages.push(assistantMessage);
+            });
+
+            return;
+          }
+
+          if (streamEvent.type === 'tool-event') {
+            updateSession(sessionId, (draft) => {
+              draft.draftCard = structuredClone(streamEvent.draftCard);
+              draft.toolEvents.push(streamEvent.toolEvent);
+            });
+
+            return;
+          }
+
+          if (streamEvent.type === 'complete') {
+            assistantMessageText = streamEvent.assistantMessage;
+
+            updateSession(sessionId, (draft) => {
+              draft.draftCard = structuredClone(streamEvent.draftCard);
+
+              const existingAssistantMessage = assistantMessageId
+                ? draft.messages.find((message) => message.id === assistantMessageId)
+                : null;
+
+              if (existingAssistantMessage) {
+                existingAssistantMessage.content = assistantMessageText;
+                return;
+              }
+
+              const assistantMessage = createCharacterAgentMessage({
+                role: CHARACTER_AGENT_MESSAGE_ROLES.assistant,
+                content: assistantMessageText,
+              });
+
+              assistantMessageId = assistantMessage.id;
+              draft.messages.push(assistantMessage);
+            });
+
+            return;
+          }
+
+          throw new Error(streamEvent.message);
         });
 
         setRuntimeState({
           isRunning: false,
           errorMessage: null,
         });
-
-        return result;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Character agent failed.';
 
@@ -268,7 +412,6 @@ export function useCharacterAgentWorkspace({
     },
     [
       apiKey,
-      card,
       ensureSessionId,
       generalCharacterIdea,
       generationSettings,

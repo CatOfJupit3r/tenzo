@@ -21,6 +21,7 @@
     "@dnd-kit/modifiers": "9.0.0",
     "@dnd-kit/sortable": "10.0.0",
     "@hookform/resolvers": "5.2.2",
+    "@mastra/core": "^1.50.0",
     "@tailwindcss/vite": "4.1.18",
     "@tanstack/devtools-vite": "0.4.0",
     "@tanstack/pacer": "0.17.0",

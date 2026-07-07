@@ -1,6 +1,7 @@
 import { Card } from '@~/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 
+import { AgentTab } from './agent-tab';
 import { CoreFieldsTab } from './core-fields-tab';
 import { DialogueTab } from './dialogue-tab';
 import { MetadataTab } from './metadata-tab';
@@ -20,6 +21,9 @@ export function CharacterCreatorTabs() {
             <TabsTrigger value={CHARACTER_CREATOR_TABS.dialogue} className={TAB_TRIGGER_CLASS_NAME}>
               Dialogue
             </TabsTrigger>
+            <TabsTrigger value={CHARACTER_CREATOR_TABS.agent} className={TAB_TRIGGER_CLASS_NAME}>
+              Agent
+            </TabsTrigger>
             <TabsTrigger value={CHARACTER_CREATOR_TABS.revise} className={TAB_TRIGGER_CLASS_NAME}>
               Revise
             </TabsTrigger>
@@ -38,6 +42,10 @@ export function CharacterCreatorTabs() {
 
         <TabsContent value={CHARACTER_CREATOR_TABS.dialogue} className="p-4 sm:p-6">
           <DialogueTab />
+        </TabsContent>
+
+        <TabsContent value={CHARACTER_CREATOR_TABS.agent} className="p-4 sm:p-6">
+          <AgentTab />
         </TabsContent>
 
         <TabsContent value={CHARACTER_CREATOR_TABS.revise} className="p-4 sm:p-6">

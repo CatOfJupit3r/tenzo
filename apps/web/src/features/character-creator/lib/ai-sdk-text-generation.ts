@@ -9,6 +9,15 @@ export interface iStreamCharacterTextOptions extends iCharacterGenerationStreamR
   signal?: AbortSignal;
 }
 
+interface iCharacterLanguageModelOptions {
+  endpoint: string;
+  apiKey: string;
+  model: string;
+  topK: number;
+  minP: number;
+  shouldSendDisabledSamplers?: boolean;
+}
+
 function toModelMessage(message: iCharacterGenerationStreamRequest['messages'][number]): ModelMessage {
   return {
     role: message.role,
@@ -42,6 +51,33 @@ export function streamCharacterText({
   shouldSendDisabledSamplers = false,
   signal,
 }: iStreamCharacterTextOptions) {
+  return streamText({
+    model: createCharacterLanguageModel({
+      endpoint,
+      apiKey,
+      model,
+      topK,
+      minP,
+      shouldSendDisabledSamplers,
+    }),
+    messages: messages.map(toModelMessage),
+    maxOutputTokens: Math.max(1, Math.floor(maxTokens)),
+    temperature,
+    topP,
+    frequencyPenalty,
+    presencePenalty,
+    abortSignal: signal,
+  });
+}
+
+export function createCharacterLanguageModel({
+  endpoint,
+  apiKey,
+  model,
+  topK,
+  minP,
+  shouldSendDisabledSamplers = false,
+}: iCharacterLanguageModelOptions) {
   const provider = createOpenAICompatible({
     name: 'characterCreator',
     baseURL: normalizeOpenAiCompatibleBaseUrl(endpoint),
@@ -56,14 +92,5 @@ export function streamCharacterText({
     }),
   });
 
-  return streamText({
-    model: provider.chatModel(model.trim()),
-    messages: messages.map(toModelMessage),
-    maxOutputTokens: Math.max(1, Math.floor(maxTokens)),
-    temperature,
-    topP,
-    frequencyPenalty,
-    presencePenalty,
-    abortSignal: signal,
-  });
+  return provider.chatModel(model.trim());
 }

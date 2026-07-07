@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { REQUEST_MODES } from './generation-config';
 import type { RequestMode } from './generation-config';
+import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
 
 export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openai-compatible', 'unknown']);
 export const PROVIDER_KINDS = PROVIDER_KIND_SCHEMA.enum;
@@ -45,26 +46,8 @@ const PROVIDER_KIND_LABELS = {
   [PROVIDER_KINDS.unknown]: 'Unknown provider',
 } satisfies Record<ProviderKind, string>;
 
-function normalizeBaseUrl(endpoint: string) {
-  const trimmedEndpoint = endpoint.trim().replace(/\/$/, '');
-
-  if (trimmedEndpoint.endsWith('/v1/chat/completions')) {
-    return trimmedEndpoint.slice(0, -'/v1/chat/completions'.length);
-  }
-
-  if (trimmedEndpoint.endsWith('/chat/completions')) {
-    return trimmedEndpoint.slice(0, -'/chat/completions'.length);
-  }
-
-  if (trimmedEndpoint.endsWith('/v1')) {
-    return trimmedEndpoint.slice(0, -'/v1'.length);
-  }
-
-  return trimmedEndpoint;
-}
-
 function buildEndpointCandidates(endpoint: string): iEndpointCandidates {
-  const baseUrl = normalizeBaseUrl(endpoint);
+  const baseUrl = normalizeOpenAiCompatibleBaseUrl(endpoint);
 
   return {
     baseUrl,

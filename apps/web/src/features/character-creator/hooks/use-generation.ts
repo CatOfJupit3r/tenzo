@@ -3,13 +3,8 @@ import { useAtom } from 'jotai';
 import { startTransition, useCallback, useMemo, useRef, useState } from 'react';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
-import {
-  buildProviderErrorMessage,
-  executeBrowserChatCompletionsRequest,
-  readChatCompletionsResponse,
-} from '../lib/api-client';
+import { streamCharacterText } from '../lib/ai-sdk-text-generation';
 import type { CharacterCard } from '../lib/card-schema';
-import { requestChatCompletionsProxy } from '../lib/chat-completions-proxy';
 import { TEMPLATE_MODES } from '../lib/field-templates';
 import {
   decodeStoredSecret,
@@ -113,6 +108,65 @@ function swapRecordKeys<T>(record: Record<string, T>, fromKey: string, toKey: st
   return nextRecord;
 }
 
+async function buildGenerationErrorMessage(response: Response) {
+  const errorText = (await response.text()).trim();
+  return errorText || `${response.status} ${response.statusText}`.trim();
+}
+
+async function readTextResponseStream({
+  response,
+  onContent,
+  signal,
+}: {
+  response: Response;
+  onContent: (content: string) => unknown;
+  signal?: AbortSignal;
+}) {
+  if (!response.body) {
+    const text = await response.text();
+
+    if (text) {
+      onContent(text);
+    }
+
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let fullContent = '';
+
+  while (true) {
+    if (signal?.aborted) {
+      throw signal.reason instanceof Error ? signal.reason : new DOMException('Request aborted', 'AbortError');
+    }
+
+    const { done: isDone, value } = await reader.read();
+
+    if (isDone) {
+      break;
+    }
+
+    const textChunk = decoder.decode(value, { stream: true });
+
+    if (!textChunk) {
+      continue;
+    }
+
+    fullContent += textChunk;
+    onContent(textChunk);
+  }
+
+  const remainingChunk = decoder.decode();
+
+  if (remainingChunk) {
+    fullContent += remainingChunk;
+    onContent(remainingChunk);
+  }
+
+  return fullContent;
+}
+
 export function useGeneration() {
   const [storedGenerationSettings, setGenerationSettings] = useAtom(characterGenerationSettingsAtom);
   const { promptSettings, updatePromptSettings } = useCharacterSession();
@@ -124,7 +178,6 @@ export function useGeneration() {
     () => sanitizeCharacterGenerationSettings({ ...connectionSettings, ...promptSettings }),
     [connectionSettings, promptSettings],
   );
-  const requestProxy = useServerFn(requestChatCompletionsProxy);
   const requestProviderHealth = useServerFn(requestProviderHealthProxy);
   const [runtimeStates, setRuntimeStates] = useState<Record<string, iFieldGenerationRuntimeState>>({});
   const [connectionHealth, setConnectionHealth] = useState<iConnectionHealthState>({
@@ -449,19 +502,13 @@ export function useGeneration() {
           messages: promptResult.messages,
         };
 
-        const response =
-          connectionSettings.requestMode === REQUEST_MODES.browser
-            ? await executeBrowserChatCompletionsRequest(requestData, abortController.signal)
-            : await requestProxy({ data: requestData, signal: abortController.signal });
+        if (connectionSettings.requestMode === REQUEST_MODES.browser) {
+          const result = streamCharacterText({
+            ...requestData,
+            signal: abortController.signal,
+          });
 
-        if (!response.ok) {
-          throw new Error(await buildProviderErrorMessage(response));
-        }
-
-        await readChatCompletionsResponse({
-          response,
-          signal: abortController.signal,
-          onContent: (content) => {
+          for await (const content of result.textStream) {
             streamedAssistantText += content;
 
             try {
@@ -473,8 +520,39 @@ export function useGeneration() {
             } catch {
               // Partial structured responses are expected mid-stream.
             }
-          },
-        });
+          }
+        } else {
+          const response = await fetch('/api/character-generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData),
+            signal: abortController.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(await buildGenerationErrorMessage(response));
+          }
+
+          await readTextResponseStream({
+            response,
+            signal: abortController.signal,
+            onContent: (content) => {
+              streamedAssistantText += content;
+
+              try {
+                const parsedResponse = parseStreamedResponse(streamedAssistantText);
+
+                startTransition(() => {
+                  onValueChange(parsedResponse);
+                });
+              } catch {
+                // Partial structured responses are expected mid-stream.
+              }
+            },
+          });
+        }
 
         const finalParsedResponse = parseStreamedResponse(streamedAssistantText);
 
@@ -502,7 +580,6 @@ export function useGeneration() {
       connectionSettings,
       getFieldInstruction,
       promptSettings.generalCharacterIdea,
-      requestProxy,
       shouldUseGeneralCharacterIdea,
       setFieldRuntimeState,
     ],

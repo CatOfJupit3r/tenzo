@@ -5,6 +5,7 @@ import { CoreFieldsTab } from './core-fields-tab';
 import { DialogueTab } from './dialogue-tab';
 import { MetadataTab } from './metadata-tab';
 import { PromptOverridesTab } from './prompt-overrides-tab';
+import { ReviseTab } from './revise-tab';
 import { CHARACTER_CREATOR_TABS, TAB_TRIGGER_CLASS_NAME } from './tabs.constants';
 
 export function CharacterCreatorTabs() {
@@ -18,6 +19,9 @@ export function CharacterCreatorTabs() {
             </TabsTrigger>
             <TabsTrigger value={CHARACTER_CREATOR_TABS.dialogue} className={TAB_TRIGGER_CLASS_NAME}>
               Dialogue
+            </TabsTrigger>
+            <TabsTrigger value={CHARACTER_CREATOR_TABS.revise} className={TAB_TRIGGER_CLASS_NAME}>
+              Revise
             </TabsTrigger>
             <TabsTrigger value={CHARACTER_CREATOR_TABS.overrides} className={TAB_TRIGGER_CLASS_NAME}>
               Prompt Overrides
@@ -34,6 +38,10 @@ export function CharacterCreatorTabs() {
 
         <TabsContent value={CHARACTER_CREATOR_TABS.dialogue} className="p-4 sm:p-6">
           <DialogueTab />
+        </TabsContent>
+
+        <TabsContent value={CHARACTER_CREATOR_TABS.revise} className="p-4 sm:p-6">
+          <ReviseTab />
         </TabsContent>
 
         <TabsContent value={CHARACTER_CREATOR_TABS.overrides} className="p-4 sm:p-6">

@@ -1,5 +1,22 @@
 import { z } from 'zod';
 
+export const CHARACTER_TEXT_FIELD_KEYS = [
+  'name',
+  'description',
+  'personality',
+  'scenario',
+  'first_mes',
+  'mes_example',
+  'creator_notes',
+  'system_prompt',
+  'post_history_instructions',
+  'creator',
+  'character_version',
+] as const;
+
+export const CHARACTER_TEXT_FIELD_KEY_SCHEMA = z.enum(CHARACTER_TEXT_FIELD_KEYS);
+export type CharacterTextFieldKey = z.infer<typeof CHARACTER_TEXT_FIELD_KEY_SCHEMA>;
+
 export const CHARACTER_BOOK_ENTRY_POSITION_SCHEMA = z.enum(['before_char', 'after_char']);
 export const CHARACTER_BOOK_ENTRY_POSITIONS = CHARACTER_BOOK_ENTRY_POSITION_SCHEMA.enum;
 
@@ -71,16 +88,3 @@ export type CharacterBook = z.infer<typeof CHARACTER_BOOK_SCHEMA>;
 export type CustomField = z.infer<typeof CUSTOM_FIELD_SCHEMA>;
 export type CharacterData = z.infer<typeof CHARACTER_DATA_SCHEMA>;
 export type CharacterCard = z.infer<typeof CHARACTER_CARD_SCHEMA>;
-
-export type CharacterTextFieldKey =
-  | 'name'
-  | 'description'
-  | 'personality'
-  | 'scenario'
-  | 'first_mes'
-  | 'mes_example'
-  | 'creator_notes'
-  | 'system_prompt'
-  | 'post_history_instructions'
-  | 'creator'
-  | 'character_version';

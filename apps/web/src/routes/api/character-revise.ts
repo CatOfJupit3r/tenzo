@@ -21,14 +21,11 @@ export const Route = createFileRoute('/api/character-revise')({
           const conversationMessages = toGenerationConversationMessages(originalMessages);
           const result = streamCharacterText({
             ...payload,
+            instructions: buildReviseSessionSystemPrompt({
+              card: payload.card,
+              fieldKey: payload.targetFieldKey,
+            }),
             messages: [
-              {
-                role: 'system',
-                content: buildReviseSessionSystemPrompt({
-                  card: payload.card,
-                  fieldKey: payload.targetFieldKey,
-                }),
-              },
               {
                 role: 'user',
                 content: buildReviseSessionContextPrompt({

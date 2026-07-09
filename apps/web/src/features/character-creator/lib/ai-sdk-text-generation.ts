@@ -50,6 +50,7 @@ export function streamCharacterText({
   minP,
   shouldSendDisabledSamplers = false,
   signal,
+  instructions,
 }: iStreamCharacterTextOptions) {
   return streamText({
     model: createCharacterLanguageModel({
@@ -60,6 +61,7 @@ export function streamCharacterText({
       minP,
       shouldSendDisabledSamplers,
     }),
+    instructions,
     messages: messages.map(toModelMessage),
     maxOutputTokens: Math.max(1, Math.floor(maxTokens)),
     temperature,

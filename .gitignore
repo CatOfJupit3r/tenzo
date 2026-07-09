@@ -6,3 +6,4 @@ mongo/data
 .moon/cache
 .github/skills/react-best-practices/
 inspo
+.pnpm-store

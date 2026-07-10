@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
+import { startGuidedSession } from '../collections/character-assistant-sessions.collection';
 import { useCharacterAssistantWorkspace } from '../hooks/use-character-assistant-workspace';
+import { useGuidedCharacterFlow } from '../hooks/use-guided-character-flow';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
@@ -17,8 +19,16 @@ const DEFAULT_ASSISTANT_FOCUS = {
 } satisfies CharacterAssistantFocus;
 
 export function CharacterAssistantProvider({ children }: PropsWithChildren) {
-  const { activeCharacterId, card, replaceCard, apiKey, generationSettings, generalCharacterIdea, connectionHealth } =
-    useCharacterCreatorContext();
+  const {
+    activeCharacterId,
+    card,
+    replaceCard,
+    apiKey,
+    generationSettings,
+    generalCharacterIdea,
+    updateGeneralCharacterIdea,
+    connectionHealth,
+  } = useCharacterCreatorContext();
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [assistantFocus, setAssistantFocus] = useState<CharacterAssistantFocus>(DEFAULT_ASSISTANT_FOCUS);
   const [contextAttachments, setContextAttachments] = useState<iCharacterAssistantContextAttachment[]>([]);
@@ -61,6 +71,22 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     focus: assistantFocus,
     contextAttachments,
   });
+  const guidedFlow = useGuidedCharacterFlow({
+    characterId: activeCharacterId,
+    apiKey,
+    endpoint: generationSettings.endpoint,
+    model: generationSettings.visionModel.trim() || generationSettings.model,
+    maxTokens: generationSettings.maxTokens,
+    temperature: generationSettings.temperature,
+    updateGeneralCharacterIdea,
+    workspace,
+  });
+
+  const openAssistantInGuidedMode = useCallback(async (characterId: string) => {
+    await startGuidedSession(characterId);
+    setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
+    setIsAssistantOpen(true);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -68,8 +94,10 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
       assistantFocus,
       contextAttachments,
       workspace,
+      guidedFlow,
       openAssistant,
       openAssistantForField,
+      openAssistantInGuidedMode,
       closeAssistant,
       addContextAttachment,
       removeContextAttachment,
@@ -84,6 +112,8 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
       openAssistantForField,
       removeContextAttachment,
       workspace,
+      guidedFlow,
+      openAssistantInGuidedMode,
     ],
   );
 

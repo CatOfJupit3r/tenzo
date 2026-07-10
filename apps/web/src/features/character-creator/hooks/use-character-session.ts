@@ -27,6 +27,7 @@ import {
   sanitizeCharacterGenerationPromptSettings,
 } from '../lib/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../lib/generation-config';
+import { deleteCharacterAssetBlob, deleteGuidedReferenceAssetBlobs } from '../lib/image-store';
 import { ensurePortraitAssetLoaded } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
 import { useCharacterLibraryList } from './use-character-library-list';
@@ -326,9 +327,14 @@ export function useCharacterSession() {
 
   const removeCharacter = useCallback(
     (id: string) => {
+      const characterToRemove = characterLibraryCollection.get(id);
       if (characterLibraryCollection.has(id)) {
         characterLibraryCollection.delete(id);
       }
+      void Promise.all([
+        characterToRemove?.portrait ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId) : Promise.resolve(),
+        deleteGuidedReferenceAssetBlobs(id),
+      ]);
 
       if (characterLibraryCollection.size === 0) {
         const fallbackCharacter = createEmptyCharacterLibraryItem();

@@ -20,6 +20,7 @@ export const MIN_P_RANGE = { min: 0, max: 1 } as const;
 export interface iCharacterGenerationConnectionSettings {
   endpoint: string;
   model: string;
+  visionModel: string;
   apiKeyCiphertext: string;
   contextSize: number;
   maxTokens: number;
@@ -48,6 +49,7 @@ export interface iCharacterGenerationSettings
 export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerationConnectionSettings = {
   endpoint: 'https://api.openai.com',
   model: 'gpt-4.1-mini',
+  visionModel: '',
   apiKeyCiphertext: '',
   contextSize: DEFAULT_CONTEXT_SIZE,
   maxTokens: 600,
@@ -135,6 +137,7 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
   return {
     endpoint: readString(candidate.endpoint, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.endpoint),
     model: readString(candidate.model, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.model),
+    visionModel: readString(candidate.visionModel, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.visionModel),
     apiKeyCiphertext: readString(
       candidate.apiKeyCiphertext,
       DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.apiKeyCiphertext,

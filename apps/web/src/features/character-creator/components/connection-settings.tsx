@@ -89,6 +89,19 @@ export function ConnectionSettings({
           <p className="text-sm text-muted-foreground">{modelHelperText}</p>
         </div>
 
+        <div className="space-y-1.5">
+          <Label htmlFor="vision-model">Vision model</Label>
+          <Input
+            id="vision-model"
+            placeholder="Same as the main model"
+            value={generationSettings.visionModel}
+            onChange={(event) => onSettingsChange({ visionModel: event.target.value })}
+          />
+          <p className="text-sm text-muted-foreground">
+            Optional. Used for reference-image analysis during guided setup.
+          </p>
+        </div>
+
         <div className="flex items-end">
           <Button
             aria-label="Run endpoint health check"

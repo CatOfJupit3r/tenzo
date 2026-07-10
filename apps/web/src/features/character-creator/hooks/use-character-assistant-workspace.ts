@@ -5,6 +5,7 @@ import { toastError, toastInfo, toastSuccess } from '@~/components/toastificatio
 import { generateUuid } from '@~/utils/uuid';
 
 import {
+  recordGuidedConcept,
   characterAssistantSessionsCollection,
   ensureCharacterAssistantSession,
   updateCharacterAssistantSession,
@@ -17,6 +18,7 @@ import {
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
+  iChatTemplateRef,
   iCharacterAssistantMessage,
 } from '../lib/character-assistant-contracts';
 import { consumeCharacterAssistantStream } from '../lib/character-assistant-stream';
@@ -53,6 +55,7 @@ interface iCharacterAssistantRuntimeState {
   streamingMessage: string;
   activityLabel: string | null;
   proposals: iCharacterEditProposal[];
+  hasCompletedCurrentGuidedStepRun: boolean;
 }
 
 export interface iCharacterAssistantPatchView {
@@ -67,6 +70,7 @@ const INITIAL_RUNTIME_STATE: iCharacterAssistantRuntimeState = {
   streamingMessage: '',
   activityLabel: null,
   proposals: [],
+  hasCompletedCurrentGuidedStepRun: false,
 };
 
 const ACTIVE_PROPOSAL_STATUSES = new Set<CharacterEditProposalStatus>([
@@ -133,6 +137,15 @@ export function useCharacterAssistantWorkspace({
     () => storedSessions.find((storedSession) => storedSession.id === characterId) ?? null,
     [characterId, storedSessions],
   );
+  const previousGuidedStepRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const currentGuidedStep = session?.mode === 'guided' ? (session.guided?.currentStep ?? null) : null;
+    if (previousGuidedStepRef.current !== currentGuidedStep) {
+      previousGuidedStepRef.current = currentGuidedStep;
+      setRuntimeState((currentState) => ({ ...currentState, hasCompletedCurrentGuidedStepRun: false }));
+    }
+  }, [session?.guided?.currentStep, session?.mode]);
 
   useEffect(() => {
     if (!characterId || session) {
@@ -197,7 +210,7 @@ export function useCharacterAssistantWorkspace({
   );
 
   const sendMessage = useCallback(
-    async (input: string) => {
+    async (input: string, options: { templates?: iChatTemplateRef[] } = {}) => {
       const trimmedInput = input.trim();
 
       if (!trimmedInput || runtimeState.isRunning) {
@@ -209,6 +222,16 @@ export function useCharacterAssistantWorkspace({
       }
 
       const currentSession = await ensureCharacterAssistantSession(characterId);
+      const isGuidedRun = currentSession.mode === 'guided' && currentSession.guided !== null;
+      const guidedStep = isGuidedRun ? currentSession.guided?.currentStep : undefined;
+      const guidedConcept = isGuidedRun ? (currentSession.guided?.concept ?? undefined) : undefined;
+      const combinedAttachments = [
+        ...contextAttachments,
+        ...(isGuidedRun ? (currentSession.guided?.attachments ?? []) : []),
+      ].filter(
+        (attachment, index, attachments) =>
+          attachments.findIndex((candidate) => candidate.id === attachment.id) === index,
+      );
       const userMessage = createMessage(CHARACTER_ASSISTANT_MESSAGE_ROLES.user, trimmedInput);
       const conversationMessages = [...currentSession.messages, userMessage];
       await updateCharacterAssistantSession(currentSession.id, (draft) => {
@@ -223,6 +246,7 @@ export function useCharacterAssistantWorkspace({
         streamingMessage: '',
         activityLabel: 'Reviewing character',
         proposals: [],
+        hasCompletedCurrentGuidedStepRun: false,
       });
 
       try {
@@ -249,13 +273,17 @@ export function useCharacterAssistantWorkspace({
             focus,
             messages: conversationMessages,
             generalCharacterIdea,
-            contextAttachments,
+            contextAttachments: combinedAttachments,
+            guidedStep,
+            concept: guidedConcept,
+            templates: options.templates ?? [],
           }),
         });
 
         let completedMessage = '';
         let completedProposals: iCharacterEditProposal[] = [];
-        await consumeCharacterAssistantStream(response, (streamEvent) => {
+        let didEncounterRunError = false;
+        await consumeCharacterAssistantStream(response, async (streamEvent) => {
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta']) {
             setRuntimeState((currentState) => ({
               ...currentState,
@@ -283,6 +311,7 @@ export function useCharacterAssistantWorkspace({
           }
 
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-error']) {
+            didEncounterRunError = true;
             setRuntimeState((currentState) => ({
               ...currentState,
               activityLabel: null,
@@ -291,13 +320,28 @@ export function useCharacterAssistantWorkspace({
             return;
           }
 
-          if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete) {
-            completedMessage = streamEvent.assistantMessage;
-            completedProposals = streamEvent.proposals;
+          if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['concept-recorded']) {
+            await recordGuidedConcept(characterId, streamEvent.concept);
+            setRuntimeState((currentState) => ({
+              ...currentState,
+              activityLabel: 'Concept recorded',
+            }));
             return;
           }
 
-          throw new Error(streamEvent.message);
+          if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete) {
+            completedMessage = streamEvent.assistantMessage;
+            completedProposals = streamEvent.proposals;
+            if (isGuidedRun && streamEvent.concept) {
+              await recordGuidedConcept(characterId, streamEvent.concept);
+            }
+            return;
+          }
+
+          if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.error) {
+            didEncounterRunError = true;
+            throw new Error(streamEvent.message);
+          }
         });
 
         const assistantMessage = createMessage(
@@ -310,7 +354,10 @@ export function useCharacterAssistantWorkspace({
             draft.proposals = upsertRunProposal(draft.proposals, proposal);
           });
         });
-        setRuntimeState(INITIAL_RUNTIME_STATE);
+        setRuntimeState({
+          ...INITIAL_RUNTIME_STATE,
+          hasCompletedCurrentGuidedStepRun: isGuidedRun && !didEncounterRunError,
+        });
       } catch (error) {
         if (isAbortError(error)) {
           setRuntimeState(INITIAL_RUNTIME_STATE);
@@ -496,6 +543,7 @@ export function useCharacterAssistantWorkspace({
     isRunning: runtimeState.isRunning,
     errorMessage: runtimeState.errorMessage,
     activityLabel: runtimeState.activityLabel,
+    hasCompletedCurrentGuidedStepRun: runtimeState.hasCompletedCurrentGuidedStepRun,
     sendMessage,
     cancelRun: () => abortControllerRef.current?.abort(),
     applyProposalFields,

@@ -5,8 +5,16 @@ import { generateUuid } from '@~/utils/uuid';
 
 import { CHARACTER_BOOK_SCHEMA, CHARACTER_TEXT_FIELD_KEY_SCHEMA, CUSTOM_FIELD_SCHEMA } from './card-schema';
 import type { CharacterCard, CustomField } from './card-schema';
-import { CHARACTER_ASSISTANT_FOCUS_KINDS, CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
-import type { CharacterAssistantFocus } from './character-assistant-contracts';
+import {
+  CHARACTER_ASSISTANT_FOCUS_KINDS,
+  CHARACTER_ASSISTANT_TOOL_NAMES,
+  CHARACTER_CONCEPT_SCHEMA,
+} from './character-assistant-contracts';
+import type {
+  CharacterAssistantFocus,
+  CharacterAssistantToolName,
+  iCharacterConcept,
+} from './character-assistant-contracts';
 import type { iCharacterEditProposal } from './character-edit-proposal';
 
 interface iCharacterAssistantProposalStore {
@@ -16,6 +24,7 @@ interface iCharacterAssistantProposalStore {
     summary: string;
     proposedCard: CharacterCard;
   }) => iCharacterEditProposal;
+  recordConcept?: (concept: iCharacterConcept) => void;
 }
 
 const CHARACTER_FIELD_CHANGE_SCHEMA = z.object({
@@ -39,6 +48,13 @@ function assertFocusAllowsField(focus: CharacterAssistantFocus, fieldKey: string
   if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field && focus.fieldKey !== fieldKey) {
     throw new Error(`This run is focused on ${focus.fieldKey}; proposing changes to ${fieldKey} is not allowed.`);
   }
+
+  if (
+    focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.fields &&
+    !focus.fieldKeys.some((allowedFieldKey) => allowedFieldKey === fieldKey)
+  ) {
+    throw new Error(`This run does not allow proposing changes to ${fieldKey}.`);
+  }
 }
 
 function createProposalResult(proposal: iCharacterEditProposal) {
@@ -52,14 +68,29 @@ function createProposalResult(proposal: iCharacterEditProposal) {
 export function createCharacterAssistantTools({
   focus,
   store,
+  allowedToolNames,
 }: {
   focus: CharacterAssistantFocus;
   store: iCharacterAssistantProposalStore;
+  allowedToolNames?: readonly CharacterAssistantToolName[];
 }) {
   const readCharacterTool = tool({
     description: 'Read the current projected character card, including proposals already made during this run.',
     inputSchema: z.object({}),
     execute: async () => ({ card: store.getCard() }),
+  });
+
+  const recordConceptTool = tool({
+    description: 'Record the structured concept established for this character creation flow.',
+    inputSchema: CHARACTER_CONCEPT_SCHEMA,
+    execute: async (concept) => {
+      if (!store.recordConcept) {
+        throw new Error('Concept recording is unavailable for this run.');
+      }
+
+      store.recordConcept(concept);
+      return { recorded: true, premise: concept.premise };
+    },
   });
 
   const proposeCharacterFieldsTool = tool({
@@ -148,12 +179,21 @@ export function createCharacterAssistantTools({
     },
   });
 
-  return {
+  const allTools = {
     [CHARACTER_ASSISTANT_TOOL_NAMES.read_character]: readCharacterTool,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.record_concept]: recordConceptTool,
     [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields]: proposeCharacterFieldsTool,
     [CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags]: proposeTagsTool,
     [CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings]: proposeAlternateGreetingsTool,
     [CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields]: proposeCustomFieldsTool,
     [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book]: proposeCharacterBookTool,
   };
+
+  const defaultToolNames = Object.values(CHARACTER_ASSISTANT_TOOL_NAMES).filter(
+    (toolName) => toolName !== CHARACTER_ASSISTANT_TOOL_NAMES.record_concept,
+  );
+  const selectedToolNames = new Set(allowedToolNames ?? defaultToolNames);
+  return Object.fromEntries(
+    Object.entries(allTools).filter(([toolName]) => selectedToolNames.has(toolName as CharacterAssistantToolName)),
+  ) as typeof allTools;
 }

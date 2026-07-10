@@ -1,6 +1,7 @@
 import { createContext } from 'react';
 
 import type { useCharacterAssistantWorkspace } from '../hooks/use-character-assistant-workspace';
+import type { useGuidedCharacterFlow } from '../hooks/use-guided-character-flow';
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
@@ -12,8 +13,10 @@ export interface iCharacterAssistantContextValue {
   assistantFocus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
   workspace: ReturnType<typeof useCharacterAssistantWorkspace>;
+  guidedFlow: ReturnType<typeof useGuidedCharacterFlow>;
   openAssistant: () => void;
   openAssistantForField: (fieldKey: CharacterEditFieldKey) => void;
+  openAssistantInGuidedMode: (characterId: string) => Promise<void>;
   closeAssistant: () => void;
   addContextAttachment: (attachment: iCharacterAssistantContextAttachment) => void;
   removeContextAttachment: (attachmentId: string) => void;

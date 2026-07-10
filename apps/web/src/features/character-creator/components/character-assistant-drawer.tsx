@@ -5,13 +5,17 @@ import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
-import { Textarea } from '@~/components/ui/textarea';
 import { cn } from '@~/lib/utils';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
+import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
 import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
 import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
+import { ChatInputEditor } from './editor/chat-input-editor';
+import { GuidedImageStep } from './guided-flow/guided-image-step';
+import { GuidedStepHeader } from './guided-flow/guided-step-header';
+import { GuidedStepPanel } from './guided-flow/guided-step-panel';
 
 function formatFieldLabel(fieldKey: CharacterEditFieldKey) {
   return fieldKey
@@ -25,8 +29,12 @@ function getErrorMessage(error: unknown) {
 }
 
 export function CharacterAssistantDrawer() {
-  const { isAssistantOpen, assistantFocus, closeAssistant, workspace } = useCharacterAssistant();
+  const { isAssistantOpen, assistantFocus, closeAssistant, workspace, guidedFlow } = useCharacterAssistant();
+  const { fieldTemplates } = useCharacterCreatorContext();
   const [inputValue, setInputValue] = useState('');
+  const [inputTemplateIds, setInputTemplateIds] = useState<string[]>([]);
+  const { guidedState } = guidedFlow;
+  const isGuided = Boolean(guidedState && guidedFlow.currentStepDefinition);
   const focusLabel =
     assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field
       ? formatFieldLabel(assistantFocus.fieldKey)
@@ -58,7 +66,7 @@ export function CharacterAssistantDrawer() {
 
   return (
     <Dialog open={isAssistantOpen} onOpenChange={(isOpen) => (isOpen ? undefined : closeAssistant())}>
-      <DialogContent className="top-0 right-0 bottom-0 left-auto h-svh w-full max-w-full translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 rounded-none border-y-0 border-r-0 p-0 sm:max-w-md">
+      <DialogContent className="top-0 right-0 bottom-0 left-auto h-svh w-full max-w-full translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 rounded-none border-y-0 border-r-0 p-0 sm:max-w-lg">
         <DialogHeader className="border-b p-5 pr-12 text-left">
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle className="flex items-center gap-2">
@@ -68,11 +76,70 @@ export function CharacterAssistantDrawer() {
             <Badge variant="outline">{focusLabel}</Badge>
             {workspace.activePatches.length > 0 ? <Badge>{workspace.activePatches.length} proposed</Badge> : null}
           </div>
-          <DialogDescription>Ask for a focused rewrite or a coordinated character-level change.</DialogDescription>
+          <DialogDescription>
+            {isGuided
+              ? 'Build the character one bounded step at a time.'
+              : 'Ask for a focused rewrite or a coordinated character-level change.'}
+          </DialogDescription>
+          {isGuided && guidedState ? (
+            <GuidedStepHeader currentStep={guidedState.currentStep} completedSteps={guidedState.completedSteps} />
+          ) : null}
         </DialogHeader>
 
         <div className="min-h-0 overflow-y-auto">
           <div className="grid gap-5 p-5">
+            {isGuided && guidedFlow.currentStepDefinition ? (
+              <GuidedStepPanel
+                definition={guidedFlow.currentStepDefinition}
+                canContinue={guidedFlow.canContinue}
+                isRunning={workspace.isRunning}
+                hasUnappliedProposals={workspace.activeProposals.length > 0}
+                onContinue={guidedFlow.continueToNextStep}
+                onSkip={guidedFlow.skipStep}
+                onExit={guidedFlow.exitGuidedMode}
+              />
+            ) : null}
+            {isGuided && guidedFlow.currentStepDefinition?.isImageStepAllowed ? (
+              <GuidedImageStep
+                analysis={guidedFlow.latestAnalysis}
+                errorMessage={guidedFlow.imageAnalysisError}
+                isAnalyzing={guidedFlow.isAnalyzingImage}
+                onAnalyze={async (file, hint) => {
+                  await guidedFlow.analyzeImage(file, hint).catch(() => undefined);
+                }}
+                onRemove={async () => {
+                  const attachmentId = guidedState?.attachments.at(-1)?.id;
+                  if (attachmentId) {
+                    await guidedFlow.removeImageAttachment(attachmentId);
+                  }
+                }}
+              />
+            ) : null}
+            {isGuided && guidedState?.concept ? (
+              <div className="grid gap-2 rounded-xl border bg-muted/30 p-4">
+                <p className="text-sm font-medium">Concept recorded</p>
+                <p className="text-sm text-muted-foreground">{guidedState.concept.premise}</p>
+                <Button type="button" size="sm" variant="outline" onClick={guidedFlow.applyConceptToCard}>
+                  Use as general character idea
+                </Button>
+              </div>
+            ) : null}
+            {guidedFlow.isGuidedComplete ? (
+              <div className="grid gap-2 rounded-xl border border-primary/40 bg-primary/5 p-4">
+                <p className="text-sm font-medium">Guided setup complete</p>
+                <p className="text-sm text-muted-foreground">
+                  The card is ready for another conversation or field editing.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" onClick={closeAssistant}>
+                    Close and edit fields
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={guidedFlow.restartGuidedSession}>
+                    Restart guided setup
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {workspace.messages.length === 0 ? (
               <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
                 Describe the outcome you want. The assistant will place every proposed edit on the affected character
@@ -195,6 +262,7 @@ export function CharacterAssistantDrawer() {
         <div className="grid gap-3 border-t bg-background p-4">
           <form
             className="grid gap-2"
+            data-character-assistant-form="true"
             onSubmit={(event) => {
               event.preventDefault();
 
@@ -203,18 +271,32 @@ export function CharacterAssistantDrawer() {
               }
 
               const message = inputValue;
+              const templates = fieldTemplates
+                .filter((template) => inputTemplateIds.includes(template.id))
+                .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
               setInputValue('');
+              setInputTemplateIds([]);
               void workspace
-                .sendMessage(message)
+                .sendMessage(message, { templates })
                 .catch((error: unknown) => toastError('Message was not sent', getErrorMessage(error)));
             }}
           >
-            <Textarea
+            <ChatInputEditor
               value={inputValue}
-              rows={3}
-              disabled={workspace.isRunning || !workspace.isConnectionConfigured}
+              templates={fieldTemplates}
+              preferredFieldKeys={guidedFlow.currentStepDefinition?.suggestedTemplateFieldKeys}
+              isDisabled={workspace.isRunning || !workspace.isConnectionConfigured}
               placeholder={`Ask about ${focusLabel.toLocaleLowerCase()}...`}
-              onChange={(event) => setInputValue(event.target.value)}
+              onValueChange={(value, templateIds) => {
+                setInputValue(value);
+                setInputTemplateIds(templateIds);
+              }}
+              onSubmit={() => {
+                if (inputValue.trim() && !workspace.isRunning && workspace.isConnectionConfigured) {
+                  const form = document.querySelector<HTMLFormElement>('[data-character-assistant-form="true"]');
+                  form?.requestSubmit();
+                }
+              }}
             />
             <div className="flex items-center justify-between gap-2">
               <Button
@@ -226,6 +308,8 @@ export function CharacterAssistantDrawer() {
                   void workspace
                     .clearConversation()
                     .catch((error: unknown) => toastError('Conversation was not cleared', getErrorMessage(error)));
+                  setInputValue('');
+                  setInputTemplateIds([]);
                 }}
               >
                 New conversation

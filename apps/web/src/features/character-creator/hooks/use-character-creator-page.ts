@@ -507,8 +507,9 @@ export function useCharacterCreatorPage() {
   );
 
   const handleCreateCharacter = useCallback(() => {
-    createCharacter();
+    const characterId = createCharacter();
     toastSuccess('Character created', 'A fresh entry is ready in your library.');
+    return characterId;
   }, [createCharacter]);
 
   const handleSelectCharacter = useCallback(

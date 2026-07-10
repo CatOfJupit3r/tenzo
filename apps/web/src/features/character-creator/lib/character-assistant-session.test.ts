@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  advanceGuidedStep,
+  characterAssistantSessionsCollection,
+  startGuidedSession,
+} from '../collections/character-assistant-sessions.collection';
+import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
+import { CHARACTER_ASSISTANT_ATTACHMENT_KINDS } from './character-assistant-contracts';
+import {
   CHARACTER_ASSISTANT_SESSION_SCHEMA,
   createCharacterAssistantSession,
   sanitizeCharacterAssistantSession,
@@ -42,6 +49,80 @@ describe('character assistant sessions', () => {
     expect(CHARACTER_ASSISTANT_SESSION_SCHEMA.safeParse(recoveredSession).success).toBe(true);
     expect(recoveredSession).not.toHaveProperty('draftCard');
     expect(recoveredSession).not.toHaveProperty('toolEvents');
+    expect(recoveredSession?.mode).toBe('chat');
+    expect(recoveredSession?.guided).toBeNull();
+  });
+
+  it('drops a malformed guided block without dropping the session', () => {
+    const recoveredSession = sanitizeCharacterAssistantSession({
+      characterId: 'character-1',
+      messages: [],
+      proposals: [],
+      mode: 'guided',
+      guided: { currentStep: 'not-a-step', attachments: 'invalid' },
+    });
+
+    expect(recoveredSession?.mode).toBe('chat');
+    expect(recoveredSession?.guided).toBeNull();
+  });
+
+  it('walks the guided sequence and ends after review', () => {
+    expect(getNextGuidedStepId(GUIDED_STEP_IDS.concept)).toBe(GUIDED_STEP_IDS.appearance);
+    expect(getNextGuidedStepId(GUIDED_STEP_IDS.review)).toBeNull();
+  });
+
+  it('round-trips guided concepts and evidence attachments', () => {
+    const session = sanitizeCharacterAssistantSession({
+      ...createCharacterAssistantSession('character-1'),
+      mode: 'guided',
+      guided: {
+        currentStep: GUIDED_STEP_IDS.appearance,
+        completedSteps: [GUIDED_STEP_IDS.concept],
+        concept: {
+          premise: 'A reluctant lunar archivist.',
+          archetype: 'Reluctant scholar',
+          keyTraits: ['curious'],
+          flaws: ['guarded'],
+          nameCandidates: ['Mira'],
+          suggestedTags: ['scholar'],
+        },
+        attachments: [
+          {
+            id: 'image-1',
+            kind: CHARACTER_ASSISTANT_ATTACHMENT_KINDS.imageAnalysis,
+            title: 'Reference',
+            content: 'Subject: A person',
+            warnings: [],
+            confidence: 0.8,
+          },
+        ],
+      },
+    });
+
+    expect(session?.guided?.concept?.premise).toContain('archivist');
+    expect(session?.guided?.attachments).toHaveLength(1);
+  });
+
+  it('advances all guided steps and returns to chat after review', async () => {
+    const characterId = 'guided-session-test';
+    await startGuidedSession(characterId);
+
+    for (let index = 0; index < 7; index += 1) {
+      await advanceGuidedStep(characterId);
+    }
+
+    const session = characterAssistantSessionsCollection.get(characterId);
+    expect(session?.mode).toBe('chat');
+    expect(session?.guided?.completedSteps).toEqual([
+      GUIDED_STEP_IDS.concept,
+      GUIDED_STEP_IDS.appearance,
+      GUIDED_STEP_IDS.personality,
+      GUIDED_STEP_IDS.scenario,
+      GUIDED_STEP_IDS.voice,
+      GUIDED_STEP_IDS.metadata,
+      GUIDED_STEP_IDS.review,
+    ]);
+    characterAssistantSessionsCollection.delete(characterId);
   });
 
   it('migrates the latest session across both agent storage versions', () => {

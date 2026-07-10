@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { memo, useCallback, useMemo } from 'react';
-import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
+import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuSparkles, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
 
 import {
   AlertDialog,
@@ -18,6 +18,7 @@ import { Button } from '@~/components/ui/button';
 import { cn } from '@~/lib/utils';
 
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
+import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
 import type { iCharacterLibraryItem } from '../lib/character-library';
@@ -163,6 +164,12 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
     handleRemoveCharacter,
     openImportDialog,
   } = useCharacterCreatorActions();
+  const { openAssistantInGuidedMode } = useCharacterAssistant();
+
+  const handleCreateWithAssistant = useCallback(async () => {
+    const characterId = handleCreateCharacter();
+    await openAssistantInGuidedMode(characterId);
+  }, [handleCreateCharacter, openAssistantInGuidedMode]);
 
   const characterCountLabel = useMemo(() => {
     if (!isCharacterLibraryReady && characterLibrary.length === 0) {
@@ -226,15 +233,19 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" size="sm" onClick={handleCreateCharacter}>
+            <Button type="button" size="sm" onClick={handleCreateWithAssistant}>
+              <LuSparkles className="size-4" />
+              Create with Assistant
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={handleCreateCharacter}>
               <LuPlus className="size-4" />
               New
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={openImportDialog}>
-              <LuFolderOpen className="size-4" />
-              Import
-            </Button>
           </div>
+          <Button type="button" size="sm" variant="outline" onClick={openImportDialog}>
+            <LuFolderOpen className="size-4" />
+            Import
+          </Button>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3">

@@ -97,6 +97,71 @@ export const MANGA_SYNTHESIS_V1_SCHEMA = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+const MANGA_BOUNDING_BOX_SCHEMA = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().nonnegative(),
+  height: z.number().nonnegative(),
+});
+
+const MANGA_EXTRACTED_TEXT_ITEM_SCHEMA = z.object({
+  order: z.number().int().positive(),
+  text: z.string(),
+  kind: z.enum(['dialogue', 'narration', 'sfx', 'sign', 'background', 'unknown']),
+  speaker: z.string().nullable().optional(),
+  region: MANGA_BOUNDING_BOX_SCHEMA.optional(),
+  confidence: z.number().min(0).max(1),
+  source: z.enum(['ocr', 'vision', 'merged']),
+  needsReview: z.boolean(),
+  notes: z.array(z.string()).optional(),
+});
+
+const MANGA_VISUAL_OBSERVATIONS_SCHEMA = z.object({
+  setting: z.string(),
+  surroundings: z.string().optional(),
+  characters: z.array(
+    z.object({
+      label: z.string(),
+      appearance: z.string().optional(),
+      clothing: z.string().optional(),
+      expression: z.string().optional(),
+      action: z.string().optional(),
+    }),
+  ),
+  cameraNotes: z.string().optional(),
+});
+
+const MANGA_PAGE_EXTRACTION_SCHEMA = z.object({
+  pageNumber: z.number().int().positive(),
+  sourceImage: z.string(),
+  dialogue: z.array(MANGA_EXTRACTED_TEXT_ITEM_SCHEMA),
+  narration: z.array(MANGA_EXTRACTED_TEXT_ITEM_SCHEMA),
+  sfxAndSigns: z.array(MANGA_EXTRACTED_TEXT_ITEM_SCHEMA),
+  pageSummary: z.object({
+    text: z.string(),
+    confidence: z.number().min(0).max(1),
+  }),
+  visualObservations: MANGA_VISUAL_OBSERVATIONS_SCHEMA.optional(),
+  warnings: z.array(z.string()),
+  needsReview: z.boolean(),
+});
+
+export const MANGA_EXTRACTION_V1_SCHEMA = z.object({
+  folderName: z.string().min(1),
+  sourceFolder: z.string(),
+  pages: z.array(MANGA_PAGE_EXTRACTION_SCHEMA),
+  warnings: z.array(z.string()),
+  needsReview: z.boolean(),
+});
+
+export const MANGA_OVERVIEW_V1_SCHEMA = z.object({
+  folderName: z.string().min(1),
+  overview: z.string(),
+  majorEvents: z.array(z.string()),
+  charactersMentioned: z.array(z.string()),
+  warnings: z.array(z.string()),
+});
+
 export const MANGA_RUN_MANIFEST_V1_SCHEMA = z
   .object({
     version: MANGA_SYNTHESIS_ARTIFACT_VERSION_SCHEMA,
@@ -124,6 +189,9 @@ export const MANGA_RUN_MANIFEST_V1_SCHEMA = z
 export type iMangaSynthesisV1 = z.infer<typeof MANGA_SYNTHESIS_V1_SCHEMA>;
 export type iMangaSynthesisCharacter = z.infer<typeof MANGA_SYNTHESIS_CHARACTER_SCHEMA>;
 export type iMangaRunManifestV1 = z.infer<typeof MANGA_RUN_MANIFEST_V1_SCHEMA>;
+export type iMangaExtractionV1 = z.infer<typeof MANGA_EXTRACTION_V1_SCHEMA>;
+export type iMangaPageExtraction = z.infer<typeof MANGA_PAGE_EXTRACTION_SCHEMA>;
+export type iMangaOverviewV1 = z.infer<typeof MANGA_OVERVIEW_V1_SCHEMA>;
 
 export interface iParsedMangaSynthesisArtifact {
   format: (typeof MANGA_SYNTHESIS_ARTIFACT_FORMATS)['manga-to-text.synthesis'];
@@ -131,6 +199,8 @@ export interface iParsedMangaSynthesisArtifact {
   sourceFileName: string;
   synthesis: iMangaSynthesisV1;
   runManifest: iMangaRunManifestV1 | null;
+  extraction: iMangaExtractionV1 | null;
+  overview: iMangaOverviewV1 | null;
   importWarnings: string[];
 }
 
@@ -180,8 +250,18 @@ export function parseMangaSynthesisJson(
     sourceFileName,
     synthesis,
     runManifest: null,
+    extraction: null,
+    overview: null,
     importWarnings,
   };
+}
+
+export function parseMangaExtractionJson(jsonText: string): iMangaExtractionV1 {
+  return parseWithSchema(MANGA_EXTRACTION_V1_SCHEMA, parseJson(jsonText, 'extraction.json'), 'extraction.json');
+}
+
+export function parseMangaOverviewJson(jsonText: string): iMangaOverviewV1 {
+  return parseWithSchema(MANGA_OVERVIEW_V1_SCHEMA, parseJson(jsonText, 'overview.json'), 'overview.json');
 }
 
 export function attachMangaRunManifest(
@@ -197,5 +277,37 @@ export function attachMangaRunManifest(
   return {
     ...artifact,
     runManifest,
+  };
+}
+
+export function attachMangaExtraction(
+  artifact: iParsedMangaSynthesisArtifact,
+  extraction: iMangaExtractionV1,
+): iParsedMangaSynthesisArtifact {
+  if (artifact.synthesis.folderName !== extraction.folderName) {
+    throw new Error(
+      `extraction.json belongs to ${extraction.folderName}, but synthesis.json belongs to ${artifact.synthesis.folderName}.`,
+    );
+  }
+
+  return {
+    ...artifact,
+    extraction,
+  };
+}
+
+export function attachMangaOverview(
+  artifact: iParsedMangaSynthesisArtifact,
+  overview: iMangaOverviewV1,
+): iParsedMangaSynthesisArtifact {
+  if (artifact.synthesis.folderName !== overview.folderName) {
+    throw new Error(
+      `overview.json belongs to ${overview.folderName}, but synthesis.json belongs to ${artifact.synthesis.folderName}.`,
+    );
+  }
+
+  return {
+    ...artifact,
+    overview,
   };
 }

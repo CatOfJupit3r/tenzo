@@ -11,11 +11,12 @@ import { MANGA_RUN_STAGE_STATUSES } from './manga-synthesis';
 export const MANGA_SYNTHESIS_CONTEXT_CONFIDENCE_LEVEL_SCHEMA = z.enum(['low', 'medium', 'high']);
 export const MANGA_SYNTHESIS_CONTEXT_CONFIDENCE_LEVELS = MANGA_SYNTHESIS_CONTEXT_CONFIDENCE_LEVEL_SCHEMA.enum;
 
-export const MAX_MANGA_SYNTHESIS_CONTEXT_CHARACTERS = 10_000;
+export const MAX_MANGA_SYNTHESIS_CONTEXT_CHARACTERS = 14_000;
 
 const MAX_CONTEXT_LIST_ITEMS = 8;
 const MAX_CONTEXT_ITEM_CHARACTERS = 500;
 const MAX_CONTEXT_SCENES = 5;
+const MAX_CONTEXT_VISUAL_OBSERVATIONS = 6;
 const MAX_ATTACHMENT_WARNINGS = 20;
 const MAX_ATTACHMENT_WARNING_CHARACTERS = 400;
 
@@ -122,27 +123,31 @@ function normalizeIdentity(value: string) {
   return normalizeInlineText(value).toLocaleLowerCase();
 }
 
+function matchesIdentity(label: string, identities: readonly string[]) {
+  const normalizedLabel = normalizeIdentity(label);
+
+  if (normalizedLabel.length < 3) {
+    return false;
+  }
+
+  return identities.some(
+    (identity) =>
+      normalizedLabel === identity || normalizedLabel.includes(identity) || identity.includes(normalizedLabel),
+  );
+}
+
+function getCharacterIdentities(character: iMangaSynthesisCharacter) {
+  return uniqueNonEmpty([character.name, ...character.aliases])
+    .map(normalizeIdentity)
+    .filter((identity) => identity.length >= 3);
+}
+
 function doesSceneContainCharacter(sceneCharacters: readonly string[], identities: readonly string[]) {
-  return sceneCharacters.some((sceneCharacter) => {
-    const normalizedSceneCharacter = normalizeIdentity(sceneCharacter);
-
-    if (normalizedSceneCharacter.length < 3) {
-      return false;
-    }
-
-    return identities.some(
-      (identity) =>
-        normalizedSceneCharacter === identity ||
-        normalizedSceneCharacter.includes(identity) ||
-        identity.includes(normalizedSceneCharacter),
-    );
-  });
+  return sceneCharacters.some((sceneCharacter) => matchesIdentity(sceneCharacter, identities));
 }
 
 function formatRelevantScenes(artifact: iParsedMangaSynthesisArtifact, character: iMangaSynthesisCharacter) {
-  const identities = uniqueNonEmpty([character.name, ...character.aliases])
-    .map(normalizeIdentity)
-    .filter((identity) => identity.length >= 3);
+  const identities = getCharacterIdentities(character);
   const relevantScenes = artifact.synthesis.scenes
     .filter((scene) => doesSceneContainCharacter(scene.characters, identities))
     .slice(0, MAX_CONTEXT_SCENES)
@@ -152,6 +157,47 @@ function formatRelevantScenes(artifact: iParsedMangaSynthesisArtifact, character
     );
 
   return formatListSection('Relevant scenes', relevantScenes);
+}
+
+function formatVisualObservations(artifact: iParsedMangaSynthesisArtifact, character: iMangaSynthesisCharacter) {
+  if (!artifact.extraction) {
+    return '';
+  }
+
+  const identities = getCharacterIdentities(character);
+  const observations = artifact.extraction.pages
+    .flatMap((page) =>
+      (page.visualObservations?.characters ?? [])
+        .filter((observation) => matchesIdentity(observation.label, identities))
+        .map((observation) => ({ page: page.pageNumber, observation })),
+    )
+    .slice(0, MAX_CONTEXT_VISUAL_OBSERVATIONS)
+    .map(({ page, observation }) => {
+      const details = [
+        observation.appearance,
+        observation.clothing ? `wearing ${observation.clothing}` : '',
+        observation.expression ? `expression: ${observation.expression}` : '',
+        observation.action ? `action: ${observation.action}` : '',
+      ]
+        .filter(Boolean)
+        .join('; ');
+      return `Page ${page}: ${details || 'no additional detail recorded'}`;
+    });
+
+  return formatListSection('Page-level visual observations (extraction.json)', observations);
+}
+
+function formatOverviewContext(artifact: iParsedMangaSynthesisArtifact, character: iMangaSynthesisCharacter) {
+  if (!artifact.overview) {
+    return '';
+  }
+
+  const identities = getCharacterIdentities(character);
+  const isMentioned = artifact.overview.charactersMentioned.some((name) => matchesIdentity(name, identities));
+  const events = formatListSection('Major chapter events (overview.json)', artifact.overview.majorEvents);
+  const mentionNote = isMentioned ? 'Character is listed among the characters mentioned in the chapter overview.' : '';
+
+  return [events, mentionNote].filter(Boolean).join('\n');
 }
 
 function createRunWarnings(runManifest: iMangaRunManifestV1 | null) {
@@ -191,6 +237,8 @@ function createAttachmentWarnings(
     ...artifact.synthesis.world.warnings,
     ...character.uncertainties,
     ...createRunWarnings(artifact.runManifest),
+    ...(artifact.extraction?.warnings ?? []),
+    ...(artifact.overview?.warnings ?? []),
   ])
     .slice(0, MAX_ATTACHMENT_WARNINGS)
     .map((warning) => truncateText(warning, MAX_ATTACHMENT_WARNING_CHARACTERS));
@@ -247,6 +295,8 @@ export function buildMangaSynthesisAttachment({
     formatRelationships(character),
     formatListSection('Roleplay notes', character.roleplayNotes),
     formatRelevantScenes(artifact, character),
+    formatVisualObservations(artifact, character),
+    formatOverviewContext(artifact, character),
     artifact.synthesis.world.settingSummary.trim()
       ? `Setting:\n${truncateText(artifact.synthesis.world.settingSummary, 1_000)}`
       : '',

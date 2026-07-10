@@ -91,10 +91,10 @@ export function useCharacterSession() {
   const mutateActiveCharacter = useCallback(
     (recipe: (draft: iCharacterLibraryItem) => unknown) => {
       if (!activeCharacterKey || !characterLibraryCollection.has(activeCharacterKey)) {
-        return;
+        return null;
       }
 
-      characterLibraryCollection.update(activeCharacterKey, (draft) => {
+      return characterLibraryCollection.update(activeCharacterKey, (draft) => {
         // The card schema applies defaults, so the draft's input type widens some
         // fields to optional; at runtime they are always populated.
         recipe(draft as iCharacterLibraryItem);
@@ -217,10 +217,16 @@ export function useCharacterSession() {
   );
 
   const replaceCard = useCallback(
-    (nextCard: CharacterCard) => {
-      mutateActiveCharacter((draft) => {
+    async (nextCard: CharacterCard) => {
+      const transaction = mutateActiveCharacter((draft) => {
         draft.card = nextCard;
       });
+
+      if (!transaction) {
+        throw new Error('The active character is unavailable.');
+      }
+
+      await transaction.isPersisted.promise;
     },
     [mutateActiveCharacter],
   );

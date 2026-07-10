@@ -1,10 +1,15 @@
 import type { ChangeEvent } from 'react';
+import { LuSparkles } from 'react-icons/lu';
 
+import { Badge } from '@~/components/ui/badge';
+import { Button } from '@~/components/ui/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 
 import type { FieldEditorVariant } from '../constants/field-config';
 import { FIELD_EDITOR_VARIANTS } from '../constants/field-config';
+import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
+import type { iCharacterEditPatch } from '../lib/character-edit-proposal';
 import type {
   iCreateStoredFieldTemplateInput,
   iFieldTemplateViewModel,
@@ -46,6 +51,10 @@ export interface iCharacterFieldProps {
   onAcceptRewrite?: () => void;
   onResolveRewriteReview?: (mergedValue: string) => void;
   onCancel?: () => void;
+  onAskAssistant?: () => void;
+  assistantPatch?: Extract<iCharacterEditPatch, { kind: 'text' }> | null;
+  onApplyAssistantProposal?: (resolvedValue?: string) => void;
+  onRejectAssistantProposal?: () => void;
 }
 
 export function CharacterField({
@@ -79,6 +88,10 @@ export function CharacterField({
   onAcceptRewrite,
   onResolveRewriteReview,
   onCancel,
+  onAskAssistant,
+  assistantPatch = null,
+  onApplyAssistantProposal,
+  onRejectAssistantProposal,
 }: iCharacterFieldProps) {
   const hasGenerationControls =
     onShouldUseGeneralCharacterIdeaChange && onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
@@ -87,8 +100,30 @@ export function CharacterField({
   const hintId = hint ? `${fieldId}-hint` : undefined;
   const shouldShowRewriteReview =
     isRewriteReviewPending && rewriteBackupValue !== null && !isGenerating && onResolveRewriteReview && onAcceptRewrite;
+  const shouldShowAssistantReview =
+    assistantPatch && !isGenerating && onApplyAssistantProposal && onRejectAssistantProposal;
 
   const renderFieldBody = () => {
+    if (shouldShowAssistantReview) {
+      return (
+        <div className="grid gap-3">
+          <div className="flex items-center gap-2">
+            <Badge>AI proposal</Badge>
+            {assistantPatch.status === CHARACTER_EDIT_PATCH_STATUSES.conflict ? (
+              <Badge variant="destructive">Needs review</Badge>
+            ) : null}
+          </div>
+          <RewriteDiffReview
+            oldValue={assistantPatch.oldValue}
+            newValue={assistantPatch.newValue}
+            onResolve={(resolvedValue) => onApplyAssistantProposal(resolvedValue)}
+            onAcceptAll={() => onApplyAssistantProposal()}
+            onRevertAll={onRejectAssistantProposal}
+          />
+        </div>
+      );
+    }
+
     if (shouldShowRewriteReview) {
       return (
         <RewriteDiffReview
@@ -139,7 +174,15 @@ export function CharacterField({
 
   return (
     <div className="space-y-3">
-      <Label htmlFor={fieldId}>{label}</Label>
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={fieldId}>{label}</Label>
+        {onAskAssistant ? (
+          <Button type="button" size="sm" variant="ghost" onClick={onAskAssistant}>
+            <LuSparkles className="size-3.5" />
+            Ask AI
+          </Button>
+        ) : null}
+      </div>
       {hasGenerationControls ? (
         <FieldGenerationControls
           fieldId={fieldId}

@@ -37,7 +37,7 @@ export const CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA = z.object({
   generalCharacterIdea: z.string(),
   fieldInstructions: z.record(z.string(), z.string()),
   fieldShouldUseGeneralCharacterIdea: z.record(z.string(), z.boolean()),
-  fieldTemplateIds: z.record(z.string(), z.string()),
+  fieldTemplateIds: z.record(z.string(), z.string()).default({}),
 });
 
 export type iCharacterGenerationPromptSettings = z.infer<typeof CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA>;

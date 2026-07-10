@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import type { ChangeEvent, FocusEvent } from 'react';
+import { LuSparkles } from 'react-icons/lu';
 
+import { Button } from '@~/components/ui/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 
 export interface iTagsInputProps {
   value: string[];
   onChange: (tags: string[]) => void;
+  onAskAssistant?: () => void;
 }
 
-export function TagsInput({ value, onChange }: iTagsInputProps) {
+export function TagsInput({ value, onChange, onAskAssistant }: iTagsInputProps) {
   const [draft, setDraft] = useState(value.join(', '));
 
   useEffect(() => {
@@ -26,7 +29,15 @@ export function TagsInput({ value, onChange }: iTagsInputProps) {
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor="character-tags">Tags</Label>
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor="character-tags">Tags</Label>
+        {onAskAssistant ? (
+          <Button type="button" size="sm" variant="ghost" onClick={onAskAssistant}>
+            <LuSparkles className="size-3.5" />
+            Ask AI
+          </Button>
+        ) : null}
+      </div>
       <Input
         id="character-tags"
         value={draft}

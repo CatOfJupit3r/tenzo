@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { LuChevronRight, LuDownload, LuFileUp, LuSettings } from 'react-icons/lu';
+import { LuChevronRight, LuDownload, LuFileUp, LuSettings, LuSparkles } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
 import { cn } from '@~/lib/utils';
 
+import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { getCharacterLibraryItemDisplayName } from '../lib/character-library';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/example-characters';
@@ -35,6 +36,7 @@ export function CharacterCreatorHeader({
   } = useCharacterCreatorContext();
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsDialogTab>(SETTINGS_DIALOG_TABS.connection);
+  const { openAssistant } = useCharacterAssistant();
   const activeCharacter =
     characterLibrary.find((character) => character.id === activeCharacterId) ?? characterLibrary[0];
 
@@ -105,6 +107,11 @@ export function CharacterCreatorHeader({
           >
             <LuSettings className="size-4" />
             Settings
+          </Button>
+
+          <Button type="button" size="sm" variant="outline" onClick={openAssistant}>
+            <LuSparkles className="size-4" />
+            Assistant
           </Button>
 
           <div className="hidden h-5 w-px bg-border sm:block" />

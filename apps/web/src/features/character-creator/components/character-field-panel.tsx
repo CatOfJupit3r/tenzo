@@ -1,6 +1,8 @@
+import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { cn } from '@~/lib/utils';
 
 import type { iCharacterFieldConfig } from '../constants/field-config';
+import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { getTemplateFieldKeyForTargetKey } from '../lib/field-templates';
 import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
@@ -13,6 +15,7 @@ interface iCharacterFieldPanelProps {
 }
 
 export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProps) {
+  const { openAssistantForField, workspace } = useCharacterAssistant();
   const {
     data,
     updateField,
@@ -30,6 +33,13 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
   } = useCharacterCreatorContext();
   const generationState = getStandardFieldGenerationState(config.key);
   const templateFieldKey = getTemplateFieldKeyForTargetKey(`field:${config.key}`);
+  const assistantPatchView = workspace.activePatches.find(
+    (patchView) => patchView.patch.fieldKey === config.key && patchView.patch.kind === 'text',
+  );
+
+  const reportAssistantError = (error: unknown) => {
+    toastError('Assistant proposal was not updated', error instanceof Error ? error.message : 'The action failed.');
+  };
 
   return (
     <div className={cn(FIELD_PANEL_CLASS_NAME, isWide ? 'xl:col-span-2' : null)}>
@@ -72,6 +82,26 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
         onAcceptRewrite={() => acceptStandardFieldRewrite(config.key)}
         onResolveRewriteReview={(mergedValue) => resolveStandardFieldRewriteReview(config.key, mergedValue)}
         onCancel={() => cancelStandardFieldGeneration(config.key)}
+        onAskAssistant={() => openAssistantForField(config.key)}
+        assistantPatch={assistantPatchView?.patch.kind === 'text' ? assistantPatchView.patch : null}
+        onApplyAssistantProposal={
+          assistantPatchView
+            ? (resolvedValue) => {
+                void workspace
+                  .applyProposalFields(assistantPatchView.proposalId, [config.key], resolvedValue)
+                  .catch(reportAssistantError);
+              }
+            : undefined
+        }
+        onRejectAssistantProposal={
+          assistantPatchView
+            ? () => {
+                void workspace
+                  .rejectProposalFields(assistantPatchView.proposalId, [config.key])
+                  .catch(reportAssistantError);
+              }
+            : undefined
+        }
       />
     </div>
   );

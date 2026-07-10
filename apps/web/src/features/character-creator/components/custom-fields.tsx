@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { LuPlus, LuTrash2 } from 'react-icons/lu';
+import { LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
 import { Input } from '@~/components/ui/input';
@@ -30,6 +30,7 @@ export interface iCustomFieldsProps {
   onAcceptRewrite: (id: string) => void;
   onResolveRewriteReview: (id: string, mergedValue: string) => void;
   onCancel: (id: string) => void;
+  onAskAssistant?: () => void;
 }
 
 export function CustomFields({
@@ -50,15 +51,24 @@ export function CustomFields({
   onAcceptRewrite,
   onResolveRewriteReview,
   onCancel,
+  onAskAssistant,
 }: iCustomFieldsProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm leading-none font-medium">Custom Fields</span>
-        <Button type="button" variant="outline" size="sm" onClick={onAdd}>
-          <LuPlus className="size-4" />
-          Add field
-        </Button>
+        <div className="flex gap-2">
+          {onAskAssistant ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onAskAssistant}>
+              <LuSparkles className="size-3.5" />
+              Ask AI
+            </Button>
+          ) : null}
+          <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+            <LuPlus className="size-4" />
+            Add field
+          </Button>
+        </div>
       </div>
 
       {fields.length === 0 ? (

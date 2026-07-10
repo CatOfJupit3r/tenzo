@@ -12,7 +12,6 @@ import { useCharacterAssistant } from '../context/character-assistant-context.ho
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
 import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
 import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
-import { MangaSynthesisAttachment } from './manga-synthesis-attachment';
 
 function formatFieldLabel(fieldKey: CharacterEditFieldKey) {
   return fieldKey
@@ -194,7 +193,6 @@ export function CharacterAssistantDrawer() {
         </div>
 
         <div className="grid gap-3 border-t bg-background p-4">
-          <MangaSynthesisAttachment />
           <form
             className="grid gap-2"
             onSubmit={(event) => {

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import type { CharacterCard } from './card-schema';
 import {
-  CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KINDS,
   CHARACTER_ASSISTANT_FOCUS_KINDS,
   CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA,
 } from './character-assistant-contracts';
@@ -81,7 +80,7 @@ describe('character assistant contracts', () => {
       contextAttachments: [
         {
           id: 'attachment-1',
-          kind: CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KINDS.manga_synthesis,
+          kind: 'evidence',
           title: 'Synthesis',
           content: 'x'.repeat(12_001),
           warnings: [],
@@ -170,7 +169,7 @@ describe('character assistant instructions', () => {
       contextAttachments: [
         {
           id: 'attachment-1',
-          kind: CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KINDS.manga_synthesis,
+          kind: 'evidence',
           title: 'Chapter synthesis',
           content: 'The character may be avoiding the capital.',
           warnings: ['Identity is uncertain'],

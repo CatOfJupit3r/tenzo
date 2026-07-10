@@ -17,8 +17,7 @@ export const CHARACTER_ASSISTANT_FOCUS_SCHEMA = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KIND_SCHEMA = z.enum(['manga_synthesis']);
-export const CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KINDS = CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KIND_SCHEMA.enum;
+export const CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KIND_SCHEMA = z.string().trim().min(1);
 
 export const CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA = z.object({
   id: z.string().trim().min(1),

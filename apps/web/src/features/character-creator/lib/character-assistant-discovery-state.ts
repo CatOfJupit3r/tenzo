@@ -1,9 +1,15 @@
 import {
+  CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_DESCRIPTION_MAX_LENGTH,
+  CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_TITLE_MAX_LENGTH,
+  CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH,
+  CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES,
   CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT,
   CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA,
 } from './character-assistant-contracts';
 import type {
+  iCharacterAssistantDiscoveryContext,
+  iCharacterAssistantDiscoveryContextCard,
   iCharacterAssistantDiscoveryDirectionCard,
   iCharacterAssistantDiscoveryDirectionCategory,
   iCharacterAssistantDiscoveryState,
@@ -13,6 +19,41 @@ const DISCOVERY_CATEGORY_SEQUENCE = Object.values(CHARACTER_ASSISTANT_DISCOVERY_
 
 function normalizeDiscoverySelection(state: iCharacterAssistantDiscoveryState): iCharacterAssistantDiscoveryState {
   return CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA.parse(state);
+}
+
+function truncateText(value: string, maxLength: number) {
+  const sanitizedValue = value.trim();
+  return sanitizedValue.length <= maxLength ? sanitizedValue : sanitizedValue.slice(0, maxLength);
+}
+
+function boundContextCategoryCards(summaryCards: iCharacterAssistantDiscoveryDirectionCard[]) {
+  return summaryCards.slice(0, 3).map((card) => ({
+    ...card,
+    id: truncateText(card.id, 120),
+    title: truncateText(card.title, CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_TITLE_MAX_LENGTH),
+    description: truncateText(card.description, CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_DESCRIPTION_MAX_LENGTH),
+    sourceCardId: card.sourceCardId?.trim() ? truncateText(card.sourceCardId, 120) : null,
+  })) as iCharacterAssistantDiscoveryContextCard[];
+}
+
+export function buildBoundedDiscoveryContext(
+  discoveryState: iCharacterAssistantDiscoveryState,
+): iCharacterAssistantDiscoveryContext {
+  const handoffSummary = buildDeterministicDiscoveryHandoffSummary(discoveryState);
+
+  return CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA.parse({
+    originalPremise: truncateText(
+      discoveryState.originalPremise,
+      CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH,
+    ),
+    handoffSummary: DISCOVERY_CATEGORY_SEQUENCE.reduce(
+      (acc, category) => {
+        acc[category] = boundContextCategoryCards(handoffSummary[category]);
+        return acc;
+      },
+      {} as iCharacterAssistantDiscoveryContext['handoffSummary'],
+    ),
+  });
 }
 
 export function sanitizeCharacterAssistantDiscoveryState(value: unknown): iCharacterAssistantDiscoveryState {

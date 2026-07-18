@@ -248,6 +248,7 @@ export const Route = createFileRoute('/api/character-assistant')({
                   generalCharacterIdea: payload.generalCharacterIdea,
                   guidedStep: payload.guidedStep,
                   concept: payload.concept,
+                  discoveryContext: payload.discoveryContext,
                   templates: payload.templates,
                   allowedToolNames,
                   store,

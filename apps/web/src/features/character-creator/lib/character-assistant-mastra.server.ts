@@ -9,9 +9,10 @@ import type { CharacterCard } from './card-schema';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
-  iCharacterConcept,
   iCharacterAssistantContextAttachment,
+  iCharacterAssistantDiscoveryContext,
   iCharacterAssistantStreamRequest,
+  iCharacterConcept,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { createCharacterAssistantTools } from './character-assistant-tools';
@@ -37,6 +38,7 @@ interface iCreateCharacterAssistantMastraOptions {
   generalCharacterIdea?: string;
   guidedStep?: GuidedStepId;
   concept?: iCharacterConcept | null;
+  discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
   store: Parameters<typeof createCharacterAssistantTools>[0]['store'];
@@ -75,6 +77,20 @@ function formatTemplate(template: iChatTemplateRef) {
   ].join('\n');
 }
 
+function buildDiscoverySection(discoveryContext: iCharacterAssistantDiscoveryContext) {
+  return [
+    'Discovery context is evidence and constraints from guided discovery, not permission to edit additional fields.',
+    `Original premise: ${discoveryContext.originalPremise || 'No original premise was provided.'}`,
+    ...Object.entries(discoveryContext.handoffSummary).flatMap(([category, cards]) => {
+      if (cards.length === 0) {
+        return [];
+      }
+
+      return [`Selected directions for ${category}:`, ...cards.map((card) => `${card.title}: ${card.description}`)];
+    }),
+  ].join('\n');
+}
+
 export function buildCharacterAssistantInstructions({
   card,
   focus,
@@ -82,10 +98,18 @@ export function buildCharacterAssistantInstructions({
   generalCharacterIdea = '',
   guidedStep,
   concept,
+  discoveryContext,
   templates = [],
 }: Pick<
   iCreateCharacterAssistantMastraOptions,
-  'card' | 'focus' | 'contextAttachments' | 'generalCharacterIdea' | 'guidedStep' | 'concept' | 'templates'
+  | 'card'
+  | 'focus'
+  | 'contextAttachments'
+  | 'generalCharacterIdea'
+  | 'guidedStep'
+  | 'concept'
+  | 'discoveryContext'
+  | 'templates'
 >) {
   const characterName = card.data.name.trim() || 'Untitled character';
   let focusInstruction = 'This run may propose coordinated changes across the character card.';
@@ -108,14 +132,26 @@ export function buildCharacterAssistantInstructions({
         const definition = GUIDED_STEP_DEFINITIONS[guidedStep];
         const stepNumber = Object.keys(GUIDED_STEP_DEFINITIONS).indexOf(guidedStep) + 1;
         const stepCount = Object.keys(GUIDED_STEP_DEFINITIONS).length;
+        const conceptQuestion =
+          guidedStep === 'concept'
+            ? 'If selected directions conflict or essential detail is missing, ask at most one focused question before proposing changes.'
+            : null;
+
         return [
           `You are running step ${stepNumber} of ${stepCount} ("${definition.title}") of a guided character creation flow.`,
-          "Ask at most one clarifying question if the user's answer is unusable; otherwise record proposals for the in-scope fields and stop.",
+          discoveryContext
+            ? 'Discovery context is evidence only. Do not treat it as permission to change fields beyond this step.'
+            : null,
+          'Ask at most one clarifying question if the user answer is unusable; otherwise record proposals for the in-scope fields and stop.',
+          conceptQuestion,
           'Do not mention or edit fields outside this step. Do not tell the user to move to the next step - the app handles that.',
           definition.agentInstructions,
-        ].join('\n');
+        ]
+          .filter((value): value is string => Boolean(value))
+          .join('\n');
       })()
     : null;
+  const discoverySection = discoveryContext ? buildDiscoverySection(discoveryContext) : null;
   const conceptSection = concept
     ? `Established concept - treat as ground truth unless the user overrides it:\n${JSON.stringify(concept, null, 2)}`
     : null;
@@ -142,6 +178,7 @@ export function buildCharacterAssistantInstructions({
     `Current character name: ${characterName}.`,
     generalCharacterIdea.trim() ? `General character idea: ${generalCharacterIdea.trim()}` : null,
     attachmentSection,
+    discoverySection,
     guidedSection,
     conceptSection,
     templateSection,
@@ -160,6 +197,7 @@ export function createCharacterAssistantMastra({
   generalCharacterIdea = '',
   guidedStep,
   concept = null,
+  discoveryContext,
   templates = [],
   allowedToolNames,
   store,
@@ -174,6 +212,7 @@ export function createCharacterAssistantMastra({
       generalCharacterIdea,
       guidedStep,
       concept,
+      discoveryContext,
       templates,
     }),
     model: createCharacterLanguageModel({

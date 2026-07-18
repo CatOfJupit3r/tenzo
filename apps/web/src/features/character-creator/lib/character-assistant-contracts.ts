@@ -97,6 +97,44 @@ export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA = z.object({
   isUserAuthored: z.boolean(),
 });
 
+export const CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH = 600;
+export const CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_TITLE_MAX_LENGTH = 80;
+export const CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_DESCRIPTION_MAX_LENGTH = 320;
+
+export const CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA = z.object({
+  id: z.string().trim().min(1).max(120),
+  category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
+  title: z.string().trim().min(1).max(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_TITLE_MAX_LENGTH),
+  description: z.string().trim().min(1).max(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_DESCRIPTION_MAX_LENGTH),
+  sourceCardId: z.string().trim().min(1).max(120).nullable(),
+  isUserAuthored: z.boolean(),
+});
+
+export const CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA = z.object({
+  originalPremise: z.string().trim().max(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH),
+  handoffSummary: z
+    .object({
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept']]: z
+        .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
+        .max(3),
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['relationship-dynamic']]: z
+        .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
+        .max(3),
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]: z
+        .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
+        .max(3),
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone]: z
+        .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
+        .max(3),
+    })
+    .default({
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept']]: [],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['relationship-dynamic']]: [],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]: [],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone]: [],
+    }),
+});
+
 export const CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA = z
   .object({
     originalPremise: z.string(),
@@ -142,7 +180,16 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   contextAttachments: z.array(CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA).max(8).optional().default([]),
   guidedStep: GUIDED_STEP_ID_SCHEMA.optional(),
   concept: CHARACTER_CONCEPT_SCHEMA.optional(),
+  discoveryContext: CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA.optional(),
   templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(4).optional().default([]),
+}).superRefine((request, ctx) => {
+  if (request.guidedStep && request.discoveryContext === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Guided assistant requests must include discovery context.',
+      path: ['discoveryContext'],
+    });
+  }
 });
 
 export const CHARACTER_ASSISTANT_STREAM_EVENT_TYPE_SCHEMA = z.enum([
@@ -219,4 +266,6 @@ export type iCharacterAssistantDiscoveryDirectionCategory = z.infer<
 export type iCharacterAssistantDiscoveryDirectionCard = z.infer<
   typeof CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA
 >;
+export type iCharacterAssistantDiscoveryContextCard = z.infer<typeof CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA>;
+export type iCharacterAssistantDiscoveryContext = z.infer<typeof CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA>;
 export type iCharacterAssistantDiscoveryState = z.infer<typeof CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA>;

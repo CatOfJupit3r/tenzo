@@ -21,6 +21,7 @@ import type {
   iChatTemplateRef,
   iCharacterAssistantMessage,
 } from '../lib/character-assistant-contracts';
+import { buildBoundedDiscoveryContext } from '../lib/character-assistant-discovery-state';
 import { consumeCharacterAssistantStream } from '../lib/character-assistant-stream';
 import {
   applyCharacterEditProposal,
@@ -225,6 +226,10 @@ export function useCharacterAssistantWorkspace({
       const isGuidedRun = currentSession.mode === 'guided' && currentSession.guided !== null;
       const guidedStep = isGuidedRun ? currentSession.guided?.currentStep : undefined;
       const guidedConcept = isGuidedRun ? (currentSession.guided?.concept ?? undefined) : undefined;
+      const discoveryContext =
+        isGuidedRun && currentSession.guided?.discovery
+          ? buildBoundedDiscoveryContext(currentSession.guided.discovery)
+          : undefined;
       const combinedAttachments = [
         ...contextAttachments,
         ...(isGuidedRun ? (currentSession.guided?.attachments ?? []) : []),
@@ -276,6 +281,7 @@ export function useCharacterAssistantWorkspace({
             contextAttachments: combinedAttachments,
             guidedStep,
             concept: guidedConcept,
+            discoveryContext,
             templates: options.templates ?? [],
           }),
         });

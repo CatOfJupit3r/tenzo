@@ -4,12 +4,12 @@ import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/
 
 import { handleCharacterAssistantDiscoveryRequest } from '../../../routes/api/character-assistant-discovery';
 
-const { generateObjectMock } = vi.hoisted(() => ({
-  generateObjectMock: vi.fn(),
+const { generateValidatedObjectMock } = vi.hoisted(() => ({
+  generateValidatedObjectMock: vi.fn(),
 }));
 
-vi.mock('ai', () => ({
-  generateObject: generateObjectMock,
+vi.mock('@~/features/character-creator/lib/structured-output.server', () => ({
+  generateValidatedObject: generateValidatedObjectMock,
 }));
 
 const BASE_REQUEST = {
@@ -37,23 +37,21 @@ function createRequest(payload: typeof BASE_REQUEST) {
 
 describe('character assistant discovery generation route', () => {
   it('returns three scoping cards for a single requested category', async () => {
-    generateObjectMock.mockResolvedValueOnce({
-      object: {
-        cards: [
-          {
-            title: 'Candid and careful',
-            description: 'The character keeps emotional distance, but still answers every question directly.',
-          },
-          {
-            title: 'Dry and precise',
-            description: 'The character speaks in clear clauses and trims every sentence to its core.',
-          },
-          {
-            title: 'Quietly theatrical',
-            description: 'The character layers humor over anxiety, then reveals an old wound at the end.',
-          },
-        ],
-      },
+    generateValidatedObjectMock.mockResolvedValueOnce({
+      cards: [
+        {
+          title: 'Candid and careful',
+          description: 'The character keeps emotional distance, but still answers every question directly.',
+        },
+        {
+          title: 'Dry and precise',
+          description: 'The character speaks in clear clauses and trims every sentence to its core.',
+        },
+        {
+          title: 'Quietly theatrical',
+          description: 'The character layers humor over anxiety, then reveals an old wound at the end.',
+        },
+      ],
     });
 
     const response = await handleCharacterAssistantDiscoveryRequest({
@@ -71,23 +69,21 @@ describe('character assistant discovery generation route', () => {
   });
 
   it('rejects malformed output when cards are materially duplicate', async () => {
-    generateObjectMock.mockResolvedValueOnce({
-      object: {
-        cards: [
-          {
-            title: 'Candid and careful',
-            description: 'The character keeps emotional distance, but still answers every question directly.',
-          },
-          {
-            title: 'Candid and careful',
-            description: 'The character keeps emotional distance, but still answers every question directly.',
-          },
-          {
-            title: 'Dry and precise',
-            description: 'The character speaks in clear clauses and trims every sentence to its core.',
-          },
-        ],
-      },
+    generateValidatedObjectMock.mockResolvedValueOnce({
+      cards: [
+        {
+          title: 'Candid and careful',
+          description: 'The character keeps emotional distance, but still answers every question directly.',
+        },
+        {
+          title: 'Candid and careful',
+          description: 'The character keeps emotional distance, but still answers every question directly.',
+        },
+        {
+          title: 'Dry and precise',
+          description: 'The character speaks in clear clauses and trims every sentence to its core.',
+        },
+      ],
     });
 
     const response = await handleCharacterAssistantDiscoveryRequest({

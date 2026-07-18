@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import type { ModelMessage } from 'ai';
 import { ZodError } from 'zod';
 
 import { GUIDED_STEP_DEFINITIONS } from '@~/features/character-creator/constants/guided-flow';
@@ -22,7 +23,7 @@ import type {
   CharacterAssistantToolName,
   iCharacterAssistantStreamEvent,
 } from '@~/features/character-creator/lib/character-assistant-contracts';
-import { createCharacterAssistantMastra } from '@~/features/character-creator/lib/character-assistant-mastra.server';
+import { streamCharacterAssistant } from '@~/features/character-creator/lib/character-assistant-runtime.server';
 import { createCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
 import type { iCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
 import { TEMPLATE_FIELD_KEYS } from '@~/features/character-creator/lib/field-templates';
@@ -35,14 +36,12 @@ function encodeServerEvent(event: iCharacterAssistantStreamEvent) {
   return textEncoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
 }
 
-function toMastraMessage(
+function toModelMessage(
   message: (typeof CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA)['shape']['messages']['element']['_output'],
-) {
+): ModelMessage {
   return {
-    id: message.id,
     role: message.role,
     content: message.content,
-    createdAt: new Date(message.createdAt),
   };
 }
 
@@ -228,7 +227,7 @@ export const Route = createFileRoute('/api/character-assistant')({
                     );
                   },
                 };
-                const { assistant } = createCharacterAssistantMastra({
+                const output = streamCharacterAssistant({
                   card: payload.card,
                   focus: effectiveFocus,
                   contextAttachments: payload.contextAttachments,
@@ -252,16 +251,8 @@ export const Route = createFileRoute('/api/character-assistant')({
                   templates: payload.templates,
                   allowedToolNames,
                   store,
-                });
-                const output = await assistant.stream(payload.messages.map(toMastraMessage), {
+                  messages: payload.messages.map(toModelMessage),
                   maxSteps: payload.guidedStep ? MAX_GUIDED_ASSISTANT_STEPS : MAX_CHARACTER_ASSISTANT_STEPS,
-                  modelSettings: {
-                    maxOutputTokens: payload.maxTokens,
-                    temperature: payload.temperature,
-                    topP: payload.topP,
-                    frequencyPenalty: payload.frequencyPenalty,
-                    presencePenalty: payload.presencePenalty,
-                  },
                   abortSignal: request.signal,
                 });
 
@@ -270,41 +261,40 @@ export const Route = createFileRoute('/api/character-assistant')({
                     enqueueEvent(
                       CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
                         type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
-                        textDelta: chunk.payload.text,
+                        textDelta: chunk.text,
                       }),
                     );
                     continue;
                   }
 
-                  if (chunk.type === 'tool-call' && isCharacterAssistantToolName(chunk.payload.toolName)) {
+                  if (chunk.type === 'tool-call' && isCharacterAssistantToolName(chunk.toolName)) {
                     enqueueEvent(
                       CHARACTER_ASSISTANT_TOOL_CALL_START_EVENT_SCHEMA.parse({
                         type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-start'],
-                        toolCallId: chunk.payload.toolCallId,
-                        toolName: chunk.payload.toolName,
+                        toolCallId: chunk.toolCallId,
+                        toolName: chunk.toolName,
                       }),
                     );
                     continue;
                   }
 
-                  if (chunk.type === 'tool-error' && isCharacterAssistantToolName(chunk.payload.toolName)) {
+                  if (chunk.type === 'tool-error' && isCharacterAssistantToolName(chunk.toolName)) {
                     enqueueEvent(
                       CHARACTER_ASSISTANT_TOOL_CALL_ERROR_EVENT_SCHEMA.parse({
                         type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-error'],
-                        toolCallId: chunk.payload.toolCallId,
-                        toolName: chunk.payload.toolName,
-                        message:
-                          chunk.payload.error instanceof Error ? chunk.payload.error.message : 'Proposal tool failed.',
+                        toolCallId: chunk.toolCallId,
+                        toolName: chunk.toolName,
+                        message: chunk.error instanceof Error ? chunk.error.message : 'Proposal tool failed.',
                       }),
                     );
                   }
                 }
 
-                const fullOutput = await output.getFullOutput();
+                const assistantMessage = await output.text;
                 enqueueEvent(
                   CHARACTER_ASSISTANT_COMPLETE_EVENT_SCHEMA.parse({
                     type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete,
-                    assistantMessage: fullOutput.text.trim() || 'The proposed changes are ready for review.',
+                    assistantMessage: assistantMessage.trim() || 'The proposed changes are ready for review.',
                     proposals: latestProposal ? [latestProposal] : [],
                     concept: recordedConcept,
                   }),

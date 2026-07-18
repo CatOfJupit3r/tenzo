@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { generateObject } from 'ai';
 import { ZodError, z } from 'zod';
 
 import { createCharacterLanguageModel } from '@~/features/character-creator/lib/ai-sdk-text-generation';
@@ -9,6 +8,7 @@ import {
   CHARACTER_CONCEPT_SCHEMA,
 } from '@~/features/character-creator/lib/character-assistant-contracts';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation-stream-contracts';
+import { generateValidatedObject } from '@~/features/character-creator/lib/structured-output.server';
 
 const DISCOVERY_CARD_TITLE_SCHEMA = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA.shape.title
   .min(3, 'Direction titles must be at least 3 characters long.')
@@ -106,20 +106,20 @@ export async function handleCharacterAssistantDiscoveryRequest({ request }: { re
   });
 
   try {
-    const generated = DISCOVERY_ROUTE_GENERATED_RESPONSE_SCHEMA.parse(
-      (
-        await generateObject({
-          model,
-          schema: DISCOVERY_ROUTE_GENERATED_RESPONSE_SCHEMA,
-          schemaName: 'character_assistant_discovery_direction_cards',
-          system: `Generate high-signal direction card text for roleplay concept work only.`,
-          prompt: buildDiscoveryPrompt(payload.originalPremise, payload.category),
-          temperature: payload.temperature,
-          topP: payload.topP,
-          maxOutputTokens: Math.max(1, Math.floor(payload.maxTokens)),
-        })
-      ).object,
-    );
+    const generated = await generateValidatedObject({
+      model,
+      schema: DISCOVERY_ROUTE_GENERATED_RESPONSE_SCHEMA,
+      schemaName: 'character_assistant_discovery_direction_cards',
+      schemaDescription: 'Exactly three distinct roleplay discovery direction cards.',
+      system: 'Generate high-signal direction card text for roleplay concept work only.',
+      prompt: buildDiscoveryPrompt(payload.originalPremise, payload.category),
+      temperature: payload.temperature,
+      topP: payload.topP,
+      frequencyPenalty: payload.frequencyPenalty,
+      presencePenalty: payload.presencePenalty,
+      maxOutputTokens: Math.max(1, Math.floor(payload.maxTokens)),
+      abortSignal: request.signal,
+    });
 
     if (!isMateriallyDistinct(generated.cards)) {
       throw new Error('The model returned non-distinct direction cards.');

@@ -1,6 +1,5 @@
-import { Agent } from '@mastra/core/agent';
-import type { ToolsInput } from '@mastra/core/agent';
-import { Mastra } from '@mastra/core/mastra';
+import { stepCountIs, streamText } from 'ai';
+import type { ModelMessage } from 'ai';
 
 import { GUIDED_STEP_DEFINITIONS } from '../constants/guided-flow';
 import type { GuidedStepId } from '../constants/guided-flow';
@@ -17,7 +16,7 @@ import type {
 } from './character-assistant-contracts';
 import { createCharacterAssistantTools } from './character-assistant-tools';
 
-interface iCreateCharacterAssistantMastraOptions {
+interface iStreamCharacterAssistantOptions {
   card: CharacterCard;
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
@@ -42,6 +41,9 @@ interface iCreateCharacterAssistantMastraOptions {
   templates?: iChatTemplateRef[];
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
   store: Parameters<typeof createCharacterAssistantTools>[0]['store'];
+  messages: ModelMessage[];
+  maxSteps: number;
+  abortSignal?: AbortSignal;
 }
 
 function formatContextAttachment(attachment: iCharacterAssistantContextAttachment) {
@@ -101,7 +103,7 @@ export function buildCharacterAssistantInstructions({
   discoveryContext,
   templates = [],
 }: Pick<
-  iCreateCharacterAssistantMastraOptions,
+  iStreamCharacterAssistantOptions,
   | 'card'
   | 'focus'
   | 'contextAttachments'
@@ -187,7 +189,7 @@ export function buildCharacterAssistantInstructions({
     .join('\n');
 }
 
-export function createCharacterAssistantMastra({
+export function streamCharacterAssistant({
   card,
   focus,
   contextAttachments,
@@ -201,10 +203,11 @@ export function createCharacterAssistantMastra({
   templates = [],
   allowedToolNames,
   store,
-}: iCreateCharacterAssistantMastraOptions) {
-  const assistant = new Agent({
-    id: 'character-assistant',
-    name: 'Character Assistant',
+  messages,
+  maxSteps,
+  abortSignal,
+}: iStreamCharacterAssistantOptions) {
+  return streamText({
     instructions: buildCharacterAssistantInstructions({
       card,
       focus,
@@ -223,16 +226,14 @@ export function createCharacterAssistantMastra({
       minP: generationSettings.minP,
       shouldSendDisabledSamplers,
     }),
-    tools: createCharacterAssistantTools({ focus, store, allowedToolNames }) as ToolsInput,
+    tools: createCharacterAssistantTools({ focus, store, allowedToolNames }),
+    messages,
+    stopWhen: stepCountIs(maxSteps),
+    maxOutputTokens: generationSettings.maxTokens,
+    temperature: generationSettings.temperature,
+    topP: generationSettings.topP,
+    frequencyPenalty: generationSettings.frequencyPenalty,
+    presencePenalty: generationSettings.presencePenalty,
+    abortSignal,
   });
-  const mastra = new Mastra({
-    agents: {
-      characterAssistant: assistant,
-    },
-  });
-
-  return {
-    mastra,
-    assistant: mastra.getAgent('characterAssistant'),
-  };
 }

@@ -15,7 +15,7 @@ import {
   sanitizeCharacterAssistantDiscoveryState,
   buildBoundedDiscoveryContext,
 } from './character-assistant-discovery-state';
-import { buildCharacterAssistantInstructions } from './character-assistant-mastra.server';
+import { buildCharacterAssistantInstructions } from './character-assistant-runtime.server';
 import { createCharacterAssistantTools } from './character-assistant-tools';
 import { createCharacterEditProposal } from './character-edit-proposal';
 

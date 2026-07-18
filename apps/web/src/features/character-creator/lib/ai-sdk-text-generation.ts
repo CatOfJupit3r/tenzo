@@ -84,6 +84,7 @@ export function createCharacterLanguageModel({
     name: 'characterCreator',
     baseURL: normalizeOpenAiCompatibleBaseUrl(endpoint),
     apiKey: apiKey.trim(),
+    supportsStructuredOutputs: true,
     transformRequestBody: (body) => ({
       ...body,
       ...buildSamplerOverrides({

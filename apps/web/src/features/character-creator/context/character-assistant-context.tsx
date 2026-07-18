@@ -74,7 +74,8 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     characterId: activeCharacterId,
     apiKey,
     endpoint: generationSettings.endpoint,
-    model: generationSettings.visionModel.trim() || generationSettings.model,
+    model: generationSettings.model,
+    visionModel: generationSettings.visionModel.trim() || generationSettings.model,
     topP: generationSettings.topP,
     frequencyPenalty: generationSettings.frequencyPenalty,
     presencePenalty: generationSettings.presencePenalty,
@@ -91,14 +92,14 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
       const isDiscoveryMode = options.mode === 'discovery';
       const trimmedPremise = options.originalPremise?.trim();
 
-      if (isDiscoveryMode && trimmedPremise) {
-        await guidedFlow.startGuidedDiscoverySession(trimmedPremise);
-      } else {
-        await guidedFlow.openGuidedSession();
-      }
-
       setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
       setIsAssistantOpen(true);
+
+      if (isDiscoveryMode && trimmedPremise) {
+        await guidedFlow.startGuidedDiscoverySession(trimmedPremise, characterId);
+      } else {
+        await guidedFlow.openGuidedSession(characterId);
+      }
     },
     [guidedFlow],
   );

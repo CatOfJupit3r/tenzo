@@ -23,6 +23,7 @@ import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
+import { CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH } from '../lib/character-assistant-contracts';
 import type { iCharacterLibraryItem } from '../lib/character-library';
 import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/character-library';
 import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
@@ -266,6 +267,7 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
               onChange={(event) => {
                 setDiscoveryPremise(event.target.value);
               }}
+              maxLength={CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH}
               placeholder="Describe a broad premise to generate discovery directions"
             />
             <Button

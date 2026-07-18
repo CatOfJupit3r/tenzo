@@ -127,6 +127,11 @@ export function GuidedDiscoveryStepPanel({
         </Button>
       </div>
 
+      <div className="rounded-md border bg-background/70 p-3">
+        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Original premise</p>
+        <p className="mt-1 text-sm">{discoveryState.originalPremise}</p>
+      </div>
+
       <div
         aria-live="polite"
         aria-atomic="true"

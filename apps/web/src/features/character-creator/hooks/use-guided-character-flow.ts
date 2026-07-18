@@ -19,7 +19,10 @@ import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_IDS } from '../constants/guided-fl
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '../lib/character-assistant-contracts';
 import type { iCharacterAssistantDiscoveryDirectionCategory } from '../lib/character-assistant-contracts';
 import { generateCharacterAssistantDiscoveryDirections } from '../lib/character-assistant-discovery-client';
-import { buildDeterministicDiscoveryHandoffSummary } from '../lib/character-assistant-discovery-state';
+import {
+  buildDeterministicDiscoveryHandoffSummary,
+  hasDiscoveryHandoffSelections,
+} from '../lib/character-assistant-discovery-state';
 import { analyzeCharacterImage } from '../lib/character-vision-client';
 import type { iCharacterImageAnalysis } from '../lib/character-vision-contracts';
 import { deleteCharacterAssetBlob } from '../lib/image-store';
@@ -37,6 +40,7 @@ interface iUseGuidedCharacterFlowOptions {
   apiKey: string;
   endpoint: string;
   model: string;
+  visionModel: string;
   maxTokens: number;
   temperature: number;
   topP: number;
@@ -81,6 +85,7 @@ export function useGuidedCharacterFlow({
   apiKey,
   endpoint,
   model,
+  visionModel,
   maxTokens,
   temperature,
   topP,
@@ -106,15 +111,20 @@ export function useGuidedCharacterFlow({
   );
   const guidedState = session?.mode === 'guided' ? session.guided : null;
   const discoveryState = guidedState?.discovery;
+  const hasCompletedDiscovery = guidedState
+    ? hasDiscoveryHandoffSelections(guidedState.discoveryHandoffSummary)
+    : false;
   const isGuidedDiscoveryMode =
-    guidedState?.currentStep === GUIDED_STEP_IDS.concept && Boolean(discoveryState?.originalPremise.trim());
+    guidedState?.currentStep === GUIDED_STEP_IDS.concept &&
+    Boolean(discoveryState?.originalPremise.trim()) &&
+    !hasCompletedDiscovery;
   const isGuidedComplete = Boolean(session?.mode === 'chat' && session.guided?.completedSteps.includes('review'));
   const currentStepDefinition = guidedState ? GUIDED_STEP_DEFINITIONS[guidedState.currentStep] : null;
   const canContinue = Boolean(
     currentStepDefinition &&
-    (currentStepDefinition.isSkippable ||
-      workspace.hasCompletedCurrentGuidedStepRun ||
-      (isGuidedDiscoveryMode && guidedState?.discovery?.isReadyForHandoff)),
+    (isGuidedDiscoveryMode
+      ? guidedState?.discovery?.isReadyForHandoff
+      : currentStepDefinition.isSkippable || workspace.hasCompletedCurrentGuidedStepRun),
   );
   const discoveryHandoffSummary = guidedState ? buildDeterministicDiscoveryHandoffSummary(guidedState.discovery) : null;
 
@@ -145,7 +155,11 @@ export function useGuidedCharacterFlow({
   );
 
   const generateDirectionsForCategory = useCallback(
-    async (category: iCharacterAssistantDiscoveryDirectionCategory, originalPremise: string) => {
+    async (
+      category: iCharacterAssistantDiscoveryDirectionCategory,
+      originalPremise: string,
+      targetCharacterId = characterId,
+    ) => {
       const controller = new AbortController();
       const previousController = discoveryControllersRef.current[category];
       if (previousController) {
@@ -172,7 +186,7 @@ export function useGuidedCharacterFlow({
           signal: controller.signal,
         });
 
-        await replaceGeneratedGuidedDiscoveryCardsByCategory(characterId, category, cards);
+        await replaceGeneratedGuidedDiscoveryCardsByCategory(targetCharacterId, category, cards);
       } catch (error) {
         if (!isAbortError(error)) {
           const message = error instanceof Error ? error.message : 'Discovery directions could not be regenerated.';
@@ -204,19 +218,19 @@ export function useGuidedCharacterFlow({
   );
 
   const startGuidedDiscoverySession = useCallback(
-    async (originalPremise: string) => {
+    async (originalPremise: string, targetCharacterId = characterId) => {
       const normalizedPremise = originalPremise.trim();
       if (!normalizedPremise) {
         throw new Error('Discovery premise must not be empty.');
       }
 
       setDiscoveryCategoryGenerationState(createEmptyDiscoveryCategoryGenerationState());
-      await startGuidedSession(characterId);
-      await startGuidedDiscovery(characterId, normalizedPremise);
+      await startGuidedSession(targetCharacterId);
+      await startGuidedDiscovery(targetCharacterId, normalizedPremise);
 
       const generationTasks = DISCOVERY_CATEGORIES.map(async (category) => {
         try {
-          await generateDirectionsForCategory(category, normalizedPremise);
+          await generateDirectionsForCategory(category, normalizedPremise, targetCharacterId);
         } catch (error) {
           setCategoryGenerationState(category, {
             errorMessage: error instanceof Error ? error.message : 'Discovery directions could not be regenerated.',
@@ -236,6 +250,8 @@ export function useGuidedCharacterFlow({
 
     if (isGuidedDiscoveryMode) {
       await finishGuidedDiscovery(characterId);
+      setLatestAnalysis(null);
+      return true;
     }
 
     await advanceGuidedStep(characterId);
@@ -268,7 +284,7 @@ export function useGuidedCharacterFlow({
           file,
           endpoint,
           apiKey,
-          model,
+          model: visionModel,
           maxTokens,
           temperature,
           userHint,
@@ -283,7 +299,7 @@ export function useGuidedCharacterFlow({
         setIsAnalyzingImage(false);
       }
     },
-    [apiKey, characterId, currentStepDefinition?.isImageStepAllowed, endpoint, maxTokens, model, temperature],
+    [apiKey, characterId, currentStepDefinition?.isImageStepAllowed, endpoint, maxTokens, temperature, visionModel],
   );
 
   const applyConceptToCard = useCallback(() => {
@@ -345,12 +361,15 @@ export function useGuidedCharacterFlow({
     [setCategoryGenerationState],
   );
 
-  const openGuidedSession = useCallback(async () => {
-    await startGuidedSession(characterId);
-    setLatestAnalysis(null);
-    setImageAnalysisError(null);
-    setDiscoveryCategoryGenerationState(createEmptyDiscoveryCategoryGenerationState());
-  }, [characterId]);
+  const openGuidedSession = useCallback(
+    async (targetCharacterId = characterId) => {
+      await startGuidedSession(targetCharacterId);
+      setLatestAnalysis(null);
+      setImageAnalysisError(null);
+      setDiscoveryCategoryGenerationState(createEmptyDiscoveryCategoryGenerationState());
+    },
+    [characterId],
+  );
 
   const restartGuidedSession = useCallback(async () => {
     await startGuidedSession(characterId);

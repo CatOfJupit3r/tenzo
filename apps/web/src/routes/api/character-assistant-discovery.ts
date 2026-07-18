@@ -66,17 +66,18 @@ function buildDirectionCardId(category: string, index: number) {
 }
 
 function isMateriallyDistinct(values: readonly { title: string; description: string }[]) {
-  const normalized = new Set<string>();
+  const normalizedTitles = new Set<string>();
+  const normalizedDescriptions = new Set<string>();
 
   for (const value of values) {
     const title = value.title.trim().toLowerCase();
     const description = value.description.trim().toLowerCase();
-    const key = `${title}|${description}`;
-    if (normalized.has(key)) {
+    if (normalizedTitles.has(title) || normalizedDescriptions.has(description)) {
       return false;
     }
 
-    normalized.add(key);
+    normalizedTitles.add(title);
+    normalizedDescriptions.add(description);
   }
 
   return true;
@@ -151,7 +152,7 @@ export async function handleCharacterAssistantDiscoveryRequest({ request }: { re
   }
 }
 
-export const Route = createFileRoute('/api/character-assistant-discovery' as never)({
+export const Route = createFileRoute('/api/character-assistant-discovery')({
   server: {
     handlers: {
       POST: handleCharacterAssistantDiscoveryRequest,

@@ -169,3 +169,7 @@ export function buildDeterministicDiscoveryHandoffSummary(
 
   return summary;
 }
+
+export function hasDiscoveryHandoffSelections(summary: iCharacterAssistantDiscoveryHandoffSummary) {
+  return DISCOVERY_CATEGORY_SEQUENCE.some((category) => summary[category].length > 0);
+}

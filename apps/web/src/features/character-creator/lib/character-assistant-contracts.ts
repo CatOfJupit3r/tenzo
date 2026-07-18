@@ -182,14 +182,6 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   concept: CHARACTER_CONCEPT_SCHEMA.optional(),
   discoveryContext: CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA.optional(),
   templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(4).optional().default([]),
-}).superRefine((request, ctx) => {
-  if (request.guidedStep && request.discoveryContext === undefined) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Guided assistant requests must include discovery context.',
-      path: ['discoveryContext'],
-    });
-  }
 });
 
 export const CHARACTER_ASSISTANT_STREAM_EVENT_TYPE_SCHEMA = z.enum([

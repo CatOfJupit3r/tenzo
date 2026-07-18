@@ -291,71 +291,77 @@ export function CharacterAssistantDrawer() {
         </div>
 
         <div className="grid gap-3 border-t bg-background p-4">
-          <form
-            className="grid gap-2"
-            data-character-assistant-form="true"
-            onSubmit={(event) => {
-              event.preventDefault();
+          {guidedFlow.isGuidedDiscoveryMode ? (
+            <p className="text-sm text-muted-foreground">
+              Select and review directions above, then continue to discuss the concept with the assistant.
+            </p>
+          ) : (
+            <form
+              className="grid gap-2"
+              data-character-assistant-form="true"
+              onSubmit={(event) => {
+                event.preventDefault();
 
-              if (!inputValue.trim() || workspace.isRunning || !workspace.isConnectionConfigured) {
-                return;
-              }
-
-              const message = inputValue;
-              const templates = fieldTemplates
-                .filter((template) => inputTemplateIds.includes(template.id))
-                .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
-              setInputValue('');
-              setInputTemplateIds([]);
-              void workspace
-                .sendMessage(message, { templates })
-                .catch((error: unknown) => toastError('Message was not sent', getErrorMessage(error)));
-            }}
-          >
-            <ChatInputEditor
-              value={inputValue}
-              templates={fieldTemplates}
-              preferredFieldKeys={guidedFlow.currentStepDefinition?.suggestedTemplateFieldKeys}
-              isDisabled={workspace.isRunning || !workspace.isConnectionConfigured}
-              placeholder={`Ask about ${focusLabel.toLocaleLowerCase()}...`}
-              onValueChange={(value, templateIds) => {
-                setInputValue(value);
-                setInputTemplateIds(templateIds);
-              }}
-              onSubmit={() => {
-                if (inputValue.trim() && !workspace.isRunning && workspace.isConnectionConfigured) {
-                  const form = document.querySelector<HTMLFormElement>('[data-character-assistant-form="true"]');
-                  form?.requestSubmit();
+                if (!inputValue.trim() || workspace.isRunning || !workspace.isConnectionConfigured) {
+                  return;
                 }
+
+                const message = inputValue;
+                const templates = fieldTemplates
+                  .filter((template) => inputTemplateIds.includes(template.id))
+                  .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
+                setInputValue('');
+                setInputTemplateIds([]);
+                void workspace
+                  .sendMessage(message, { templates })
+                  .catch((error: unknown) => toastError('Message was not sent', getErrorMessage(error)));
               }}
-            />
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={workspace.messages.length === 0}
-                onClick={() => {
-                  void workspace
-                    .clearConversation()
-                    .catch((error: unknown) => toastError('Conversation was not cleared', getErrorMessage(error)));
-                  setInputValue('');
-                  setInputTemplateIds([]);
+            >
+              <ChatInputEditor
+                value={inputValue}
+                templates={fieldTemplates}
+                preferredFieldKeys={guidedFlow.currentStepDefinition?.suggestedTemplateFieldKeys}
+                isDisabled={workspace.isRunning || !workspace.isConnectionConfigured}
+                placeholder={`Ask about ${focusLabel.toLocaleLowerCase()}...`}
+                onValueChange={(value, templateIds) => {
+                  setInputValue(value);
+                  setInputTemplateIds(templateIds);
                 }}
-              >
-                New conversation
-              </Button>
-              {workspace.isRunning ? (
-                <Button type="button" size="sm" variant="outline" onClick={workspace.cancelRun}>
-                  Stop
+                onSubmit={() => {
+                  if (inputValue.trim() && !workspace.isRunning && workspace.isConnectionConfigured) {
+                    const form = document.querySelector<HTMLFormElement>('[data-character-assistant-form="true"]');
+                    form?.requestSubmit();
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={workspace.messages.length === 0}
+                  onClick={() => {
+                    void workspace
+                      .clearConversation()
+                      .catch((error: unknown) => toastError('Conversation was not cleared', getErrorMessage(error)));
+                    setInputValue('');
+                    setInputTemplateIds([]);
+                  }}
+                >
+                  New conversation
                 </Button>
-              ) : (
-                <Button type="submit" size="sm" disabled={!inputValue.trim() || !workspace.isConnectionConfigured}>
-                  Send
-                </Button>
-              )}
-            </div>
-          </form>
+                {workspace.isRunning ? (
+                  <Button type="button" size="sm" variant="outline" onClick={workspace.cancelRun}>
+                    Stop
+                  </Button>
+                ) : (
+                  <Button type="submit" size="sm" disabled={!inputValue.trim() || !workspace.isConnectionConfigured}>
+                    Send
+                  </Button>
+                )}
+              </div>
+            </form>
+          )}
         </div>
       </DialogContent>
     </Dialog>

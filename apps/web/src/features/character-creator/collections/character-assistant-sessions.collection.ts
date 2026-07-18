@@ -198,6 +198,10 @@ export async function finishGuidedDiscovery(characterId: string) {
       return;
     }
 
+    if (!draft.guided.discovery.isReadyForHandoff) {
+      throw new Error('Select at least one discovery direction before continuing.');
+    }
+
     draft.guided.discoveryHandoffSummary = buildDeterministicDiscoveryHandoffSummary(draft.guided.discovery);
   });
 }

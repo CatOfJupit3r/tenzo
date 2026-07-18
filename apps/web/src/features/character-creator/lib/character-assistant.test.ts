@@ -70,7 +70,7 @@ describe('character assistant contracts', () => {
     });
   });
 
-  it('requires discovery context for guided requests', () => {
+  it('accepts guided requests with or without discovery context', () => {
     const baseRequest = {
       endpoint: 'http://localhost:1234',
       apiKey: 'key',
@@ -89,7 +89,7 @@ describe('character assistant contracts', () => {
       guidedStep: GUIDED_STEP_IDS.appearance,
     };
 
-    expect(CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA.safeParse(baseRequest).success).toBe(false);
+    expect(CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA.safeParse(baseRequest).success).toBe(true);
 
     expect(
       CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA.safeParse({

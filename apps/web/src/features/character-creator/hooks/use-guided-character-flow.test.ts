@@ -24,6 +24,7 @@ type iMockSession = ReturnType<typeof createCharacterAssistantSession>;
 
 const mockSessions = new Map<string, iMockSession>();
 const mockGenerationErrors = new Set<iCharacterAssistantDiscoveryDirectionCategory>();
+const mockGenerationModels: string[] = [];
 const mockDiscoveredCardsByCategory = new Map<
   iCharacterAssistantDiscoveryDirectionCategory,
   iCharacterAssistantDiscoveryDirectionCard[]
@@ -243,7 +244,8 @@ vi.mock('../collections/character-assistant-sessions.collection', () => ({
 
 vi.mock('../lib/character-assistant-discovery-client', () => ({
   generateCharacterAssistantDiscoveryDirections: vi.fn(
-    async ({ category }: { category: iCharacterAssistantDiscoveryDirectionCategory }) => {
+    async ({ category, model }: { category: iCharacterAssistantDiscoveryDirectionCategory; model: string }) => {
+      mockGenerationModels.push(model);
       if (mockGenerationErrors.has(category)) {
         throw new Error(`Generation for ${category} failed.`);
       }
@@ -270,6 +272,7 @@ function renderGuidedFlow(characterId: string) {
       apiKey: 'key',
       endpoint: 'https://api.example.com',
       model: 'model',
+      visionModel: 'vision-model',
       maxTokens: 1024,
       temperature: 0.8,
       topP: 0.9,
@@ -288,6 +291,7 @@ function renderGuidedFlow(characterId: string) {
 beforeEach(() => {
   resetMockSessions();
   mockGenerationErrors.clear();
+  mockGenerationModels.length = 0;
   mockDiscoveredCardsByCategory.clear();
 });
 
@@ -317,6 +321,7 @@ describe('use-guided-character-flow discovery orchestration', () => {
 
     const readySession = getMockSession(characterId);
     expect(readySession?.guided?.discovery.cards.length).toBe(12);
+    expect(mockGenerationModels).toEqual(['model', 'model', 'model', 'model']);
     expect(result.current.canContinue).toBe(false);
 
     const conceptCard = assertDirectionCard(
@@ -343,11 +348,28 @@ describe('use-guided-character-flow discovery orchestration', () => {
       throw new Error('Expected discovery handoff summary after continue.');
     }
     expect(afterContinueSession?.mode).toBe(CHARACTER_ASSISTANT_SESSION_MODES.guided);
-    expect(afterContinueSession?.guided?.currentStep).toBe(GUIDED_STEP_IDS.appearance);
+    expect(afterContinueSession?.guided?.currentStep).toBe(GUIDED_STEP_IDS.concept);
+    expect(afterContinueSession?.guided?.completedSteps).not.toContain(GUIDED_STEP_IDS.concept);
+    expect(result.current.isGuidedDiscoveryMode).toBe(false);
     expect(afterContinueSummary[CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept']]).toHaveLength(
       1,
     );
     expect(afterContinueSummary[CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]).toEqual([]);
+  });
+
+  it('starts discovery for an explicitly targeted newly created character', async () => {
+    const activeCharacterId = 'previous-character';
+    const targetCharacterId = 'new-character';
+    const premise = 'A lost prince hires the thief who stole his crown.';
+    const { result } = renderGuidedFlow(activeCharacterId);
+
+    await act(async () => {
+      await result.current.startGuidedDiscoverySession(premise, targetCharacterId);
+    });
+
+    expect(getMockSession(activeCharacterId)).toBeNull();
+    expect(getMockSession(targetCharacterId)?.guided?.discovery.originalPremise).toBe(premise);
+    expect(getMockSession(targetCharacterId)?.guided?.discovery.cards).toHaveLength(12);
   });
 
   it('isolates category regeneration failures to the requested discovery category', async () => {

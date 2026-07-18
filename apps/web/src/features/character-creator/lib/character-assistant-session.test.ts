@@ -668,4 +668,16 @@ describe('character assistant sessions', () => {
     expect(restartedSession.guided?.discoveryHandoffSummary).toEqual(createDiscoveryHandoffSummaryDefault());
     characterAssistantSessionsCollection.delete(characterId);
   });
+
+  it('requires a selection before finishing discovery', async () => {
+    const characterId = 'guided-discovery-empty-handoff';
+    await startGuidedSession(characterId);
+    await startGuidedDiscovery(characterId, 'Two strangers inherit opposite halves of an impossible map.');
+
+    await expect(finishGuidedDiscovery(characterId)).rejects.toThrowError(
+      'Select at least one discovery direction before continuing.',
+    );
+
+    characterAssistantSessionsCollection.delete(characterId);
+  });
 });

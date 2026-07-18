@@ -21,7 +21,11 @@ import type {
   iChatTemplateRef,
   iCharacterAssistantMessage,
 } from '../lib/character-assistant-contracts';
-import { buildBoundedDiscoveryContext } from '../lib/character-assistant-discovery-state';
+import {
+  buildBoundedDiscoveryContext,
+  buildDeterministicDiscoveryHandoffSummary,
+  hasDiscoveryHandoffSelections,
+} from '../lib/character-assistant-discovery-state';
 import { consumeCharacterAssistantStream } from '../lib/character-assistant-stream';
 import {
   applyCharacterEditProposal,
@@ -226,10 +230,14 @@ export function useCharacterAssistantWorkspace({
       const isGuidedRun = currentSession.mode === 'guided' && currentSession.guided !== null;
       const guidedStep = isGuidedRun ? currentSession.guided?.currentStep : undefined;
       const guidedConcept = isGuidedRun ? (currentSession.guided?.concept ?? undefined) : undefined;
+      const guidedDiscovery = isGuidedRun ? currentSession.guided?.discovery : undefined;
+      const hasDiscoveryContext = Boolean(
+        guidedDiscovery &&
+        (guidedDiscovery.originalPremise.trim() ||
+          hasDiscoveryHandoffSelections(buildDeterministicDiscoveryHandoffSummary(guidedDiscovery))),
+      );
       const discoveryContext =
-        isGuidedRun && currentSession.guided?.discovery
-          ? buildBoundedDiscoveryContext(currentSession.guided.discovery)
-          : undefined;
+        guidedDiscovery && hasDiscoveryContext ? buildBoundedDiscoveryContext(guidedDiscovery) : undefined;
       const combinedAttachments = [
         ...contextAttachments,
         ...(isGuidedRun ? (currentSession.guided?.attachments ?? []) : []),

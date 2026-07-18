@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/character-creator/lib/character-assistant-contracts';
 
-import { handleCharacterAssistantDiscoveryRequest } from './character-assistant-discovery';
+import { handleCharacterAssistantDiscoveryRequest } from '../../../routes/api/character-assistant-discovery';
 
 const { generateObjectMock } = vi.hoisted(() => ({
   generateObjectMock: vi.fn(),

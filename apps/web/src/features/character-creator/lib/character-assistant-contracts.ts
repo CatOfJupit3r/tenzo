@@ -79,6 +79,55 @@ export const CHAT_TEMPLATE_REF_SCHEMA = STORED_FIELD_TEMPLATE_SCHEMA.pick({
 export type iCharacterConcept = z.infer<typeof CHARACTER_CONCEPT_SCHEMA>;
 export type iChatTemplateRef = z.infer<typeof CHAT_TEMPLATE_REF_SCHEMA>;
 
+export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA = z.enum([
+  'character-concept',
+  'relationship-dynamic',
+  'scenario',
+  'tone',
+]);
+export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES =
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA.enum;
+
+export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA = z.object({
+  id: z.string().trim().min(1),
+  category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
+  title: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  sourceCardId: z.string().trim().min(1).nullable(),
+  isUserAuthored: z.boolean(),
+});
+
+export const CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA = z
+  .object({
+    originalPremise: z.string(),
+    cards: z.array(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA),
+    selectedCardIds: z.array(z.string().trim().min(1)),
+    isReadyForHandoff: z.boolean().optional(),
+  })
+  .transform((state) => {
+    const cardIds = new Set(state.cards.map((card) => card.id));
+    const deduplicatedSelectedCardIds = [...new Set(state.selectedCardIds)].filter((cardId) => cardIds.has(cardId));
+
+    return {
+      ...state,
+      selectedCardIds: deduplicatedSelectedCardIds,
+      isReadyForHandoff: deduplicatedSelectedCardIds.length > 0,
+    };
+  })
+  .default({
+    originalPremise: '',
+    cards: [],
+    selectedCardIds: [],
+    isReadyForHandoff: false,
+  });
+
+export const CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT = {
+  originalPremise: '',
+  cards: [],
+  selectedCardIds: [],
+  isReadyForHandoff: false,
+};
+
 const CHARACTER_ASSISTANT_GENERATION_SETTINGS_SCHEMA = CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA.omit({
   instructions: true,
   messages: true,
@@ -164,3 +213,10 @@ export type iCharacterAssistantConcept = z.infer<typeof CHARACTER_CONCEPT_SCHEMA
 export type iCharacterAssistantMessage = z.infer<typeof CHARACTER_ASSISTANT_MESSAGE_SCHEMA>;
 export type iCharacterAssistantStreamRequest = z.infer<typeof CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA>;
 export type iCharacterAssistantStreamEvent = z.infer<typeof CHARACTER_ASSISTANT_STREAM_EVENT_SCHEMA>;
+export type iCharacterAssistantDiscoveryDirectionCategory = z.infer<
+  typeof CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA
+>;
+export type iCharacterAssistantDiscoveryDirectionCard = z.infer<
+  typeof CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA
+>;
+export type iCharacterAssistantDiscoveryState = z.infer<typeof CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA>;

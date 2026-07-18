@@ -3,9 +3,12 @@ import { z } from 'zod';
 import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-flow';
 import {
   CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA,
+  CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT,
+  CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA,
   CHARACTER_CONCEPT_SCHEMA,
   CHARACTER_ASSISTANT_MESSAGE_SCHEMA,
 } from './character-assistant-contracts';
+import { sanitizeCharacterAssistantDiscoveryState } from './character-assistant-discovery-state';
 import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from './character-edit-proposal';
 
 export const CHARACTER_ASSISTANT_SESSION_MODE_SCHEMA = z.enum(['chat', 'guided']);
@@ -25,6 +28,9 @@ export const CHARACTER_ASSISTANT_SESSION_SCHEMA = z.object({
       completedSteps: z.array(GUIDED_STEP_ID_SCHEMA),
       concept: CHARACTER_CONCEPT_SCHEMA.nullable(),
       attachments: z.array(CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA).max(4),
+      discovery: CHARACTER_ASSISTANT_DISCOVERY_STATE_SCHEMA.optional().default(
+        CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT,
+      ),
     })
     .nullable()
     .default(null),
@@ -63,6 +69,13 @@ export function sanitizeCharacterAssistantSession(value: unknown): iCharacterAss
     : [];
   const modeResult = CHARACTER_ASSISTANT_SESSION_MODE_SCHEMA.safeParse(candidate.mode);
   const guidedResult = CHARACTER_ASSISTANT_SESSION_SCHEMA.shape.guided.safeParse(candidate.guided);
+  const guided =
+    guidedResult.success && guidedResult.data
+      ? {
+          ...guidedResult.data,
+          discovery: sanitizeCharacterAssistantDiscoveryState(guidedResult.data.discovery),
+        }
+      : null;
 
   return CHARACTER_ASSISTANT_SESSION_SCHEMA.parse({
     id: characterId,
@@ -75,7 +88,7 @@ export function sanitizeCharacterAssistantSession(value: unknown): iCharacterAss
       modeResult.success && (modeResult.data !== CHARACTER_ASSISTANT_SESSION_MODES.guided || guidedResult.success)
         ? modeResult.data
         : CHARACTER_ASSISTANT_SESSION_MODES.chat,
-    guided: guidedResult.success ? guidedResult.data : null,
+    guided,
   });
 }
 

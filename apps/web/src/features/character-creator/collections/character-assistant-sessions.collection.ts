@@ -3,6 +3,7 @@ import { createCollection, localStorageCollectionOptions } from '@tanstack/react
 import { localStorageApi } from '@~/db/storage';
 
 import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
+import { CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT } from '../lib/character-assistant-contracts';
 import type { iCharacterConcept, iCharacterAssistantContextAttachment } from '../lib/character-assistant-contracts';
 import {
   CHARACTER_ASSISTANT_SESSION_SCHEMA,
@@ -82,6 +83,7 @@ export async function startGuidedSession(characterId: string) {
       completedSteps: [],
       concept: null,
       attachments: [],
+      discovery: CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT,
     };
   });
 }

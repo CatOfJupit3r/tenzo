@@ -1,5 +1,5 @@
 import { useAtomValue } from 'jotai';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuSparkles, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
 
 import {
@@ -15,6 +15,8 @@ import {
 } from '@~/components/ui/alert-dialog';
 import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button';
+import { Input } from '@~/components/ui/input';
+import { Label } from '@~/components/ui/label';
 import { cn } from '@~/lib/utils';
 
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
@@ -165,11 +167,23 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
     openImportDialog,
   } = useCharacterCreatorActions();
   const { openAssistantInGuidedMode } = useCharacterAssistant();
+  const [discoveryPremise, setDiscoveryPremise] = useState('');
 
   const handleCreateWithAssistant = useCallback(async () => {
     const characterId = handleCreateCharacter();
     await openAssistantInGuidedMode(characterId);
   }, [handleCreateCharacter, openAssistantInGuidedMode]);
+
+  const handleCreateWithDiscovery = useCallback(async () => {
+    const normalizedPremise = discoveryPremise.trim();
+    if (!normalizedPremise) {
+      return;
+    }
+
+    const characterId = handleCreateCharacter();
+    await openAssistantInGuidedMode(characterId, { mode: 'discovery', originalPremise: normalizedPremise });
+    setDiscoveryPremise('');
+  }, [discoveryPremise, handleCreateCharacter, openAssistantInGuidedMode]);
 
   const characterCountLabel = useMemo(() => {
     if (!isCharacterLibraryReady && characterLibrary.length === 0) {
@@ -232,14 +246,37 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" size="sm" onClick={handleCreateWithAssistant}>
+          <div className="grid gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" size="sm" onClick={handleCreateWithAssistant}>
+                <LuSparkles className="size-4" />
+                Create with Assistant (direct)
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={handleCreateCharacter}>
+                <LuPlus className="size-4" />
+                New
+              </Button>
+            </div>
+            <Label htmlFor="discovery-premise" className="text-xs text-muted-foreground">
+              Discovery from broad premise
+            </Label>
+            <Input
+              id="discovery-premise"
+              value={discoveryPremise}
+              onChange={(event) => {
+                setDiscoveryPremise(event.target.value);
+              }}
+              placeholder="Describe a broad premise to generate discovery directions"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={discoveryPremise.trim().length === 0}
+              onClick={handleCreateWithDiscovery}
+            >
               <LuSparkles className="size-4" />
-              Create with Assistant
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={handleCreateCharacter}>
-              <LuPlus className="size-4" />
-              New
+              Discover and open guide
             </Button>
           </div>
           <Button type="button" size="sm" variant="outline" onClick={openImportDialog}>

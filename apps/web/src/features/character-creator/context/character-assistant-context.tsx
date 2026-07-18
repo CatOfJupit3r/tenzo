@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
-import { startGuidedSession } from '../collections/character-assistant-sessions.collection';
 import { useCharacterAssistantWorkspace } from '../hooks/use-character-assistant-workspace';
 import { useGuidedCharacterFlow } from '../hooks/use-guided-character-flow';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
@@ -76,17 +75,33 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     apiKey,
     endpoint: generationSettings.endpoint,
     model: generationSettings.visionModel.trim() || generationSettings.model,
+    topP: generationSettings.topP,
+    frequencyPenalty: generationSettings.frequencyPenalty,
+    presencePenalty: generationSettings.presencePenalty,
+    topK: generationSettings.topK,
+    minP: generationSettings.minP,
     maxTokens: generationSettings.maxTokens,
     temperature: generationSettings.temperature,
     updateGeneralCharacterIdea,
     workspace,
   });
 
-  const openAssistantInGuidedMode = useCallback(async (characterId: string) => {
-    await startGuidedSession(characterId);
-    setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
-    setIsAssistantOpen(true);
-  }, []);
+  const openAssistantInGuidedMode = useCallback(
+    async (characterId: string, options: { mode?: 'direct' | 'discovery'; originalPremise?: string } = {}) => {
+      const isDiscoveryMode = options.mode === 'discovery';
+      const trimmedPremise = options.originalPremise?.trim();
+
+      if (isDiscoveryMode && trimmedPremise) {
+        await guidedFlow.startGuidedDiscoverySession(trimmedPremise);
+      } else {
+        await guidedFlow.openGuidedSession();
+      }
+
+      setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
+      setIsAssistantOpen(true);
+    },
+    [guidedFlow],
+  );
 
   const value = useMemo(
     () => ({

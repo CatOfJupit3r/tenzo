@@ -7,12 +7,14 @@ import { Button } from '@~/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
 import { cn } from '@~/lib/utils';
 
+import { GUIDED_STEP_IDS } from '../constants/guided-flow';
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
 import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
 import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
 import { ChatInputEditor } from './editor/chat-input-editor';
+import { GuidedDiscoveryStepPanel } from './guided-flow/guided-discovery-step-panel';
 import { GuidedImageStep } from './guided-flow/guided-image-step';
 import { GuidedStepHeader } from './guided-flow/guided-step-header';
 import { GuidedStepPanel } from './guided-flow/guided-step-panel';
@@ -34,7 +36,11 @@ export function CharacterAssistantDrawer() {
   const [inputValue, setInputValue] = useState('');
   const [inputTemplateIds, setInputTemplateIds] = useState<string[]>([]);
   const { guidedState } = guidedFlow;
+  const discoveryState = guidedState?.discovery;
   const isGuided = Boolean(guidedState && guidedFlow.currentStepDefinition);
+  const isDiscoveryConcept = Boolean(
+    guidedState && guidedFlow.currentStepDefinition?.id === GUIDED_STEP_IDS.concept && discoveryState?.originalPremise,
+  );
   const focusLabel =
     assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field
       ? formatFieldLabel(assistantFocus.fieldKey)
@@ -64,6 +70,41 @@ export function CharacterAssistantDrawer() {
     }
   };
 
+  let guidedStepPanel = null;
+
+  if (isGuided && guidedFlow.currentStepDefinition && discoveryState) {
+    if (isDiscoveryConcept) {
+      guidedStepPanel = (
+        <GuidedDiscoveryStepPanel
+          definition={guidedFlow.currentStepDefinition}
+          canContinue={guidedFlow.canContinue}
+          isRunning={workspace.isRunning}
+          hasUnappliedProposals={workspace.activeProposals.length > 0}
+          discoveryState={discoveryState}
+          generationState={guidedFlow.discoveryCategoryGenerationState}
+          onContinue={guidedFlow.continueToNextStep}
+          onExit={guidedFlow.exitGuidedMode}
+          onRegenerateCategory={guidedFlow.regenerateDiscoveryCategory}
+          onCancelGeneration={guidedFlow.cancelDiscoveryGeneration}
+          onToggleSelection={guidedFlow.toggleDiscoverySelection}
+          onCreateCustomDirection={guidedFlow.createDiscoveryCustomVariant}
+        />
+      );
+    } else {
+      guidedStepPanel = (
+        <GuidedStepPanel
+          definition={guidedFlow.currentStepDefinition}
+          canContinue={guidedFlow.canContinue}
+          isRunning={workspace.isRunning}
+          hasUnappliedProposals={workspace.activeProposals.length > 0}
+          onContinue={guidedFlow.continueToNextStep}
+          onSkip={guidedFlow.skipStep}
+          onExit={guidedFlow.exitGuidedMode}
+        />
+      );
+    }
+  }
+
   return (
     <Dialog open={isAssistantOpen} onOpenChange={(isOpen) => (isOpen ? undefined : closeAssistant())}>
       <DialogContent className="top-0 right-0 bottom-0 left-auto h-svh w-full max-w-full translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 rounded-none border-y-0 border-r-0 p-0 sm:max-w-lg">
@@ -88,17 +129,7 @@ export function CharacterAssistantDrawer() {
 
         <div className="min-h-0 overflow-y-auto">
           <div className="grid gap-5 p-5">
-            {isGuided && guidedFlow.currentStepDefinition ? (
-              <GuidedStepPanel
-                definition={guidedFlow.currentStepDefinition}
-                canContinue={guidedFlow.canContinue}
-                isRunning={workspace.isRunning}
-                hasUnappliedProposals={workspace.activeProposals.length > 0}
-                onContinue={guidedFlow.continueToNextStep}
-                onSkip={guidedFlow.skipStep}
-                onExit={guidedFlow.exitGuidedMode}
-              />
-            ) : null}
+            {guidedStepPanel}
             {isGuided && guidedFlow.currentStepDefinition?.isImageStepAllowed ? (
               <GuidedImageStep
                 analysis={guidedFlow.latestAnalysis}

@@ -1,18 +1,44 @@
 import { createCollection, localStorageCollectionOptions } from '@tanstack/react-db';
+import { z } from 'zod';
 
 import { localStorageApi } from '@~/db/storage';
 
 import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
-import { CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT } from '../lib/character-assistant-contracts';
-import type { iCharacterConcept, iCharacterAssistantContextAttachment } from '../lib/character-assistant-contracts';
+import {
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
+  CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT,
+  CHARACTER_CONCEPT_SCHEMA,
+} from '../lib/character-assistant-contracts';
+import type {
+  iCharacterConcept,
+  iCharacterAssistantContextAttachment,
+  iCharacterAssistantDiscoveryDirectionCategory,
+  iCharacterAssistantDiscoveryDirectionCard,
+} from '../lib/character-assistant-contracts';
+import {
+  buildDeterministicDiscoveryHandoffSummary,
+  createCustomizedDirectionCard,
+  replaceGeneratedDiscoveryCardsByCategory,
+  toggleDirectionCardSelection,
+} from '../lib/character-assistant-discovery-state';
 import {
   CHARACTER_ASSISTANT_SESSION_SCHEMA,
   CHARACTER_ASSISTANT_SESSION_MODES,
   createCharacterAssistantSession,
+  createDiscoveryHandoffSummaryDefault,
 } from '../lib/character-assistant-session';
 import type { iCharacterAssistantSession } from '../lib/character-assistant-session';
 import { migrateCharacterAssistantSessionStorage } from '../lib/character-assistant-session-storage';
 import { deleteGuidedReferenceAssetBlobs } from '../lib/image-store';
+
+const CUSTOMIZED_DISCOVERY_CARD_SCHEMA = z.object({
+  id: z.string().trim().min(1),
+  title: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA.shape.title,
+  description: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA.shape.description,
+});
+const DISCOVERY_PREMISE_SCHEMA = CHARACTER_CONCEPT_SCHEMA.shape.premise;
+const DISCOVERY_CATEGORY_SCHEMA = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA;
 
 export const CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY = 'tenzo:character-creator:assistant-sessions:v2';
 const LEGACY_CHARACTER_AGENT_SESSION_STORAGE_KEYS = [
@@ -84,7 +110,115 @@ export async function startGuidedSession(characterId: string) {
       concept: null,
       attachments: [],
       discovery: CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT,
+      discoveryHandoffSummary: createDiscoveryHandoffSummaryDefault(),
     };
+  });
+}
+
+export async function startGuidedDiscovery(characterId: string, originalPremise: string) {
+  const session = await ensureCharacterAssistantSession(characterId);
+  const parsedOriginalPremise = DISCOVERY_PREMISE_SCHEMA.parse(originalPremise);
+
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (!draft.guided) {
+      return;
+    }
+
+    draft.guided.discovery = {
+      originalPremise: parsedOriginalPremise,
+      cards: [],
+      selectedCardIds: [],
+      isReadyForHandoff: false,
+    };
+    draft.guided.discoveryHandoffSummary = createDiscoveryHandoffSummaryDefault();
+  });
+}
+
+export async function replaceGeneratedGuidedDiscoveryCardsByCategory(
+  characterId: string,
+  category: iCharacterAssistantDiscoveryDirectionCategory,
+  generatedCards: readonly iCharacterAssistantDiscoveryDirectionCard[],
+) {
+  const parsedCategory = DISCOVERY_CATEGORY_SCHEMA.parse(category);
+  const session = await ensureCharacterAssistantSession(characterId);
+
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (!draft.guided) {
+      return;
+    }
+
+    draft.guided.discovery = replaceGeneratedDiscoveryCardsByCategory(
+      draft.guided.discovery,
+      parsedCategory,
+      generatedCards,
+    );
+  });
+}
+
+export async function toggleGuidedDiscoveryCardSelection(characterId: string, cardId: string) {
+  const session = await ensureCharacterAssistantSession(characterId);
+  const parsedCardId = z.string().trim().min(1).parse(cardId);
+
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (!draft.guided) {
+      return;
+    }
+
+    draft.guided.discovery = toggleDirectionCardSelection(draft.guided.discovery, parsedCardId);
+  });
+}
+
+export async function addCustomizedGuidedDiscoveryCard(
+  characterId: string,
+  sourceCardId: string,
+  customCard: { id: string; title: string; description: string },
+) {
+  const session = await ensureCharacterAssistantSession(characterId);
+  const parsedSourceCardId = z.string().trim().min(1).parse(sourceCardId);
+  const parsedCustomCard = CUSTOMIZED_DISCOVERY_CARD_SCHEMA.parse(customCard);
+
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (!draft.guided) {
+      return;
+    }
+
+    draft.guided.discovery = createCustomizedDirectionCard(
+      draft.guided.discovery,
+      parsedSourceCardId,
+      parsedCustomCard,
+    );
+  });
+}
+
+export async function finishGuidedDiscovery(characterId: string) {
+  const session = await ensureCharacterAssistantSession(characterId);
+
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (!draft.guided) {
+      return;
+    }
+
+    draft.guided.discoveryHandoffSummary = buildDeterministicDiscoveryHandoffSummary(draft.guided.discovery);
+  });
+}
+
+export async function restartGuidedDiscovery(characterId: string) {
+  const session = await ensureCharacterAssistantSession(characterId);
+
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (!draft.guided) {
+      return;
+    }
+
+    const nextDiscovery = {
+      originalPremise: draft.guided.discovery.originalPremise,
+      cards: [],
+      selectedCardIds: [],
+      isReadyForHandoff: false,
+    };
+
+    draft.guided.discovery = nextDiscovery;
+    draft.guided.discoveryHandoffSummary = createDiscoveryHandoffSummaryDefault();
   });
 }
 

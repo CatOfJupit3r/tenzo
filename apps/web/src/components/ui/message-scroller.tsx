@@ -1,9 +1,4 @@
-import {
-  MessageScroller as MessageScrollerPrimitive,
-  useMessageScroller,
-  useMessageScrollerScrollable,
-  useMessageScrollerVisibility,
-} from '@shadcn/react/message-scroller';
+import { MessageScroller as MessageScrollerPrimitive } from '@shadcn/react/message-scroller';
 import type { ComponentProps } from 'react';
 import { LuArrowDown } from 'react-icons/lu';
 

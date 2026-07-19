@@ -36,7 +36,7 @@ export function CharacterCreatorHeader({
   } = useCharacterCreatorContext();
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsDialogTab>(SETTINGS_DIALOG_TABS.connection);
-  const { openAssistant } = useCharacterAssistant();
+  const { isAssistantOpen, openAssistant, closeAssistant } = useCharacterAssistant();
   const activeCharacter =
     characterLibrary.find((character) => character.id === activeCharacterId) ?? characterLibrary[0];
 
@@ -109,9 +109,15 @@ export function CharacterCreatorHeader({
             Settings
           </Button>
 
-          <Button type="button" size="sm" variant="outline" onClick={openAssistant}>
+          <Button
+            type="button"
+            size="sm"
+            variant={isAssistantOpen ? 'secondary' : 'outline'}
+            aria-pressed={isAssistantOpen}
+            onClick={isAssistantOpen ? closeAssistant : openAssistant}
+          >
             <LuSparkles className="size-4" />
-            Assistant
+            {isAssistantOpen ? 'Hide Assistant' : 'Show Assistant'}
           </Button>
 
           <div className="hidden h-5 w-px bg-border sm:block" />

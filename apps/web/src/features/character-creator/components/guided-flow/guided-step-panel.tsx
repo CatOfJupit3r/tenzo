@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LuArrowRight, LuSkipForward } from 'react-icons/lu';
+import { LuArrowRight, LuMessageSquarePlus, LuSkipForward } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
 
@@ -13,6 +13,7 @@ interface iGuidedStepPanelProps {
   onContinue: () => Promise<unknown>;
   onSkip: () => Promise<unknown>;
   onExit: () => Promise<unknown>;
+  onUsePrompt: (prompt: string) => void;
 }
 
 export function GuidedStepPanel({
@@ -23,6 +24,7 @@ export function GuidedStepPanel({
   onContinue,
   onSkip,
   onExit,
+  onUsePrompt,
 }: iGuidedStepPanelProps) {
   const [isConfirmingContinue, setIsConfirmingContinue] = useState(false);
   const runAction = (action: () => Promise<unknown>) => {
@@ -40,11 +42,11 @@ export function GuidedStepPanel({
   };
 
   return (
-    <section className="grid gap-3 rounded-xl border bg-primary/5 p-4" aria-label={`${definition.title} guided step`}>
+    <section className="grid gap-3 rounded-xl border bg-primary/5 p-3" aria-label={`${definition.title} guided step`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium tracking-wide text-primary uppercase">Guided setup</p>
-          <h2 className="text-lg font-semibold">{definition.title}</h2>
+          <h2 className="font-semibold">{definition.title}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{definition.userPrompt}</p>
         </div>
         <button
@@ -55,8 +57,6 @@ export function GuidedStepPanel({
           Exit guided mode
         </button>
       </div>
-
-      <p className="text-xs text-muted-foreground">Apply what you like, then continue.</p>
 
       {isConfirmingContinue ? (
         <div className="grid gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
@@ -73,6 +73,10 @@ export function GuidedStepPanel({
       ) : null}
 
       <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="secondary" onClick={() => onUsePrompt(definition.userPrompt)}>
+          <LuMessageSquarePlus className="size-4" />
+          Use prompt
+        </Button>
         <Button type="button" size="sm" onClick={() => runAction(handleContinue)} disabled={!canContinue || isRunning}>
           Continue
           <LuArrowRight className="size-4" />

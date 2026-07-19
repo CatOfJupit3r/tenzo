@@ -8,9 +8,16 @@ import type { GuidedStepId } from '../../constants/guided-flow';
 interface iGuidedStepHeaderProps {
   currentStep: GuidedStepId;
   completedSteps: readonly GuidedStepId[];
+  isDisabled?: boolean;
+  onStepSelect: (stepId: GuidedStepId) => void;
 }
 
-export function GuidedStepHeader({ currentStep, completedSteps }: iGuidedStepHeaderProps) {
+export function GuidedStepHeader({
+  currentStep,
+  completedSteps,
+  isDisabled = false,
+  onStepSelect,
+}: iGuidedStepHeaderProps) {
   return (
     <nav aria-label="Guided character setup steps">
       <ol className="grid grid-cols-7 gap-1">
@@ -27,20 +34,24 @@ export function GuidedStepHeader({ currentStep, completedSteps }: iGuidedStepHea
 
           return (
             <li key={stepId}>
-              <div
+              <button
+                type="button"
                 aria-current={isCurrent ? 'step' : undefined}
+                aria-label={`Open ${definition.title} scaffold`}
+                disabled={isDisabled}
                 className={cn(
-                  'flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-center text-[10px] transition-colors',
+                  'flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-center text-[10px] transition-colors hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60',
                   stepClassName,
                 )}
+                onClick={() => onStepSelect(stepId)}
               >
                 {isCompleted ? (
                   <LuCheck aria-hidden="true" className="size-3.5" />
                 ) : (
                   <span>{GUIDED_STEP_SEQUENCE.indexOf(stepId) + 1}</span>
                 )}
-                <span className="truncate max-w-full">{definition.title}</span>
-              </div>
+                <span className="max-w-full truncate">{definition.title}</span>
+              </button>
             </li>
           );
         })}

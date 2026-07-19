@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { localStorageApi } from '@~/db/storage';
 
-import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
+import { GUIDED_STEP_ID_SCHEMA, GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
 import type { GuidedStepId } from '../constants/guided-flow';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
@@ -245,6 +245,20 @@ export async function advanceGuidedStep(characterId: string) {
     }
 
     draft.guided.currentStep = nextStep;
+  });
+}
+
+export async function selectGuidedStep(characterId: string, stepId: GuidedStepId) {
+  const session = await ensureCharacterAssistantSession(characterId);
+  const parsedStepId = GUIDED_STEP_ID_SCHEMA.parse(stepId);
+
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (!draft.guided) {
+      return;
+    }
+
+    draft.mode = CHARACTER_ASSISTANT_SESSION_MODES.guided;
+    draft.guided.currentStep = parsedStepId;
   });
 }
 

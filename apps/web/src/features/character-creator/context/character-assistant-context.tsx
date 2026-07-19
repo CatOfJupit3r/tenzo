@@ -28,7 +28,7 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     updateGeneralCharacterIdea,
     connectionHealth,
   } = useCharacterCreatorContext();
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [assistantFocus, setAssistantFocus] = useState<CharacterAssistantFocus>(DEFAULT_ASSISTANT_FOCUS);
   const [contextAttachments, setContextAttachments] = useState<iCharacterAssistantContextAttachment[]>([]);
 

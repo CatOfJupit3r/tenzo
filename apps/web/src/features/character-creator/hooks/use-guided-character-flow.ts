@@ -11,11 +11,13 @@ import {
   finishGuidedDiscovery,
   removeGuidedAttachment,
   replaceGeneratedGuidedDiscoveryCardsByCategory,
+  selectGuidedStep,
   startGuidedDiscovery,
   startGuidedSession,
   toggleGuidedDiscoveryCardSelection,
 } from '../collections/character-assistant-sessions.collection';
 import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_IDS } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-flow';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '../lib/character-assistant-contracts';
 import type { iCharacterAssistantDiscoveryDirectionCategory } from '../lib/character-assistant-contracts';
 import { generateCharacterAssistantDiscoveryDirections } from '../lib/character-assistant-discovery-client';
@@ -23,6 +25,7 @@ import {
   buildDeterministicDiscoveryHandoffSummary,
   hasDiscoveryHandoffSelections,
 } from '../lib/character-assistant-discovery-state';
+import { CHARACTER_ASSISTANT_SESSION_MODES } from '../lib/character-assistant-session';
 import { analyzeCharacterImage } from '../lib/character-vision-client';
 import type { iCharacterImageAnalysis } from '../lib/character-vision-contracts';
 import { deleteCharacterAssetBlob } from '../lib/image-store';
@@ -109,7 +112,8 @@ export function useGuidedCharacterFlow({
     () => storedSessions.find((storedSession) => storedSession.id === characterId) ?? null,
     [characterId, storedSessions],
   );
-  const guidedState = session?.mode === 'guided' ? session.guided : null;
+  const savedGuidedState = session?.guided ?? null;
+  const guidedState = session?.mode === CHARACTER_ASSISTANT_SESSION_MODES.guided ? session.guided : null;
   const discoveryState = guidedState?.discovery;
   const hasCompletedDiscovery = guidedState
     ? hasDiscoveryHandoffSelections(guidedState.discoveryHandoffSummary)
@@ -272,6 +276,20 @@ export function useGuidedCharacterFlow({
     return true;
   }, [characterId, currentStepDefinition?.isSkippable]);
 
+  const navigateToStep = useCallback(
+    async (stepId: GuidedStepId) => {
+      if (!savedGuidedState) {
+        return false;
+      }
+
+      await selectGuidedStep(characterId, stepId);
+      setLatestAnalysis(null);
+      setImageAnalysisError(null);
+      return true;
+    },
+    [characterId, savedGuidedState],
+  );
+
   const analyzeImage = useCallback(
     async (file: File, userHint?: string) => {
       if (!currentStepDefinition?.isImageStepAllowed) {
@@ -387,6 +405,7 @@ export function useGuidedCharacterFlow({
 
   return {
     guidedState,
+    savedGuidedState,
     isGuidedComplete,
     currentStepDefinition,
     canContinue,
@@ -395,6 +414,7 @@ export function useGuidedCharacterFlow({
     latestAnalysis,
     continueToNextStep,
     skipStep,
+    navigateToStep,
     analyzeImage,
     applyConceptToCard,
     removeImageAttachment,

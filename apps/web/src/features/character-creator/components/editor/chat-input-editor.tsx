@@ -80,11 +80,22 @@ export function ChatInputEditor({
   }, [editor, isDisabled]);
 
   useEffect(() => {
-    if (!editor || value || editor.isEmpty) {
+    if (!editor) {
       return;
     }
 
-    editor.commands.clearContent();
+    const currentValue = serializeChatInput(editor.getJSON()).text;
+    if (currentValue === value) {
+      return;
+    }
+
+    if (value) {
+      editor.commands.setContent(createInitialContent(value), { emitUpdate: false });
+      editor.commands.focus('end');
+      return;
+    }
+
+    editor.commands.clearContent(false);
   }, [editor, value]);
 
   return (

@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-flow';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '../lib/character-assistant-contracts';
 import type {
   iCharacterAssistantDiscoveryDirectionCard,
@@ -239,6 +240,22 @@ vi.mock('../collections/character-assistant-sessions.collection', () => ({
     });
     return getMockSession(characterId);
   }),
+  selectGuidedStep: vi.fn(async (characterId: string, stepId: GuidedStepId) => {
+    const currentSession = mockSessions.get(characterId);
+    if (!currentSession?.guided) {
+      return null;
+    }
+
+    mockSessions.set(characterId, {
+      ...currentSession,
+      mode: CHARACTER_ASSISTANT_SESSION_MODES.guided,
+      guided: {
+        ...currentSession.guided,
+        currentStep: stepId,
+      },
+    });
+    return getMockSession(characterId);
+  }),
   removeGuidedAttachment: vi.fn(async () => null),
 }));
 
@@ -324,6 +341,29 @@ describe('use-guided-character-flow discovery orchestration', () => {
     rerender();
 
     expect(result.current.canContinue).toBe(true);
+  });
+
+  it('switches directly between prompt scaffolds without clearing the guided session', async () => {
+    const characterId = 'character-step-navigation';
+    const { result, rerender } = renderGuidedFlow(characterId);
+    await act(async () => {
+      await result.current.openGuidedSession();
+    });
+
+    const session = getMockSession(characterId);
+    if (!session?.guided) {
+      throw new Error('Expected a guided session.');
+    }
+    session.guided.completedSteps.push(GUIDED_STEP_IDS.appearance);
+
+    await act(async () => {
+      await result.current.navigateToStep(GUIDED_STEP_IDS.scenario);
+    });
+    rerender();
+
+    expect(getMockSession(characterId)?.guided?.currentStep).toBe(GUIDED_STEP_IDS.scenario);
+    expect(getMockSession(characterId)?.guided?.completedSteps).toEqual([GUIDED_STEP_IDS.appearance]);
+    expect(result.current.currentStepDefinition?.id).toBe(GUIDED_STEP_IDS.scenario);
   });
 
   it('allows selection and handoff summary before continuing concept step', async () => {

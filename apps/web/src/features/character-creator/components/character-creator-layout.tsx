@@ -41,7 +41,7 @@ export function CharacterCreatorLayout() {
             <CharacterLibraryPanel isOpen={isCharacterLibraryPanelOpen} onClose={closeCharacterLibraryPanel} />
 
             <main className="min-w-0 flex-1">
-              <div className="grid gap-6 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]">
+              <div className="grid gap-4 lg:grid-cols-[minmax(160px,190px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(180px,220px)_minmax(0,1fr)]">
                 <PortraitPanel />
                 <CharacterCreatorTabs />
               </div>

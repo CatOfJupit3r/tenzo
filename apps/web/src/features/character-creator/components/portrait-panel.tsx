@@ -16,12 +16,12 @@ export function PortraitPanel() {
   } = useCharacterCreatorContext();
 
   return (
-    <div className="space-y-6 lg:sticky lg:self-start">
-      <Card className="gap-4 bg-card/95 shadow-sm">
-        <CardHeader>
-          <CardTitle>Portrait</CardTitle>
+    <div className="lg:sticky lg:top-32 lg:self-start">
+      <Card className="gap-3 bg-card/95 py-4 shadow-sm">
+        <CardHeader className="px-4">
+          <CardTitle className="text-sm">Portrait</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3">
           <ImageUpload
             portraitFileName={portraitReference?.fileName ?? null}
             portraitDimensions={portraitDimensions}

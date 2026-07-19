@@ -136,7 +136,7 @@ export function CharacterAssistantPanel() {
   return (
     <aside
       aria-label="Character Assistant"
-      className="fixed inset-y-0 right-0 z-50 flex h-svh w-[min(30rem,100vw)] shrink-0 flex-col border-l bg-background shadow-2xl xl:sticky xl:top-0 xl:z-30 xl:w-120 xl:shadow-none"
+      className="fixed inset-y-0 right-0 z-50 flex h-svh w-[min(28rem,100vw)] shrink-0 flex-col border-l bg-background shadow-2xl xl:sticky xl:top-0 xl:z-30 xl:w-112 xl:shadow-none"
     >
       <header className="grid gap-3 border-b p-4">
         <div className="flex items-start justify-between gap-3">

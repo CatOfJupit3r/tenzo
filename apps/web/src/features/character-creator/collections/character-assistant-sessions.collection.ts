@@ -76,6 +76,16 @@ export async function ensureCharacterAssistantSession(characterId: string) {
   return CHARACTER_ASSISTANT_SESSION_SCHEMA.parse(characterAssistantSessionsCollection.get(session.id) ?? session);
 }
 
+export async function removeCharacterAssistantSession(characterId: string) {
+  await characterAssistantSessionsCollection.preload();
+  if (!characterAssistantSessionsCollection.has(characterId)) {
+    return;
+  }
+
+  const transaction = characterAssistantSessionsCollection.delete(characterId);
+  await transaction.isPersisted.promise;
+}
+
 export async function updateCharacterAssistantSession(
   sessionId: string,
   recipe: (draft: iCharacterAssistantSession) => unknown,

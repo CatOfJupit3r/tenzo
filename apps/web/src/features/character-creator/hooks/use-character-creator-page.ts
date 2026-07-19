@@ -109,6 +109,10 @@ export function useCharacterCreatorPage() {
 
   const {
     isCharacterLibraryReady,
+    isSaving,
+    saveErrorMessage,
+    hasPersistedEdits,
+    lastSavedAt,
     characterLibrary,
     activeCharacterId,
     card,
@@ -131,6 +135,7 @@ export function useCharacterCreatorPage() {
     selectCharacter,
     duplicateCharacter,
     removeCharacter,
+    discardProvisionalCharacter,
   } = useCharacterSession();
 
   const {
@@ -893,11 +898,15 @@ export function useCharacterCreatorPage() {
       openImportDialog,
       openExportDialog,
       handleCreateCharacter,
+      createProvisionalCharacter: createCharacter,
       handleSelectCharacter,
       handleDuplicateCharacter,
       handleRemoveCharacter,
+      discardProvisionalCharacter,
     }),
     [
+      createCharacter,
+      discardProvisionalCharacter,
       handleCreateCharacter,
       handleDuplicateCharacter,
       handleRemoveCharacter,
@@ -910,6 +919,10 @@ export function useCharacterCreatorPage() {
   return {
     actions,
     isCharacterLibraryReady,
+    isSaving,
+    saveErrorMessage,
+    hasPersistedEdits,
+    lastSavedAt,
     characterLibrary,
     activeCharacterId,
     card,
@@ -1007,5 +1020,6 @@ export function useCharacterCreatorPage() {
     handleSelectCharacter,
     handleDuplicateCharacter,
     handleRemoveCharacter,
+    discardProvisionalCharacter,
   };
 }

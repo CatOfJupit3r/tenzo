@@ -1,7 +1,7 @@
 import { EditorContent } from '@tiptap/react';
 import { LuPlus } from 'react-icons/lu';
 
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
 import { useMesExampleEditor } from '../../hooks/use-mes-example-editor';
@@ -13,6 +13,7 @@ export interface iMesExampleEditorProps {
   placeholder?: string;
   isReadOnly?: boolean;
   isStreaming?: boolean;
+  ariaLabelledBy?: string;
   ariaDescribedBy?: string;
   onValueChange: (value: string) => void;
 }
@@ -28,6 +29,7 @@ export function MesExampleEditor({
   placeholder,
   isReadOnly = false,
   isStreaming = false,
+  ariaLabelledBy,
   ariaDescribedBy,
   onValueChange,
 }: iMesExampleEditorProps) {
@@ -40,6 +42,7 @@ export function MesExampleEditor({
       id: fieldId,
       role: 'textbox',
       'aria-multiline': 'true',
+      ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
       ...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {}),
     },
     onValueChange,

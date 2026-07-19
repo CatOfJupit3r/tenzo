@@ -3,7 +3,8 @@ import { LuLoaderCircle, LuSparkles, LuTriangleAlert, LuX } from 'react-icons/lu
 
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { Badge } from '@~/components/ui/badge';
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
+import { Dialog, DialogContent, DialogTitle } from '@~/components/ui/dialog';
 import { cn } from '@~/lib/utils';
 
 import { GUIDED_STEP_IDS } from '../constants/guided-flow';
@@ -32,13 +33,26 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'The assistant action failed.';
 }
 
-export function CharacterAssistantPanel() {
-  const { isAssistantOpen, assistantFocus, closeAssistant, workspace, guidedFlow } = useCharacterAssistant();
-  const { fieldTemplates } = useCharacterCreatorContext();
+export interface iCharacterAssistantPanelProps {
+  isOverlay: boolean;
+  onOpenConnectionSettings: () => void;
+  onRestoreAssistantToggleFocus: () => void;
+}
+
+export function CharacterAssistantPanel({
+  isOverlay,
+  onOpenConnectionSettings,
+  onRestoreAssistantToggleFocus,
+}: iCharacterAssistantPanelProps) {
+  const { isAssistantOpen, assistantFocus, closeAssistant, openAssistant, workspace, guidedFlow } =
+    useCharacterAssistant();
+  const { apiKey, fieldTemplates, generationSettings } = useCharacterCreatorContext();
   const [inputValue, setInputValue] = useState('');
   const [inputTemplateIds, setInputTemplateIds] = useState<string[]>([]);
+  const [inputScopeLabel, setInputScopeLabel] = useState('Whole character');
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const shouldFollowConversationRef = useRef(true);
+  const shouldRestoreAssistantToggleFocusRef = useRef(true);
   const { guidedState } = guidedFlow;
   const scaffoldState = guidedFlow.savedGuidedState;
   const discoveryState = guidedState?.discovery;
@@ -50,7 +64,47 @@ export function CharacterAssistantPanel() {
     assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field
       ? formatFieldLabel(assistantFocus.fieldKey)
       : 'Whole character';
+  const missingConnectionSettings = [
+    generationSettings.endpoint.trim() ? null : 'endpoint',
+    generationSettings.model.trim() ? null : 'model',
+    apiKey.trim() ? null : 'API key',
+  ].filter((setting): setting is string => setting !== null);
+  const composerLabel = isGuided
+    ? `Message Character Assistant about ${guidedFlow.currentStepDefinition?.title.toLocaleLowerCase() ?? focusLabel.toLocaleLowerCase()}`
+    : `Message Character Assistant about ${focusLabel.toLocaleLowerCase()}`;
+  const isGuidedScopeMismatch = isGuided && assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field;
+  const isDraftScopeMismatch = !isGuided && Boolean(inputValue.trim()) && inputScopeLabel !== focusLabel;
+  const isScopeMismatch = isGuidedScopeMismatch || isDraftScopeMismatch;
+  const isComposerDisabled = workspace.isRunning || !workspace.isConnectionConfigured || isScopeMismatch;
+  const conflictingScopeLabel = isGuidedScopeMismatch
+    ? `${guidedFlow.currentStepDefinition?.title ?? 'Guided'} scaffold`
+    : inputScopeLabel;
+  const keepScopeDraftLabel = isGuidedScopeMismatch ? `Keep ${conflictingScopeLabel}` : `Use draft for ${focusLabel}`;
+  let assistantBodyGridClassName = 'grid-rows-[minmax(0,1fr)]';
+
+  if (isGuided) {
+    assistantBodyGridClassName = 'grid-rows-[minmax(0,1fr)_minmax(12rem,1fr)]';
+  } else if (guidedFlow.isGuidedComplete) {
+    assistantBodyGridClassName = 'grid-rows-[auto_minmax(0,1fr)]';
+  }
+
+  let composerPlaceholder = `Ask about ${focusLabel.toLocaleLowerCase()}...`;
+
+  if (!workspace.isConnectionConfigured) {
+    composerPlaceholder = 'Configure the Assistant connection to start chatting.';
+  } else if (isScopeMismatch) {
+    composerPlaceholder = 'Choose how to handle the existing context first.';
+  } else if (isGuided && guidedFlow.currentStepDefinition) {
+    composerPlaceholder = `Discuss ${guidedFlow.currentStepDefinition.title.toLocaleLowerCase()}...`;
+  }
+
   const lastMessageContent = workspace.messages.at(-1)?.content;
+
+  useEffect(() => {
+    if (isAssistantOpen) {
+      shouldRestoreAssistantToggleFocusRef.current = true;
+    }
+  }, [isAssistantOpen]);
 
   useEffect(() => {
     if (!isAssistantOpen || !shouldFollowConversationRef.current) {
@@ -93,6 +147,45 @@ export function CharacterAssistantPanel() {
     }
   };
 
+  const exitGuidedModeForScopeChange = async () => {
+    if (!isGuided) {
+      return;
+    }
+
+    await guidedFlow.exitGuidedMode();
+  };
+
+  const handleKeepScopeDraft = () => {
+    if (isGuidedScopeMismatch) {
+      openAssistant();
+      return;
+    }
+
+    setInputScopeLabel(focusLabel);
+  };
+
+  const handleReplaceScopeDraft = async () => {
+    try {
+      await exitGuidedModeForScopeChange();
+      setInputValue(`Help me refine the ${focusLabel.toLocaleLowerCase()} field.`);
+      setInputTemplateIds([]);
+      setInputScopeLabel(focusLabel);
+    } catch (error) {
+      toastError('Assistant scope was not changed', getErrorMessage(error));
+    }
+  };
+
+  const handleClearScopeDraft = async () => {
+    try {
+      await exitGuidedModeForScopeChange();
+      setInputValue('');
+      setInputTemplateIds([]);
+      setInputScopeLabel(focusLabel);
+    } catch (error) {
+      toastError('Assistant scope was not changed', getErrorMessage(error));
+    }
+  };
+
   let guidedStepPanel = null;
 
   if (isGuided && guidedFlow.currentStepDefinition && discoveryState) {
@@ -123,7 +216,10 @@ export function CharacterAssistantPanel() {
           onContinue={guidedFlow.continueToNextStep}
           onSkip={guidedFlow.skipStep}
           onExit={guidedFlow.exitGuidedMode}
-          onUsePrompt={setInputValue}
+          onUsePrompt={(prompt) => {
+            setInputValue(prompt);
+            setInputScopeLabel(`${guidedFlow.currentStepDefinition?.title ?? 'Guided'} scaffold`);
+          }}
         />
       );
     }
@@ -133,11 +229,8 @@ export function CharacterAssistantPanel() {
     return null;
   }
 
-  return (
-    <aside
-      aria-label="Character Assistant"
-      className="fixed inset-y-0 right-0 z-50 flex h-svh w-[min(28rem,100vw)] shrink-0 flex-col border-l bg-background shadow-2xl xl:sticky xl:top-0 xl:z-30 xl:w-112 xl:shadow-none"
-    >
+  const panelContent = (
+    <>
       <header className="grid gap-3 border-b p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -176,177 +269,182 @@ export function CharacterAssistantPanel() {
         ) : null}
       </header>
 
-      {isGuided ? (
-        <div className="max-h-[42svh] overflow-y-auto border-b bg-muted/10 p-3">
-          <div className="grid gap-3">
-            {guidedStepPanel}
-            {guidedFlow.currentStepDefinition?.isImageStepAllowed ? (
-              <GuidedImageStep
-                analysis={guidedFlow.latestAnalysis}
-                errorMessage={guidedFlow.imageAnalysisError}
-                isAnalyzing={guidedFlow.isAnalyzingImage}
-                onAnalyze={async (file, hint) => {
-                  await guidedFlow.analyzeImage(file, hint).catch(() => undefined);
-                }}
-                onRemove={async () => {
-                  const attachmentId = guidedState?.attachments.at(-1)?.id;
-                  if (attachmentId) {
-                    await guidedFlow.removeImageAttachment(attachmentId);
-                  }
-                }}
-              />
-            ) : null}
-            {guidedState?.concept ? (
-              <div className="flex items-start justify-between gap-3 rounded-lg border bg-background p-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium">Concept recorded</p>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{guidedState.concept.premise}</p>
-                </div>
-                <Button type="button" size="sm" variant="outline" onClick={guidedFlow.applyConceptToCard}>
-                  Use idea
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-
-      {!isGuided && guidedFlow.isGuidedComplete ? (
-        <div className="flex items-center justify-between gap-3 border-b bg-primary/5 px-4 py-2 text-sm">
-          <span>Guided setup is complete. Keep chatting or reopen any scaffold above.</span>
-          <Button type="button" size="sm" variant="ghost" onClick={guidedFlow.restartGuidedSession}>
-            Start over
-          </Button>
-        </div>
-      ) : null}
-
-      <div
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
-        aria-label="Assistant conversation"
-        onScroll={(event) => {
-          const target = event.currentTarget;
-          shouldFollowConversationRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
-        }}
-      >
-        <div className="grid gap-4">
-          {workspace.messages.length === 0 ? (
-            <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-              Describe the character or ask for a focused change. Suggestions appear on their native fields for review.
-            </div>
-          ) : null}
-
-          <div className="grid gap-3">
-            {workspace.messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'max-w-[92%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap',
-                  message.role === CHARACTER_ASSISTANT_MESSAGE_ROLES.user
-                    ? 'ml-auto bg-primary text-primary-foreground'
-                    : 'border bg-card',
-                )}
-              >
-                {message.content}
-              </div>
-            ))}
-          </div>
-
-          <div aria-live="polite" aria-busy={workspace.isRunning}>
-            {workspace.activityLabel ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <LuLoaderCircle className="size-4 animate-spin" />
-                {workspace.activityLabel}
-              </div>
-            ) : null}
-          </div>
-
-          {workspace.errorMessage ? (
-            <div role="alert" className="flex gap-2 rounded-xl border border-destructive/40 bg-destructive/5 p-3">
-              <LuTriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-              <p className="text-sm text-destructive">{workspace.errorMessage}</p>
-            </div>
-          ) : null}
-
-          {workspace.activeProposals.length > 0 ? (
-            <section className="grid gap-3 rounded-xl border bg-muted/15 p-3" aria-label="Assistant proposals">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium">Proposed changes</p>
-                  <p className="text-xs text-muted-foreground">
-                    Detailed diffs also appear beside the affected fields.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      void workspace
-                        .discardAllProposals()
-                        .catch((error: unknown) => toastError('Proposals were not discarded', getErrorMessage(error)));
-                    }}
-                  >
-                    Reject all
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      void handleApplyAll();
-                    }}
-                  >
-                    Apply all
-                  </Button>
-                </div>
-              </div>
-
-              {workspace.activeProposals.map((proposal) => (
-                <div key={proposal.id} className="rounded-lg border bg-background p-3">
-                  {proposal.summary ? <p className="mb-3 text-sm">{proposal.summary}</p> : null}
-                  <div className="grid gap-2">
-                    {proposal.patches
-                      .filter((patch) => patch.status !== CHARACTER_EDIT_PATCH_STATUSES.rejected)
-                      .map((patch) => (
-                        <div
-                          key={patch.fieldKey}
-                          className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{formatFieldLabel(patch.fieldKey)}</p>
-                            <p className="text-xs text-muted-foreground">{patch.status}</p>
-                          </div>
-                          {patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed ? (
-                            <div className="flex shrink-0 gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  void handleReject(proposal.id, [patch.fieldKey]);
-                                }}
-                              >
-                                Reject
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => {
-                                  void handleApply(proposal.id, [patch.fieldKey]);
-                                }}
-                              >
-                                Apply
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
+      <div className={cn('grid min-h-0', assistantBodyGridClassName)}>
+        {isGuided ? (
+          <div className="min-h-0 overflow-y-auto border-b bg-muted/10 p-3">
+            <div className="grid gap-3">
+              {guidedStepPanel}
+              {guidedFlow.currentStepDefinition?.isImageStepAllowed ? (
+                <GuidedImageStep
+                  analysis={guidedFlow.latestAnalysis}
+                  errorMessage={guidedFlow.imageAnalysisError}
+                  isAnalyzing={guidedFlow.isAnalyzingImage}
+                  onAnalyze={async (file, hint) => {
+                    await guidedFlow.analyzeImage(file, hint).catch(() => undefined);
+                  }}
+                  onRemove={async () => {
+                    const attachmentId = guidedState?.attachments.at(-1)?.id;
+                    if (attachmentId) {
+                      await guidedFlow.removeImageAttachment(attachmentId);
+                    }
+                  }}
+                />
+              ) : null}
+              {guidedState?.concept ? (
+                <div className="flex items-start justify-between gap-3 rounded-lg border bg-background p-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">Concept recorded</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{guidedState.concept.premise}</p>
                   </div>
+                  <Button type="button" size="sm" variant="outline" onClick={guidedFlow.applyConceptToCard}>
+                    Use idea
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {!isGuided && guidedFlow.isGuidedComplete ? (
+          <div className="flex items-center justify-between gap-3 border-b bg-primary/5 px-4 py-2 text-sm">
+            <span>Guided setup is complete. Keep chatting or reopen any scaffold above.</span>
+            <Button type="button" size="sm" variant="ghost" onClick={guidedFlow.restartGuidedSession}>
+              Start over
+            </Button>
+          </div>
+        ) : null}
+
+        <div
+          className="min-h-0 overflow-y-auto overscroll-contain p-4"
+          aria-label="Assistant conversation"
+          onScroll={(event) => {
+            const target = event.currentTarget;
+            shouldFollowConversationRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
+          }}
+        >
+          <div className="grid gap-4">
+            {workspace.messages.length === 0 ? (
+              <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                Describe the character or ask for a focused change. Suggestions appear on their native fields for
+                review.
+              </div>
+            ) : null}
+
+            <div className="grid gap-3">
+              {workspace.messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    'max-w-[92%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap',
+                    message.role === CHARACTER_ASSISTANT_MESSAGE_ROLES.user
+                      ? 'ml-auto bg-primary text-primary-foreground'
+                      : 'border bg-card',
+                  )}
+                >
+                  {message.content}
                 </div>
               ))}
-            </section>
-          ) : null}
-          <div ref={conversationEndRef} aria-hidden="true" />
+            </div>
+
+            <div aria-live="polite" aria-busy={workspace.isRunning}>
+              {workspace.activityLabel ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LuLoaderCircle className="size-4 animate-spin" />
+                  {workspace.activityLabel}
+                </div>
+              ) : null}
+            </div>
+
+            {workspace.errorMessage ? (
+              <div role="alert" className="flex gap-2 rounded-xl border border-destructive/40 bg-destructive/5 p-3">
+                <LuTriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
+                <p className="text-sm text-destructive">{workspace.errorMessage}</p>
+              </div>
+            ) : null}
+
+            {workspace.activeProposals.length > 0 ? (
+              <section className="grid gap-3 rounded-xl border bg-muted/15 p-3" aria-label="Assistant proposals">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Proposed changes</p>
+                    <p className="text-xs text-muted-foreground">
+                      Detailed diffs also appear beside the affected fields.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void workspace
+                          .discardAllProposals()
+                          .catch((error: unknown) =>
+                            toastError('Proposals were not discarded', getErrorMessage(error)),
+                          );
+                      }}
+                    >
+                      Reject all
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        void handleApplyAll();
+                      }}
+                    >
+                      Apply all
+                    </Button>
+                  </div>
+                </div>
+
+                {workspace.activeProposals.map((proposal) => (
+                  <div key={proposal.id} className="rounded-lg border bg-background p-3">
+                    {proposal.summary ? <p className="mb-3 text-sm">{proposal.summary}</p> : null}
+                    <div className="grid gap-2">
+                      {proposal.patches
+                        .filter((patch) => patch.status !== CHARACTER_EDIT_PATCH_STATUSES.rejected)
+                        .map((patch) => (
+                          <div
+                            key={patch.fieldKey}
+                            className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{formatFieldLabel(patch.fieldKey)}</p>
+                              <p className="text-xs text-muted-foreground">{patch.status}</p>
+                            </div>
+                            {patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed ? (
+                              <div className="flex shrink-0 gap-1">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    void handleReject(proposal.id, [patch.fieldKey]);
+                                  }}
+                                >
+                                  Reject
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => {
+                                    void handleApply(proposal.id, [patch.fieldKey]);
+                                  }}
+                                >
+                                  Apply
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+            <div ref={conversationEndRef} aria-hidden="true" />
+          </div>
         </div>
       </div>
 
@@ -356,77 +454,186 @@ export function CharacterAssistantPanel() {
             You can chat now, or select discovery directions above and continue when ready.
           </p>
         ) : null}
-        <form
-          className="grid gap-2"
-          data-character-assistant-form="true"
-          onSubmit={(event) => {
-            event.preventDefault();
-
-            if (!inputValue.trim() || workspace.isRunning || !workspace.isConnectionConfigured) {
-              return;
-            }
-
-            const message = inputValue;
-            const templates = fieldTemplates
-              .filter((template) => inputTemplateIds.includes(template.id))
-              .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
-            shouldFollowConversationRef.current = true;
-            setInputValue('');
-            setInputTemplateIds([]);
-            void workspace
-              .sendMessage(message, { templates })
-              .catch((error: unknown) => toastError('Message was not sent', getErrorMessage(error)));
-          }}
-        >
-          <ChatInputEditor
-            value={inputValue}
-            templates={fieldTemplates}
-            preferredFieldKeys={guidedFlow.currentStepDefinition?.suggestedTemplateFieldKeys}
-            isDisabled={workspace.isRunning || !workspace.isConnectionConfigured}
-            placeholder={
-              isGuided && guidedFlow.currentStepDefinition
-                ? `Discuss ${guidedFlow.currentStepDefinition.title.toLocaleLowerCase()}...`
-                : `Ask about ${focusLabel.toLocaleLowerCase()}...`
-            }
-            onValueChange={(value, templateIds) => {
-              setInputValue(value);
-              setInputTemplateIds(templateIds);
-            }}
-            onSubmit={() => {
-              if (inputValue.trim() && !workspace.isRunning && workspace.isConnectionConfigured) {
-                const form = document.querySelector<HTMLFormElement>('[data-character-assistant-form="true"]');
-                form?.requestSubmit();
-              }
-            }}
-          />
-          <div className="flex items-center justify-between gap-2">
+        {workspace.isConnectionConfigured && isScopeMismatch ? (
+          <div role="alert" className="grid gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+            <div>
+              <p className="text-sm font-medium">Choose which context to use</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {conflictingScopeLabel} is still active, but Ask AI is focused on {focusLabel}.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={handleKeepScopeDraft}>
+                {keepScopeDraftLabel}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  void handleReplaceScopeDraft();
+                }}
+              >
+                Replace for {focusLabel}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  void handleClearScopeDraft();
+                }}
+              >
+                Clear draft
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {!workspace.isConnectionConfigured ? (
+          <div
+            id="character-assistant-connection-required"
+            role="status"
+            className="flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3"
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Connect the Assistant</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Set {missingConnectionSettings.join(', ')} in Connection settings before sending a message.
+              </p>
+            </div>
             <Button
               type="button"
               size="sm"
-              variant="ghost"
-              disabled={workspace.messages.length === 0}
+              variant="outline"
+              className="shrink-0"
               onClick={() => {
-                void workspace
-                  .clearConversation()
-                  .catch((error: unknown) => toastError('Conversation was not cleared', getErrorMessage(error)));
-                setInputValue('');
-                setInputTemplateIds([]);
+                if (isOverlay) {
+                  shouldRestoreAssistantToggleFocusRef.current = false;
+                  closeAssistant();
+                }
+                onOpenConnectionSettings();
               }}
             >
-              New conversation
+              Open Settings
             </Button>
-            {workspace.isRunning ? (
-              <Button type="button" size="sm" variant="outline" onClick={workspace.cancelRun}>
-                Stop
-              </Button>
-            ) : (
-              <Button type="submit" size="sm" disabled={!inputValue.trim() || !workspace.isConnectionConfigured}>
-                Send
-              </Button>
-            )}
           </div>
-        </form>
+        ) : null}
+        {workspace.isConnectionConfigured ? (
+          <form
+            className="grid gap-2"
+            data-character-assistant-form="true"
+            aria-label={composerLabel}
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              if (!inputValue.trim() || workspace.isRunning || isScopeMismatch) {
+                return;
+              }
+
+              const message = inputValue;
+              const templates = fieldTemplates
+                .filter((template) => inputTemplateIds.includes(template.id))
+                .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
+              shouldFollowConversationRef.current = true;
+              setInputValue('');
+              setInputTemplateIds([]);
+              setInputScopeLabel(focusLabel);
+              void workspace
+                .sendMessage(message, { templates })
+                .catch((error: unknown) => toastError('Message was not sent', getErrorMessage(error)));
+            }}
+          >
+            <ChatInputEditor
+              value={inputValue}
+              templates={fieldTemplates}
+              preferredFieldKeys={guidedFlow.currentStepDefinition?.suggestedTemplateFieldKeys}
+              isDisabled={isComposerDisabled}
+              ariaLabel={composerLabel}
+              placeholder={composerPlaceholder}
+              onValueChange={(value, templateIds) => {
+                if (!inputValue.trim() && value.trim()) {
+                  setInputScopeLabel(
+                    isGuided ? `${guidedFlow.currentStepDefinition?.title ?? 'Guided'} scaffold` : focusLabel,
+                  );
+                } else if (!value.trim()) {
+                  setInputScopeLabel(focusLabel);
+                }
+                setInputValue(value);
+                setInputTemplateIds(templateIds);
+              }}
+              onSubmit={() => {
+                if (inputValue.trim() && !workspace.isRunning && !isScopeMismatch) {
+                  const form = document.querySelector<HTMLFormElement>('[data-character-assistant-form="true"]');
+                  form?.requestSubmit();
+                }
+              }}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={workspace.messages.length === 0}
+                onClick={() => {
+                  void workspace
+                    .clearConversation()
+                    .catch((error: unknown) => toastError('Conversation was not cleared', getErrorMessage(error)));
+                  setInputValue('');
+                  setInputTemplateIds([]);
+                  setInputScopeLabel(focusLabel);
+                }}
+              >
+                New conversation
+              </Button>
+              {workspace.isRunning ? (
+                <Button type="button" size="sm" variant="outline" onClick={workspace.cancelRun}>
+                  Stop
+                </Button>
+              ) : (
+                <Button type="submit" size="sm" disabled={!inputValue.trim() || isScopeMismatch}>
+                  Send
+                </Button>
+              )}
+            </div>
+          </form>
+        ) : null}
       </footer>
+    </>
+  );
+
+  if (isOverlay) {
+    return (
+      <Dialog
+        open={isAssistantOpen}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeAssistant();
+          }
+        }}
+      >
+        <DialogContent
+          aria-describedby={undefined}
+          className="inset-y-0 top-0 right-0 left-auto z-50 h-svh w-[min(28rem,100vw)] max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 rounded-none border-y-0 border-r-0 p-0 shadow-2xl"
+          showCloseButton={false}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (shouldRestoreAssistantToggleFocusRef.current) {
+              onRestoreAssistantToggleFocus();
+            }
+          }}
+        >
+          <DialogTitle className="sr-only">Character Assistant</DialogTitle>
+          {panelContent}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <aside
+      aria-label="Character Assistant"
+      className="grid h-full w-112 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto] border-l bg-background"
+    >
+      {panelContent}
     </aside>
   );
 }

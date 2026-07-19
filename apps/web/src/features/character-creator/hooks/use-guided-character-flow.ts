@@ -194,12 +194,15 @@ export function useGuidedCharacterFlow({
         });
 
         await replaceGeneratedGuidedDiscoveryCardsByCategory(targetCharacterId, category, cards);
+        return true;
       } catch (error) {
         if (!isAbortError(error)) {
           const message = error instanceof Error ? error.message : 'Discovery directions could not be regenerated.';
           setCategoryGenerationState(category, { errorMessage: message });
           throw error;
         }
+
+        return false;
       } finally {
         if (discoveryControllersRef.current[category] === controller) {
           discoveryControllersRef.current[category] = null;
@@ -235,19 +238,23 @@ export function useGuidedCharacterFlow({
       await startGuidedSession(targetCharacterId);
       await startGuidedDiscovery(targetCharacterId, normalizedPremise);
 
-      const generationTasks = DISCOVERY_CATEGORIES.map(async (category) => {
-        try {
-          await generateDirectionsForCategory(category, normalizedPremise, targetCharacterId);
-        } catch (error) {
-          setCategoryGenerationState(category, {
-            errorMessage: error instanceof Error ? error.message : 'Discovery directions could not be regenerated.',
-          });
-        }
-      });
+      const generationResults = await Promise.allSettled(
+        DISCOVERY_CATEGORIES.map(async (category) =>
+          generateDirectionsForCategory(category, normalizedPremise, targetCharacterId),
+        ),
+      );
+      const hasGeneratedDirections = generationResults.some((result) => result.status === 'fulfilled' && result.value);
 
-      await Promise.allSettled(generationTasks);
+      if (!hasGeneratedDirections) {
+        const firstFailure = generationResults.find((result) => result.status === 'rejected');
+        const failureMessage =
+          firstFailure?.status === 'rejected' && firstFailure.reason instanceof Error
+            ? firstFailure.reason.message
+            : 'Discovery generation did not produce any directions.';
+        throw new Error(`Guided discovery could not start. ${failureMessage}`);
+      }
     },
-    [characterId, generateDirectionsForCategory, setCategoryGenerationState],
+    [characterId, generateDirectionsForCategory],
   );
 
   const continueToNextStep = useCallback(async () => {

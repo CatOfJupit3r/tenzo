@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { LuArrowRight, LuLoaderCircle, LuRotateCcw } from 'react-icons/lu';
 
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
 import { Checkbox } from '@~/components/ui/checkbox';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
@@ -74,6 +74,8 @@ export function GuidedDiscoveryStepPanel({
   const [editingDescription, setEditingDescription] = useState('');
   const handoffSummary = useMemo(() => buildDeterministicDiscoveryHandoffSummary(discoveryState), [discoveryState]);
   const hasHandoffSummary = Object.values(handoffSummary).some((cards) => cards.length > 0);
+  const failedCategories = DISCOVERY_CATEGORY_SEQUENCE.filter((category) => generationState[category].errorMessage);
+  const isGeneratingAnyCategory = DISCOVERY_CATEGORY_SEQUENCE.some((category) => generationState[category].isRunning);
   const selectedCardIds = useMemo(() => new Set(discoveryState.selectedCardIds), [discoveryState.selectedCardIds]);
   const cardsByCategory = useMemo(() => {
     const grouped = DISCOVERY_CATEGORY_SEQUENCE.reduce(
@@ -150,7 +152,8 @@ export function GuidedDiscoveryStepPanel({
             if (state.errorMessage) {
               return (
                 <li key={category} className="text-destructive">
-                  Could not regenerate {CATEGORY_LABELS[category]}.
+                  <span className="font-medium">Could not generate {CATEGORY_LABELS[category]}:</span>{' '}
+                  {state.errorMessage}
                 </li>
               );
             }
@@ -166,6 +169,27 @@ export function GuidedDiscoveryStepPanel({
             return null;
           })}
         </ul>
+        {failedCategories.length > 0 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isGeneratingAnyCategory}
+              onClick={() => {
+                runAction(async () => {
+                  await Promise.allSettled(failedCategories.map(async (category) => onRegenerateCategory(category)));
+                });
+              }}
+            >
+              <LuRotateCcw className="size-4" />
+              Retry all
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              If connection errors continue, review endpoint, model, and API key in Settings.
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-4">

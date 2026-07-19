@@ -1,12 +1,7 @@
 /// <reference types="vite/client" />
-import type { TanStackDevtools } from '@tanstack/react-devtools';
-import { formDevtoolsPlugin } from '@tanstack/react-form-devtools';
 import type { QueryClient } from '@tanstack/react-query';
-import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { NuqsAdapter } from 'nuqs/adapters/react';
-import type { ComponentProps } from 'react';
 
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';
 import { ThemeProvider } from '@~/components/themes/theme-provider';
@@ -52,20 +47,6 @@ export const Route = createRootRouteWithContext<iRouterAppContext>()({
   }),
 });
 
-const PLUGINS: ComponentProps<typeof TanStackDevtools>['plugins'] = [
-  {
-    name: 'TanStack Query',
-    render: <ReactQueryDevtoolsPanel />,
-    defaultOpen: true,
-  },
-  {
-    name: 'TanStack Router',
-    render: <TanStackRouterDevtoolsPanel />,
-    defaultOpen: false,
-  },
-  formDevtoolsPlugin(),
-];
-
 function RootComponent() {
   const { initialTheme } = Route.useLoaderData();
   const themeClass = getInitialThemeClass(initialTheme);
@@ -78,13 +59,12 @@ function RootComponent() {
       <body>
         <ThemeProvider initialTheme={initialTheme}>
           <NuqsAdapter>
-            <div className="grid h-svh grid-rows-[auto_1fr]">
+            <div className="grid h-svh min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
               <Outlet />
             </div>
             <ToasterContainer />
           </NuqsAdapter>
         </ThemeProvider>
-        {/* <TanStackDevtools plugins={PLUGINS} /> */}
         <Scripts />
       </body>
     </html>

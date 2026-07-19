@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   advanceGuidedStep,
   characterAssistantSessionsCollection,
+  removeCharacterAssistantSession,
   finishGuidedDiscovery,
   restartGuidedDiscovery,
   replaceGeneratedGuidedDiscoveryCardsByCategory,
@@ -45,6 +46,20 @@ describe('character assistant sessions', () => {
   it('uses one deterministic session identity per character', () => {
     expect(createCharacterAssistantSession('character-1').id).toBe('character-1');
     expect(createCharacterAssistantSession('character-1').id).toBe('character-1');
+  });
+
+  it('removes only the targeted provisional character session', async () => {
+    const provisionalCharacterId = 'provisional-character-session';
+    const existingCharacterId = 'existing-character-session';
+    await startGuidedSession(provisionalCharacterId);
+    await startGuidedSession(existingCharacterId);
+
+    await removeCharacterAssistantSession(provisionalCharacterId);
+
+    expect(characterAssistantSessionsCollection.get(provisionalCharacterId)).toBeUndefined();
+    expect(characterAssistantSessionsCollection.get(existingCharacterId)).toBeDefined();
+
+    await removeCharacterAssistantSession(existingCharacterId);
   });
 
   it('sanitizes legacy agent sessions into conversation and proposal state', () => {

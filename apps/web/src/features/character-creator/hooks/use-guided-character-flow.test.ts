@@ -429,6 +429,35 @@ describe('use-guided-character-flow discovery orchestration', () => {
     expect(getMockSession(targetCharacterId)?.guided?.discovery.cards).toHaveLength(12);
   });
 
+  it('rejects an all-category discovery failure while preserving the premise for retry', async () => {
+    const characterId = 'character-all-categories-failed';
+    const premise = 'A lighthouse keeper bargains with the storm that erased her town.';
+    const { result, rerender } = renderGuidedFlow(characterId);
+
+    Object.values(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES).forEach((category) => {
+      mockGenerationErrors.add(category);
+    });
+
+    let errorMessage = '';
+    await act(async () => {
+      try {
+        await result.current.startGuidedDiscoverySession(premise);
+      } catch (error) {
+        errorMessage = error instanceof Error ? error.message : '';
+      }
+    });
+    rerender();
+
+    expect(errorMessage).toContain('Guided discovery could not start.');
+    expect(getMockSession(characterId)?.guided?.discovery.originalPremise).toBe(premise);
+    expect(getMockSession(characterId)?.guided?.discovery.cards).toHaveLength(0);
+    Object.values(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES).forEach((category) => {
+      expect(result.current.discoveryCategoryGenerationState[category].errorMessage).toBe(
+        `Generation for ${category} failed.`,
+      );
+    });
+  });
+
   it('isolates category regeneration failures to the requested discovery category', async () => {
     const characterId = 'character-scoped-regeneration';
     const premise = 'A courier and a tyrant bargain over a stolen relic.';

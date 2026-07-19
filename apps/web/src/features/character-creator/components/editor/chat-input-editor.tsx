@@ -3,7 +3,7 @@ import { Paragraph } from '@tiptap/extension-paragraph';
 import { Text } from '@tiptap/extension-text';
 import { Placeholder, UndoRedo } from '@tiptap/extensions';
 import { EditorContent, useEditor } from '@tiptap/react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { cn } from '@~/lib/utils';
 
@@ -17,6 +17,7 @@ interface iChatInputEditorProps {
   preferredFieldKeys?: readonly string[];
   isDisabled?: boolean;
   placeholder?: string;
+  ariaLabel?: string;
   onValueChange: (value: string, templateIds: string[]) => void;
   onSubmit: () => void;
 }
@@ -39,9 +40,17 @@ export function ChatInputEditor({
   preferredFieldKeys,
   isDisabled = false,
   placeholder,
+  ariaLabel,
   onValueChange,
   onSubmit,
 }: iChatInputEditorProps) {
+  const lastEmittedInputRef = useRef({ text: value, templateIds: [] as string[] });
+  const onValueChangeRef = useRef(onValueChange);
+
+  useEffect(() => {
+    onValueChangeRef.current = onValueChange;
+  }, [onValueChange]);
+
   const editor = useEditor({
     extensions: [
       Document,
@@ -57,6 +66,7 @@ export function ChatInputEditor({
       attributes: {
         role: 'textbox',
         'aria-multiline': 'true',
+        ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
         class: 'min-h-20 max-h-36 overflow-y-auto px-3 py-2 text-sm outline-none',
       },
       handleKeyDown: (_view, event) => {
@@ -71,7 +81,16 @@ export function ChatInputEditor({
     },
     onUpdate: ({ editor: updatedEditor }) => {
       const serialized = serializeChatInput(updatedEditor.getJSON());
-      onValueChange(serialized.text, serialized.templateIds);
+      const hasSameTemplateIds =
+        serialized.templateIds.length === lastEmittedInputRef.current.templateIds.length &&
+        serialized.templateIds.every(
+          (templateId, index) => templateId === lastEmittedInputRef.current.templateIds[index],
+        );
+      if (serialized.text === lastEmittedInputRef.current.text && hasSameTemplateIds) {
+        return;
+      }
+      lastEmittedInputRef.current = serialized;
+      onValueChangeRef.current(serialized.text, serialized.templateIds);
     },
   });
 
@@ -84,10 +103,24 @@ export function ChatInputEditor({
       return;
     }
 
-    const currentValue = serializeChatInput(editor.getJSON()).text;
-    if (currentValue === value) {
+    if (ariaLabel) {
+      editor.view.dom.setAttribute('aria-label', ariaLabel);
       return;
     }
+
+    editor.view.dom.removeAttribute('aria-label');
+  }, [ariaLabel, editor]);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    if (lastEmittedInputRef.current.text === value) {
+      return;
+    }
+
+    lastEmittedInputRef.current = { text: value, templateIds: [] };
 
     if (value) {
       editor.commands.setContent(createInitialContent(value), { emitUpdate: false });

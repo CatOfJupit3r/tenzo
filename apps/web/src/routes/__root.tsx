@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { TanStackDevtools } from '@tanstack/react-devtools';
+import type { TanStackDevtools } from '@tanstack/react-devtools';
 import { formDevtoolsPlugin } from '@tanstack/react-form-devtools';
 import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools';
@@ -84,7 +84,7 @@ function RootComponent() {
             <ToasterContainer />
           </NuqsAdapter>
         </ThemeProvider>
-        <TanStackDevtools plugins={PLUGINS} />
+        {/* <TanStackDevtools plugins={PLUGINS} /> */}
         <Scripts />
       </body>
     </html>

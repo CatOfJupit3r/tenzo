@@ -120,11 +120,14 @@ export function useGuidedCharacterFlow({
     !hasCompletedDiscovery;
   const isGuidedComplete = Boolean(session?.mode === 'chat' && session.guided?.completedSteps.includes('review'));
   const currentStepDefinition = guidedState ? GUIDED_STEP_DEFINITIONS[guidedState.currentStep] : null;
+  const hasPersistedCurrentGuidedStepRun = Boolean(guidedState?.completedSteps.includes(guidedState.currentStep));
   const canContinue = Boolean(
     currentStepDefinition &&
     (isGuidedDiscoveryMode
       ? guidedState?.discovery?.isReadyForHandoff
-      : currentStepDefinition.isSkippable || workspace.hasCompletedCurrentGuidedStepRun),
+      : currentStepDefinition.isSkippable ||
+        workspace.hasCompletedCurrentGuidedStepRun ||
+        hasPersistedCurrentGuidedStepRun),
   );
   const discoveryHandoffSummary = guidedState ? buildDeterministicDiscoveryHandoffSummary(guidedState.discovery) : null;
 

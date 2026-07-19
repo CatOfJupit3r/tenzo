@@ -9,6 +9,7 @@ import {
   createCharacterEditProposal,
   createCharacterEditPatches,
   reduceCharacterEditProposal,
+  upsertCharacterEditProposal,
 } from './character-edit-proposal';
 
 describe('character edit proposals', () => {
@@ -95,5 +96,30 @@ describe('character edit proposals', () => {
     expect(nextProposal.patches).toHaveLength(1);
     expect(nextProposal.patches[0]?.newValue).toBe('Second');
     expect(nextProposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.streaming);
+  });
+
+  it('does not let a stale streamed proposal replace its persisted applied state', () => {
+    const baseCard = createEmptyCharacterCard();
+    const proposedCard = structuredClone(baseCard);
+    proposedCard.data.name = 'Mira';
+    const streamedProposal = {
+      ...createCharacterEditProposal({
+        baseCard,
+        proposedCard,
+        sourceMessageId: 'message-1',
+      }),
+      updatedAt: '2026-07-19T12:00:00.000Z',
+    };
+    const appliedProposal = reduceCharacterEditProposal(streamedProposal, {
+      type: 'apply-succeeded',
+      fieldKeys: ['name'],
+      occurredAt: '2026-07-19T12:00:01.000Z',
+    });
+
+    const proposals = upsertCharacterEditProposal([appliedProposal], streamedProposal);
+
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]?.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.applied);
+    expect(proposals[0]?.patches[0]?.status).toBe(CHARACTER_EDIT_PATCH_STATUSES.applied);
   });
 });

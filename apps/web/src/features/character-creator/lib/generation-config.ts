@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+import {
+  CHARACTER_ASSISTANT_GENERATION_MODES,
+  CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA,
+} from './character-assistant-generation-mode';
+import type { CharacterAssistantGenerationMode } from './character-assistant-generation-mode';
+
 export const OUTPUT_FORMAT_SCHEMA = z.enum(['xml', 'json', 'none']);
 export const OUTPUT_FORMATS = OUTPUT_FORMAT_SCHEMA.enum;
 export type OutputFormat = z.infer<typeof OUTPUT_FORMAT_SCHEMA>;
@@ -26,6 +32,7 @@ export interface iCharacterGenerationConnectionSettings {
   maxTokens: number;
   outputFormat: OutputFormat;
   requestMode: RequestMode;
+  assistantGenerationMode: CharacterAssistantGenerationMode;
   temperature: number;
   topP: number;
   frequencyPenalty: number;
@@ -55,6 +62,7 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   maxTokens: 600,
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
+  assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
   temperature: 1,
   topP: 1,
   frequencyPenalty: 0,
@@ -153,6 +161,10 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
     requestMode: REQUEST_MODE_SCHEMA.safeParse(candidate.requestMode).success
       ? (candidate.requestMode as RequestMode)
       : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.requestMode,
+    assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.safeParse(candidate.assistantGenerationMode)
+      .success
+      ? (candidate.assistantGenerationMode as CharacterAssistantGenerationMode)
+      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.assistantGenerationMode,
     temperature: readFloatInRange(
       candidate.temperature,
       TEMPERATURE_RANGE,

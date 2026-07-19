@@ -8,6 +8,10 @@ export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openai-compatible', 'u
 export const PROVIDER_KINDS = PROVIDER_KIND_SCHEMA.enum;
 export type ProviderKind = z.infer<typeof PROVIDER_KIND_SCHEMA>;
 
+export function isKoboldCppModel(model: string) {
+  return model.trim().toLowerCase().startsWith('koboldcpp/');
+}
+
 export interface iConnectionHealthRequest {
   endpoint: string;
   apiKey: string;

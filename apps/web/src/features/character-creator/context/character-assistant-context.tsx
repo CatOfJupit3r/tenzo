@@ -67,6 +67,7 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     generationSettings,
     generalCharacterIdea,
     shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
+    providerKind: connectionHealth.providerKind,
     focus: assistantFocus,
     contextAttachments,
   });

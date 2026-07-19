@@ -309,6 +309,23 @@ describe('use-guided-character-flow discovery orchestration', () => {
     expect(result.current.isGuidedDiscoveryMode).toBe(false);
   });
 
+  it('keeps a completed current step available to continue after runtime state is lost', async () => {
+    const characterId = 'character-resumed-step';
+    const { result, rerender } = renderGuidedFlow(characterId);
+    await act(async () => {
+      await result.current.openGuidedSession();
+    });
+
+    const session = getMockSession(characterId);
+    if (!session?.guided) {
+      throw new Error('Expected a guided session.');
+    }
+    session.guided.completedSteps.push(session.guided.currentStep);
+    rerender();
+
+    expect(result.current.canContinue).toBe(true);
+  });
+
   it('allows selection and handoff summary before continuing concept step', async () => {
     const characterId = 'character-selection';
     const premise = 'A detective and an oracle track a forgotten city.';

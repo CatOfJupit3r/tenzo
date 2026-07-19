@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import type { ModelMessage } from 'ai';
 import { ZodError } from 'zod';
 
-import { GUIDED_STEP_DEFINITIONS } from '@~/features/character-creator/constants/guided-flow';
+import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_IDS } from '@~/features/character-creator/constants/guided-flow';
 import type { CharacterCard } from '@~/features/character-creator/lib/card-schema';
 import { CHARACTER_TEXT_FIELD_KEYS } from '@~/features/character-creator/lib/card-schema';
 import {
@@ -23,10 +23,13 @@ import type {
   CharacterAssistantToolName,
   iCharacterAssistantStreamEvent,
 } from '@~/features/character-creator/lib/character-assistant-contracts';
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/character-assistant-generation-mode';
 import { streamCharacterAssistant } from '@~/features/character-creator/lib/character-assistant-runtime.server';
+import { generateStructuredCharacterAssistant } from '@~/features/character-creator/lib/character-assistant-structured.server';
 import { createCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
 import type { iCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
 import { TEMPLATE_FIELD_KEYS } from '@~/features/character-creator/lib/field-templates';
+import { generateUuid } from '@~/utils/uuid';
 
 const MAX_CHARACTER_ASSISTANT_STEPS = 12;
 const MAX_GUIDED_ASSISTANT_STEPS = 6;
@@ -227,6 +230,71 @@ export const Route = createFileRoute('/api/character-assistant')({
                     );
                   },
                 };
+
+                const runStructuredAssistant = async () => {
+                  const result = await generateStructuredCharacterAssistant({
+                    card: projectedCard,
+                    focus: effectiveFocus,
+                    contextAttachments: payload.contextAttachments,
+                    apiKey: payload.apiKey,
+                    generationSettings: {
+                      endpoint: payload.endpoint,
+                      model: payload.model,
+                      maxTokens: payload.maxTokens,
+                      temperature: payload.temperature,
+                      topP: payload.topP,
+                      frequencyPenalty: payload.frequencyPenalty,
+                      presencePenalty: payload.presencePenalty,
+                      topK: payload.topK,
+                      minP: payload.minP,
+                    },
+                    shouldSendDisabledSamplers: payload.shouldSendDisabledSamplers,
+                    generalCharacterIdea: payload.generalCharacterIdea,
+                    guidedStep: payload.guidedStep,
+                    concept: payload.concept,
+                    discoveryContext: payload.discoveryContext,
+                    templates: payload.templates,
+                    messages: payload.messages.map(toModelMessage),
+                    abortSignal: request.signal,
+                  });
+
+                  if (result.concept) {
+                    store.recordConcept(result.concept);
+                  }
+
+                  if (result.hasChanges) {
+                    store.appendProposedCard({
+                      toolCallId: `structured-output-${generateUuid()}`,
+                      summary: result.summary,
+                      proposedCard: result.proposedCard,
+                    });
+                  }
+
+                  return result.assistantMessage;
+                };
+                const enqueueComplete = (assistantMessage: string) => {
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_COMPLETE_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete,
+                      assistantMessage: assistantMessage.trim() || 'The proposed changes are ready for review.',
+                      proposals: latestProposal ? [latestProposal] : [],
+                      concept: recordedConcept,
+                    }),
+                  );
+                };
+
+                if (payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']) {
+                  const assistantMessage = await runStructuredAssistant();
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                      textDelta: assistantMessage,
+                    }),
+                  );
+                  enqueueComplete(assistantMessage);
+                  return;
+                }
+
                 const output = streamCharacterAssistant({
                   card: payload.card,
                   focus: effectiveFocus,
@@ -291,14 +359,18 @@ export const Route = createFileRoute('/api/character-assistant')({
                 }
 
                 const assistantMessage = await output.text;
-                enqueueEvent(
-                  CHARACTER_ASSISTANT_COMPLETE_EVENT_SCHEMA.parse({
-                    type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete,
-                    assistantMessage: assistantMessage.trim() || 'The proposed changes are ready for review.',
-                    proposals: latestProposal ? [latestProposal] : [],
-                    concept: recordedConcept,
-                  }),
-                );
+                const isMissingGuidedOutput =
+                  payload.guidedStep !== undefined &&
+                  (latestProposal === null ||
+                    (payload.guidedStep === GUIDED_STEP_IDS.concept && recordedConcept === undefined));
+
+                if (isMissingGuidedOutput) {
+                  throw new Error(
+                    'The model completed without the required tool calls. Switch to Structured output or choose a model trained for tool calling.',
+                  );
+                }
+
+                enqueueComplete(assistantMessage);
               } catch (error) {
                 enqueueEvent(
                   CHARACTER_ASSISTANT_ERROR_EVENT_SCHEMA.parse({

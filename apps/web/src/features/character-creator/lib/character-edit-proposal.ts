@@ -96,6 +96,23 @@ export const CHARACTER_EDIT_PROPOSAL_SCHEMA = z.object({
 });
 export type iCharacterEditProposal = z.infer<typeof CHARACTER_EDIT_PROPOSAL_SCHEMA>;
 
+function isSameCharacterEditProposalRun(proposal: iCharacterEditProposal, candidate: iCharacterEditProposal) {
+  return candidate.sourceMessageId
+    ? proposal.sourceMessageId === candidate.sourceMessageId
+    : proposal.id === candidate.id;
+}
+
+export function upsertCharacterEditProposal(
+  proposals: iCharacterEditProposal[],
+  nextProposal: iCharacterEditProposal,
+): iCharacterEditProposal[] {
+  const currentProposal = proposals.find((proposal) => isSameCharacterEditProposalRun(proposal, nextProposal));
+  const proposalToKeep =
+    currentProposal && currentProposal.updatedAt > nextProposal.updatedAt ? currentProposal : nextProposal;
+
+  return [...proposals.filter((proposal) => !isSameCharacterEditProposalRun(proposal, nextProposal)), proposalToKeep];
+}
+
 export const CHARACTER_EDIT_PROPOSAL_EVENT_SCHEMA = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('patches-upserted'),

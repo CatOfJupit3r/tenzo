@@ -8,6 +8,7 @@ import {
   recordGuidedConcept,
   characterAssistantSessionsCollection,
   ensureCharacterAssistantSession,
+  recordGuidedStepRunCompletion,
   updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
 import type { CharacterCard } from '../lib/card-schema';
@@ -32,6 +33,7 @@ import {
   CHARACTER_EDIT_PATCH_STATUSES,
   CHARACTER_EDIT_PROPOSAL_STATUSES,
   reduceCharacterEditProposal,
+  upsertCharacterEditProposal,
 } from '../lib/character-edit-proposal';
 import type {
   CharacterEditFieldKey,
@@ -41,6 +43,7 @@ import type {
   iCharacterEditProposal,
 } from '../lib/character-edit-proposal';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
+import type { ProviderKind } from '../lib/provider-health';
 
 interface iUseCharacterAssistantWorkspaceOptions {
   characterId: string;
@@ -50,6 +53,7 @@ interface iUseCharacterAssistantWorkspaceOptions {
   generationSettings: iCharacterGenerationSettings;
   generalCharacterIdea: string;
   shouldSendDisabledSamplers: boolean;
+  providerKind: ProviderKind | null;
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
 }
@@ -101,19 +105,6 @@ function createMessage(role: iCharacterAssistantMessage['role'], content: string
   };
 }
 
-function upsertRunProposal(
-  proposals: iCharacterEditProposal[],
-  nextProposal: iCharacterEditProposal,
-): iCharacterEditProposal[] {
-  const proposalsWithoutCurrentRun = proposals.filter((proposal) =>
-    nextProposal.sourceMessageId
-      ? proposal.sourceMessageId !== nextProposal.sourceMessageId
-      : proposal.id !== nextProposal.id,
-  );
-
-  return [...proposalsWithoutCurrentRun, nextProposal];
-}
-
 function isAbortError(error: unknown) {
   return error instanceof Error && error.name === 'AbortError';
 }
@@ -130,6 +121,7 @@ export function useCharacterAssistantWorkspace({
   generationSettings,
   generalCharacterIdea,
   shouldSendDisabledSamplers,
+  providerKind,
   focus,
   contextAttachments,
 }: iUseCharacterAssistantWorkspaceOptions) {
@@ -171,7 +163,7 @@ export function useCharacterAssistantWorkspace({
   const proposals = useMemo(() => {
     let mergedProposals = session?.proposals ?? [];
     runtimeState.proposals.forEach((proposal) => {
-      mergedProposals = upsertRunProposal(mergedProposals, proposal);
+      mergedProposals = upsertCharacterEditProposal(mergedProposals, proposal);
     });
     return mergedProposals;
   }, [runtimeState.proposals, session?.proposals]);
@@ -208,7 +200,7 @@ export function useCharacterAssistantWorkspace({
   const persistProposal = useCallback(
     async (nextProposal: iCharacterEditProposal) => {
       await updateCharacterAssistantSession(characterId, (draft) => {
-        draft.proposals = upsertRunProposal(draft.proposals, nextProposal);
+        draft.proposals = upsertCharacterEditProposal(draft.proposals, nextProposal);
       });
     },
     [characterId],
@@ -282,6 +274,8 @@ export function useCharacterAssistantWorkspace({
             topK: generationSettings.topK,
             minP: generationSettings.minP,
             shouldSendDisabledSamplers,
+            assistantGenerationMode: generationSettings.assistantGenerationMode,
+            providerKind: providerKind ?? undefined,
             card,
             focus,
             messages: conversationMessages,
@@ -318,7 +312,7 @@ export function useCharacterAssistantWorkspace({
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.proposal) {
             setRuntimeState((currentState) => ({
               ...currentState,
-              proposals: upsertRunProposal(currentState.proposals, streamEvent.proposal),
+              proposals: upsertCharacterEditProposal(currentState.proposals, streamEvent.proposal),
               activityLabel: `Proposed ${streamEvent.proposal.patches.length} change${streamEvent.proposal.patches.length === 1 ? '' : 's'}`,
             }));
             return;
@@ -365,9 +359,12 @@ export function useCharacterAssistantWorkspace({
         await updateCharacterAssistantSession(currentSession.id, (draft) => {
           draft.messages.push(assistantMessage);
           completedProposals.forEach((proposal) => {
-            draft.proposals = upsertRunProposal(draft.proposals, proposal);
+            draft.proposals = upsertCharacterEditProposal(draft.proposals, proposal);
           });
         });
+        if (isGuidedRun && guidedStep && !didEncounterRunError) {
+          await recordGuidedStepRunCompletion(characterId, guidedStep);
+        }
         setRuntimeState({
           ...INITIAL_RUNTIME_STATE,
           hasCompletedCurrentGuidedStepRun: isGuidedRun && !didEncounterRunError,
@@ -403,6 +400,7 @@ export function useCharacterAssistantWorkspace({
       generationSettings,
       isConnectionConfigured,
       runtimeState.isRunning,
+      providerKind,
       shouldSendDisabledSamplers,
     ],
   );

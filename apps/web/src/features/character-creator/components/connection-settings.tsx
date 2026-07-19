@@ -9,6 +9,7 @@ import type { iOptionType } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
 import { cn } from '@~/lib/utils';
 
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/character-assistant-generation-mode';
 import { OUTPUT_FORMATS, REQUEST_MODES } from '../lib/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
@@ -38,6 +39,19 @@ const outputFormatOptions: iOptionType[] = [
     label: 'Raw text',
     value: OUTPUT_FORMATS.none,
     description: 'Fastest, but the least structured when models drift.',
+  },
+];
+
+const assistantGenerationModeOptions: iOptionType[] = [
+  {
+    label: 'Structured output',
+    value: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
+    description: 'Schema-constrained edits with a JSON fallback for smaller and local models.',
+  },
+  {
+    label: 'Tool calls',
+    value: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
+    description: 'Multi-step agent tools for models with reliable native function calling.',
   },
 ];
 
@@ -148,6 +162,26 @@ export function ConnectionSettings({
               }
             }}
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="assistant-generation-mode">Character assistant mode</Label>
+          <SingleSelect
+            inputId="assistant-generation-mode"
+            options={assistantGenerationModeOptions}
+            value={generationSettings.assistantGenerationMode}
+            onValueChange={(value) => {
+              if (value) {
+                onSettingsChange({
+                  assistantGenerationMode: value as iCharacterGenerationSettings['assistantGenerationMode'],
+                });
+              }
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Structured output is the dependable default. Tool calls expose native agent behavior without a hidden
+            fallback.
+          </p>
         </div>
 
         <div className="flex items-center justify-between rounded-lg border px-3 py-2 md:self-end">

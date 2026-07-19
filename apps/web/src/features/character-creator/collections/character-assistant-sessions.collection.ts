@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { localStorageApi } from '@~/db/storage';
 
 import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-flow';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
@@ -244,6 +245,17 @@ export async function advanceGuidedStep(characterId: string) {
     }
 
     draft.guided.currentStep = nextStep;
+  });
+}
+
+export async function recordGuidedStepRunCompletion(characterId: string, stepId: GuidedStepId) {
+  const session = await ensureCharacterAssistantSession(characterId);
+  return updateCharacterAssistantSession(session.id, (draft) => {
+    if (draft.guided?.currentStep !== stepId || draft.guided.completedSteps.includes(stepId)) {
+      return;
+    }
+
+    draft.guided.completedSteps.push(stepId);
   });
 }
 

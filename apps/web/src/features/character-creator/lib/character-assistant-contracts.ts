@@ -2,9 +2,14 @@ import { z } from 'zod';
 
 import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-flow';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
+import {
+  CHARACTER_ASSISTANT_GENERATION_MODES,
+  CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA,
+} from './character-assistant-generation-mode';
 import { CHARACTER_EDIT_FIELD_KEY_SCHEMA, CHARACTER_EDIT_PROPOSAL_SCHEMA } from './character-edit-proposal';
 import { STORED_FIELD_TEMPLATE_SCHEMA } from './field-templates';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from './generation-stream-contracts';
+import { PROVIDER_KIND_SCHEMA, PROVIDER_KINDS } from './provider-health';
 
 export const CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA = z.enum(['card', 'field', 'fields']);
 export const CHARACTER_ASSISTANT_FOCUS_KINDS = CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA.enum;
@@ -182,6 +187,10 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   concept: CHARACTER_CONCEPT_SCHEMA.optional(),
   discoveryContext: CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA.optional(),
   templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(4).optional().default([]),
+  assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.optional().default(
+    CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
+  ),
+  providerKind: PROVIDER_KIND_SCHEMA.optional().default(PROVIDER_KINDS.unknown),
 });
 
 export const CHARACTER_ASSISTANT_STREAM_EVENT_TYPE_SCHEMA = z.enum([

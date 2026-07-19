@@ -46,6 +46,20 @@ interface iStreamCharacterAssistantOptions {
   abortSignal?: AbortSignal;
 }
 
+interface iBuildCharacterAssistantInstructionsOptions extends Pick<
+  iStreamCharacterAssistantOptions,
+  | 'card'
+  | 'focus'
+  | 'contextAttachments'
+  | 'generalCharacterIdea'
+  | 'guidedStep'
+  | 'concept'
+  | 'discoveryContext'
+  | 'templates'
+> {
+  shouldUseProposalTools?: boolean;
+}
+
 function formatContextAttachment(attachment: iCharacterAssistantContextAttachment) {
   const confidence = attachment.confidence === null ? 'unknown' : `${Math.round(attachment.confidence * 100)}%`;
   const warnings = attachment.warnings.length > 0 ? attachment.warnings.join('; ') : 'none';
@@ -102,17 +116,8 @@ export function buildCharacterAssistantInstructions({
   concept,
   discoveryContext,
   templates = [],
-}: Pick<
-  iStreamCharacterAssistantOptions,
-  | 'card'
-  | 'focus'
-  | 'contextAttachments'
-  | 'generalCharacterIdea'
-  | 'guidedStep'
-  | 'concept'
-  | 'discoveryContext'
-  | 'templates'
->) {
+  shouldUseProposalTools = true,
+}: iBuildCharacterAssistantInstructionsOptions) {
   const characterName = card.data.name.trim() || 'Untitled character';
   let focusInstruction = 'This run may propose coordinated changes across the character card.';
   if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field) {
@@ -169,7 +174,9 @@ export function buildCharacterAssistantInstructions({
   return [
     'You are the Character Assistant inside a local-first character card editor.',
     'Help the user refine either one focused field or the character as a coherent whole.',
-    'Use proposal tools for every requested card edit. Never output raw JSON as a substitute for a proposal.',
+    shouldUseProposalTools
+      ? 'Use proposal tools for every requested card edit. Never output raw JSON as a substitute for a proposal.'
+      : 'Express every requested card edit through the provided structured changes fields.',
     'Proposals are reviewable suggestions and do not change the live card until the user accepts them.',
     'Read the current projected character before substantial edits. It includes proposals already made in this run.',
     'Preserve the existing character intent and roleplay macros such as {{char}} and {{user}} unless asked otherwise.',

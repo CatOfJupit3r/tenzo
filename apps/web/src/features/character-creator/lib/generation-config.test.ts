@@ -5,6 +5,7 @@ import {
   CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
   DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
+  GENERATION_PROVIDERS,
   sanitizeCharacterGenerationConnectionSettings,
 } from './generation-config';
 
@@ -29,6 +30,15 @@ describe('CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA', () => {
 });
 
 describe('sanitizeCharacterGenerationConnectionSettings', () => {
+  it('defaults stored settings that predate provider selection to KoboldCpp', () => {
+    const result = sanitizeCharacterGenerationConnectionSettings({
+      ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
+      provider: undefined,
+    });
+
+    expect(result.provider).toBe(GENERATION_PROVIDERS.koboldcpp);
+  });
+
   it('defaults stored settings to structured assistant generation', () => {
     const result = sanitizeCharacterGenerationConnectionSettings({
       ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,

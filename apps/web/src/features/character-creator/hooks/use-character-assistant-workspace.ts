@@ -280,6 +280,7 @@ export function useCharacterAssistantWorkspace({
           signal: abortController.signal,
           body: JSON.stringify({
             characterId,
+            provider: generationSettings.provider,
             endpoint: generationSettings.endpoint,
             apiKey,
             model: generationSettings.model,

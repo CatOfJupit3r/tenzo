@@ -74,6 +74,7 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
   const guidedFlow = useGuidedCharacterFlow({
     characterId: activeCharacterId,
     apiKey,
+    provider: generationSettings.provider,
     endpoint: generationSettings.endpoint,
     model: generationSettings.model,
     visionModel: generationSettings.visionModel.trim() || generationSettings.model,

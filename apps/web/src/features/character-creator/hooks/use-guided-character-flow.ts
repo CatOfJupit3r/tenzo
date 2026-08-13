@@ -28,6 +28,7 @@ import {
 import { CHARACTER_ASSISTANT_SESSION_MODES } from '../lib/character-assistant-session';
 import { analyzeCharacterImage } from '../lib/character-vision-client';
 import type { iCharacterImageAnalysis } from '../lib/character-vision-contracts';
+import type { GenerationProvider } from '../lib/generation-config';
 import { deleteCharacterAssetBlob } from '../lib/image-store';
 
 type iDiscoveryCategoryGenerationState = Record<
@@ -43,6 +44,7 @@ type iDiscoveryCategoryGenerationState = Record<
 interface iUseGuidedCharacterFlowOptions {
   characterId: string;
   apiKey: string;
+  provider: GenerationProvider;
   endpoint: string;
   model: string;
   visionModel: string;
@@ -93,6 +95,7 @@ function createDiscoveryControllerMap() {
 export function useGuidedCharacterFlow({
   characterId,
   apiKey,
+  provider,
   endpoint,
   model,
   visionModel,
@@ -215,6 +218,7 @@ export function useGuidedCharacterFlow({
 
       try {
         const cards = await generateCharacterAssistantDiscoveryDirections({
+          provider,
           endpoint,
           apiKey,
           model,
@@ -261,6 +265,7 @@ export function useGuidedCharacterFlow({
     },
     [
       apiKey,
+      provider,
       endpoint,
       frequencyPenalty,
       maxTokens,

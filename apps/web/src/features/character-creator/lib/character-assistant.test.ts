@@ -18,6 +18,7 @@ import {
 import { buildCharacterAssistantInstructions } from './character-assistant-runtime.server';
 import { createCharacterAssistantTools } from './character-assistant-tools';
 import { createCharacterEditProposal } from './character-edit-proposal';
+import { GENERATION_PROVIDERS } from './generation-config';
 
 const executeOptions = {
   toolCallId: 'tool-call-1',
@@ -72,6 +73,7 @@ describe('character assistant contracts', () => {
 
   it('accepts guided requests with or without discovery context', () => {
     const baseRequest = {
+      provider: GENERATION_PROVIDERS.koboldcpp,
       endpoint: 'http://localhost:1234',
       apiKey: 'key',
       model: 'model',

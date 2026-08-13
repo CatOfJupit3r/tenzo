@@ -19,6 +19,7 @@ import {
   createCharacterAssistantSession,
   CHARACTER_ASSISTANT_SESSION_MODES,
 } from '../lib/character-assistant-session';
+import { GENERATION_PROVIDERS } from '../lib/generation-config';
 import {
   DISCOVERY_CATEGORY_TIMEOUT_MS,
   DISCOVERY_LONG_RUNNING_THRESHOLD_MS,
@@ -309,6 +310,7 @@ function renderGuidedFlow(
     useGuidedCharacterFlow({
       characterId,
       apiKey: 'key',
+      provider: GENERATION_PROVIDERS.koboldcpp,
       endpoint: 'https://api.example.com',
       model: 'model',
       visionModel: 'vision-model',

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/character-creator/lib/character-assistant-contracts';
+import { GENERATION_PROVIDERS } from '@~/features/character-creator/lib/generation-config';
 
 import { handleCharacterAssistantDiscoveryRequest } from '../../../routes/api/character-assistant-discovery';
 
@@ -13,6 +14,7 @@ vi.mock('@~/features/character-creator/lib/structured-output.server', () => ({
 }));
 
 const BASE_REQUEST = {
+  provider: GENERATION_PROVIDERS.koboldcpp,
   endpoint: 'http://localhost:11434',
   apiKey: 'key',
   model: 'gpt-4.1-mini',

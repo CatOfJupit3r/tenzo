@@ -14,6 +14,21 @@ export const REQUEST_MODE_SCHEMA = z.enum(['proxy', 'browser']);
 export const REQUEST_MODES = REQUEST_MODE_SCHEMA.enum;
 export type RequestMode = z.infer<typeof REQUEST_MODE_SCHEMA>;
 
+export const GENERATION_PROVIDER_SCHEMA = z.enum(['koboldcpp', 'openrouter']);
+export const GENERATION_PROVIDERS = GENERATION_PROVIDER_SCHEMA.enum;
+export type GenerationProvider = z.infer<typeof GENERATION_PROVIDER_SCHEMA>;
+
+export const GENERATION_PROVIDER_DEFAULTS = {
+  [GENERATION_PROVIDERS.koboldcpp]: {
+    endpoint: 'http://localhost:5001',
+    model: 'local-model',
+  },
+  [GENERATION_PROVIDERS.openrouter]: {
+    endpoint: 'https://openrouter.ai/api',
+    model: 'openai/gpt-4.1-mini',
+  },
+} satisfies Record<GenerationProvider, { endpoint: string; model: string }>;
+
 export const DEFAULT_CONTEXT_SIZE = 8_192;
 
 export const TEMPERATURE_RANGE = { min: 0, max: 2 } as const;
@@ -24,6 +39,7 @@ export const TOP_K_RANGE = { min: 0, max: 200 } as const;
 export const MIN_P_RANGE = { min: 0, max: 1 } as const;
 
 export interface iCharacterGenerationConnectionSettings {
+  provider: GenerationProvider;
   endpoint: string;
   model: string;
   visionModel: string;
@@ -54,8 +70,8 @@ export interface iCharacterGenerationSettings
   extends iCharacterGenerationConnectionSettings, iCharacterGenerationPromptSettings {}
 
 export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerationConnectionSettings = {
-  endpoint: 'https://api.openai.com',
-  model: 'gpt-4.1-mini',
+  provider: GENERATION_PROVIDERS.koboldcpp,
+  ...GENERATION_PROVIDER_DEFAULTS[GENERATION_PROVIDERS.koboldcpp],
   visionModel: '',
   apiKeyCiphertext: '',
   contextSize: DEFAULT_CONTEXT_SIZE,
@@ -143,6 +159,9 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
   const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
   return {
+    provider: GENERATION_PROVIDER_SCHEMA.safeParse(candidate.provider).success
+      ? (candidate.provider as GenerationProvider)
+      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.provider,
     endpoint: readString(candidate.endpoint, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.endpoint),
     model: readString(candidate.model, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.model),
     visionModel: readString(candidate.visionModel, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.visionModel),

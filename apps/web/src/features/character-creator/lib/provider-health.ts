@@ -4,7 +4,7 @@ import { REQUEST_MODES } from './generation-config';
 import type { RequestMode } from './generation-config';
 import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
 
-export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openai-compatible', 'unknown']);
+export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openrouter', 'openai-compatible', 'unknown']);
 export const PROVIDER_KINDS = PROVIDER_KIND_SCHEMA.enum;
 export type ProviderKind = z.infer<typeof PROVIDER_KIND_SCHEMA>;
 
@@ -46,6 +46,7 @@ interface iEndpointCandidates {
 
 const PROVIDER_KIND_LABELS = {
   [PROVIDER_KINDS.koboldcpp]: 'KoboldCpp',
+  [PROVIDER_KINDS.openrouter]: 'OpenRouter',
   [PROVIDER_KINDS['openai-compatible']]: 'OpenAI-compatible',
   [PROVIDER_KINDS.unknown]: 'Unknown provider',
 } satisfies Record<ProviderKind, string>;
@@ -225,6 +226,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     koboldContextResponse?.isOk === true ||
     koboldPublicContextResponse?.isOk === true;
   const isKoboldCpp = (providerName?.toLowerCase().includes('koboldcpp') ?? false) || hasKoboldMetadata;
+  const isOpenRouter = candidates.baseUrl.toLowerCase().includes('openrouter.ai/api');
   const hasOpenAiSurface = Boolean(modelsResponse?.isOk);
 
   if (!isKoboldCpp && !hasOpenAiSurface && !contextSize) {
@@ -242,6 +244,8 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   if (!resolvedProviderName) {
     if (isKoboldCpp) {
       resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS.koboldcpp];
+    } else if (isOpenRouter) {
+      resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS.openrouter];
     } else if (hasOpenAiSurface) {
       resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS['openai-compatible']];
     }
@@ -251,6 +255,8 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
 
   if (isKoboldCpp) {
     providerKind = PROVIDER_KINDS.koboldcpp;
+  } else if (isOpenRouter) {
+    providerKind = PROVIDER_KINDS.openrouter;
   } else if (hasOpenAiSurface) {
     providerKind = PROVIDER_KINDS['openai-compatible'];
   }

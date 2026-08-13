@@ -10,15 +10,21 @@ import { Switch } from '@~/components/ui/switch';
 import { cn } from '@~/lib/utils';
 
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/character-assistant-generation-mode';
-import { OUTPUT_FORMATS, REQUEST_MODES } from '../lib/generation-config';
+import {
+  GENERATION_PROVIDER_DEFAULTS,
+  GENERATION_PROVIDERS,
+  OUTPUT_FORMATS,
+  REQUEST_MODES,
+} from '../lib/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
+import type { ProviderKind } from '../lib/provider-health';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iConnectionHealthViewModel {
   isChecking: boolean;
   errorMessage: string | null;
   providerName: string | null;
-  providerKind: 'koboldcpp' | 'openai-compatible' | 'unknown' | null;
+  providerKind: ProviderKind | null;
   availableModels: string[];
   detectedModel: string | null;
   detectedContextSize: number | null;
@@ -39,6 +45,19 @@ const outputFormatOptions: iOptionType[] = [
     label: 'Raw text',
     value: OUTPUT_FORMATS.none,
     description: 'Fastest, but the least structured when models drift.',
+  },
+];
+
+const providerOptions: iOptionType[] = [
+  {
+    label: 'KoboldCpp',
+    value: GENERATION_PROVIDERS.koboldcpp,
+    description: 'Connect to a local KoboldCpp OpenAI-compatible endpoint.',
+  },
+  {
+    label: 'OpenRouter',
+    value: GENERATION_PROVIDERS.openrouter,
+    description: 'Use an OpenRouter API key and model ID through TanStack AI.',
   },
 ];
 
@@ -73,6 +92,7 @@ export function ConnectionSettings({
   onSettingsChange,
 }: iConnectionSettingsProps) {
   const isUsingProxy = generationSettings.requestMode === REQUEST_MODES.proxy;
+  const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.openrouter;
   const hasDetectedModels = connectionHealth.availableModels.length > 0;
   const modelHelperText = hasDetectedModels
     ? `Detected models: ${connectionHealth.availableModels.join(', ')}`
@@ -81,22 +101,40 @@ export function ConnectionSettings({
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1.5 md:col-span-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="api-provider">Provider</Label>
+          <SingleSelect
+            inputId="api-provider"
+            options={providerOptions}
+            value={generationSettings.provider}
+            onValueChange={(value) => {
+              if (value && GENERATION_PROVIDERS[value as keyof typeof GENERATION_PROVIDERS]) {
+                const provider = value as iCharacterGenerationSettings['provider'];
+                onSettingsChange({ provider, ...GENERATION_PROVIDER_DEFAULTS[provider] });
+              }
+            }}
+          />
+        </div>
+
+        <div className="space-y-1.5">
           <Label htmlFor="api-endpoint">Endpoint</Label>
           <Input
+            disabled={isUsingOpenRouter}
             id="api-endpoint"
-            placeholder="https://api.openai.com"
+            placeholder="http://localhost:5001"
             value={generationSettings.endpoint}
             onChange={(event) => onSettingsChange({ endpoint: event.target.value })}
           />
-          <p className="text-sm text-muted-foreground">Use the provider base URL or a full /v1/chat/completions URL.</p>
+          <p className="text-sm text-muted-foreground">
+            {isUsingOpenRouter ? 'Managed by the OpenRouter provider.' : 'Use the KoboldCpp server base URL.'}
+          </p>
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="api-model">Model</Label>
           <Input
             id="api-model"
-            placeholder="gpt-4.1-mini"
+            placeholder={isUsingOpenRouter ? 'anthropic/claude-sonnet-4' : 'local-model'}
             value={generationSettings.model}
             onChange={(event) => onSettingsChange({ model: event.target.value })}
           />
@@ -141,7 +179,7 @@ export function ConnectionSettings({
           <Input
             id="api-key"
             type="password"
-            placeholder="sk-..."
+            placeholder={isUsingOpenRouter ? 'sk-or-v1-...' : 'Optional for local KoboldCpp'}
             value={apiKey}
             onChange={(event) => onApiKeyChange(event.target.value)}
           />

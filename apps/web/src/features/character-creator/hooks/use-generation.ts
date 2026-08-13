@@ -488,6 +488,7 @@ export function useGeneration() {
           maxExampleContextCharacters,
         });
         const requestData = {
+          provider: connectionSettings.provider,
           endpoint: connectionSettings.endpoint,
           apiKey,
           model: connectionSettings.model,

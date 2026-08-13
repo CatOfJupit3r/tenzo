@@ -34,6 +34,8 @@ type iDiscoveryCategoryGenerationState = Record<
   iCharacterAssistantDiscoveryDirectionCategory,
   {
     isRunning: boolean;
+    elapsedSeconds: number;
+    isLongRunning: boolean;
     errorMessage: string | null;
   }
 >;
@@ -54,8 +56,13 @@ interface iUseGuidedCharacterFlowOptions {
   updateGeneralCharacterIdea: (value: string) => void;
   workspace: {
     hasCompletedCurrentGuidedStepRun: boolean;
+    hasUnresolvedProposals: boolean;
   };
 }
+
+export const DISCOVERY_LONG_RUNNING_THRESHOLD_MS = 10_000;
+export const DISCOVERY_CATEGORY_TIMEOUT_MS = 45_000;
+const DISCOVERY_CATEGORY_TIMEOUT_MESSAGE = 'Generation timed out. Retry this category.';
 
 const DISCOVERY_CATEGORIES = [
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
@@ -68,14 +75,14 @@ function createEmptyDiscoveryCategoryGenerationState() {
   const state = {} as iDiscoveryCategoryGenerationState;
 
   DISCOVERY_CATEGORIES.forEach((category) => {
-    state[category] = { isRunning: false, errorMessage: null };
+    state[category] = { isRunning: false, elapsedSeconds: 0, isLongRunning: false, errorMessage: null };
   });
 
   return state;
 }
 
 function isAbortError(error: unknown) {
-  return error instanceof Error && error.name === 'AbortError';
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError';
 }
 
 function createDiscoveryControllerMap() {
@@ -122,11 +129,15 @@ export function useGuidedCharacterFlow({
     guidedState?.currentStep === GUIDED_STEP_IDS.concept &&
     Boolean(discoveryState?.originalPremise.trim()) &&
     !hasCompletedDiscovery;
-  const isGuidedComplete = Boolean(session?.mode === 'chat' && session.guided?.completedSteps.includes('review'));
+  const isGuidedComplete = Boolean(
+    session?.mode === CHARACTER_ASSISTANT_SESSION_MODES.chat &&
+    session.guided?.completedSteps.includes(GUIDED_STEP_IDS.review),
+  );
   const currentStepDefinition = guidedState ? GUIDED_STEP_DEFINITIONS[guidedState.currentStep] : null;
   const hasPersistedCurrentGuidedStepRun = Boolean(guidedState?.completedSteps.includes(guidedState.currentStep));
   const canContinue = Boolean(
     currentStepDefinition &&
+    !(currentStepDefinition.id === GUIDED_STEP_IDS.review && workspace.hasUnresolvedProposals) &&
     (isGuidedDiscoveryMode
       ? guidedState?.discovery?.isReadyForHandoff
       : currentStepDefinition.isSkippable ||
@@ -174,7 +185,33 @@ export function useGuidedCharacterFlow({
       }
 
       discoveryControllersRef.current[category] = controller;
-      setCategoryGenerationState(category, { isRunning: true, errorMessage: null });
+      const startedAt = Date.now();
+      let didTimeOut = false;
+      const elapsedTimer = window.setInterval(() => {
+        if (discoveryControllersRef.current[category] !== controller) {
+          return;
+        }
+
+        const elapsedMilliseconds = Date.now() - startedAt;
+        setCategoryGenerationState(category, {
+          elapsedSeconds: Math.floor(elapsedMilliseconds / 1000),
+          isLongRunning: elapsedMilliseconds >= DISCOVERY_LONG_RUNNING_THRESHOLD_MS,
+        });
+      }, 1000);
+      const timeoutTimer = window.setTimeout(() => {
+        if (discoveryControllersRef.current[category] !== controller) {
+          return;
+        }
+
+        didTimeOut = true;
+        controller.abort();
+      }, DISCOVERY_CATEGORY_TIMEOUT_MS);
+      setCategoryGenerationState(category, {
+        isRunning: true,
+        elapsedSeconds: 0,
+        isLongRunning: false,
+        errorMessage: null,
+      });
 
       try {
         const cards = await generateCharacterAssistantDiscoveryDirections({
@@ -196,19 +233,30 @@ export function useGuidedCharacterFlow({
         await replaceGeneratedGuidedDiscoveryCardsByCategory(targetCharacterId, category, cards);
         return true;
       } catch (error) {
+        if (didTimeOut) {
+          const timeoutError = new Error(DISCOVERY_CATEGORY_TIMEOUT_MESSAGE);
+          if (discoveryControllersRef.current[category] === controller) {
+            setCategoryGenerationState(category, { errorMessage: timeoutError.message });
+          }
+          throw timeoutError;
+        }
+
         if (!isAbortError(error)) {
           const message = error instanceof Error ? error.message : 'Discovery directions could not be regenerated.';
-          setCategoryGenerationState(category, { errorMessage: message });
+          if (discoveryControllersRef.current[category] === controller) {
+            setCategoryGenerationState(category, { errorMessage: message });
+          }
           throw error;
         }
 
         return false;
       } finally {
+        window.clearInterval(elapsedTimer);
+        window.clearTimeout(timeoutTimer);
         if (discoveryControllersRef.current[category] === controller) {
           discoveryControllersRef.current[category] = null;
+          setCategoryGenerationState(category, { isRunning: false });
         }
-
-        setCategoryGenerationState(category, { isRunning: false });
       }
     },
     [

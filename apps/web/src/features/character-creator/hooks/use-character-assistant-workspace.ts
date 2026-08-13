@@ -551,6 +551,7 @@ export function useCharacterAssistantWorkspace({
     messages,
     activeProposals,
     activePatches,
+    hasUnresolvedProposals: activeProposals.length > 0,
     isConnectionConfigured,
     isRunning: runtimeState.isRunning,
     errorMessage: runtimeState.errorMessage,

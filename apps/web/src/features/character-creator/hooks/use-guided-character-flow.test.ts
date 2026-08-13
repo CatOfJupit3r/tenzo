@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
+import { GUIDED_STEP_IDS, GUIDED_STEP_SEQUENCE, getNextGuidedStepId } from '../constants/guided-flow';
 import type { GuidedStepId } from '../constants/guided-flow';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '../lib/character-assistant-contracts';
 import type {
@@ -19,13 +19,18 @@ import {
   createCharacterAssistantSession,
   CHARACTER_ASSISTANT_SESSION_MODES,
 } from '../lib/character-assistant-session';
-import { useGuidedCharacterFlow } from './use-guided-character-flow';
+import {
+  DISCOVERY_CATEGORY_TIMEOUT_MS,
+  DISCOVERY_LONG_RUNNING_THRESHOLD_MS,
+  useGuidedCharacterFlow,
+} from './use-guided-character-flow';
 
 type iMockSession = ReturnType<typeof createCharacterAssistantSession>;
 
 const mockSessions = new Map<string, iMockSession>();
 const mockGenerationErrors = new Set<iCharacterAssistantDiscoveryDirectionCategory>();
 const mockGenerationModels: string[] = [];
+const mockHangingGenerationCategories = new Set<iCharacterAssistantDiscoveryDirectionCategory>();
 const mockDiscoveredCardsByCategory = new Map<
   iCharacterAssistantDiscoveryDirectionCategory,
   iCharacterAssistantDiscoveryDirectionCard[]
@@ -66,7 +71,7 @@ function assertDirectionCard(card: iCharacterAssistantDiscoveryDirectionCard | u
   return card;
 }
 
-function createDiscoverySession(characterId: string) {
+function createDiscoverySession(characterId: string): iMockSession {
   const baseSession = createCharacterAssistantSession(characterId);
   return {
     ...baseSession,
@@ -227,15 +232,16 @@ vi.mock('../collections/character-assistant-sessions.collection', () => ({
     }
 
     const guidedState = ensureGuidedState(currentSession);
-    const nextStep = getNextGuidedStepId(guidedState.currentStep) ?? GUIDED_STEP_IDS.appearance;
+    const nextStep = getNextGuidedStepId(guidedState.currentStep);
     mockSessions.set(characterId, {
       ...currentSession,
+      mode: nextStep ? currentSession.mode : CHARACTER_ASSISTANT_SESSION_MODES.chat,
       guided: {
         ...guidedState,
         completedSteps: [...guidedState.completedSteps, guidedState.currentStep].filter(
           (step, index, steps) => index === steps.indexOf(step),
         ),
-        currentStep: nextStep,
+        currentStep: nextStep ?? guidedState.currentStep,
       },
     });
     return getMockSession(characterId);
@@ -261,8 +267,21 @@ vi.mock('../collections/character-assistant-sessions.collection', () => ({
 
 vi.mock('../lib/character-assistant-discovery-client', () => ({
   generateCharacterAssistantDiscoveryDirections: vi.fn(
-    async ({ category, model }: { category: iCharacterAssistantDiscoveryDirectionCategory; model: string }) => {
+    async ({
+      category,
+      model,
+      signal,
+    }: {
+      category: iCharacterAssistantDiscoveryDirectionCategory;
+      model: string;
+      signal: AbortSignal;
+    }) => {
       mockGenerationModels.push(model);
+      if (mockHangingGenerationCategories.has(category)) {
+        await new Promise((_, reject) => {
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+        });
+      }
       if (mockGenerationErrors.has(category)) {
         throw new Error(`Generation for ${category} failed.`);
       }
@@ -282,7 +301,10 @@ vi.mock('@~/utils/uuid', () => ({
   generateUuid: vi.fn(() => 'custom-variant-1'),
 }));
 
-function renderGuidedFlow(characterId: string) {
+function renderGuidedFlow(
+  characterId: string,
+  options: { hasUnresolvedProposals?: boolean; updateGeneralCharacterIdea?: (value: string) => unknown } = {},
+) {
   return renderHook(() =>
     useGuidedCharacterFlow({
       characterId,
@@ -297,9 +319,10 @@ function renderGuidedFlow(characterId: string) {
       presencePenalty: 0,
       topK: 0,
       minP: 0,
-      updateGeneralCharacterIdea: vi.fn(),
+      updateGeneralCharacterIdea: options.updateGeneralCharacterIdea ?? vi.fn(),
       workspace: {
         hasCompletedCurrentGuidedStepRun: false,
+        hasUnresolvedProposals: options.hasUnresolvedProposals ?? false,
       },
     }),
   );
@@ -309,7 +332,12 @@ beforeEach(() => {
   resetMockSessions();
   mockGenerationErrors.clear();
   mockGenerationModels.length = 0;
+  mockHangingGenerationCategories.clear();
   mockDiscoveredCardsByCategory.clear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('use-guided-character-flow discovery orchestration', () => {
@@ -511,6 +539,144 @@ describe('use-guided-character-flow discovery orchestration', () => {
       result.current.discoveryCategoryGenerationState[CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]
         .errorMessage,
     ).toBeNull();
+  });
+
+  it('times out one category, preserves successful categories, and allows retry', async () => {
+    vi.useFakeTimers();
+    const characterId = 'character-category-timeout';
+    const premise = 'A singer bargains with the echo that stole her memories.';
+    const timedOutCategory = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone;
+    mockHangingGenerationCategories.add(timedOutCategory);
+    const { result, rerender } = renderGuidedFlow(characterId);
+
+    let startPromise: Promise<unknown> = Promise.resolve();
+    act(() => {
+      startPromise = result.current.startGuidedDiscoverySession(premise);
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DISCOVERY_LONG_RUNNING_THRESHOLD_MS);
+    });
+    expect(result.current.discoveryCategoryGenerationState[timedOutCategory]).toMatchObject({
+      isRunning: true,
+      isLongRunning: true,
+      elapsedSeconds: DISCOVERY_LONG_RUNNING_THRESHOLD_MS / 1000,
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DISCOVERY_CATEGORY_TIMEOUT_MS - DISCOVERY_LONG_RUNNING_THRESHOLD_MS);
+      await expect(startPromise).resolves.toBeUndefined();
+    });
+    rerender();
+
+    const successfulCards = getMockSession(characterId)?.guided?.discovery.cards ?? [];
+    expect(successfulCards).toHaveLength(9);
+    expect(successfulCards.some((card) => card.category === timedOutCategory)).toBe(false);
+    expect(result.current.discoveryCategoryGenerationState[timedOutCategory]).toMatchObject({
+      isRunning: false,
+      errorMessage: 'Generation timed out. Retry this category.',
+    });
+
+    mockHangingGenerationCategories.delete(timedOutCategory);
+    await act(async () => {
+      await result.current.regenerateDiscoveryCategory(timedOutCategory);
+    });
+    rerender();
+
+    expect(
+      getMockSession(characterId)?.guided?.discovery.cards.filter((card) => card.category === timedOutCategory),
+    ).toHaveLength(3);
+    expect(result.current.discoveryCategoryGenerationState[timedOutCategory].errorMessage).toBeNull();
+  });
+
+  it('keeps a replacement category request active when the previous request aborts', async () => {
+    const characterId = 'character-overlapping-category-request';
+    const category = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone;
+    const { result, rerender } = renderGuidedFlow(characterId);
+
+    await act(async () => {
+      await result.current.startGuidedDiscoverySession('A diplomat negotiates with her own forgotten future.');
+    });
+    rerender();
+    mockHangingGenerationCategories.add(category);
+
+    let firstRequest: Promise<unknown> = Promise.resolve();
+    let replacementRequest: Promise<unknown> = Promise.resolve();
+    act(() => {
+      firstRequest = result.current.regenerateDiscoveryCategory(category);
+      replacementRequest = result.current.regenerateDiscoveryCategory(category);
+    });
+    await act(async () => {
+      await firstRequest;
+    });
+
+    expect(result.current.discoveryCategoryGenerationState[category]).toMatchObject({
+      isRunning: true,
+      errorMessage: null,
+    });
+
+    act(() => {
+      result.current.cancelDiscoveryGeneration(category);
+    });
+    await act(async () => {
+      await replacementRequest;
+    });
+
+    expect(result.current.discoveryCategoryGenerationState[category]).toMatchObject({
+      isRunning: false,
+      errorMessage: null,
+    });
+  });
+
+  it('blocks Review completion until unresolved proposals settle', async () => {
+    const characterId = 'character-review-gate';
+    const session = createDiscoverySession(characterId);
+    const guidedState = ensureGuidedState(session);
+    guidedState.currentStep = GUIDED_STEP_IDS.review;
+    guidedState.completedSteps = [...GUIDED_STEP_SEQUENCE];
+    mockSessions.set(characterId, session);
+
+    const { result } = renderGuidedFlow(characterId, { hasUnresolvedProposals: true });
+    expect(result.current.canContinue).toBe(false);
+    await expect(result.current.continueToNextStep()).resolves.toBe(false);
+    expect(getMockSession(characterId)?.mode).toBe(CHARACTER_ASSISTANT_SESSION_MODES.guided);
+
+    const settledFlow = renderGuidedFlow(characterId, { hasUnresolvedProposals: false });
+    expect(settledFlow.result.current.canContinue).toBe(true);
+    await act(async () => {
+      await settledFlow.result.current.continueToNextStep();
+    });
+    settledFlow.rerender();
+
+    expect(getMockSession(characterId)?.mode).toBe(CHARACTER_ASSISTANT_SESSION_MODES.chat);
+    expect(settledFlow.result.current.isGuidedComplete).toBe(true);
+  });
+
+  it('applies the recorded concept to the general character idea', () => {
+    const characterId = 'character-use-idea';
+    const session = createDiscoverySession(characterId);
+    const guidedState = ensureGuidedState(session);
+    guidedState.concept = {
+      premise: 'A patient cartographer who maps impossible promises.',
+      archetype: 'Patient cartographer',
+      keyTraits: [],
+      flaws: [],
+      nameCandidates: [],
+      suggestedTags: [],
+    };
+    mockSessions.set(characterId, session);
+    let generalCharacterIdea = '';
+    const { result } = renderGuidedFlow(characterId, {
+      updateGeneralCharacterIdea: (value) => {
+        generalCharacterIdea = value;
+      },
+    });
+
+    act(() => {
+      result.current.applyConceptToCard();
+    });
+
+    expect(generalCharacterIdea).toBe('A patient cartographer who maps impossible promises.');
   });
 
   it('creates a custom selectable variant for a generated direction', async () => {

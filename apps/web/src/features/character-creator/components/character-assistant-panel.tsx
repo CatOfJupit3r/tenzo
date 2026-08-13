@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LuLoaderCircle, LuSparkles, LuTriangleAlert, LuX } from 'react-icons/lu';
 
-import { toastError } from '@~/components/toastifications/create-jsx-toasts';
+import { toastError, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
 import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button/button';
 import { Dialog, DialogContent, DialogTitle } from '@~/components/ui/dialog';
@@ -216,6 +216,8 @@ export function CharacterAssistantPanel({
           onContinue={guidedFlow.continueToNextStep}
           onSkip={guidedFlow.skipStep}
           onExit={guidedFlow.exitGuidedMode}
+          onApplyAllProposals={workspace.applyAllProposals}
+          onRejectAllProposals={workspace.discardAllProposals}
           onUsePrompt={(prompt) => {
             setInputValue(prompt);
             setInputScopeLabel(`${guidedFlow.currentStepDefinition?.title ?? 'Guided'} scaffold`);
@@ -296,7 +298,15 @@ export function CharacterAssistantPanel({
                     <p className="text-xs font-medium">Concept recorded</p>
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{guidedState.concept.premise}</p>
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={guidedFlow.applyConceptToCard}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      guidedFlow.applyConceptToCard();
+                      toastSuccess('Idea added', 'The general character idea now uses this guided concept.');
+                    }}
+                  >
                     Use idea
                   </Button>
                 </div>

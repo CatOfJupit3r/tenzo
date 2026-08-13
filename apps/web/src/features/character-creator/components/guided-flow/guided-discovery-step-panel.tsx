@@ -18,6 +18,8 @@ import { buildDeterministicDiscoveryHandoffSummary } from '../../lib/character-a
 
 interface iGuidedDiscoveryCategoryState {
   isRunning: boolean;
+  elapsedSeconds: number;
+  isLongRunning: boolean;
   errorMessage: string | null;
 }
 
@@ -146,7 +148,12 @@ export function GuidedDiscoveryStepPanel({
             const hasCards = cardsByCategory[category]?.length > 0;
 
             if (state.isRunning) {
-              return <li key={category}>Generating {CATEGORY_LABELS[category]}.</li>;
+              return (
+                <li key={category}>
+                  {state.isLongRunning ? 'Still generating' : 'Generating'} {CATEGORY_LABELS[category]}...{' '}
+                  {state.elapsedSeconds}s elapsed.
+                </li>
+              );
             }
 
             if (state.errorMessage) {
@@ -227,10 +234,10 @@ export function GuidedDiscoveryStepPanel({
                     onClick={() => {
                       runAction(async () => onRegenerateCategory(category));
                     }}
-                    aria-label={`Regenerate ${CATEGORY_LABELS[category]} directions`}
+                    aria-label={`${errorMessage ? 'Retry' : 'Regenerate'} ${CATEGORY_LABELS[category]} directions`}
                   >
                     <LuRotateCcw className="size-4" />
-                    Regenerate
+                    {errorMessage ? 'Retry' : 'Regenerate'}
                   </Button>
                 </div>
               </div>

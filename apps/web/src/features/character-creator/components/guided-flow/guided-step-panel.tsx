@@ -3,6 +3,7 @@ import { LuArrowRight, LuMessageSquarePlus, LuSkipForward } from 'react-icons/lu
 
 import { Button } from '@~/components/ui/button';
 
+import { GUIDED_STEP_IDS } from '../../constants/guided-flow';
 import type { iGuidedStepDefinition } from '../../constants/guided-flow';
 
 interface iGuidedStepPanelProps {
@@ -13,6 +14,8 @@ interface iGuidedStepPanelProps {
   onContinue: () => Promise<unknown>;
   onSkip: () => Promise<unknown>;
   onExit: () => Promise<unknown>;
+  onApplyAllProposals: () => Promise<unknown>;
+  onRejectAllProposals: () => Promise<unknown>;
   onUsePrompt: (prompt: string) => void;
 }
 
@@ -24,6 +27,8 @@ export function GuidedStepPanel({
   onContinue,
   onSkip,
   onExit,
+  onApplyAllProposals,
+  onRejectAllProposals,
   onUsePrompt,
 }: iGuidedStepPanelProps) {
   const [isConfirmingContinue, setIsConfirmingContinue] = useState(false);
@@ -32,6 +37,10 @@ export function GuidedStepPanel({
   };
 
   const handleContinue = async () => {
+    if (definition.id === GUIDED_STEP_IDS.review && hasUnappliedProposals) {
+      return;
+    }
+
     if (hasUnappliedProposals && !isConfirmingContinue) {
       setIsConfirmingContinue(true);
       return;
@@ -57,6 +66,31 @@ export function GuidedStepPanel({
           Exit guided mode
         </button>
       </div>
+
+      {definition.id === GUIDED_STEP_IDS.review && hasUnappliedProposals ? (
+        <div role="alert" className="grid gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <div>
+            <p className="font-medium">Resolve proposed changes to finish</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Apply or reject every active proposal before completing guided setup.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => runAction(onRejectAllProposals)}
+              disabled={isRunning}
+            >
+              Reject all
+            </Button>
+            <Button type="button" size="sm" onClick={() => runAction(onApplyAllProposals)} disabled={isRunning}>
+              Apply all
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {isConfirmingContinue ? (
         <div className="grid gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">

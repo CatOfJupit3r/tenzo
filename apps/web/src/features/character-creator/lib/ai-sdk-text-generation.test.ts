@@ -1,12 +1,18 @@
 import { EventType } from '@tanstack/ai';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createCharacterLanguageModel, streamCharacterText } from './ai-sdk-text-generation';
 import { GENERATION_PROVIDERS } from './generation-config';
 
-const { chatMock, createOpenRouterTextMock } = vi.hoisted(() => ({
+const { chatMock, createOpenAICompatibleMock, createOpenRouterTextMock, transformRequestBodyMock } = vi.hoisted(() => ({
   chatMock: vi.fn(),
+  createOpenAICompatibleMock: vi.fn(),
   createOpenRouterTextMock: vi.fn(() => ({ name: 'openrouter' })),
+  transformRequestBodyMock: vi.fn(),
+}));
+
+vi.mock('@ai-sdk/openai-compatible', () => ({
+  createOpenAICompatible: createOpenAICompatibleMock,
 }));
 
 vi.mock('@tanstack/ai', async () => ({
@@ -17,6 +23,16 @@ vi.mock('@tanstack/ai', async () => ({
 vi.mock('@tanstack/ai-openrouter', () => ({
   createOpenRouterText: createOpenRouterTextMock,
 }));
+
+beforeEach(() => {
+  createOpenAICompatibleMock.mockImplementation((options) => {
+    transformRequestBodyMock.mockImplementation(options.transformRequestBody);
+
+    return {
+      chatModel: vi.fn(() => ({ supportsStructuredOutputs: options.supportsStructuredOutputs })),
+    };
+  });
+});
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -77,9 +93,33 @@ describe('AI SDK text generation', () => {
         adapter: { name: 'openrouter' },
         messages: [{ role: 'user', content: 'A storm caller.' }],
         systemPrompts: ['Write character prose.'],
+        modelOptions: expect.objectContaining({
+          provider: {
+            data_collection: 'deny',
+            zdr: true,
+          },
+        }),
         stream: true,
       }),
     );
     expect(text).toBe('OpenRouter');
+  });
+
+  it('enforces OpenRouter privacy routing for compatible model requests', () => {
+    createCharacterLanguageModel({
+      endpoint: 'https://openrouter.ai/api',
+      apiKey: 'sk-or-v1-test',
+      model: 'thedrummer/cydonia-24b-v4.1',
+      topK: 0,
+      minP: 0,
+    });
+
+    expect(transformRequestBodyMock({ messages: [] })).toEqual({
+      messages: [],
+      provider: {
+        data_collection: 'deny',
+        zdr: true,
+      },
+    });
   });
 });

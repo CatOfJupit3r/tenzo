@@ -126,7 +126,9 @@ export function ConnectionSettings({
             onChange={(event) => onSettingsChange({ endpoint: event.target.value })}
           />
           <p className="text-sm text-muted-foreground">
-            {isUsingOpenRouter ? 'Managed by the OpenRouter provider.' : 'Use the KoboldCpp server base URL.'}
+            {isUsingOpenRouter
+              ? 'Managed by OpenRouter with zero-retention and data-collection-denied routing.'
+              : 'Use the KoboldCpp server base URL.'}
           </p>
         </div>
 
@@ -272,6 +274,8 @@ export function ConnectionSettings({
         <AlertDescription>
           Proxy mode sends the key per request through the TanStack Start server function and does not persist it
           server-side. Browser mode keeps the request entirely client-side, but only works for CORS-friendly endpoints.
+          OpenRouter requests require a zero-data-retention endpoint and deny provider data collection; requests fail
+          when the selected model has no compliant endpoint.
         </AlertDescription>
       </Alert>
     </div>

@@ -21,6 +21,11 @@ interface iCharacterLanguageModelOptions {
   shouldSendDisabledSamplers?: boolean;
 }
 
+const OPENROUTER_PROVIDER_PRIVACY_OPTIONS = {
+  data_collection: 'deny',
+  zdr: true,
+} as const;
+
 function toModelMessage(message: iCharacterGenerationStreamRequest['messages'][number]): ModelMessage {
   return {
     role: message.role,
@@ -90,6 +95,7 @@ async function* streamOpenRouterText({
       topP,
       frequencyPenalty,
       presencePenalty,
+      provider: OPENROUTER_PROVIDER_PRIVACY_OPTIONS,
     },
     abortController,
     stream: true,
@@ -192,6 +198,7 @@ export function createCharacterLanguageModel({
   minP,
   shouldSendDisabledSamplers = false,
 }: iCharacterLanguageModelOptions) {
+  const isOpenRouter = normalizeOpenAiCompatibleBaseUrl(endpoint).toLowerCase().includes('openrouter.ai/api');
   const provider = createOpenAICompatible({
     name: 'characterCreator',
     baseURL: normalizeOpenAiCompatibleBaseUrl(endpoint),
@@ -199,6 +206,7 @@ export function createCharacterLanguageModel({
     supportsStructuredOutputs: true,
     transformRequestBody: (body) => ({
       ...body,
+      ...(isOpenRouter ? { provider: OPENROUTER_PROVIDER_PRIVACY_OPTIONS } : {}),
       ...buildSamplerOverrides({
         topK,
         minP,

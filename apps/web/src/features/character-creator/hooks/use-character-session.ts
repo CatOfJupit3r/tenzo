@@ -9,7 +9,13 @@ import { removeCharacterAssistantSession } from '../collections/character-assist
 import { characterLibraryCollection } from '../collections/character-library.collection';
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
-import type { CharacterCard, CharacterTextFieldKey, CustomField } from '../lib/card-schema';
+import type {
+  CharacterBook,
+  CharacterBookEntry,
+  CharacterCard,
+  CharacterTextFieldKey,
+  CustomField,
+} from '../lib/card-schema';
 import {
   createCharacterLibraryItem,
   createDuplicateCharacterName,
@@ -277,6 +283,88 @@ export function useCharacterSession() {
     [mutateActiveCharacter],
   );
 
+  const createCharacterBook = useCallback(() => {
+    mutateActiveCharacter((draft) => {
+      draft.card.data.character_book ??= { extensions: {}, entries: [] };
+    });
+  }, [mutateActiveCharacter]);
+
+  const removeCharacterBook = useCallback(() => {
+    mutateActiveCharacter((draft) => {
+      delete draft.card.data.character_book;
+    });
+  }, [mutateActiveCharacter]);
+
+  const updateCharacterBook = useCallback(
+    (patch: Partial<Omit<CharacterBook, 'entries' | 'extensions'>>) => {
+      mutateActiveCharacter((draft) => {
+        if (draft.card.data.character_book) {
+          Object.assign(draft.card.data.character_book, patch);
+        }
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const addCharacterBookEntry = useCallback(() => {
+    mutateActiveCharacter((draft) => {
+      const characterBook = draft.card.data.character_book;
+
+      if (!characterBook) {
+        return;
+      }
+
+      characterBook.entries.push({
+        keys: [],
+        content: '',
+        extensions: {},
+        enabled: true,
+        insertion_order: characterBook.entries.length,
+      });
+    });
+  }, [mutateActiveCharacter]);
+
+  const updateCharacterBookEntry = useCallback(
+    (index: number, patch: Partial<Omit<CharacterBookEntry, 'extensions'>>) => {
+      mutateActiveCharacter((draft) => {
+        const entry = draft.card.data.character_book?.entries[index];
+
+        if (entry) {
+          Object.assign(entry, patch);
+        }
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const removeCharacterBookEntry = useCallback(
+    (index: number) => {
+      mutateActiveCharacter((draft) => {
+        draft.card.data.character_book?.entries.splice(index, 1);
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const reorderCharacterBookEntries = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      mutateActiveCharacter((draft) => {
+        const entries = draft.card.data.character_book?.entries;
+
+        if (!entries || toIndex < 0 || toIndex >= entries.length) {
+          return;
+        }
+
+        const [movedEntry] = entries.splice(fromIndex, 1);
+
+        if (movedEntry) {
+          entries.splice(toIndex, 0, movedEntry);
+        }
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
   const updatePromptSettings = useCallback(
     (updater: (settings: iCharacterGenerationPromptSettings) => iCharacterGenerationPromptSettings) => {
       mutateActiveCharacter((draft) => {
@@ -480,6 +568,13 @@ export function useCharacterSession() {
     addCustomField,
     updateCustomField,
     removeCustomField,
+    createCharacterBook,
+    removeCharacterBook,
+    updateCharacterBook,
+    addCharacterBookEntry,
+    updateCharacterBookEntry,
+    removeCharacterBookEntry,
+    reorderCharacterBookEntries,
     updatePromptSettings,
     replacePromptSettings,
     addExampleCharacters,

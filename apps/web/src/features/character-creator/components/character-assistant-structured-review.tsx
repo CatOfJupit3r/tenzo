@@ -5,7 +5,7 @@ import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
 import type { iCharacterEditPatch } from '../lib/character-edit-proposal';
 
 interface iCharacterAssistantStructuredReviewProps {
-  patch: Exclude<iCharacterEditPatch, { kind: 'text' } | { kind: 'character-book' }>;
+  patch: Exclude<iCharacterEditPatch, { kind: 'text' }>;
   onApply: () => void;
   onReject: () => void;
 }
@@ -14,6 +14,20 @@ function renderValues(patch: iCharacterAssistantStructuredReviewProps['patch'], 
   if (patch.kind === 'string-list') {
     const values = side === 'old' ? patch.oldValue : patch.newValue;
     return values.length > 0 ? values.map((value) => <li key={value}>{value}</li>) : <li>None</li>;
+  }
+
+  if (patch.kind === 'character-book') {
+    const characterBook = side === 'old' ? patch.oldValue : patch.newValue;
+    return characterBook ? (
+      <li>
+        <span className="font-medium">{characterBook.name ?? 'Untitled book'}</span>
+        <span className="block text-muted-foreground">
+          {characterBook.entries.length} {characterBook.entries.length === 1 ? 'entry' : 'entries'}
+        </span>
+      </li>
+    ) : (
+      <li>No character book</li>
+    );
   }
 
   const values = side === 'old' ? patch.oldValue : patch.newValue;

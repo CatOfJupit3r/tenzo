@@ -1,6 +1,7 @@
 import { Card } from '@~/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 
+import { CharacterBookTab } from './character-book-tab';
 import { CoreFieldsTab } from './core-fields-tab';
 import { DialogueTab } from './dialogue-tab';
 import { MetadataTab } from './metadata-tab';
@@ -19,6 +20,9 @@ export function CharacterCreatorTabs() {
             <TabsTrigger value={CHARACTER_CREATOR_TABS.dialogue} className={TAB_TRIGGER_CLASS_NAME}>
               Dialogue
             </TabsTrigger>
+            <TabsTrigger value={CHARACTER_CREATOR_TABS.character_book} className={TAB_TRIGGER_CLASS_NAME}>
+              Character Book
+            </TabsTrigger>
             <TabsTrigger value={CHARACTER_CREATOR_TABS.overrides} className={TAB_TRIGGER_CLASS_NAME}>
               Prompt Overrides
             </TabsTrigger>
@@ -34,6 +38,10 @@ export function CharacterCreatorTabs() {
 
         <TabsContent value={CHARACTER_CREATOR_TABS.dialogue} className="p-4 sm:p-6">
           <DialogueTab />
+        </TabsContent>
+
+        <TabsContent value={CHARACTER_CREATOR_TABS.character_book} className="p-4 sm:p-6">
+          <CharacterBookTab />
         </TabsContent>
 
         <TabsContent value={CHARACTER_CREATOR_TABS.overrides} className="p-4 sm:p-6">

@@ -17,7 +17,7 @@ import {
   toggleGuidedDiscoveryCardSelection,
 } from '../collections/character-assistant-sessions.collection';
 import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_IDS } from '../constants/guided-flow';
-import type { GuidedStepId } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '../lib/character-assistant-contracts';
 import type { iCharacterAssistantDiscoveryDirectionCategory } from '../lib/character-assistant-contracts';
 import { generateCharacterAssistantDiscoveryDirections } from '../lib/character-assistant-discovery-client';

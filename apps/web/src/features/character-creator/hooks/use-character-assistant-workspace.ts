@@ -11,6 +11,7 @@ import {
   recordGuidedStepRunCompletion,
   updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import type { CharacterCard } from '../lib/card-schema';
 import {
   CHARACTER_ASSISTANT_MESSAGE_ROLES,
@@ -64,6 +65,7 @@ interface iCharacterAssistantRuntimeState {
   streamingMessage: string;
   activityLabel: string | null;
   proposals: iCharacterEditProposal[];
+  guidedStepId: GuidedStepId | null;
   hasCompletedCurrentGuidedStepRun: boolean;
 }
 
@@ -79,6 +81,7 @@ const INITIAL_RUNTIME_STATE: iCharacterAssistantRuntimeState = {
   streamingMessage: '',
   activityLabel: null,
   proposals: [],
+  guidedStepId: null,
   hasCompletedCurrentGuidedStepRun: false,
 };
 
@@ -96,13 +99,22 @@ const ACTIVE_PATCH_STATUSES = new Set<CharacterEditPatchStatus>([
   CHARACTER_EDIT_PATCH_STATUSES.conflict,
 ]);
 
-function createMessage(role: iCharacterAssistantMessage['role'], content: string): iCharacterAssistantMessage {
+function createMessage(
+  role: iCharacterAssistantMessage['role'],
+  content: string,
+  guidedStepId?: GuidedStepId,
+): iCharacterAssistantMessage {
   return {
     id: generateUuid(),
     role,
     content,
     createdAt: new Date().toISOString(),
+    guidedStepId,
   };
+}
+
+function assignGuidedStep(proposal: iCharacterEditProposal, guidedStepId?: GuidedStepId) {
+  return guidedStepId ? { ...proposal, guidedStepId } : proposal;
 }
 
 function isAbortError(error: unknown) {
@@ -193,9 +205,13 @@ export function useCharacterAssistantWorkspace({
 
     return [
       ...storedMessages,
-      createMessage(CHARACTER_ASSISTANT_MESSAGE_ROLES.assistant, runtimeState.streamingMessage),
+      createMessage(
+        CHARACTER_ASSISTANT_MESSAGE_ROLES.assistant,
+        runtimeState.streamingMessage,
+        runtimeState.guidedStepId ?? undefined,
+      ),
     ];
-  }, [runtimeState.streamingMessage, session?.messages]);
+  }, [runtimeState.guidedStepId, runtimeState.streamingMessage, session?.messages]);
 
   const persistProposal = useCallback(
     async (nextProposal: iCharacterEditProposal) => {
@@ -237,7 +253,7 @@ export function useCharacterAssistantWorkspace({
         (attachment, index, attachments) =>
           attachments.findIndex((candidate) => candidate.id === attachment.id) === index,
       );
-      const userMessage = createMessage(CHARACTER_ASSISTANT_MESSAGE_ROLES.user, trimmedInput);
+      const userMessage = createMessage(CHARACTER_ASSISTANT_MESSAGE_ROLES.user, trimmedInput, guidedStep);
       const conversationMessages = [...currentSession.messages, userMessage];
       await updateCharacterAssistantSession(currentSession.id, (draft) => {
         draft.messages.push(userMessage);
@@ -251,6 +267,7 @@ export function useCharacterAssistantWorkspace({
         streamingMessage: '',
         activityLabel: 'Reviewing character',
         proposals: [],
+        guidedStepId: guidedStep ?? null,
         hasCompletedCurrentGuidedStepRun: false,
       });
 
@@ -310,9 +327,10 @@ export function useCharacterAssistantWorkspace({
           }
 
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.proposal) {
+            const guidedProposal = assignGuidedStep(streamEvent.proposal, guidedStep);
             setRuntimeState((currentState) => ({
               ...currentState,
-              proposals: upsertCharacterEditProposal(currentState.proposals, streamEvent.proposal),
+              proposals: upsertCharacterEditProposal(currentState.proposals, guidedProposal),
               activityLabel: `Proposed ${streamEvent.proposal.patches.length} change${streamEvent.proposal.patches.length === 1 ? '' : 's'}`,
             }));
             return;
@@ -339,7 +357,7 @@ export function useCharacterAssistantWorkspace({
 
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete) {
             completedMessage = streamEvent.assistantMessage;
-            completedProposals = streamEvent.proposals;
+            completedProposals = streamEvent.proposals.map((proposal) => assignGuidedStep(proposal, guidedStep));
             if (isGuidedRun && streamEvent.concept) {
               await recordGuidedConcept(characterId, streamEvent.concept);
             }
@@ -355,6 +373,7 @@ export function useCharacterAssistantWorkspace({
         const assistantMessage = createMessage(
           CHARACTER_ASSISTANT_MESSAGE_ROLES.assistant,
           completedMessage || 'The proposed changes are ready for review.',
+          guidedStep,
         );
         await updateCharacterAssistantSession(currentSession.id, (draft) => {
           draft.messages.push(assistantMessage);

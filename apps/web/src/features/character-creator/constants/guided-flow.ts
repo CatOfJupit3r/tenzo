@@ -1,21 +1,11 @@
-import { z } from 'zod';
-
 import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
 import { CHARACTER_EDIT_FIELD_KEYS } from '../lib/character-edit-proposal';
 import type { TemplateFieldKey } from '../lib/field-templates';
 import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
+import { GUIDED_STEP_ID_SCHEMA } from './guided-step-id';
+import type { GuidedStepId } from './guided-step-id';
 
-export const GUIDED_STEP_ID_SCHEMA = z.enum([
-  'concept',
-  'appearance',
-  'personality',
-  'scenario',
-  'voice',
-  'metadata',
-  'review',
-]);
 export const GUIDED_STEP_IDS = GUIDED_STEP_ID_SCHEMA.enum;
-export type GuidedStepId = z.infer<typeof GUIDED_STEP_ID_SCHEMA>;
 
 export interface iGuidedStepDefinition {
   id: GuidedStepId;

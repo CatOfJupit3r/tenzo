@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-flow';
+import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-step-id';
 import {
   CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_STATE_DEFAULT,

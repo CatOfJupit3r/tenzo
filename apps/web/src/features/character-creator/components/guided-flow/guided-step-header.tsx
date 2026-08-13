@@ -3,7 +3,7 @@ import { LuCheck } from 'react-icons/lu';
 import { cn } from '@~/lib/utils';
 
 import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_SEQUENCE } from '../../constants/guided-flow';
-import type { GuidedStepId } from '../../constants/guided-flow';
+import type { GuidedStepId } from '../../constants/guided-step-id';
 
 interface iGuidedStepHeaderProps {
   currentStep: GuidedStepId;

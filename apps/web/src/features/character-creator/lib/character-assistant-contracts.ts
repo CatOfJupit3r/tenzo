@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-flow';
+import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-step-id';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
 import {
   CHARACTER_ASSISTANT_GENERATION_MODES,
@@ -51,6 +51,7 @@ export const CHARACTER_ASSISTANT_MESSAGE_SCHEMA = z.object({
   role: CHARACTER_ASSISTANT_MESSAGE_ROLE_SCHEMA,
   content: z.string(),
   createdAt: z.string(),
+  guidedStepId: GUIDED_STEP_ID_SCHEMA.optional(),
 });
 
 export const CHARACTER_ASSISTANT_TOOL_NAME_SCHEMA = z.enum([

@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GUIDED_STEP_IDS, GUIDED_STEP_SEQUENCE, getNextGuidedStepId } from '../constants/guided-flow';
-import type { GuidedStepId } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '../lib/character-assistant-contracts';
 import type {
   iCharacterAssistantDiscoveryDirectionCard,

@@ -3,8 +3,9 @@ import { z } from 'zod';
 
 import { localStorageApi } from '@~/db/storage';
 
-import { GUIDED_STEP_ID_SCHEMA, GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
-import type { GuidedStepId } from '../constants/guided-flow';
+import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
+import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-step-id';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,

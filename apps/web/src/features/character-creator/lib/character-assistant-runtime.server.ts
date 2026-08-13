@@ -2,7 +2,7 @@ import { stepCountIs, streamText } from 'ai';
 import type { ModelMessage } from 'ai';
 
 import { GUIDED_STEP_DEFINITIONS } from '../constants/guided-flow';
-import type { GuidedStepId } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import { createCharacterLanguageModel } from './ai-sdk-text-generation';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';

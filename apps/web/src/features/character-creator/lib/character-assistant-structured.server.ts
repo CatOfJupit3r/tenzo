@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { generateUuid } from '@~/utils/uuid';
 
 import { GUIDED_STEP_IDS } from '../constants/guided-flow';
-import type { GuidedStepId } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import { createCharacterLanguageModel } from './ai-sdk-text-generation';
 import { CHARACTER_BOOK_SCHEMA, CHARACTER_TEXT_FIELD_KEYS, CUSTOM_FIELD_SCHEMA } from './card-schema';
 import type { CharacterCard, CustomField } from './card-schema';

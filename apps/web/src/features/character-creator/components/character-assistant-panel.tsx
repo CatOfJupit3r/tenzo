@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { LuLoaderCircle, LuSparkles, LuTriangleAlert, LuX } from 'react-icons/lu';
+import { LuSparkles, LuX } from 'react-icons/lu';
 
 import { toastError, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
 import { Badge } from '@~/components/ui/badge';
@@ -10,12 +10,9 @@ import { cn } from '@~/lib/utils';
 import { GUIDED_STEP_IDS } from '../constants/guided-flow';
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
-import {
-  CHARACTER_ASSISTANT_FOCUS_KINDS,
-  CHARACTER_ASSISTANT_MESSAGE_ROLES,
-} from '../lib/character-assistant-contracts';
-import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
+import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
 import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
+import { CharacterAssistantConversation } from './character-assistant-conversation';
 import { ChatInputEditor } from './editor/chat-input-editor';
 import { GuidedDiscoveryStepPanel } from './guided-flow/guided-discovery-step-panel';
 import { GuidedImageStep } from './guided-flow/guided-image-step';
@@ -51,8 +48,10 @@ export function CharacterAssistantPanel({
   const [inputTemplateIds, setInputTemplateIds] = useState<string[]>([]);
   const [inputScopeLabel, setInputScopeLabel] = useState('Whole character');
   const conversationEndRef = useRef<HTMLDivElement>(null);
+  const settledOutcomeRef = useRef<HTMLDivElement>(null);
   const shouldFollowConversationRef = useRef(true);
   const shouldRestoreAssistantToggleFocusRef = useRef(true);
+  const wasRunningRef = useRef(workspace.isRunning);
   const { guidedState } = guidedFlow;
   const scaffoldState = guidedFlow.savedGuidedState;
   const discoveryState = guidedState?.discovery;
@@ -122,6 +121,14 @@ export function CharacterAssistantPanel({
     workspace.activityLabel,
     workspace.isRunning,
   ]);
+
+  useEffect(() => {
+    if (wasRunningRef.current && !workspace.isRunning) {
+      shouldFollowConversationRef.current = true;
+      settledOutcomeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    wasRunningRef.current = workspace.isRunning;
+  }, [workspace.isRunning]);
 
   const handleApply = async (proposalId: string, fieldKeys?: CharacterEditFieldKey[]) => {
     try {
@@ -333,126 +340,30 @@ export function CharacterAssistantPanel({
           }}
         >
           <div className="grid gap-4">
-            {workspace.messages.length === 0 ? (
-              <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                Describe the character or ask for a focused change. Suggestions appear on their native fields for
-                review.
-              </div>
-            ) : null}
-
-            <div className="grid gap-3">
-              {workspace.messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'max-w-[92%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap',
-                    message.role === CHARACTER_ASSISTANT_MESSAGE_ROLES.user
-                      ? 'ml-auto bg-primary text-primary-foreground'
-                      : 'border bg-card',
-                  )}
-                >
-                  {message.content}
-                </div>
-              ))}
-            </div>
-
-            <div aria-live="polite" aria-busy={workspace.isRunning}>
-              {workspace.activityLabel ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <LuLoaderCircle className="size-4 animate-spin" />
-                  {workspace.activityLabel}
-                </div>
-              ) : null}
-            </div>
-
-            {workspace.errorMessage ? (
-              <div role="alert" className="flex gap-2 rounded-xl border border-destructive/40 bg-destructive/5 p-3">
-                <LuTriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-                <p className="text-sm text-destructive">{workspace.errorMessage}</p>
-              </div>
-            ) : null}
-
-            {workspace.activeProposals.length > 0 ? (
-              <section className="grid gap-3 rounded-xl border bg-muted/15 p-3" aria-label="Assistant proposals">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium">Proposed changes</p>
-                    <p className="text-xs text-muted-foreground">
-                      Detailed diffs also appear beside the affected fields.
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        void workspace
-                          .discardAllProposals()
-                          .catch((error: unknown) =>
-                            toastError('Proposals were not discarded', getErrorMessage(error)),
-                          );
-                      }}
-                    >
-                      Reject all
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        void handleApplyAll();
-                      }}
-                    >
-                      Apply all
-                    </Button>
-                  </div>
-                </div>
-
-                {workspace.activeProposals.map((proposal) => (
-                  <div key={proposal.id} className="rounded-lg border bg-background p-3">
-                    {proposal.summary ? <p className="mb-3 text-sm">{proposal.summary}</p> : null}
-                    <div className="grid gap-2">
-                      {proposal.patches
-                        .filter((patch) => patch.status !== CHARACTER_EDIT_PATCH_STATUSES.rejected)
-                        .map((patch) => (
-                          <div
-                            key={patch.fieldKey}
-                            className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-2"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{formatFieldLabel(patch.fieldKey)}</p>
-                              <p className="text-xs text-muted-foreground">{patch.status}</p>
-                            </div>
-                            {patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed ? (
-                              <div className="flex shrink-0 gap-1">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    void handleReject(proposal.id, [patch.fieldKey]);
-                                  }}
-                                >
-                                  Reject
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() => {
-                                    void handleApply(proposal.id, [patch.fieldKey]);
-                                  }}
-                                >
-                                  Apply
-                                </Button>
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                ))}
-              </section>
-            ) : null}
+            <CharacterAssistantConversation
+              messages={workspace.messages}
+              proposals={workspace.activeProposals}
+              currentGuidedStepId={guidedFlow.currentStepDefinition?.id}
+              isGuided={isGuided}
+              isRunning={workspace.isRunning}
+              activityLabel={workspace.activityLabel}
+              errorMessage={workspace.errorMessage}
+              settledOutcomeRef={settledOutcomeRef}
+              onApply={(proposalId, fieldKeys) => {
+                void handleApply(proposalId, fieldKeys);
+              }}
+              onReject={(proposalId, fieldKeys) => {
+                void handleReject(proposalId, fieldKeys);
+              }}
+              onApplyAll={() => {
+                void handleApplyAll();
+              }}
+              onRejectAll={() => {
+                void workspace
+                  .discardAllProposals()
+                  .catch((error: unknown) => toastError('Proposals were not discarded', getErrorMessage(error)));
+              }}
+            />
             <div ref={conversationEndRef} aria-hidden="true" />
           </div>
         </div>

@@ -136,6 +136,37 @@ describe('character assistant sessions', () => {
     expect(session?.guided?.attachments).toHaveLength(1);
   });
 
+  it('retains guided-step ownership for persisted conversation results', () => {
+    const session = sanitizeCharacterAssistantSession({
+      ...createCharacterAssistantSession('character-1'),
+      messages: [
+        {
+          id: 'message-1',
+          role: 'assistant',
+          content: 'Appearance is ready.',
+          createdAt: '2026-08-13T10:00:00.000Z',
+          guidedStepId: GUIDED_STEP_IDS.appearance,
+        },
+      ],
+      proposals: [
+        {
+          id: 'proposal-1',
+          characterId: 'character-1',
+          baseRevision: 'revision-1',
+          patches: [],
+          status: 'review',
+          guidedStepId: GUIDED_STEP_IDS.appearance,
+          errorMessage: null,
+          createdAt: '2026-08-13T10:00:00.000Z',
+          updatedAt: '2026-08-13T10:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(session?.messages[0]?.guidedStepId).toBe(GUIDED_STEP_IDS.appearance);
+    expect(session?.proposals[0]?.guidedStepId).toBe(GUIDED_STEP_IDS.appearance);
+  });
+
   it('advances all guided steps and returns to chat after review', async () => {
     const characterId = 'guided-session-test';
     await startGuidedSession(characterId);

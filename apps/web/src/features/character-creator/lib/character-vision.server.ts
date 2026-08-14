@@ -1,9 +1,9 @@
-import type { LanguageModel } from 'ai';
+import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
 
-import { createCharacterLanguageModel } from './ai-sdk-text-generation';
 import { CHARACTER_IMAGE_ANALYSIS_SCHEMA, CHARACTER_VISION_REQUEST_SCHEMA } from './character-vision-contracts';
 import type { iCharacterImageAnalysis, iCharacterVisionRequest } from './character-vision-contracts';
 import { generateValidatedObject } from './structured-output.server';
+import { createCharacterModelOptions, createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 const VISION_SYSTEM_PROMPT =
   'You describe character reference images for a character card editor. Describe only what is visible; put uncertainty in warnings and lower confidence. Do not invent story details.';
@@ -33,13 +33,13 @@ function clampAnalysisArrays(value: unknown): unknown {
   };
 }
 
-function buildVisionMessages(imageDataUrl: string, userHint?: string) {
+function buildVisionMessages(imageDataUrl: string, userHint?: string): ModelMessage[] {
   return [
     {
       role: 'user' as const,
       content: [
-        { type: 'image' as const, image: imageDataUrl },
-        ...(userHint?.trim() ? [{ type: 'text' as const, text: `User hint: ${userHint.trim()}` }] : []),
+        { type: 'image' as const, source: { type: 'url' as const, value: imageDataUrl } },
+        ...(userHint?.trim() ? [{ type: 'text' as const, content: `User hint: ${userHint.trim()}` }] : []),
       ],
     },
   ];
@@ -47,29 +47,30 @@ function buildVisionMessages(imageDataUrl: string, userHint?: string) {
 
 export async function analyzeCharacterImage(
   request: iCharacterVisionRequest,
-  modelOverride?: Exclude<LanguageModel, string>,
+  adapterOverride?: AnyTextAdapter,
 ): Promise<iCharacterImageAnalysis> {
   const parsedRequest = CHARACTER_VISION_REQUEST_SCHEMA.parse(request);
-  const model =
-    modelOverride ??
-    createCharacterLanguageModel({
+  const adapter =
+    adapterOverride ??
+    createCharacterTextAdapter({
       endpoint: parsedRequest.endpoint,
       apiKey: parsedRequest.apiKey,
       model: parsedRequest.model,
-      topK: 0,
-      minP: 0,
     });
   const messages = buildVisionMessages(parsedRequest.imageDataUrl, parsedRequest.userHint);
 
   const analysis = await generateValidatedObject({
-    model,
+    adapter,
     system: VISION_SYSTEM_PROMPT,
     messages,
     schema: CHARACTER_IMAGE_ANALYSIS_SCHEMA,
-    schemaName: 'character_image_analysis',
     schemaDescription: 'Visible character appearance details with uncertainty and suggested tags.',
-    maxOutputTokens: Math.max(1, Math.floor(parsedRequest.maxTokens)),
-    temperature: parsedRequest.temperature,
+    modelOptions: createCharacterModelOptions(parsedRequest.endpoint, {
+      maxTokens: parsedRequest.maxTokens,
+      temperature: parsedRequest.temperature,
+      topK: 0,
+      minP: 0,
+    }),
   });
 
   return CHARACTER_IMAGE_ANALYSIS_SCHEMA.parse(clampAnalysisArrays(analysis));

@@ -1,95 +1,48 @@
-import { extractJsonMiddleware, generateText, Output, wrapLanguageModel } from 'ai';
-import type { LanguageModel, ModelMessage } from 'ai';
+import { chat } from '@tanstack/ai';
+import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
 import { z } from 'zod';
 
 interface iGenerateValidatedObjectOptions<T> {
-  model: Exclude<LanguageModel, string>;
+  adapter: AnyTextAdapter;
   schema: z.ZodType<T>;
-  schemaName: string;
   schemaDescription: string;
   system: string;
   prompt?: string;
   messages?: ModelMessage[];
-  maxOutputTokens: number;
-  temperature: number;
-  topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
+  modelOptions?: Record<string, unknown>;
   abortSignal?: AbortSignal;
 }
 
-export function extractFirstJsonValue(content: string) {
+function buildMessages(prompt?: string, messages?: ModelMessage[]): ModelMessage[] {
+  if (messages) {
+    return messages;
+  }
+
+  if (prompt) {
+    return [{ role: 'user', content: prompt }];
+  }
+
+  throw new Error('Structured generation requires a prompt or messages.');
+}
+
+function extractFirstJsonValue(content: string) {
   for (let start = 0; start < content.length; start += 1) {
     if (content[start] !== '{' && content[start] !== '[') {
       continue;
     }
 
-    const stack: string[] = [];
-    let isInsideString = false;
-    let isEscaped = false;
-
-    for (let index = start; index < content.length; index += 1) {
-      const character = content[index];
-
-      if (isInsideString) {
-        if (isEscaped) {
-          isEscaped = false;
-        } else if (character === '\\') {
-          isEscaped = true;
-        } else if (character === '"') {
-          isInsideString = false;
-        }
-        continue;
-      }
-
-      if (character === '"') {
-        isInsideString = true;
-        continue;
-      }
-
-      if (character === '{' || character === '[') {
-        stack.push(character);
-        continue;
-      }
-
-      if (character !== '}' && character !== ']') {
-        continue;
-      }
-
-      const openingCharacter = stack.pop();
-      const isMatchingPair =
-        (openingCharacter === '{' && character === '}') || (openingCharacter === '[' && character === ']');
-
-      if (!isMatchingPair) {
-        break;
-      }
-
-      if (stack.length === 0) {
-        const candidate = content.slice(start, index + 1);
-
-        try {
-          JSON.parse(candidate);
-          return candidate;
-        } catch {
-          break;
-        }
+    for (let end = content.length; end > start; end -= 1) {
+      try {
+        const candidate = content.slice(start, end);
+        JSON.parse(candidate);
+        return candidate;
+      } catch {
+        // Continue until the first complete JSON value is isolated.
       }
     }
   }
 
   throw new Error('The model response did not contain a complete JSON value.');
-}
-
-function buildPromptInput(prompt?: string, messages?: ModelMessage[]) {
-  if (messages) {
-    return { messages } as const;
-  }
-
-  if (prompt) {
-    return { prompt } as const;
-  }
-
-  throw new Error('Structured generation requires a prompt or messages.');
 }
 
 function describeGenerationError(error: unknown) {
@@ -98,73 +51,55 @@ function describeGenerationError(error: unknown) {
   }
 
   const responseBody = Reflect.get(error, 'responseBody');
-  const cause = Reflect.get(error, 'cause');
-  let details = error.message;
-
-  if (typeof responseBody === 'string' && responseBody.trim()) {
-    details = responseBody;
-  } else if (cause instanceof Error && cause.message !== error.message) {
-    details = `${error.message}: ${cause.message}`;
-  }
+  const details = typeof responseBody === 'string' && responseBody.trim() ? responseBody : error.message;
   const compactMessage = details.replace(/\s+/g, ' ').trim();
   return compactMessage.length > 300 ? `${compactMessage.slice(0, 297)}...` : compactMessage;
 }
 
 export async function generateValidatedObject<T>({
-  model,
+  adapter,
   schema,
-  schemaName,
   schemaDescription,
   system,
   prompt,
   messages,
-  maxOutputTokens,
-  temperature,
-  topP,
-  frequencyPenalty,
-  presencePenalty,
+  modelOptions,
   abortSignal,
 }: iGenerateValidatedObjectOptions<T>): Promise<T> {
-  const promptInput = buildPromptInput(prompt, messages);
-  const modelWithJsonExtraction = wrapLanguageModel({
-    model,
-    middleware: extractJsonMiddleware({ transform: extractFirstJsonValue }),
-  });
-  const settings = {
-    maxOutputTokens,
-    temperature,
-    topP,
-    frequencyPenalty,
-    presencePenalty,
-    abortSignal,
-  };
+  const abortController = new AbortController();
+  if (abortSignal?.aborted) {
+    abortController.abort(abortSignal.reason);
+  } else {
+    abortSignal?.addEventListener('abort', () => abortController.abort(abortSignal.reason), { once: true });
+  }
+
+  const inputMessages = buildMessages(prompt, messages);
 
   try {
-    const result = await generateText({
-      model: modelWithJsonExtraction,
-      output: Output.object({
-        schema,
-        name: schemaName,
-        description: schemaDescription,
-      }),
-      system,
-      ...promptInput,
-      ...settings,
+    const output = await chat({
+      adapter,
+      messages: inputMessages,
+      systemPrompts: [system],
+      outputSchema: schema.describe(schemaDescription),
+      modelOptions,
+      abortController,
     });
 
-    return schema.parse(result.output);
+    return schema.parse(output);
   } catch (structuredOutputError) {
-    const jsonSchema = JSON.stringify(z.toJSONSchema(schema));
-
     try {
-      const result = await generateText({
-        model,
-        system: `${system}\nReturn only one JSON value matching this JSON Schema: ${jsonSchema}`,
-        ...promptInput,
-        ...settings,
+      const text = await chat({
+        adapter,
+        messages: inputMessages,
+        systemPrompts: [
+          `${system}\nReturn only one JSON value matching this JSON Schema: ${JSON.stringify(z.toJSONSchema(schema))}`,
+        ],
+        modelOptions,
+        abortController,
+        stream: false,
       });
-      const parsedValue = JSON.parse(extractFirstJsonValue(result.text)) as unknown;
-      return schema.parse(parsedValue);
+
+      return schema.parse(JSON.parse(extractFirstJsonValue(text)) as unknown);
     } catch (fallbackError) {
       throw new AggregateError(
         [structuredOutputError, fallbackError],

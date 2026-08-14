@@ -1,4 +1,4 @@
-import type { LanguageModel } from 'ai';
+import type { AnyTextAdapter } from '@tanstack/ai';
 import { describe, expect, it, vi } from 'vitest';
 
 import { analyzeCharacterImage } from './character-vision.server';
@@ -38,13 +38,13 @@ const analysis = {
   confidence: 0.8,
   warnings: [],
 };
-const mockModel = {} as Exclude<LanguageModel, string>;
+const mockAdapter = {} as AnyTextAdapter;
 
 describe('character vision analysis', () => {
   it('returns a validated structured analysis', async () => {
     generateValidatedObjectMock.mockResolvedValueOnce(analysis);
 
-    await expect(analyzeCharacterImage(request, mockModel)).resolves.toEqual(analysis);
+    await expect(analyzeCharacterImage(request, mockAdapter)).resolves.toEqual(analysis);
     expect(generateValidatedObjectMock).toHaveBeenCalledOnce();
   });
 
@@ -54,7 +54,7 @@ describe('character vision analysis', () => {
       suggestedTags: Array.from({ length: 12 }, (_, index) => `tag-${index}`),
     });
 
-    const result = await analyzeCharacterImage(request, mockModel);
+    const result = await analyzeCharacterImage(request, mockAdapter);
     expect(result.suggestedTags).toHaveLength(10);
     expect(result).toMatchObject({
       suggestedTags: expect.arrayContaining(['tag-0', 'tag-9']),

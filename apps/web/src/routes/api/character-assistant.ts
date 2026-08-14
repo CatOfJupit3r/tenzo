@@ -1,5 +1,6 @@
+import { EventType } from '@tanstack/ai';
+import type { ModelMessage } from '@tanstack/ai';
 import { createFileRoute } from '@tanstack/react-router';
-import type { ModelMessage } from 'ai';
 import { ZodError } from 'zod';
 
 import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_IDS } from '@~/features/character-creator/constants/guided-flow';
@@ -355,45 +356,52 @@ export const Route = createFileRoute('/api/character-assistant')({
                   abortSignal: request.signal,
                 });
                 try {
-                  for await (const chunk of output.fullStream) {
-                    if (chunk.type === 'error') {
-                      throw chunk.error;
+                  let assistantMessage = '';
+                  for await (const chunk of output) {
+                    if (chunk.type === EventType.RUN_ERROR) {
+                      throw new Error(chunk.message);
                     }
 
-                    if (chunk.type === 'text-delta') {
+                    if (chunk.type === EventType.TEXT_MESSAGE_CONTENT) {
+                      assistantMessage += chunk.delta;
                       enqueueEvent(
                         CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
                           type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
-                          textDelta: chunk.text,
+                          textDelta: chunk.delta,
                         }),
                       );
                       continue;
                     }
 
-                    if (chunk.type === 'tool-call' && isCharacterAssistantToolName(chunk.toolName)) {
+                    if (chunk.type === EventType.TOOL_CALL_START && isCharacterAssistantToolName(chunk.toolCallName)) {
                       enqueueEvent(
                         CHARACTER_ASSISTANT_TOOL_CALL_START_EVENT_SCHEMA.parse({
                           type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-start'],
                           toolCallId: chunk.toolCallId,
-                          toolName: chunk.toolName,
+                          toolName: chunk.toolCallName,
                         }),
                       );
                       continue;
                     }
 
-                    if (chunk.type === 'tool-error' && isCharacterAssistantToolName(chunk.toolName)) {
+                    const toolName = chunk.type === EventType.TOOL_CALL_END ? chunk.toolCallName : undefined;
+                    if (
+                      chunk.type === EventType.TOOL_CALL_END &&
+                      chunk.state === 'output-error' &&
+                      toolName &&
+                      isCharacterAssistantToolName(toolName)
+                    ) {
                       enqueueEvent(
                         CHARACTER_ASSISTANT_TOOL_CALL_ERROR_EVENT_SCHEMA.parse({
                           type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-error'],
                           toolCallId: chunk.toolCallId,
-                          toolName: chunk.toolName,
-                          message: chunk.error instanceof Error ? chunk.error.message : 'Proposal tool failed.',
+                          toolName,
+                          message: typeof chunk.result === 'string' ? chunk.result : 'Proposal tool failed.',
                         }),
                       );
                     }
                   }
 
-                  const assistantMessage = await output.text;
                   const visibleAssistantMessage = assistantMessage
                     .replaceAll(CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER, '')
                     .trim();

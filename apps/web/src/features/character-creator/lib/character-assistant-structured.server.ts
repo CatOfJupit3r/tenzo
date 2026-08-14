@@ -1,11 +1,10 @@
-import type { ModelMessage } from 'ai';
+import type { ModelMessage } from '@tanstack/ai';
 import { z } from 'zod';
 
 import { generateUuid } from '@~/utils/uuid';
 
 import { GUIDED_STEP_IDS } from '../constants/guided-flow';
 import type { GuidedStepId } from '../constants/guided-step-id';
-import { createCharacterLanguageModel } from './ai-sdk-text-generation';
 import { CHARACTER_BOOK_SCHEMA, CHARACTER_TEXT_FIELD_KEYS, CUSTOM_FIELD_SCHEMA } from './card-schema';
 import type { CharacterCard, CustomField } from './card-schema';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
@@ -21,6 +20,7 @@ import { buildCharacterAssistantInstructions } from './character-assistant-runti
 import { CHARACTER_EDIT_FIELD_KEYS, createCharacterEditPatches } from './character-edit-proposal';
 import type { CharacterEditFieldKey } from './character-edit-proposal';
 import { generateValidatedObject } from './structured-output.server';
+import { createCharacterModelOptions, createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 interface iGenerateStructuredCharacterAssistantOptions {
   card: CharacterCard;
@@ -238,24 +238,21 @@ export async function generateStructuredCharacterAssistant({
     JSON.stringify(card),
   ].join('\n');
   const output = await generateValidatedObject({
-    model: createCharacterLanguageModel({
+    adapter: createCharacterTextAdapter({
       endpoint: generationSettings.endpoint,
       apiKey,
       model: generationSettings.model,
-      topK: generationSettings.topK,
-      minP: generationSettings.minP,
-      shouldSendDisabledSamplers,
     }),
     schema: responseSchema,
-    schemaName: 'character_assistant_response',
     schemaDescription: 'A user-facing response plus reviewable edits limited to the allowed character fields.',
     system,
     messages,
-    maxOutputTokens: Math.min(4_000, Math.max(1_600, generationSettings.maxTokens)),
-    temperature: Math.min(0.4, generationSettings.temperature),
-    topP: generationSettings.topP,
-    frequencyPenalty: generationSettings.frequencyPenalty,
-    presencePenalty: generationSettings.presencePenalty,
+    modelOptions: createCharacterModelOptions(generationSettings.endpoint, {
+      ...generationSettings,
+      maxTokens: Math.min(4_000, Math.max(1_600, generationSettings.maxTokens)),
+      temperature: Math.min(0.4, generationSettings.temperature),
+      shouldSendDisabledSamplers,
+    }),
     abortSignal,
   });
   const { changes } = output;

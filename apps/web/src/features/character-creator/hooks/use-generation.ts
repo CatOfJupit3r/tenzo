@@ -3,7 +3,6 @@ import { useAtom } from 'jotai';
 import { startTransition, useCallback, useMemo, useRef, useState } from 'react';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
-import { streamCharacterText } from '../lib/ai-sdk-text-generation';
 import type { CharacterCard } from '../lib/card-schema';
 import { TEMPLATE_MODES } from '../lib/field-templates';
 import {
@@ -28,6 +27,7 @@ import type { ProviderKind } from '../lib/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
 import { getPrefilled, parseResponse } from '../lib/response-parser';
 import { parseSlotResponse, renderStrictTemplate } from '../lib/strict-template-renderer';
+import { streamCharacterText } from '../lib/tanstack-ai-text-generation';
 import { useCharacterSession } from './use-character-session';
 
 interface iFieldGenerationRuntimeState {

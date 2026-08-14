@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ZodError, z } from 'zod';
 
-import { createCharacterLanguageModel } from '@~/features/character-creator/lib/ai-sdk-text-generation';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
@@ -9,6 +8,10 @@ import {
 } from '@~/features/character-creator/lib/character-assistant-contracts';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation-stream-contracts';
 import { generateValidatedObject } from '@~/features/character-creator/lib/structured-output.server';
+import {
+  createCharacterModelOptions,
+  createCharacterTextAdapter,
+} from '@~/features/character-creator/lib/tanstack-ai-text-generation';
 
 const DISCOVERY_CARD_TITLE_SCHEMA = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA.shape.title
   .min(3, 'Direction titles must be at least 3 characters long.')
@@ -97,27 +100,20 @@ export async function handleCharacterAssistantDiscoveryRequest({ request }: { re
     });
   }
 
-  const model = createCharacterLanguageModel({
+  const adapter = createCharacterTextAdapter({
     endpoint: payload.endpoint,
     apiKey: payload.apiKey,
     model: payload.model,
-    topK: payload.topK,
-    minP: payload.minP,
   });
 
   try {
     const generated = await generateValidatedObject({
-      model,
+      adapter,
       schema: DISCOVERY_ROUTE_GENERATED_RESPONSE_SCHEMA,
-      schemaName: 'character_assistant_discovery_direction_cards',
       schemaDescription: 'Exactly three distinct roleplay discovery direction cards.',
       system: 'Generate high-signal direction card text for roleplay concept work only.',
       prompt: buildDiscoveryPrompt(payload.originalPremise, payload.category),
-      temperature: payload.temperature,
-      topP: payload.topP,
-      frequencyPenalty: payload.frequencyPenalty,
-      presencePenalty: payload.presencePenalty,
-      maxOutputTokens: Math.max(1, Math.floor(payload.maxTokens)),
+      modelOptions: createCharacterModelOptions(payload.endpoint, payload),
       abortSignal: request.signal,
     });
 

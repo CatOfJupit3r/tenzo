@@ -1,4 +1,3 @@
-import type { Instructions } from 'ai';
 import { z } from 'zod';
 
 import {
@@ -30,7 +29,7 @@ export const CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA = z.object({
   topK: z.number().min(TOP_K_RANGE.min).max(TOP_K_RANGE.max),
   minP: z.number().min(MIN_P_RANGE.min).max(MIN_P_RANGE.max),
   shouldSendDisabledSamplers: z.boolean().optional(),
-  instructions: z.custom<Instructions>().optional(),
+  instructions: z.string().optional(),
 });
 
 export type iCharacterGenerationStreamRequest = z.infer<typeof CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA>;

@@ -1,98 +1,93 @@
-import type { LanguageModel } from 'ai';
+import type { AnyTextAdapter } from '@tanstack/ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
-import { extractFirstJsonValue, generateValidatedObject } from './structured-output.server';
+import { generateValidatedObject } from './structured-output.server';
 
-const { generateTextMock } = vi.hoisted(() => ({
-  generateTextMock: vi.fn(),
+const { chatMock } = vi.hoisted(() => ({
+  chatMock: vi.fn(),
 }));
 
-vi.mock('ai', () => ({
-  extractJsonMiddleware: vi.fn(() => 'json-middleware'),
-  generateText: generateTextMock,
-  Output: {
-    object: vi.fn(() => 'object-output'),
-  },
-  wrapLanguageModel: vi.fn(({ model }: { model: unknown }) => model),
+vi.mock('@tanstack/ai', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@tanstack/ai')),
+  chat: chatMock,
 }));
 
 const RESPONSE_SCHEMA = z.object({
   cards: z.array(z.object({ title: z.string() })).length(1),
 });
-const model = {} as Exclude<LanguageModel, string>;
+const adapter = {} as AnyTextAdapter;
 
 beforeEach(() => {
-  generateTextMock.mockReset();
+  chatMock.mockReset();
 });
 
 describe('structured output generation', () => {
-  it('extracts the first complete JSON value from fenced or prefaced text', () => {
-    expect(extractFirstJsonValue('Result:\n```json\n{"cards":[{"title":"A } inside text"}]}\n```')).toBe(
-      '{"cards":[{"title":"A } inside text"}]}',
+  it('uses TanStack AI native schema-backed output', async () => {
+    const structuredValue = { cards: [{ title: 'Structured card' }] };
+    chatMock.mockResolvedValueOnce(structuredValue);
+
+    await expect(
+      generateValidatedObject({
+        adapter,
+        schema: RESPONSE_SCHEMA,
+        schemaDescription: 'One test card.',
+        system: 'Generate a card.',
+        prompt: 'Create it.',
+        modelOptions: { max_tokens: 100, temperature: 0.5 },
+      }),
+    ).resolves.toEqual(structuredValue);
+    expect(chatMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adapter,
+        messages: [{ role: 'user', content: 'Create it.' }],
+        systemPrompts: ['Generate a card.'],
+        outputSchema: expect.any(Object),
+        modelOptions: { max_tokens: 100, temperature: 0.5 },
+      }),
     );
   });
 
-  it('skips non-JSON bracketed prose before the response', () => {
-    expect(extractFirstJsonValue('[JSON response]\n{"cards":[{"title":"Card"}]}')).toBe('{"cards":[{"title":"Card"}]}');
-  });
-
-  it('uses validated structured output when the provider supports it', async () => {
-    const structuredValue = { cards: [{ title: 'Structured card' }] };
-    generateTextMock.mockResolvedValueOnce({ output: structuredValue });
-
+  it('requires either prompt text or messages', async () => {
     await expect(
       generateValidatedObject({
-        model,
+        adapter,
         schema: RESPONSE_SCHEMA,
-        schemaName: 'test_cards',
         schemaDescription: 'One test card.',
         system: 'Generate a card.',
-        prompt: 'Create it.',
-        maxOutputTokens: 100,
-        temperature: 0.5,
       }),
-    ).resolves.toEqual(structuredValue);
-    expect(generateTextMock).toHaveBeenCalledOnce();
+    ).rejects.toThrow('requires a prompt or messages');
+    expect(chatMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to extracted and validated JSON text', async () => {
-    generateTextMock
-      .mockRejectedValueOnce(new Error('Structured response format is unsupported.'))
-      .mockResolvedValueOnce({ text: 'Here is the result:\n```json\n{"cards":[{"title":"Fallback card"}]}\n```' });
+  it('falls back to extracted JSON through TanStack AI for compatible servers without response formats', async () => {
+    chatMock
+      .mockRejectedValueOnce(new Error('Structured output is unsupported.'))
+      .mockResolvedValueOnce('Result:\n```json\n{"cards":[{"title":"Fallback card"}]}\n```');
 
     await expect(
       generateValidatedObject({
-        model,
+        adapter,
         schema: RESPONSE_SCHEMA,
-        schemaName: 'test_cards',
         schemaDescription: 'One test card.',
         system: 'Generate a card.',
         prompt: 'Create it.',
-        maxOutputTokens: 100,
-        temperature: 0.5,
       }),
     ).resolves.toEqual({ cards: [{ title: 'Fallback card' }] });
-    expect(generateTextMock).toHaveBeenCalledTimes(2);
+    expect(chatMock).toHaveBeenLastCalledWith(expect.objectContaining({ stream: false }));
   });
 
-  it('surfaces the provider response body when both structured attempts fail', async () => {
-    const providerError = Object.assign(new Error('Provider returned error'), {
-      responseBody: '{"error":{"message":"No endpoints match the requested data policy."}}',
-    });
-    generateTextMock.mockRejectedValue(providerError);
+  it('surfaces provider failures from both attempts', async () => {
+    chatMock.mockRejectedValue(new Error('Provider rejected structured output.'));
 
     await expect(
       generateValidatedObject({
-        model,
+        adapter,
         schema: RESPONSE_SCHEMA,
-        schemaName: 'test_cards',
         schemaDescription: 'One test card.',
         system: 'Generate a card.',
         prompt: 'Create it.',
-        maxOutputTokens: 100,
-        temperature: 0.5,
       }),
-    ).rejects.toThrow('No endpoints match the requested data policy.');
+    ).rejects.toThrow('Provider rejected structured output.');
   });
 });

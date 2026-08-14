@@ -13,6 +13,11 @@ vi.mock('@~/features/character-creator/lib/structured-output.server', () => ({
   generateValidatedObject: generateValidatedObjectMock,
 }));
 
+vi.mock('@~/features/character-creator/lib/tanstack-ai-text-generation', () => ({
+  createCharacterTextAdapter: vi.fn(() => ({})),
+  createCharacterModelOptions: vi.fn(() => ({})),
+}));
+
 const BASE_REQUEST = {
   provider: GENERATION_PROVIDERS.koboldcpp,
   endpoint: 'http://localhost:11434',

@@ -19,8 +19,9 @@ const { generateValidatedObjectMock } = vi.hoisted(() => ({
   generateValidatedObjectMock: vi.fn(),
 }));
 
-vi.mock('./ai-sdk-text-generation', () => ({
-  createCharacterLanguageModel: vi.fn(() => ({})),
+vi.mock('./tanstack-ai-text-generation', () => ({
+  createCharacterTextAdapter: vi.fn(() => ({})),
+  createCharacterModelOptions: vi.fn(() => ({})),
 }));
 
 vi.mock('./structured-output.server', () => ({

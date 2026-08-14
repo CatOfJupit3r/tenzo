@@ -22,9 +22,9 @@ import { GENERATION_PROVIDERS } from './generation-config';
 
 const executeOptions = {
   toolCallId: 'tool-call-1',
-  messages: [],
   abortSignal: new AbortController().signal,
   context: {},
+  emitCustomEvent: () => undefined,
 };
 
 function createProposalStore(card: CharacterCard) {

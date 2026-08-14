@@ -1,9 +1,8 @@
-import { stepCountIs, streamText } from 'ai';
-import type { ModelMessage } from 'ai';
+import { chat, maxIterations } from '@tanstack/ai';
+import type { ModelMessage } from '@tanstack/ai';
 
 import { GUIDED_STEP_DEFINITIONS } from '../constants/guided-flow';
 import type { GuidedStepId } from '../constants/guided-step-id';
-import { createCharacterLanguageModel } from './ai-sdk-text-generation';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
@@ -15,6 +14,7 @@ import type {
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { createCharacterAssistantTools } from './character-assistant-tools';
+import { createCharacterModelOptions, createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 interface iStreamCharacterAssistantOptions {
   card: CharacterCard;
@@ -228,35 +228,43 @@ export function streamCharacterAssistant({
   maxSteps,
   abortSignal,
 }: iStreamCharacterAssistantOptions) {
-  return streamText({
-    instructions: buildCharacterAssistantInstructions({
-      card,
-      focus,
-      contextAttachments,
-      generalCharacterIdea,
-      guidedStep,
-      concept,
-      discoveryContext,
-      templates,
-      shouldUseProposalTools: shouldUseNativeTools,
-      shouldUseSyntheticToolCalling: !shouldUseNativeTools,
-    }),
-    model: createCharacterLanguageModel({
+  const abortController = new AbortController();
+  if (abortSignal?.aborted) {
+    abortController.abort(abortSignal.reason);
+  } else {
+    abortSignal?.addEventListener('abort', () => abortController.abort(abortSignal.reason), { once: true });
+  }
+
+  return chat({
+    adapter: createCharacterTextAdapter({
       endpoint: generationSettings.endpoint,
       apiKey,
       model: generationSettings.model,
-      topK: generationSettings.topK,
-      minP: generationSettings.minP,
+    }),
+    systemPrompts: [
+      buildCharacterAssistantInstructions({
+        card,
+        focus,
+        contextAttachments,
+        generalCharacterIdea,
+        guidedStep,
+        concept,
+        discoveryContext,
+        templates,
+        shouldUseProposalTools: shouldUseNativeTools,
+        shouldUseSyntheticToolCalling: !shouldUseNativeTools,
+      }),
+    ],
+    ...(shouldUseNativeTools
+      ? { tools: Object.values(createCharacterAssistantTools({ focus, store, allowedToolNames })) }
+      : {}),
+    messages,
+    agentLoopStrategy: maxIterations(maxSteps),
+    modelOptions: createCharacterModelOptions(generationSettings.endpoint, {
+      ...generationSettings,
       shouldSendDisabledSamplers,
     }),
-    ...(shouldUseNativeTools ? { tools: createCharacterAssistantTools({ focus, store, allowedToolNames }) } : {}),
-    messages,
-    stopWhen: stepCountIs(maxSteps),
-    maxOutputTokens: generationSettings.maxTokens,
-    temperature: generationSettings.temperature,
-    topP: generationSettings.topP,
-    frequencyPenalty: generationSettings.frequencyPenalty,
-    presencePenalty: generationSettings.presencePenalty,
-    abortSignal,
+    abortController,
+    stream: true,
   });
 }

@@ -29,6 +29,7 @@ export interface iCharacterFieldProps {
   editorVariant?: FieldEditorVariant;
   doesAllowOriginalMacro?: boolean;
   shouldUseGeneralCharacterIdea?: boolean;
+  shouldShowGeneralCharacterIdeaToggle?: boolean;
   instructionValue?: string;
   generationErrorMessage?: string | null;
   isGenerating?: boolean;
@@ -66,6 +67,7 @@ export function CharacterField({
   editorVariant,
   doesAllowOriginalMacro = false,
   shouldUseGeneralCharacterIdea = true,
+  shouldShowGeneralCharacterIdeaToggle = true,
   instructionValue = '',
   generationErrorMessage = null,
   isGenerating = false,
@@ -93,8 +95,7 @@ export function CharacterField({
   onApplyAssistantProposal,
   onRejectAssistantProposal,
 }: iCharacterFieldProps) {
-  const hasGenerationControls =
-    onShouldUseGeneralCharacterIdeaChange && onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
+  const hasGenerationControls = onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
 
   const resolvedVariant = editorVariant ?? (rows <= 1 ? FIELD_EDITOR_VARIANTS.plain : FIELD_EDITOR_VARIANTS.markdown);
   const labelId = `${fieldId}-label`;
@@ -193,6 +194,7 @@ export function CharacterField({
           fieldId={fieldId}
           label={label}
           shouldUseGeneralCharacterIdea={shouldUseGeneralCharacterIdea}
+          shouldShowGeneralCharacterIdeaToggle={shouldShowGeneralCharacterIdeaToggle}
           instructionValue={instructionValue}
           errorMessage={generationErrorMessage}
           hasExistingValue={value.trim().length > 0}

@@ -42,8 +42,9 @@ const CUSTOMIZED_DISCOVERY_CARD_SCHEMA = z.object({
 const DISCOVERY_PREMISE_SCHEMA = CHARACTER_CONCEPT_SCHEMA.shape.premise;
 const DISCOVERY_CATEGORY_SCHEMA = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA;
 
-export const CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY = 'tenzo:character-creator:assistant-sessions:v2';
+export const CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY = 'tenzo:character-creator:assistant-sessions:v3';
 const LEGACY_CHARACTER_AGENT_SESSION_STORAGE_KEYS = [
+  'tenzo:character-creator:assistant-sessions:v2',
   'tenzo:character-creator:assistant-sessions:v1',
   'tenzo:character-creator:agent-sessions:v2',
   'tenzo:character-creator:agent-sessions:v1',

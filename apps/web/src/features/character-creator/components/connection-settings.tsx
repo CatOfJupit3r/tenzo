@@ -63,9 +63,9 @@ const providerOptions: iOptionType[] = [
 
 const assistantGenerationModeOptions: iOptionType[] = [
   {
-    label: 'Structured output',
+    label: 'Compatible guided chat',
     value: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
-    description: 'Schema-constrained edits with a JSON fallback for smaller and local models.',
+    description: 'Chat normally with any model, then synthesize reviewable edits when the step is ready.',
   },
   {
     label: 'Tool calls',
@@ -219,8 +219,8 @@ export function ConnectionSettings({
             }}
           />
           <p className="text-sm text-muted-foreground">
-            Structured output is the dependable default. Tool calls expose native agent behavior without a hidden
-            fallback.
+            Compatible guided chat works without native tools. Tool calls expose native agent behavior for models that
+            support it reliably.
           </p>
         </div>
 

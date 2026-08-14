@@ -24,7 +24,7 @@ export const GENERATION_PROVIDER_DEFAULTS = {
     model: 'local-model',
   },
   [GENERATION_PROVIDERS.openrouter]: {
-    endpoint: 'https://openrouter.ai/api',
+    endpoint: 'https://openrouter.ai/api/v1',
     model: 'openai/gpt-4.1-mini',
   },
 } satisfies Record<GenerationProvider, { endpoint: string; model: string }>;

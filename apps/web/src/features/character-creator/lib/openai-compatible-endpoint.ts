@@ -2,7 +2,7 @@ export function normalizeOpenAiCompatibleBaseUrl(endpoint: string) {
   const trimmedEndpoint = endpoint.trim().replace(/\/$/, '');
 
   if (trimmedEndpoint.endsWith('/v1/chat/completions')) {
-    return trimmedEndpoint.slice(0, -'/v1/chat/completions'.length);
+    return trimmedEndpoint.slice(0, -'/chat/completions'.length);
   }
 
   if (trimmedEndpoint.endsWith('/chat/completions')) {
@@ -10,12 +10,12 @@ export function normalizeOpenAiCompatibleBaseUrl(endpoint: string) {
   }
 
   if (trimmedEndpoint.endsWith('/v1')) {
-    return trimmedEndpoint.slice(0, -'/v1'.length);
+    return trimmedEndpoint;
   }
 
-  return trimmedEndpoint;
+  return `${trimmedEndpoint}/v1`;
 }
 
 export function normalizeChatCompletionsEndpoint(endpoint: string) {
-  return `${normalizeOpenAiCompatibleBaseUrl(endpoint)}/v1/chat/completions`;
+  return `${normalizeOpenAiCompatibleBaseUrl(endpoint)}/chat/completions`;
 }

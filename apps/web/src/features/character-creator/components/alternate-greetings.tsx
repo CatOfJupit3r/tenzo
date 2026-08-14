@@ -95,6 +95,7 @@ export function AlternateGreetings({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Move greeting ${index + 1} up`}
                       disabled={index === 0}
                       tooltip="Move up"
                       onClick={() => onMove(index, index - 1)}
@@ -105,6 +106,7 @@ export function AlternateGreetings({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Move greeting ${index + 1} down`}
                       disabled={index === greetings.length - 1}
                       tooltip="Move down"
                       onClick={() => onMove(index, index + 1)}
@@ -115,6 +117,7 @@ export function AlternateGreetings({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Remove greeting ${index + 1}`}
                       tooltip="Remove greeting"
                       onClick={() => onRemove(index)}
                     >

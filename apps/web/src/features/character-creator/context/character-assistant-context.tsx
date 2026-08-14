@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
 import { useCharacterAssistantWorkspace } from '../hooks/use-character-assistant-workspace';
@@ -31,6 +31,17 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [assistantFocus, setAssistantFocus] = useState<CharacterAssistantFocus>(DEFAULT_ASSISTANT_FOCUS);
   const [contextAttachments, setContextAttachments] = useState<iCharacterAssistantContextAttachment[]>([]);
+  const previousCharacterIdRef = useRef(activeCharacterId);
+
+  useEffect(() => {
+    if (previousCharacterIdRef.current === activeCharacterId) {
+      return;
+    }
+
+    previousCharacterIdRef.current = activeCharacterId;
+    setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
+    setContextAttachments([]);
+  }, [activeCharacterId]);
 
   const openAssistant = useCallback(() => {
     setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);

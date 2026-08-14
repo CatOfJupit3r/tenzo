@@ -115,7 +115,7 @@ export function CharacterCreatorHeader({
           </div>
           <div className="min-w-0 space-y-0.5">
             <div className="flex min-w-0 items-baseline gap-2">
-              <p className="shrink-0 text-sm font-semibold">Character Card Creator</p>
+              <p className="shrink-0 text-lg font-semibold">Tenzo</p>
               <p className="max-w-56 truncate text-xs text-muted-foreground" title={activeCharacterLabel}>
                 {activeCharacterLabel}
               </p>

@@ -52,11 +52,12 @@ const PROVIDER_KIND_LABELS = {
 } satisfies Record<ProviderKind, string>;
 
 function buildEndpointCandidates(endpoint: string): iEndpointCandidates {
-  const baseUrl = normalizeOpenAiCompatibleBaseUrl(endpoint);
+  const openAiBaseUrl = normalizeOpenAiCompatibleBaseUrl(endpoint);
+  const baseUrl = openAiBaseUrl.slice(0, -'/v1'.length);
 
   return {
-    baseUrl,
-    modelsUrl: `${baseUrl}/v1/models`,
+    baseUrl: openAiBaseUrl,
+    modelsUrl: `${openAiBaseUrl}/models`,
     koboldModelUrl: `${baseUrl}/api/v1/model`,
     koboldContextUrl: `${baseUrl}/api/extra/true_max_context_length`,
     koboldPublicContextUrl: `${baseUrl}/api/v1/config/max_context_length`,

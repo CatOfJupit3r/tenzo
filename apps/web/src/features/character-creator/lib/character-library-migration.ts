@@ -1,6 +1,9 @@
 import { localStorageApi } from '@~/db/storage';
 
-import { characterLibraryCollection } from '../collections/character-library.collection';
+import {
+  CHARACTER_LIBRARY_COLLECTION_STORAGE_KEY,
+  characterLibraryCollection,
+} from '../collections/character-library.collection';
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import {
   CHARACTER_LIBRARY_SOURCES,
@@ -11,6 +14,7 @@ import {
   sanitizeCharacterPortraitReference,
 } from './character-library';
 import type { iCharacterLibraryItem } from './character-library';
+import { hasStoredCharacterLibraryEntries } from './character-library-storage';
 import { STORED_EXAMPLE_CHARACTER_SCHEMA } from './example-characters';
 import type { iStoredExampleCharacter } from './example-characters';
 import { sanitizeCharacterGenerationPromptSettings, sanitizeCharacterGenerationSettings } from './generation-config';
@@ -21,14 +25,6 @@ const LEGACY_EXAMPLES_KEY = 'tenzo:character-creator:example-characters';
 const LEGACY_CARD_KEY = 'tenzo:character-creator:card';
 const LEGACY_PORTRAIT_KEY = 'tenzo:character-creator:portrait';
 const LEGACY_GENERATION_SETTINGS_KEY = 'tenzo:character-creator:generation-settings';
-
-const LEGACY_KEYS_TO_REMOVE = [
-  LEGACY_LIBRARY_KEY,
-  LEGACY_EXAMPLES_KEY,
-  LEGACY_CARD_KEY,
-  LEGACY_PORTRAIT_KEY,
-  LEGACY_GENERATION_SETTINGS_KEY,
-];
 
 let hasRunMigration = false;
 
@@ -130,17 +126,13 @@ export function ensureCharacterCreatorDataMigrated() {
 
   hasRunMigration = true;
 
-  if (localStorageApi.getItem(MIGRATION_FLAG_KEY)) {
+  if (localStorageApi.getItem(MIGRATION_FLAG_KEY) && characterLibraryCollection.size > 0) {
     return;
   }
 
-  try {
-    migrateLibraryFromLegacy();
-    migrateExamplesFromLegacy();
-  } finally {
-    localStorageApi.setItem(MIGRATION_FLAG_KEY, '1');
-    LEGACY_KEYS_TO_REMOVE.forEach((key) => localStorageApi.removeItem(key));
-  }
+  migrateLibraryFromLegacy();
+  migrateExamplesFromLegacy();
+  localStorageApi.setItem(MIGRATION_FLAG_KEY, '1');
 }
 
 /**
@@ -150,7 +142,10 @@ export function ensureCharacterCreatorDataMigrated() {
 export function ensureCharacterCreatorSessionInitialized() {
   ensureCharacterCreatorDataMigrated();
 
-  if (characterLibraryCollection.size === 0) {
+  if (
+    characterLibraryCollection.size === 0 &&
+    !hasStoredCharacterLibraryEntries(CHARACTER_LIBRARY_COLLECTION_STORAGE_KEY)
+  ) {
     characterLibraryCollection.insert(createEmptyCharacterLibraryItem());
   }
 }

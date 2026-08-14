@@ -33,6 +33,10 @@ describe('structured output generation', () => {
     );
   });
 
+  it('skips non-JSON bracketed prose before the response', () => {
+    expect(extractFirstJsonValue('[JSON response]\n{"cards":[{"title":"Card"}]}')).toBe('{"cards":[{"title":"Card"}]}');
+  });
+
   it('uses validated structured output when the provider supports it', async () => {
     const structuredValue = { cards: [{ title: 'Structured card' }] };
     generateTextMock.mockResolvedValueOnce({ output: structuredValue });
@@ -70,5 +74,25 @@ describe('structured output generation', () => {
       }),
     ).resolves.toEqual({ cards: [{ title: 'Fallback card' }] });
     expect(generateTextMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces the provider response body when both structured attempts fail', async () => {
+    const providerError = Object.assign(new Error('Provider returned error'), {
+      responseBody: '{"error":{"message":"No endpoints match the requested data policy."}}',
+    });
+    generateTextMock.mockRejectedValue(providerError);
+
+    await expect(
+      generateValidatedObject({
+        model,
+        schema: RESPONSE_SCHEMA,
+        schemaName: 'test_cards',
+        schemaDescription: 'One test card.',
+        system: 'Generate a card.',
+        prompt: 'Create it.',
+        maxOutputTokens: 100,
+        temperature: 0.5,
+      }),
+    ).rejects.toThrow('No endpoints match the requested data policy.');
   });
 });

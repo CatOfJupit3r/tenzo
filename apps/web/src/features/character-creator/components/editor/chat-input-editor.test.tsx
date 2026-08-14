@@ -81,7 +81,7 @@ describe('ChatInputEditor', () => {
 
     try {
       await user.type(textbox, 'x');
-      await waitFor(() => expect(onValueChange).toHaveBeenLastCalledWith('x', []));
+      await waitFor(() => expect(onValueChange).toHaveBeenLastCalledWith('x', [], expect.any(Object)));
       expect(onValueChange).toHaveBeenCalledTimes(1);
     } finally {
       if (elementFromPointDescriptor) {
@@ -100,5 +100,36 @@ describe('ChatInputEditor', () => {
         Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect');
       }
     }
+  });
+
+  it('hydrates a persisted Tiptap document with template mentions', async () => {
+    const onValueChange = vi.fn();
+    render(
+      <ChatInputEditor
+        value="Use /voice-template"
+        content={{
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'Use ' },
+                { type: 'mention', attrs: { id: 'voice-template', label: 'voice-template' } },
+              ],
+            },
+          ],
+        }}
+        templates={[]}
+        ariaLabel="Assistant message"
+        onValueChange={onValueChange}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const textbox = await screen.findByRole('textbox', { name: 'Assistant message' });
+    expect(textbox.querySelector('[data-type="mention"]')).not.toBeNull();
+    await waitFor(() =>
+      expect(onValueChange).toHaveBeenLastCalledWith('Use /voice-template', ['voice-template'], expect.any(Object)),
+    );
   });
 });

@@ -24,7 +24,11 @@ import type {
   iCharacterAssistantStreamEvent,
 } from '@~/features/character-creator/lib/character-assistant-contracts';
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/character-assistant-generation-mode';
-import { streamCharacterAssistant } from '@~/features/character-creator/lib/character-assistant-runtime.server';
+import { shouldFallbackFromToolCalling } from '@~/features/character-creator/lib/character-assistant-provider-errors';
+import {
+  CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER,
+  streamCharacterAssistant,
+} from '@~/features/character-creator/lib/character-assistant-runtime.server';
 import { generateStructuredCharacterAssistant } from '@~/features/character-creator/lib/character-assistant-structured.server';
 import { createCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
 import type { iCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
@@ -44,7 +48,7 @@ function toModelMessage(
 ): ModelMessage {
   return {
     role: message.role,
-    content: message.content,
+    content: message.content.replaceAll(CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER, '').trim(),
   };
 }
 
@@ -273,17 +277,43 @@ export const Route = createFileRoute('/api/character-assistant')({
                   return result.assistantMessage;
                 };
                 const enqueueComplete = (assistantMessage: string) => {
+                  const hasCompletedGuidedStep =
+                    payload.guidedStep === undefined ||
+                    (latestProposal !== null &&
+                      (payload.guidedStep !== GUIDED_STEP_IDS.concept || recordedConcept !== undefined));
                   enqueueEvent(
                     CHARACTER_ASSISTANT_COMPLETE_EVENT_SCHEMA.parse({
                       type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete,
                       assistantMessage: assistantMessage.trim() || 'The proposed changes are ready for review.',
                       proposals: latestProposal ? [latestProposal] : [],
                       concept: recordedConcept,
+                      hasCompletedGuidedStep,
                     }),
                   );
                 };
+                const isCompatibleGuidedChat =
+                  payload.guidedStep !== undefined &&
+                  payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'];
+                const hasUserRequestedFinalization = payload.messages
+                  .at(-1)
+                  ?.content.includes(CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER);
 
-                if (payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']) {
+                if (isCompatibleGuidedChat && hasUserRequestedFinalization) {
+                  const assistantMessage = await runStructuredAssistant();
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                      textDelta: assistantMessage,
+                    }),
+                  );
+                  enqueueComplete(assistantMessage);
+                  return;
+                }
+
+                if (
+                  payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'] &&
+                  !isCompatibleGuidedChat
+                ) {
                   const assistantMessage = await runStructuredAssistant();
                   enqueueEvent(
                     CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
@@ -318,59 +348,80 @@ export const Route = createFileRoute('/api/character-assistant')({
                   discoveryContext: payload.discoveryContext,
                   templates: payload.templates,
                   allowedToolNames,
+                  shouldUseNativeTools: !isCompatibleGuidedChat,
                   store,
                   messages: payload.messages.map(toModelMessage),
                   maxSteps: payload.guidedStep ? MAX_GUIDED_ASSISTANT_STEPS : MAX_CHARACTER_ASSISTANT_STEPS,
                   abortSignal: request.signal,
                 });
+                try {
+                  for await (const chunk of output.fullStream) {
+                    if (chunk.type === 'error') {
+                      throw chunk.error;
+                    }
 
-                for await (const chunk of output.fullStream) {
-                  if (chunk.type === 'text-delta') {
-                    enqueueEvent(
-                      CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
-                        type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
-                        textDelta: chunk.text,
-                      }),
-                    );
-                    continue;
+                    if (chunk.type === 'text-delta') {
+                      enqueueEvent(
+                        CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                          type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                          textDelta: chunk.text,
+                        }),
+                      );
+                      continue;
+                    }
+
+                    if (chunk.type === 'tool-call' && isCharacterAssistantToolName(chunk.toolName)) {
+                      enqueueEvent(
+                        CHARACTER_ASSISTANT_TOOL_CALL_START_EVENT_SCHEMA.parse({
+                          type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-start'],
+                          toolCallId: chunk.toolCallId,
+                          toolName: chunk.toolName,
+                        }),
+                      );
+                      continue;
+                    }
+
+                    if (chunk.type === 'tool-error' && isCharacterAssistantToolName(chunk.toolName)) {
+                      enqueueEvent(
+                        CHARACTER_ASSISTANT_TOOL_CALL_ERROR_EVENT_SCHEMA.parse({
+                          type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-error'],
+                          toolCallId: chunk.toolCallId,
+                          toolName: chunk.toolName,
+                          message: chunk.error instanceof Error ? chunk.error.message : 'Proposal tool failed.',
+                        }),
+                      );
+                    }
                   }
 
-                  if (chunk.type === 'tool-call' && isCharacterAssistantToolName(chunk.toolName)) {
-                    enqueueEvent(
-                      CHARACTER_ASSISTANT_TOOL_CALL_START_EVENT_SCHEMA.parse({
-                        type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-start'],
-                        toolCallId: chunk.toolCallId,
-                        toolName: chunk.toolName,
-                      }),
-                    );
-                    continue;
+                  const assistantMessage = await output.text;
+                  const visibleAssistantMessage = assistantMessage
+                    .replaceAll(CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER, '')
+                    .trim();
+
+                  enqueueComplete(visibleAssistantMessage);
+                } catch (error) {
+                  if (
+                    !shouldFallbackFromToolCalling({
+                      error,
+                      isGuidedRun: payload.guidedStep !== undefined,
+                      isConceptStep: payload.guidedStep === GUIDED_STEP_IDS.concept,
+                      doesRequestStructuredFinalization: false,
+                      hasProposal: latestProposal !== null,
+                      hasConcept: recordedConcept !== undefined,
+                    })
+                  ) {
+                    throw error;
                   }
 
-                  if (chunk.type === 'tool-error' && isCharacterAssistantToolName(chunk.toolName)) {
-                    enqueueEvent(
-                      CHARACTER_ASSISTANT_TOOL_CALL_ERROR_EVENT_SCHEMA.parse({
-                        type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-error'],
-                        toolCallId: chunk.toolCallId,
-                        toolName: chunk.toolName,
-                        message: chunk.error instanceof Error ? chunk.error.message : 'Proposal tool failed.',
-                      }),
-                    );
-                  }
-                }
-
-                const assistantMessage = await output.text;
-                const isMissingGuidedOutput =
-                  payload.guidedStep !== undefined &&
-                  (latestProposal === null ||
-                    (payload.guidedStep === GUIDED_STEP_IDS.concept && recordedConcept === undefined));
-
-                if (isMissingGuidedOutput) {
-                  throw new Error(
-                    'The model completed without the required tool calls. Switch to Structured output or choose a model trained for tool calling.',
+                  const assistantMessage = await runStructuredAssistant();
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                      textDelta: assistantMessage,
+                    }),
                   );
+                  enqueueComplete(assistantMessage);
                 }
-
-                enqueueComplete(assistantMessage);
               } catch (error) {
                 enqueueEvent(
                   CHARACTER_ASSISTANT_ERROR_EVENT_SCHEMA.parse({

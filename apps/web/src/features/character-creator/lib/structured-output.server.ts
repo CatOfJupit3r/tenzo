@@ -19,66 +19,65 @@ interface iGenerateValidatedObjectOptions<T> {
 }
 
 export function extractFirstJsonValue(content: string) {
-  const objectStart = content.indexOf('{');
-  const arrayStart = content.indexOf('[');
-  let start = Math.min(objectStart, arrayStart);
+  for (let start = 0; start < content.length; start += 1) {
+    if (content[start] !== '{' && content[start] !== '[') {
+      continue;
+    }
 
-  if (objectStart < 0) {
-    start = arrayStart;
-  } else if (arrayStart < 0) {
-    start = objectStart;
-  }
+    const stack: string[] = [];
+    let isInsideString = false;
+    let isEscaped = false;
 
-  if (start < 0) {
-    throw new Error('The model response did not contain JSON.');
-  }
+    for (let index = start; index < content.length; index += 1) {
+      const character = content[index];
 
-  const stack: string[] = [];
-  let isInsideString = false;
-  let isEscaped = false;
-
-  for (let index = start; index < content.length; index += 1) {
-    const character = content[index];
-
-    if (isInsideString) {
-      if (isEscaped) {
-        isEscaped = false;
-      } else if (character === '\\') {
-        isEscaped = true;
-      } else if (character === '"') {
-        isInsideString = false;
+      if (isInsideString) {
+        if (isEscaped) {
+          isEscaped = false;
+        } else if (character === '\\') {
+          isEscaped = true;
+        } else if (character === '"') {
+          isInsideString = false;
+        }
+        continue;
       }
-      continue;
-    }
 
-    if (character === '"') {
-      isInsideString = true;
-      continue;
-    }
+      if (character === '"') {
+        isInsideString = true;
+        continue;
+      }
 
-    if (character === '{' || character === '[') {
-      stack.push(character);
-      continue;
-    }
+      if (character === '{' || character === '[') {
+        stack.push(character);
+        continue;
+      }
 
-    if (character !== '}' && character !== ']') {
-      continue;
-    }
+      if (character !== '}' && character !== ']') {
+        continue;
+      }
 
-    const openingCharacter = stack.pop();
-    const isMatchingPair =
-      (openingCharacter === '{' && character === '}') || (openingCharacter === '[' && character === ']');
+      const openingCharacter = stack.pop();
+      const isMatchingPair =
+        (openingCharacter === '{' && character === '}') || (openingCharacter === '[' && character === ']');
 
-    if (!isMatchingPair) {
-      throw new Error('The model response contained malformed JSON delimiters.');
-    }
+      if (!isMatchingPair) {
+        break;
+      }
 
-    if (stack.length === 0) {
-      return content.slice(start, index + 1);
+      if (stack.length === 0) {
+        const candidate = content.slice(start, index + 1);
+
+        try {
+          JSON.parse(candidate);
+          return candidate;
+        } catch {
+          break;
+        }
+      }
     }
   }
 
-  throw new Error('The model response contained incomplete JSON.');
+  throw new Error('The model response did not contain a complete JSON value.');
 }
 
 function buildPromptInput(prompt?: string, messages?: ModelMessage[]) {
@@ -91,6 +90,24 @@ function buildPromptInput(prompt?: string, messages?: ModelMessage[]) {
   }
 
   throw new Error('Structured generation requires a prompt or messages.');
+}
+
+function describeGenerationError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return 'Unknown provider error.';
+  }
+
+  const responseBody = Reflect.get(error, 'responseBody');
+  const cause = Reflect.get(error, 'cause');
+  let details = error.message;
+
+  if (typeof responseBody === 'string' && responseBody.trim()) {
+    details = responseBody;
+  } else if (cause instanceof Error && cause.message !== error.message) {
+    details = `${error.message}: ${cause.message}`;
+  }
+  const compactMessage = details.replace(/\s+/g, ' ').trim();
+  return compactMessage.length > 300 ? `${compactMessage.slice(0, 297)}...` : compactMessage;
 }
 
 export async function generateValidatedObject<T>({
@@ -151,7 +168,7 @@ export async function generateValidatedObject<T>({
     } catch (fallbackError) {
       throw new AggregateError(
         [structuredOutputError, fallbackError],
-        'The model did not return valid structured JSON. Try a more capable model or disable incompatible sampling settings.',
+        `The model did not return valid structured JSON. Structured response: ${describeGenerationError(structuredOutputError)} JSON fallback: ${describeGenerationError(fallbackError)}`,
       );
     }
   }

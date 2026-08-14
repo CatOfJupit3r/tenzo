@@ -16,6 +16,8 @@ const MES_EXAMPLE_FORMAT_GUIDANCE = `Format this using SillyTavern's example-dia
 
 const OUT_OF_CHARACTER_FIELD_GUIDANCE = `Write this as out-of-character reference notes for the roleplay AI — not as in-character dialogue or narration.`;
 
+const GENERAL_CHARACTER_IDEA_FORMAT_GUIDANCE = `Write a concise, high-level character concept that can guide generation of every card field. Focus on the character's core identity, tone, roleplay premise, and defining traits. Do not write dialogue, JSON, or field labels.`;
+
 const FIELD_FORMAT_GUIDANCE: Partial<Record<CharacterTextFieldKey, string>> = {
   first_mes: GREETING_FORMAT_GUIDANCE,
   mes_example: MES_EXAMPLE_FORMAT_GUIDANCE,
@@ -29,6 +31,10 @@ const FIELD_FORMAT_GUIDANCE: Partial<Record<CharacterTextFieldKey, string>> = {
 
 export class TaskInstructionService {
   getFieldFormatGuidance(target: iFieldGenerationTarget): string {
+    if (target.kind === GENERATION_TARGET_KINDS['general-character-idea']) {
+      return GENERAL_CHARACTER_IDEA_FORMAT_GUIDANCE;
+    }
+
     if (target.kind === GENERATION_TARGET_KINDS['alternate-greeting']) {
       return GREETING_FORMAT_GUIDANCE;
     }

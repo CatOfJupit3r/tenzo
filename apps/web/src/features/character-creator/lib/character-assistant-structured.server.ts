@@ -83,26 +83,29 @@ function getAllowedFieldKeys(focus: CharacterAssistantFocus): CharacterEditField
   return Object.values(CHARACTER_EDIT_FIELD_KEYS);
 }
 
-function createResponseSchema(allowedFieldKeys: readonly CharacterEditFieldKey[], guidedStep?: GuidedStepId) {
+export function createCharacterAssistantResponseSchema(
+  allowedFieldKeys: readonly CharacterEditFieldKey[],
+  guidedStep?: GuidedStepId,
+) {
   const changeShape: Record<string, z.ZodType> = {};
 
   allowedFieldKeys.forEach((fieldKey) => {
     if (CHARACTER_TEXT_FIELD_KEYS.some((textFieldKey) => textFieldKey === fieldKey)) {
-      changeShape[fieldKey] = z.string().nullable();
+      changeShape[fieldKey] = z.string().nullable().optional();
       return;
     }
 
     if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.tags || fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings) {
-      changeShape[fieldKey] = z.array(z.string()).nullable();
+      changeShape[fieldKey] = z.array(z.string()).nullable().optional();
       return;
     }
 
     if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.custom_fields) {
-      changeShape[fieldKey] = z.array(CUSTOM_FIELD_INPUT_SCHEMA).nullable();
+      changeShape[fieldKey] = z.array(CUSTOM_FIELD_INPUT_SCHEMA).nullable().optional();
       return;
     }
 
-    changeShape[fieldKey] = CHARACTER_BOOK_CHANGE_SCHEMA;
+    changeShape[fieldKey] = CHARACTER_BOOK_CHANGE_SCHEMA.optional();
   });
 
   return z.object({
@@ -158,6 +161,10 @@ function applyStructuredChanges(
     }
 
     if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.character_book) {
+      if (value === undefined) {
+        return;
+      }
+
       const characterBookChange = CHARACTER_BOOK_CHANGE_SCHEMA.parse(value);
       if (!characterBookChange.shouldChange) {
         return;
@@ -190,13 +197,17 @@ export async function generateStructuredCharacterAssistant({
   abortSignal,
 }: iGenerateStructuredCharacterAssistantOptions): Promise<iStructuredCharacterAssistantResult> {
   const allowedFieldKeys = getAllowedFieldKeys(focus);
-  const responseSchema = createResponseSchema(allowedFieldKeys, guidedStep);
+  const responseSchema = createCharacterAssistantResponseSchema(allowedFieldKeys, guidedStep);
   const nullableChangeInstructions = allowedFieldKeys.map((fieldKey) => {
     if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.character_book) {
-      return `${fieldKey}: set shouldChange to false to preserve it; set shouldChange to true with a value to replace or remove it.`;
+      return `${fieldKey}: omit it to preserve it; otherwise set shouldChange to true with a value to replace or remove it.`;
     }
 
-    return `${fieldKey}: use null to preserve it, otherwise provide its complete replacement value.`;
+    if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings) {
+      return `${fieldKey}: omit it to preserve it; otherwise provide the complete ordered list, including worthwhile existing greetings and any new greetings requested.`;
+    }
+
+    return `${fieldKey}: omit it to preserve it, otherwise provide its complete replacement value.`;
   });
   const system = [
     buildCharacterAssistantInstructions({
@@ -211,6 +222,7 @@ export async function generateStructuredCharacterAssistant({
       shouldUseProposalTools: false,
     }),
     'Return one schema-backed response for the application.',
+    'In changes, include only fields that should change.',
     'Put every requested card edit in changes. Never claim an edit was made when its changes value preserves the field.',
     'When the user asks only for advice, analysis, or clarification, preserve every field.',
     'Be compact: assistantMessage must be one sentence under 40 words.',
@@ -239,7 +251,7 @@ export async function generateStructuredCharacterAssistant({
     schemaDescription: 'A user-facing response plus reviewable edits limited to the allowed character fields.',
     system,
     messages,
-    maxOutputTokens: Math.min(1_600, Math.max(900, generationSettings.maxTokens)),
+    maxOutputTokens: Math.min(4_000, Math.max(1_600, generationSettings.maxTokens)),
     temperature: Math.min(0.4, generationSettings.temperature),
     topP: generationSettings.topP,
     frequencyPenalty: generationSettings.frequencyPenalty,

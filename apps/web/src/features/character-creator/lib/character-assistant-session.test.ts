@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  characterAssistantComposerDraftsCollection,
+  clearCharacterAssistantComposerDraft,
+  saveCharacterAssistantComposerDraft,
+} from '../collections/character-assistant-composer-drafts.collection';
+import {
   advanceGuidedStep,
   characterAssistantSessionsCollection,
   removeCharacterAssistantSession,
@@ -46,6 +51,37 @@ describe('character assistant sessions', () => {
   it('uses one deterministic session identity per character', () => {
     expect(createCharacterAssistantSession('character-1').id).toBe('character-1');
     expect(createCharacterAssistantSession('character-1').id).toBe('character-1');
+  });
+
+  it('clears a persisted Tiptap draft without changing conversation messages', async () => {
+    const characterId = 'draft-isolation-character';
+    const session = createCharacterAssistantSession(characterId);
+    session.messages.push({
+      id: 'message-1',
+      role: 'user',
+      content: 'Keep this message',
+      createdAt: '2026-08-14T00:00:00.000Z',
+    });
+    characterAssistantSessionsCollection.insert(session);
+
+    await saveCharacterAssistantComposerDraft({
+      characterId,
+      text: 'Persist this draft',
+      templateIds: ['voice'],
+      scopeLabel: 'Voice',
+      document: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    await clearCharacterAssistantComposerDraft(characterId);
+
+    expect(characterAssistantComposerDraftsCollection.get(characterId)).toMatchObject({
+      text: '',
+      templateIds: [],
+      document: null,
+    });
+    expect(characterAssistantSessionsCollection.get(characterId)?.messages).toHaveLength(1);
+
+    characterAssistantComposerDraftsCollection.delete(characterId);
+    characterAssistantSessionsCollection.delete(characterId);
   });
 
   it('removes only the targeted provisional character session', async () => {

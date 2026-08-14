@@ -1,3 +1,4 @@
+import type { JSONContent } from '@tiptap/core';
 import { Document } from '@tiptap/extension-document';
 import { Paragraph } from '@tiptap/extension-paragraph';
 import { Text } from '@tiptap/extension-text';
@@ -13,12 +14,13 @@ import type { iFieldTemplateViewModel } from '../../lib/field-templates';
 
 interface iChatInputEditorProps {
   value: string;
+  content?: JSONContent | null;
   templates: iFieldTemplateViewModel[];
   preferredFieldKeys?: readonly string[];
   isDisabled?: boolean;
   placeholder?: string;
   ariaLabel?: string;
-  onValueChange: (value: string, templateIds: string[]) => void;
+  onValueChange: (value: string, templateIds: string[], content: JSONContent) => void;
   onSubmit: () => void;
 }
 
@@ -36,6 +38,7 @@ function createInitialContent(value: string) {
 
 export function ChatInputEditor({
   value,
+  content,
   templates,
   preferredFieldKeys,
   isDisabled = false,
@@ -45,6 +48,7 @@ export function ChatInputEditor({
   onSubmit,
 }: iChatInputEditorProps) {
   const lastEmittedInputRef = useRef({ text: value, templateIds: [] as string[] });
+  const lastDocumentRef = useRef(JSON.stringify(content ?? createInitialContent(value)));
   const onValueChangeRef = useRef(onValueChange);
 
   useEffect(() => {
@@ -60,7 +64,7 @@ export function ChatInputEditor({
       Placeholder.configure({ placeholder: placeholder ?? '' }),
       buildChatTemplateMentionExtension({ templates, preferredFieldKeys }),
     ],
-    content: createInitialContent(value),
+    content: content ?? createInitialContent(value),
     editable: !isDisabled,
     editorProps: {
       attributes: {
@@ -90,7 +94,9 @@ export function ChatInputEditor({
         return;
       }
       lastEmittedInputRef.current = serialized;
-      onValueChangeRef.current(serialized.text, serialized.templateIds);
+      const document = updatedEditor.getJSON();
+      lastDocumentRef.current = JSON.stringify(document);
+      onValueChangeRef.current(serialized.text, serialized.templateIds, document);
     },
   });
 
@@ -116,20 +122,26 @@ export function ChatInputEditor({
       return;
     }
 
-    if (lastEmittedInputRef.current.text === value) {
+    const nextContent = content ?? createInitialContent(value);
+    const nextDocument = JSON.stringify(nextContent);
+    if (lastDocumentRef.current === nextDocument) {
       return;
     }
 
-    lastEmittedInputRef.current = { text: value, templateIds: [] };
+    lastDocumentRef.current = nextDocument;
+    lastEmittedInputRef.current = {
+      text: value,
+      templateIds: content ? serializeChatInput(content).templateIds : [],
+    };
 
-    if (value) {
-      editor.commands.setContent(createInitialContent(value), { emitUpdate: false });
+    if (value || content) {
+      editor.commands.setContent(nextContent, { emitUpdate: false });
       editor.commands.focus('end');
       return;
     }
 
     editor.commands.clearContent(false);
-  }, [editor, value]);
+  }, [content, editor, value]);
 
   return (
     <div

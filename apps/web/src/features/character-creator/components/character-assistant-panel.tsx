@@ -1,5 +1,6 @@
+import type { JSONContent } from '@tiptap/core';
 import { useEffect, useRef, useState } from 'react';
-import { LuSparkles, LuX } from 'react-icons/lu';
+import { LuHistory, LuRefreshCw, LuSparkles, LuX } from 'react-icons/lu';
 
 import { toastError, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
 import { Badge } from '@~/components/ui/badge';
@@ -18,6 +19,8 @@ import { GuidedDiscoveryStepPanel } from './guided-flow/guided-discovery-step-pa
 import { GuidedImageStep } from './guided-flow/guided-image-step';
 import { GuidedStepHeader } from './guided-flow/guided-step-header';
 import { GuidedStepPanel } from './guided-flow/guided-step-panel';
+import { ResizablePanelHandle } from './resizable-panel-handle';
+import { WORKSPACE_PANEL_WIDTHS } from './workspace-panel-layout';
 
 function formatFieldLabel(fieldKey: CharacterEditFieldKey) {
   return fieldKey
@@ -34,24 +37,32 @@ export interface iCharacterAssistantPanelProps {
   isOverlay: boolean;
   onOpenConnectionSettings: () => void;
   onRestoreAssistantToggleFocus: () => void;
+  onWidthChange: (width: number) => void;
+  width: number;
 }
 
 export function CharacterAssistantPanel({
   isOverlay,
   onOpenConnectionSettings,
   onRestoreAssistantToggleFocus,
+  onWidthChange,
+  width,
 }: iCharacterAssistantPanelProps) {
   const { isAssistantOpen, assistantFocus, closeAssistant, openAssistant, workspace, guidedFlow } =
     useCharacterAssistant();
-  const { apiKey, fieldTemplates, generationSettings } = useCharacterCreatorContext();
+  const { apiKey, data, fieldTemplates, generationSettings } = useCharacterCreatorContext();
   const [inputValue, setInputValue] = useState('');
   const [inputTemplateIds, setInputTemplateIds] = useState<string[]>([]);
+  const [inputDocument, setInputDocument] = useState<JSONContent | null>(null);
   const [inputScopeLabel, setInputScopeLabel] = useState('Whole character');
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const settledOutcomeRef = useRef<HTMLDivElement>(null);
   const shouldFollowConversationRef = useRef(true);
   const shouldRestoreAssistantToggleFocusRef = useRef(true);
+  const hydratedComposerSessionIdRef = useRef<string | null>(null);
   const wasRunningRef = useRef(workspace.isRunning);
+  const { updateComposerDraft } = workspace;
   const { guidedState } = guidedFlow;
   const scaffoldState = guidedFlow.savedGuidedState;
   const discoveryState = guidedState?.discovery;
@@ -63,6 +74,13 @@ export function CharacterAssistantPanel({
     assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field
       ? formatFieldLabel(assistantFocus.fieldKey)
       : 'Whole character';
+  const isFieldFocus = assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field;
+  const assistantTitle =
+    assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field ? `Discuss ${focusLabel}` : 'Tenzo Assistant';
+  const assistantContextLabel =
+    assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field
+      ? `${data.name.trim() || 'Untitled character'} / ${focusLabel}`
+      : 'Whole-character conversation';
   const missingConnectionSettings = [
     generationSettings.endpoint.trim() ? null : 'endpoint',
     generationSettings.model.trim() ? null : 'model',
@@ -81,7 +99,7 @@ export function CharacterAssistantPanel({
   const keepScopeDraftLabel = isGuidedScopeMismatch ? `Keep ${conflictingScopeLabel}` : `Use draft for ${focusLabel}`;
   let assistantBodyGridClassName = 'grid-rows-[minmax(0,1fr)]';
 
-  if (isGuided) {
+  if (isGuided && !isFieldFocus) {
     assistantBodyGridClassName = 'grid-rows-[minmax(0,1fr)_minmax(12rem,1fr)]';
   } else if (guidedFlow.isGuidedComplete) {
     assistantBodyGridClassName = 'grid-rows-[auto_minmax(0,1fr)]';
@@ -95,6 +113,8 @@ export function CharacterAssistantPanel({
     composerPlaceholder = 'Choose how to handle the existing context first.';
   } else if (isGuided && guidedFlow.currentStepDefinition) {
     composerPlaceholder = `Discuss ${guidedFlow.currentStepDefinition.title.toLocaleLowerCase()}...`;
+  } else if (isFieldFocus) {
+    composerPlaceholder = `What should change in ${focusLabel.toLocaleLowerCase()}?`;
   }
 
   const lastMessageContent = workspace.messages.at(-1)?.content;
@@ -104,6 +124,58 @@ export function CharacterAssistantPanel({
       shouldRestoreAssistantToggleFocusRef.current = true;
     }
   }, [isAssistantOpen]);
+
+  useEffect(() => {
+    if (
+      !workspace.composerDraftSessionId ||
+      hydratedComposerSessionIdRef.current === workspace.composerDraftSessionId
+    ) {
+      return;
+    }
+
+    hydratedComposerSessionIdRef.current = workspace.composerDraftSessionId;
+    setInputValue(workspace.composerDraft.text);
+    setInputTemplateIds(workspace.composerDraft.templateIds);
+    setInputDocument(workspace.composerDraft.document);
+    setInputScopeLabel(workspace.composerDraft.scopeLabel);
+  }, [workspace.composerDraft, workspace.composerDraftSessionId]);
+
+  useEffect(() => {
+    if (
+      !workspace.composerDraftSessionId ||
+      hydratedComposerSessionIdRef.current !== workspace.composerDraftSessionId
+    ) {
+      return () => undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void updateComposerDraft({
+        text: inputValue,
+        templateIds: inputTemplateIds,
+        scopeLabel: inputScopeLabel,
+        document: inputDocument,
+      }).catch((error: unknown) => toastError('Draft was not saved', getErrorMessage(error)));
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    inputDocument,
+    inputScopeLabel,
+    inputTemplateIds,
+    inputValue,
+    updateComposerDraft,
+    workspace.composerDraftSessionId,
+  ]);
+
+  useEffect(() => {
+    setIsHistoryVisible(false);
+  }, [assistantContextLabel]);
+
+  useEffect(() => {
+    if (workspace.activeProposals.length > 0) {
+      setIsHistoryVisible(true);
+    }
+  }, [workspace.activeProposals.length]);
 
   useEffect(() => {
     if (!isAssistantOpen || !shouldFollowConversationRef.current) {
@@ -176,6 +248,7 @@ export function CharacterAssistantPanel({
       await exitGuidedModeForScopeChange();
       setInputValue(`Help me refine the ${focusLabel.toLocaleLowerCase()} field.`);
       setInputTemplateIds([]);
+      setInputDocument(null);
       setInputScopeLabel(focusLabel);
     } catch (error) {
       toastError('Assistant scope was not changed', getErrorMessage(error));
@@ -187,10 +260,41 @@ export function CharacterAssistantPanel({
       await exitGuidedModeForScopeChange();
       setInputValue('');
       setInputTemplateIds([]);
+      setInputDocument(null);
       setInputScopeLabel(focusLabel);
     } catch (error) {
       toastError('Assistant scope was not changed', getErrorMessage(error));
     }
+  };
+
+  const handleSubmitMessage = async () => {
+    if (!inputValue.trim() || workspace.isRunning || isScopeMismatch) {
+      return;
+    }
+
+    const message = inputValue;
+    const templates = fieldTemplates
+      .filter((template) => inputTemplateIds.includes(template.id))
+      .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
+    shouldFollowConversationRef.current = true;
+    setIsHistoryVisible(true);
+
+    const wasSuccessful = await workspace.sendMessage(message, { templates });
+    if (wasSuccessful) {
+      setInputValue('');
+      setInputTemplateIds([]);
+      setInputDocument(null);
+      setInputScopeLabel(focusLabel);
+    }
+  };
+
+  const handleRequestResponse = async () => {
+    const templates = fieldTemplates
+      .filter((template) => inputTemplateIds.includes(template.id))
+      .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
+    shouldFollowConversationRef.current = true;
+    setIsHistoryVisible(true);
+    await workspace.requestResponse({ templates });
   };
 
   let guidedStepPanel = null;
@@ -227,6 +331,8 @@ export function CharacterAssistantPanel({
           onRejectAllProposals={workspace.discardAllProposals}
           onUsePrompt={(prompt) => {
             setInputValue(prompt);
+            setInputTemplateIds([]);
+            setInputDocument(null);
             setInputScopeLabel(`${guidedFlow.currentStepDefinition?.title ?? 'Guided'} scaffold`);
           }}
         />
@@ -246,21 +352,33 @@ export function CharacterAssistantPanel({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="flex items-center gap-2 font-semibold">
                 <LuSparkles className="size-5 text-primary" />
-                Character Assistant
+                {assistantTitle}
               </h2>
-              <Badge variant="outline">{focusLabel}</Badge>
               {workspace.activePatches.length > 0 ? <Badge>{workspace.activePatches.length} proposed</Badge> : null}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Chat continuously while you inspect and edit the card beside it.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{assistantContextLabel}</p>
           </div>
-          <Button type="button" size="icon" variant="ghost" aria-label="Hide assistant" onClick={closeAssistant}>
-            <LuX className="size-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {isFieldFocus && workspace.messages.length > 0 ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label={isHistoryVisible ? 'Hide assistant history' : 'Show assistant history'}
+                aria-expanded={isHistoryVisible}
+                tooltip={isHistoryVisible ? 'Hide history' : 'Show history'}
+                onClick={() => setIsHistoryVisible(!isHistoryVisible)}
+              >
+                <LuHistory className="size-4" />
+              </Button>
+            ) : null}
+            <Button type="button" size="icon" variant="ghost" aria-label="Hide assistant" onClick={closeAssistant}>
+              <LuX className="size-4" />
+            </Button>
+          </div>
         </div>
 
-        {scaffoldState ? (
+        {scaffoldState && !isFieldFocus ? (
           <div className="grid gap-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Prompt scaffolds</p>
@@ -279,7 +397,7 @@ export function CharacterAssistantPanel({
       </header>
 
       <div className={cn('grid min-h-0', assistantBodyGridClassName)}>
-        {isGuided ? (
+        {isGuided && !isFieldFocus ? (
           <div className="min-h-0 overflow-y-auto border-b bg-muted/10 p-3">
             <div className="grid gap-3">
               {guidedStepPanel}
@@ -322,7 +440,7 @@ export function CharacterAssistantPanel({
           </div>
         ) : null}
 
-        {!isGuided && guidedFlow.isGuidedComplete ? (
+        {!isGuided && guidedFlow.isGuidedComplete && !isFieldFocus ? (
           <div className="flex items-center justify-between gap-3 border-b bg-primary/5 px-4 py-2 text-sm">
             <span>Guided setup is complete. Keep chatting or reopen any scaffold above.</span>
             <Button type="button" size="sm" variant="ghost" onClick={guidedFlow.restartGuidedSession}>
@@ -331,42 +449,53 @@ export function CharacterAssistantPanel({
           </div>
         ) : null}
 
-        <div
-          className="min-h-0 overflow-y-auto overscroll-contain p-4"
-          aria-label="Assistant conversation"
-          onScroll={(event) => {
-            const target = event.currentTarget;
-            shouldFollowConversationRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
-          }}
-        >
-          <div className="grid gap-4">
-            <CharacterAssistantConversation
-              messages={workspace.messages}
-              proposals={workspace.activeProposals}
-              currentGuidedStepId={guidedFlow.currentStepDefinition?.id}
-              isGuided={isGuided}
-              isRunning={workspace.isRunning}
-              activityLabel={workspace.activityLabel}
-              errorMessage={workspace.errorMessage}
-              settledOutcomeRef={settledOutcomeRef}
-              onApply={(proposalId, fieldKeys) => {
-                void handleApply(proposalId, fieldKeys);
-              }}
-              onReject={(proposalId, fieldKeys) => {
-                void handleReject(proposalId, fieldKeys);
-              }}
-              onApplyAll={() => {
-                void handleApplyAll();
-              }}
-              onRejectAll={() => {
-                void workspace
-                  .discardAllProposals()
-                  .catch((error: unknown) => toastError('Proposals were not discarded', getErrorMessage(error)));
-              }}
-            />
-            <div ref={conversationEndRef} aria-hidden="true" />
+        {isFieldFocus && !isHistoryVisible ? (
+          <div className="flex min-h-0 items-center justify-center p-6 text-center">
+            <div className="max-w-72 rounded-xl border bg-muted/15 p-4">
+              <p className="text-sm font-medium">Revise {focusLabel}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Describe the outcome you want. Tenzo will propose an edit you can review before applying.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div
+            className="min-h-0 overflow-y-auto overscroll-contain p-4"
+            aria-label="Assistant conversation"
+            onScroll={(event) => {
+              const target = event.currentTarget;
+              shouldFollowConversationRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 80;
+            }}
+          >
+            <div className="grid gap-4">
+              <CharacterAssistantConversation
+                messages={workspace.messages}
+                proposals={workspace.activeProposals}
+                currentGuidedStepId={guidedFlow.currentStepDefinition?.id}
+                isGuided={isGuided}
+                isRunning={workspace.isRunning}
+                activityLabel={workspace.activityLabel}
+                errorMessage={workspace.errorMessage}
+                settledOutcomeRef={settledOutcomeRef}
+                onApply={(proposalId, fieldKeys) => {
+                  void handleApply(proposalId, fieldKeys);
+                }}
+                onReject={(proposalId, fieldKeys) => {
+                  void handleReject(proposalId, fieldKeys);
+                }}
+                onApplyAll={() => {
+                  void handleApplyAll();
+                }}
+                onRejectAll={() => {
+                  void workspace
+                    .discardAllProposals()
+                    .catch((error: unknown) => toastError('Proposals were not discarded', getErrorMessage(error)));
+                }}
+              />
+              <div ref={conversationEndRef} aria-hidden="true" />
+            </div>
+          </div>
+        )}
       </div>
 
       <footer className="grid gap-2 border-t bg-background p-3">
@@ -445,32 +574,18 @@ export function CharacterAssistantPanel({
             aria-label={composerLabel}
             onSubmit={(event) => {
               event.preventDefault();
-
-              if (!inputValue.trim() || workspace.isRunning || isScopeMismatch) {
-                return;
-              }
-
-              const message = inputValue;
-              const templates = fieldTemplates
-                .filter((template) => inputTemplateIds.includes(template.id))
-                .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
-              shouldFollowConversationRef.current = true;
-              setInputValue('');
-              setInputTemplateIds([]);
-              setInputScopeLabel(focusLabel);
-              void workspace
-                .sendMessage(message, { templates })
-                .catch((error: unknown) => toastError('Message was not sent', getErrorMessage(error)));
+              void handleSubmitMessage();
             }}
           >
             <ChatInputEditor
               value={inputValue}
+              content={inputDocument}
               templates={fieldTemplates}
               preferredFieldKeys={guidedFlow.currentStepDefinition?.suggestedTemplateFieldKeys}
               isDisabled={isComposerDisabled}
               ariaLabel={composerLabel}
               placeholder={composerPlaceholder}
-              onValueChange={(value, templateIds) => {
+              onValueChange={(value, templateIds, content) => {
                 if (!inputValue.trim() && value.trim()) {
                   setInputScopeLabel(
                     isGuided ? `${guidedFlow.currentStepDefinition?.title ?? 'Guided'} scaffold` : focusLabel,
@@ -480,6 +595,7 @@ export function CharacterAssistantPanel({
                 }
                 setInputValue(value);
                 setInputTemplateIds(templateIds);
+                setInputDocument(content);
               }}
               onSubmit={() => {
                 if (inputValue.trim() && !workspace.isRunning && !isScopeMismatch) {
@@ -500,6 +616,7 @@ export function CharacterAssistantPanel({
                     .catch((error: unknown) => toastError('Conversation was not cleared', getErrorMessage(error)));
                   setInputValue('');
                   setInputTemplateIds([]);
+                  setInputDocument(null);
                   setInputScopeLabel(focusLabel);
                 }}
               >
@@ -510,9 +627,25 @@ export function CharacterAssistantPanel({
                   Stop
                 </Button>
               ) : (
-                <Button type="submit" size="sm" disabled={!inputValue.trim() || isScopeMismatch}>
-                  Send
-                </Button>
+                <div className="flex items-center gap-2">
+                  {workspace.messages.length > 0 ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isScopeMismatch}
+                      onClick={() => {
+                        void handleRequestResponse();
+                      }}
+                    >
+                      {workspace.errorMessage ? <LuRefreshCw className="size-4" /> : <LuSparkles className="size-4" />}
+                      {workspace.errorMessage ? 'Retry' : 'Generate response'}
+                    </Button>
+                  ) : null}
+                  <Button type="submit" size="sm" disabled={!inputValue.trim() || isScopeMismatch}>
+                    Send
+                  </Button>
+                </div>
               )}
             </div>
           </form>
@@ -550,11 +683,22 @@ export function CharacterAssistantPanel({
   }
 
   return (
-    <aside
-      aria-label="Character Assistant"
-      className="grid h-full w-112 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto] border-l bg-background"
-    >
-      {panelContent}
-    </aside>
+    <div className="flex h-full min-h-0 shrink-0">
+      <ResizablePanelHandle
+        ariaLabel="Resize assistant panel"
+        direction={-1}
+        minWidth={WORKSPACE_PANEL_WIDTHS.assistant.min}
+        maxWidth={WORKSPACE_PANEL_WIDTHS.assistant.max}
+        width={width}
+        onWidthChange={onWidthChange}
+      />
+      <aside
+        aria-label="Character Assistant"
+        className="grid h-full min-h-0 shrink-0 grid-rows-[auto_minmax(0,1fr)_auto] border-l bg-background"
+        style={{ width }}
+      >
+        {panelContent}
+      </aside>
+    </div>
   );
 }

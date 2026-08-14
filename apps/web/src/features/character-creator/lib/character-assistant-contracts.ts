@@ -238,6 +238,7 @@ export const CHARACTER_ASSISTANT_COMPLETE_EVENT_SCHEMA = z.object({
   assistantMessage: z.string(),
   proposals: z.array(CHARACTER_EDIT_PROPOSAL_SCHEMA),
   concept: CHARACTER_CONCEPT_SCHEMA.optional(),
+  hasCompletedGuidedStep: z.boolean(),
 });
 
 export const CHARACTER_ASSISTANT_ERROR_EVENT_SCHEMA = z.object({

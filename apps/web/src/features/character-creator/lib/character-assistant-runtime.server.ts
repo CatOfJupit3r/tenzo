@@ -40,6 +40,7 @@ interface iStreamCharacterAssistantOptions {
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
+  shouldUseNativeTools?: boolean;
   store: Parameters<typeof createCharacterAssistantTools>[0]['store'];
   messages: ModelMessage[];
   maxSteps: number;
@@ -58,7 +59,10 @@ interface iBuildCharacterAssistantInstructionsOptions extends Pick<
   | 'templates'
 > {
   shouldUseProposalTools?: boolean;
+  shouldUseSyntheticToolCalling?: boolean;
 }
+
+export const CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER = '/finalize-tool';
 
 function formatContextAttachment(attachment: iCharacterAssistantContextAttachment) {
   const confidence = attachment.confidence === null ? 'unknown' : `${Math.round(attachment.confidence * 100)}%`;
@@ -117,6 +121,7 @@ export function buildCharacterAssistantInstructions({
   discoveryContext,
   templates = [],
   shouldUseProposalTools = true,
+  shouldUseSyntheticToolCalling = false,
 }: iBuildCharacterAssistantInstructionsOptions) {
   const characterName = card.data.name.trim() || 'Untitled character';
   let focusInstruction = 'This run may propose coordinated changes across the character card.';
@@ -149,7 +154,9 @@ export function buildCharacterAssistantInstructions({
           discoveryContext
             ? 'Discovery context is evidence only. Do not treat it as permission to change fields beyond this step.'
             : null,
-          'Ask at most one clarifying question if the user answer is unusable; otherwise record proposals for the in-scope fields and stop.',
+          shouldUseSyntheticToolCalling
+            ? `Have a useful, natural conversation about this step. Ask follow-up questions, offer concrete creative ideas, and answer the user fully. Do not finalize or claim to edit the card until the user sends ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER}.`
+            : 'Ask at most one clarifying question if the user answer is unusable; otherwise record proposals for the in-scope fields and stop.',
           conceptQuestion,
           'Do not mention or edit fields outside this step. Do not tell the user to move to the next step - the app handles that.',
           definition.agentInstructions,
@@ -170,13 +177,18 @@ export function buildCharacterAssistantInstructions({
           ...templates.map(formatTemplate),
         ].join('\n\n')
       : null;
+  let proposalInstruction = 'Express every requested card edit through the provided structured changes fields.';
+
+  if (shouldUseSyntheticToolCalling) {
+    proposalInstruction = `Act as a conversational creative assistant. Never emit JSON or ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER}; that marker is a user command handled by the application.`;
+  } else if (shouldUseProposalTools) {
+    proposalInstruction = `Use proposal tools for requested card edits. If native tools are unavailable, discuss the step normally and include ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER} only when the gathered details are ready to become a reviewable proposal.`;
+  }
 
   return [
     'You are the Character Assistant inside a local-first character card editor.',
     'Help the user refine either one focused field or the character as a coherent whole.',
-    shouldUseProposalTools
-      ? 'Use proposal tools for every requested card edit. Never output raw JSON as a substitute for a proposal.'
-      : 'Express every requested card edit through the provided structured changes fields.',
+    proposalInstruction,
     'Proposals are reviewable suggestions and do not change the live card until the user accepts them.',
     'Read the current projected character before substantial edits. It includes proposals already made in this run.',
     'Preserve the existing character intent and roleplay macros such as {{char}} and {{user}} unless asked otherwise.',
@@ -191,6 +203,7 @@ export function buildCharacterAssistantInstructions({
     guidedSection,
     conceptSection,
     templateSection,
+    shouldUseSyntheticToolCalling ? `Current character card:\n${JSON.stringify(card)}` : null,
   ]
     .filter((section): section is string => Boolean(section))
     .join('\n');
@@ -209,6 +222,7 @@ export function streamCharacterAssistant({
   discoveryContext,
   templates = [],
   allowedToolNames,
+  shouldUseNativeTools = true,
   store,
   messages,
   maxSteps,
@@ -224,6 +238,8 @@ export function streamCharacterAssistant({
       concept,
       discoveryContext,
       templates,
+      shouldUseProposalTools: shouldUseNativeTools,
+      shouldUseSyntheticToolCalling: !shouldUseNativeTools,
     }),
     model: createCharacterLanguageModel({
       endpoint: generationSettings.endpoint,
@@ -233,7 +249,7 @@ export function streamCharacterAssistant({
       minP: generationSettings.minP,
       shouldSendDisabledSamplers,
     }),
-    tools: createCharacterAssistantTools({ focus, store, allowedToolNames }),
+    ...(shouldUseNativeTools ? { tools: createCharacterAssistantTools({ focus, store, allowedToolNames }) } : {}),
     messages,
     stopWhen: stepCountIs(maxSteps),
     maxOutputTokens: generationSettings.maxTokens,

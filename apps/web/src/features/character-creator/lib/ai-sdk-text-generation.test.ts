@@ -49,6 +49,23 @@ describe('AI SDK text generation', () => {
     });
 
     expect(Reflect.get(model, 'supportsStructuredOutputs')).toBe(true);
+    expect(createOpenAICompatibleMock).toHaveBeenCalledWith(
+      expect.objectContaining({ baseURL: 'http://localhost:5001/v1' }),
+    );
+  });
+
+  it('uses the OpenRouter API v1 base URL', () => {
+    createCharacterLanguageModel({
+      endpoint: 'https://openrouter.ai/api',
+      apiKey: 'sk-or-v1-test',
+      model: 'thedrummer/cydonia-24b-v4.1',
+      topK: 0,
+      minP: 0,
+    });
+
+    expect(createOpenAICompatibleMock).toHaveBeenCalledWith(
+      expect.objectContaining({ baseURL: 'https://openrouter.ai/api/v1' }),
+    );
   });
 
   it('streams OpenRouter text through the TanStack AI adapter using the supplied key and model', async () => {

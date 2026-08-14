@@ -33,6 +33,7 @@ export interface iFieldGenerationControlsProps {
   fieldId: string;
   label: string;
   shouldUseGeneralCharacterIdea: boolean;
+  shouldShowGeneralCharacterIdeaToggle?: boolean;
   instructionValue: string;
   errorMessage?: string | null;
   hasExistingValue: boolean;
@@ -45,7 +46,7 @@ export interface iFieldGenerationControlsProps {
   templateFieldKey?: TemplateFieldKey | null;
   onTemplateIdChange?: (templateId: string | null) => void;
   onSaveTemplate?: (input: iCreateStoredFieldTemplateInput) => void;
-  onShouldUseGeneralCharacterIdeaChange: (value: boolean) => void;
+  onShouldUseGeneralCharacterIdeaChange?: (value: boolean) => void;
   onInstructionChange: (value: string) => void;
   onGenerate: () => void;
   onContinue: () => void;
@@ -58,6 +59,7 @@ export function FieldGenerationControls({
   fieldId,
   label,
   shouldUseGeneralCharacterIdea,
+  shouldShowGeneralCharacterIdeaToggle = true,
   instructionValue,
   errorMessage,
   hasExistingValue,
@@ -111,19 +113,21 @@ export function FieldGenerationControls({
         </PopoverTrigger>
 
         <PopoverContent align="start" className="w-80 space-y-3" side="left">
-          <div className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Use General Character Idea</p>
-              <p className="text-xs text-muted-foreground">
-                Applies the shared character idea to this field&apos;s generation prompt.
-              </p>
+          {shouldShowGeneralCharacterIdeaToggle && onShouldUseGeneralCharacterIdeaChange ? (
+            <div className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Use General Character Idea</p>
+                <p className="text-xs text-muted-foreground">
+                  Applies the shared character idea to this field&apos;s generation prompt.
+                </p>
+              </div>
+              <Switch
+                checked={shouldUseGeneralCharacterIdea}
+                aria-label={`Use general character idea for ${label}`}
+                onCheckedChange={onShouldUseGeneralCharacterIdeaChange}
+              />
             </div>
-            <Switch
-              checked={shouldUseGeneralCharacterIdea}
-              aria-label={`Use general character idea for ${label}`}
-              onCheckedChange={onShouldUseGeneralCharacterIdeaChange}
-            />
-          </div>
+          ) : null}
 
           {hasTemplatePicker ? (
             <div className="space-y-1">

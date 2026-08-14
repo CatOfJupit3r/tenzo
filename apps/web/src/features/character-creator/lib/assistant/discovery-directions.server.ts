@@ -27,7 +27,22 @@ type DiscoveryGenerationSettings = Pick<
   'maxTokens' | 'temperature' | 'topP' | 'frequencyPenalty' | 'presencePenalty' | 'topK' | 'minP'
 >;
 
-async function generateCategory({
+function isMateriallyDistinct(values: readonly { title: string; description: string }[]) {
+  const normalizedTitles = new Set<string>();
+  const normalizedDescriptions = new Set<string>();
+  for (const value of values) {
+    const title = value.title.trim().toLowerCase();
+    const description = value.description.trim().toLowerCase();
+    if (normalizedTitles.has(title) || normalizedDescriptions.has(description)) {
+      return false;
+    }
+    normalizedTitles.add(title);
+    normalizedDescriptions.add(description);
+  }
+  return true;
+}
+
+export async function generateCharacterDiscoveryCategory({
   premise,
   category,
   endpoint,
@@ -56,6 +71,9 @@ async function generateCategory({
     modelOptions: createCharacterModelOptions(endpoint, generationSettings),
     abortSignal,
   });
+  if (!isMateriallyDistinct(generated.cards)) {
+    throw new Error('The model returned non-distinct direction cards.');
+  }
   return generated.cards.map((card, index) => ({
     id: buildDirectionCardId(category, index),
     category,
@@ -85,7 +103,15 @@ export async function generateCharacterDiscoveryDirections({
   const cards = (
     await Promise.all(
       categories.map(async (category) =>
-        generateCategory({ premise, category, endpoint, apiKey, model, generationSettings, abortSignal }),
+        generateCharacterDiscoveryCategory({
+          premise,
+          category,
+          endpoint,
+          apiKey,
+          model,
+          generationSettings,
+          abortSignal,
+        }),
       ),
     )
   ).flat();

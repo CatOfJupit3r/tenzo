@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { readCharacterAssetBlob } from './image-store';
+import { readCharacterAssetBlob } from '../cards/image-store';
 import { readPortraitDimensions } from './portrait-focal-point';
 import type { iPortraitDimensions } from './portrait-focal-point';
 

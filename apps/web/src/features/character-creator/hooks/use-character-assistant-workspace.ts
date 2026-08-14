@@ -18,18 +18,18 @@ import {
   updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
-import { createCharacterAssistantMessagePersistence } from '../lib/assistant/message-persistence';
-import type { CharacterCard } from '../lib/card-schema';
-import { CHARACTER_CONCEPT_SCHEMA } from '../lib/character-assistant-contracts';
+import { CHARACTER_CONCEPT_SCHEMA } from '../lib/assistant/character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
   iChatTemplateRef,
-} from '../lib/character-assistant-contracts';
-import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../lib/character-edit-proposal';
-import type { iCharacterEditPatch } from '../lib/character-edit-proposal';
-import type { iCharacterGenerationSettings } from '../lib/generation-config';
-import type { ProviderKind } from '../lib/provider-health';
+} from '../lib/assistant/character-assistant-contracts';
+import { createCharacterAssistantMessagePersistence } from '../lib/assistant/message-persistence';
+import type { CharacterCard } from '../lib/cards/card-schema';
+import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../lib/proposals/character-edit-proposal';
+import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
+import type { ProviderKind } from '../lib/provider/provider-health';
 import { useProposalActions } from './use-proposal-actions';
 
 interface iUseCharacterAssistantWorkspaceOptions {

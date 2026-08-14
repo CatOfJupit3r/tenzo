@@ -1,4 +1,4 @@
-import type { CharacterCard, CharacterTextFieldKey } from '../card-schema';
+import type { CharacterCard, CharacterTextFieldKey } from '../cards/card-schema';
 import { GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { iFieldGenerationTarget } from './generation-contracts';
 import { PromptFormatter } from './prompt-formatting';

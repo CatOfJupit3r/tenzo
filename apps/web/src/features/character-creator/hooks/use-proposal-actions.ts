@@ -3,19 +3,19 @@ import { useCallback, useMemo } from 'react';
 import { toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
 
 import { updateCharacterAssistantSession } from '../collections/character-assistant-sessions.collection';
-import type { CharacterCard } from '../lib/card-schema';
+import type { CharacterCard } from '../lib/cards/card-schema';
 import {
   applyCharacterEditProposal,
   CHARACTER_EDIT_PATCH_STATUSES,
   CHARACTER_EDIT_PROPOSAL_STATUSES,
   reduceCharacterEditProposal,
   upsertCharacterEditProposal,
-} from '../lib/character-edit-proposal';
+} from '../lib/proposals/character-edit-proposal';
 import type {
   CharacterEditFieldKey,
   CharacterEditProposalStatus,
   iCharacterEditProposal,
-} from '../lib/character-edit-proposal';
+} from '../lib/proposals/character-edit-proposal';
 
 const ACTIVE_PROPOSAL_STATUSES = new Set<CharacterEditProposalStatus>([
   CHARACTER_EDIT_PROPOSAL_STATUSES.streaming,

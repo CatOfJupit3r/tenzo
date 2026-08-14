@@ -1,3 +1,6 @@
+import type { iCharacterGenerationConnectionSettings } from '../generation/generation-config';
+import { renderPortraitBlobWithCrop } from '../portrait/portrait-focal-point';
+import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
 import { createArchiveBlob, readArchiveBytes } from './archive';
 import type { iArchiveFileEntry } from './archive';
 import { buildFullBackupFiles, findBackupManifest, parseFullBackup } from './backup';
@@ -14,11 +17,8 @@ import type { iCharacterLibraryItem } from './character-library';
 import type { iStoredExampleCharacter } from './example-characters';
 import { ARCHIVE_FORMAT_FILE_EXTENSIONS } from './export-settings';
 import type { ArchiveFormat, ExportDetailLevel } from './export-settings';
-import type { iCharacterGenerationConnectionSettings } from './generation-config';
 import { downloadBlob, readBlobAsUint8Array, readFileAsText } from './image-utils';
 import { embedCharacterCardInPng, readCharacterCardFromPng } from './png-embed';
-import { renderPortraitBlobWithCrop } from './portrait-focal-point';
-import type { iPortraitCropRect } from './portrait-focal-point';
 
 export interface iImportedCharacterCardFile {
   card: CharacterCard;

@@ -21,8 +21,8 @@ import {
   TEMPLATE_FIELD_KEY_LABELS,
   TEMPLATE_FIELD_KEY_SCHEMA,
   TEMPLATE_MODES,
-} from '../lib/field-templates';
-import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/field-templates';
+} from '../lib/cards/field-templates';
+import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/cards/field-templates';
 
 const templateFieldKeyOptions: iOptionType[] = TEMPLATE_FIELD_KEY_SCHEMA.options.map((fieldKey) => ({
   label: TEMPLATE_FIELD_KEY_LABELS[fieldKey],

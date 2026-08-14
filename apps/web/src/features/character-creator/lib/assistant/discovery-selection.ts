@@ -1,4 +1,4 @@
-import type { iCharacterAssistantDiscoveryDirectionCard } from '../character-assistant-contracts';
+import type { iCharacterAssistantDiscoveryDirectionCard } from './character-assistant-contracts';
 
 export function formatDiscoverySelectionMessage(cards: readonly iCharacterAssistantDiscoveryDirectionCard[]) {
   return [

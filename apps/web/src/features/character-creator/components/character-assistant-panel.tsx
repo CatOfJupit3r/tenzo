@@ -8,13 +8,13 @@ import { Dialog, DialogContent, DialogTitle } from '@~/components/ui/dialog';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
+import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/assistant/character-assistant-contracts';
 import {
   deriveNextPromptSuggestions,
   mergeNextPromptSuggestions,
   readModelPromptSuggestions,
 } from '../lib/assistant/next-prompt-suggestions';
-import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
-import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
+import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
 import { CharacterAssistantConversation } from './character-assistant-conversation';
 import { ChatInputEditor } from './editor/chat-input-editor';
 import { ResizablePanelHandle } from './resizable-panel-handle';

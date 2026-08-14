@@ -1,9 +1,9 @@
 import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
 
+import { generateValidatedObject } from '../generation/structured-output.server';
+import { createCharacterModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
 import { CHARACTER_IMAGE_ANALYSIS_SCHEMA, CHARACTER_VISION_REQUEST_SCHEMA } from './character-vision-contracts';
 import type { iCharacterImageAnalysis, iCharacterVisionRequest } from './character-vision-contracts';
-import { generateValidatedObject } from './structured-output.server';
-import { createCharacterModelOptions, createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 const VISION_SYSTEM_PROMPT =
   'You describe character reference images for a character card editor. Describe only what is visible; put uncertainty in warnings and lower confidence. Do not invent story details.';

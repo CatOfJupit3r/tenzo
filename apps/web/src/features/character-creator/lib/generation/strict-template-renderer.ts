@@ -1,4 +1,4 @@
-import { normalizeTemplateSlotLabel, TEMPLATE_SLOT_PATTERN } from './field-templates';
+import { normalizeTemplateSlotLabel, TEMPLATE_SLOT_PATTERN } from '../cards/field-templates';
 
 const CLOSED_SLOT_PATTERN = /<slot\s+name\s*=\s*["']([^"']+)["']\s*>([\s\S]*?)<\/slot>/gi;
 const OPEN_SLOT_PATTERN = /<slot\s+name\s*=\s*["']([^"']+)["']\s*>([\s\S]*)$/i;

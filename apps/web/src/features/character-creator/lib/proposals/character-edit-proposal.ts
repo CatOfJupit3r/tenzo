@@ -8,8 +8,8 @@ import {
   CHARACTER_TEXT_FIELD_KEYS,
   CHARACTER_TEXT_FIELD_KEY_SCHEMA,
   CUSTOM_FIELD_SCHEMA,
-} from './card-schema';
-import type { CharacterBook, CharacterCard, CustomField } from './card-schema';
+} from '../cards/card-schema';
+import type { CharacterBook, CharacterCard, CustomField } from '../cards/card-schema';
 
 export const CHARACTER_EDIT_LIST_FIELD_KEY_SCHEMA = z.enum(['tags', 'alternate_greetings']);
 export const CHARACTER_EDIT_LIST_FIELD_KEYS = CHARACTER_EDIT_LIST_FIELD_KEY_SCHEMA.enum;

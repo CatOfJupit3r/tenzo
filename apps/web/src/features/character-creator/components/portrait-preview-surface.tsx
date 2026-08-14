@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import { cn } from '@~/lib/utils';
 
-import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
+import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait/portrait-focal-point';
 
 export interface iPortraitPreviewSurfaceProps {
   alt: string;

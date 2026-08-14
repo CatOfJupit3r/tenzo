@@ -3,8 +3,8 @@ import { Provider } from 'jotai';
 import type { ReactNode } from 'react';
 import { expect, it, vi } from 'vitest';
 
-import { createEmptyCharacterLibraryItem, DEFAULT_CHARACTER_LIBRARY_ITEM_ID } from '../lib/character-library';
-import type { iCharacterLibraryItem } from '../lib/character-library';
+import { createEmptyCharacterLibraryItem, DEFAULT_CHARACTER_LIBRARY_ITEM_ID } from '../lib/cards/character-library';
+import type { iCharacterLibraryItem } from '../lib/cards/character-library';
 import { useCharacterSession } from './use-character-session';
 
 type iCharacterUpdate = (
@@ -24,7 +24,7 @@ vi.mock('@~/db/persistent-collection', () => ({
 vi.mock('../atoms/character-session.atom', async () => {
   const [{ atom }, { DEFAULT_CHARACTER_LIBRARY_ITEM_ID: defaultCharacterId }] = await Promise.all([
     import('jotai'),
-    import('../lib/character-library'),
+    import('../lib/cards/character-library'),
   ]);
 
   return { activeCharacterIdAtom: atom(defaultCharacterId) };

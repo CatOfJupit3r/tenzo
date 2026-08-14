@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
 import {
   buildExportedCharacterCard,
   extractTenzoCardMetadata,
@@ -10,7 +11,6 @@ import {
 } from './card-format';
 import type { CharacterCard } from './card-schema';
 import { EXPORT_DETAIL_LEVELS } from './export-settings';
-import type { iCharacterGenerationPromptSettings } from './generation-config';
 
 describe('card-format', () => {
   it('normalizes V1 cards into V2 shape with defaults', () => {

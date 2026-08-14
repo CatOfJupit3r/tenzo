@@ -19,8 +19,12 @@ import {
   TEMPLATE_MODE_LABELS,
   TEMPLATE_MODES,
   validateFieldTemplate,
-} from '../lib/field-templates';
-import type { iFieldTemplateViewModel, TemplateMode, iCreateStoredFieldTemplateInput } from '../lib/field-templates';
+} from '../lib/cards/field-templates';
+import type {
+  iFieldTemplateViewModel,
+  TemplateMode,
+  iCreateStoredFieldTemplateInput,
+} from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 
 const templateModeOptions: iOptionType[] = [
@@ -138,7 +142,7 @@ export function FieldTemplatesPanel({
               {selectedTemplate.isBuiltIn ? (
                 <Badge variant="secondary">
                   <LuLock className="size-3" />
-                  Built-in — duplicate to edit
+                  Built-in â€” duplicate to edit
                 </Badge>
               ) : null}
             </div>

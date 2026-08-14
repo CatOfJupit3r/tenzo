@@ -4,13 +4,13 @@ import { usePersistentCollection } from '@~/db/persistent-collection';
 
 import { fieldTemplatesCollection } from '../collections/field-templates.collection';
 import { BUILT_IN_FIELD_TEMPLATES } from '../constants/default-field-templates';
-import { createStoredFieldTemplate, sanitizeTemplateFieldKeys } from '../lib/field-templates';
+import { createStoredFieldTemplate, sanitizeTemplateFieldKeys } from '../lib/cards/field-templates';
 import type {
   iCreateStoredFieldTemplateInput,
   iFieldTemplateViewModel,
   iStoredFieldTemplate,
   TemplateFieldKey,
-} from '../lib/field-templates';
+} from '../lib/cards/field-templates';
 
 export type FieldTemplatePatch = Partial<Omit<iStoredFieldTemplate, 'id' | 'createdAt' | 'updatedAt'>>;
 

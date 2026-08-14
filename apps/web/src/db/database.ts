@@ -2,10 +2,10 @@ import Dexie from 'dexie';
 import type { EntityTable } from 'dexie';
 
 import type { iCharacterAssistantComposerDraft } from '../features/character-creator/collections/character-assistant-composer-drafts.collection';
-import type { iCharacterAssistantSession } from '../features/character-creator/lib/character-assistant-session';
-import type { iCharacterLibraryItem } from '../features/character-creator/lib/character-library';
-import type { iStoredExampleCharacter } from '../features/character-creator/lib/example-characters';
-import type { iStoredFieldTemplate } from '../features/character-creator/lib/field-templates';
+import type { iCharacterAssistantSession } from '../features/character-creator/lib/assistant/character-assistant-session';
+import type { iCharacterLibraryItem } from '../features/character-creator/lib/cards/character-library';
+import type { iStoredExampleCharacter } from '../features/character-creator/lib/cards/example-characters';
+import type { iStoredFieldTemplate } from '../features/character-creator/lib/cards/field-templates';
 import type { UiPreference } from './collections/ui-preferences.collection';
 
 export const APPLICATION_DATABASE_NAME = 'tenzo-character-creator';

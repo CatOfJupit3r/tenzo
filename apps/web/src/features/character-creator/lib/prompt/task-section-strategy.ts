@@ -3,7 +3,7 @@ import {
   getFormatInstructions,
   getStrictTemplateFormatInstructions,
 } from '../../constants/default-prompts';
-import { parseTemplateSlots, TEMPLATE_MODES } from '../field-templates';
+import { parseTemplateSlots, TEMPLATE_MODES } from '../cards/field-templates';
 import { PROMPT_SECTION_NAMES } from './prompt-section-strategy';
 import type { iPromptPipelineContext, iPromptSectionStrategy } from './prompt-section-strategy';
 import type { TaskInstructionService } from './task-instruction-service';

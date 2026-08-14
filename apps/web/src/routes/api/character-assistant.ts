@@ -2,13 +2,13 @@ import { chatParamsFromRequestBody, toServerSentEventsResponse } from '@tanstack
 import { createFileRoute } from '@tanstack/react-router';
 import { ZodError } from 'zod';
 
+import { CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/assistant/character-assistant-generation-mode';
+import { streamCharacterAssistant } from '@~/features/character-creator/lib/assistant/character-assistant-runtime.server';
+import { generateStructuredCharacterAssistantStream } from '@~/features/character-creator/lib/assistant/character-assistant-structured.server';
 import { generateCharacterDiscoveryDirections } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
-import { CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/character-assistant-contracts';
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/character-assistant-generation-mode';
-import { streamCharacterAssistant } from '@~/features/character-creator/lib/character-assistant-runtime.server';
-import { generateStructuredCharacterAssistantStream } from '@~/features/character-creator/lib/character-assistant-structured.server';
-import { createCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
-import type { iCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
+import { createCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
+import type { iCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 
 function createRunStore(
   characterId: string,

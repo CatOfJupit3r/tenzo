@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
 import { useCharacterAssistantWorkspace } from '../hooks/use-character-assistant-workspace';
-import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
+import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/assistant/character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
-} from '../lib/character-assistant-contracts';
-import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
-import { PROVIDER_KINDS } from '../lib/provider-health';
+} from '../lib/assistant/character-assistant-contracts';
+import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
+import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import { CharacterAssistantContext } from './character-assistant-context.constants';
 import { useCharacterCreatorContext } from './character-creator-context/character-creator-context.hooks';
 

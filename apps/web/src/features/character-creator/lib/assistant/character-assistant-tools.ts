@@ -8,8 +8,10 @@ import {
   CHARACTER_CARD_SCHEMA,
   CHARACTER_TEXT_FIELD_KEY_SCHEMA,
   CUSTOM_FIELD_SCHEMA,
-} from './card-schema';
-import type { CharacterCard, CustomField } from './card-schema';
+} from '../cards/card-schema';
+import type { CharacterCard, CustomField } from '../cards/card-schema';
+import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../proposals/character-edit-proposal';
+import type { iCharacterEditProposal } from '../proposals/character-edit-proposal';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_FOCUS_KINDS,
@@ -22,8 +24,6 @@ import type {
   iCharacterAssistantDiscoveryDirectionCard,
   iCharacterConcept,
 } from './character-assistant-contracts';
-import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from './character-edit-proposal';
-import type { iCharacterEditProposal } from './character-edit-proposal';
 
 export interface iCharacterAssistantProposalStore {
   getCard: () => CharacterCard;

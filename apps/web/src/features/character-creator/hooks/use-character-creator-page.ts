@@ -9,7 +9,7 @@ import { exportSettingsAtom } from '../atoms/export-settings.atom';
 import { characterLibraryCollection } from '../collections/character-library.collection';
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import type { iCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.constants';
-import type { iBackupPortraitAsset, iTenzoBackup } from '../lib/backup';
+import type { iBackupPortraitAsset, iTenzoBackup } from '../lib/cards/backup';
 import {
   exportCharacterCardJson,
   exportCharacterCardPng,
@@ -18,23 +18,23 @@ import {
   importArchiveFile,
   importCharacterCardFile,
   isArchiveFile,
-} from '../lib/card-files';
-import type { iBulkExportCharacter, iImportedCharacterCardFile } from '../lib/card-files';
-import type { CharacterTextFieldKey } from '../lib/card-schema';
-import { CHARACTER_LIBRARY_SOURCES, createCharacterLibraryItem } from '../lib/character-library';
-import type { iCharacterPortraitReference } from '../lib/character-library';
+} from '../lib/cards/card-files';
+import type { iBulkExportCharacter, iImportedCharacterCardFile } from '../lib/cards/card-files';
+import type { CharacterTextFieldKey } from '../lib/cards/card-schema';
+import { CHARACTER_LIBRARY_SOURCES, createCharacterLibraryItem } from '../lib/cards/character-library';
+import type { iCharacterPortraitReference } from '../lib/cards/character-library';
 import {
   createStoredExampleCharacter,
   getExampleCharacterDisplayName,
   MAX_EXAMPLE_CHARACTER_COUNT,
   toPromptExampleCharacter,
-} from '../lib/example-characters';
-import type { iExportSettings } from '../lib/export-settings';
-import { getTemplateFieldKeyForTargetKey, TEMPLATE_MODES } from '../lib/field-templates';
-import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation-config';
-import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
-import { invalidatePortraitAsset } from '../lib/portrait-asset-cache';
-import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
+} from '../lib/cards/example-characters';
+import type { iExportSettings } from '../lib/cards/export-settings';
+import { getTemplateFieldKeyForTargetKey, TEMPLATE_MODES } from '../lib/cards/field-templates';
+import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/cards/image-store';
+import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation/generation-config';
+import { invalidatePortraitAsset } from '../lib/portrait/portrait-asset-cache';
+import { renderPortraitThumbnailDataUrl } from '../lib/portrait/portrait-focal-point';
 import { ExampleContextService } from '../lib/prompt/example-context-service';
 import {
   GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY,

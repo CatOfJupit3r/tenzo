@@ -4,8 +4,8 @@ import { PersistentCollection } from '@~/db/persistent-collection';
 import {
   CHARACTER_ASSISTANT_SESSION_SCHEMA,
   createCharacterAssistantSession,
-} from '../lib/character-assistant-session';
-import type { iCharacterAssistantSession } from '../lib/character-assistant-session';
+} from '../lib/assistant/character-assistant-session';
+import type { iCharacterAssistantSession } from '../lib/assistant/character-assistant-session';
 
 export const CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY = 'tenzo:character-creator:assistant-sessions:v4';
 export const LEGACY_CHARACTER_AGENT_SESSION_STORAGE_KEYS = [

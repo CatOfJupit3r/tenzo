@@ -7,18 +7,21 @@ import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
-import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from '../lib/assistant/tool-part-renderers';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_CONCEPT_SCHEMA,
-} from '../lib/character-assistant-contracts';
-import { CHARACTER_EDIT_PATCH_STATUSES, CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../lib/character-edit-proposal';
+} from '../lib/assistant/character-assistant-contracts';
+import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from '../lib/assistant/tool-part-renderers';
+import { computeRewriteDiffHunks } from '../lib/editor/rewrite-diff';
+import {
+  CHARACTER_EDIT_PATCH_STATUSES,
+  CHARACTER_EDIT_PROPOSAL_SCHEMA,
+} from '../lib/proposals/character-edit-proposal';
 import type {
   CharacterEditFieldKey,
   iCharacterEditPatch,
   iCharacterEditProposal,
-} from '../lib/character-edit-proposal';
-import { computeRewriteDiffHunks } from '../lib/editor/rewrite-diff';
+} from '../lib/proposals/character-edit-proposal';
 import { DiscoveryCardGrid } from './assistant/discovery-card-grid';
 
 function formatFieldLabel(fieldKey: CharacterEditFieldKey) {

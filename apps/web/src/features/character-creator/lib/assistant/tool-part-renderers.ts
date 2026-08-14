@@ -1,5 +1,5 @@
-import { CHARACTER_ASSISTANT_TOOL_NAMES } from '../character-assistant-contracts';
-import type { CharacterAssistantToolName } from '../character-assistant-contracts';
+import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
+import type { CharacterAssistantToolName } from './character-assistant-contracts';
 
 export const ASSISTANT_TOOL_RENDERER_KINDS = {
   concept: 'concept',

@@ -6,8 +6,8 @@ import {
   getPortraitAssetSnapshot,
   PORTRAIT_ASSET_STATUSES,
   subscribeToPortraitAssets,
-} from '../lib/portrait-asset-cache';
-import type { iPortraitAssetEntry } from '../lib/portrait-asset-cache';
+} from '../lib/portrait/portrait-asset-cache';
+import type { iPortraitAssetEntry } from '../lib/portrait/portrait-asset-cache';
 
 /**
  * Subscribes to the shared portrait asset cache for a single asset. Returns the

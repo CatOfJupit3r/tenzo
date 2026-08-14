@@ -3,8 +3,8 @@ import { z } from 'zod';
 import {
   CHARACTER_ASSISTANT_GENERATION_MODES,
   CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA,
-} from './character-assistant-generation-mode';
-import type { CharacterAssistantGenerationMode } from './character-assistant-generation-mode';
+} from '../assistant/character-assistant-generation-mode';
+import type { CharacterAssistantGenerationMode } from '../assistant/character-assistant-generation-mode';
 
 export const OUTPUT_FORMAT_SCHEMA = z.enum(['xml', 'json', 'none']);
 export const OUTPUT_FORMATS = OUTPUT_FORMAT_SCHEMA.enum;

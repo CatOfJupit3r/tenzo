@@ -1,4 +1,4 @@
-import type { CharacterTextFieldKey } from '../card-schema';
+import type { CharacterTextFieldKey } from '../cards/card-schema';
 import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { GenerationMode, iFieldGenerationTarget } from './generation-contracts';
 import type { SeededRandom } from './seeded-random';

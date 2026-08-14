@@ -9,15 +9,15 @@ import type { iOptionType } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
 import { cn } from '@~/lib/utils';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/character-assistant-generation-mode';
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/assistant/character-assistant-generation-mode';
 import {
   GENERATION_PROVIDER_DEFAULTS,
   GENERATION_PROVIDERS,
   OUTPUT_FORMATS,
   REQUEST_MODES,
-} from '../lib/generation-config';
-import type { iCharacterGenerationSettings } from '../lib/generation-config';
-import type { ProviderKind } from '../lib/provider-health';
+} from '../lib/generation/generation-config';
+import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import type { ProviderKind } from '../lib/provider/provider-health';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iConnectionHealthViewModel {

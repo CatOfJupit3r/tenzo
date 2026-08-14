@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
+import type { iCharacterAssistantDiscoveryDirectionCard } from '../../lib/assistant/character-assistant-contracts';
 import { formatDiscoverySelectionMessage } from '../../lib/assistant/discovery-selection';
-import type { iCharacterAssistantDiscoveryDirectionCard } from '../../lib/character-assistant-contracts';
 import { MarkdownFieldEditor } from '../editor/markdown-field-editor';
 
 export function DiscoveryCardGrid({

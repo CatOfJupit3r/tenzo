@@ -1,14 +1,14 @@
 import { generateUuid } from '@~/utils/uuid';
 
-import { createEmptyCharacterCard } from '../constants/card-defaults';
+import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import { sanitizeCharacterGenerationPromptSettings } from '../generation/generation-config';
+import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
+import { sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
+import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
 import { CHARACTER_BOOK_ENTRY_POSITION_SCHEMA, CHARACTER_CARD_SCHEMA } from './card-schema';
 import type { CharacterBook, CharacterBookEntry, CharacterCard, CustomField } from './card-schema';
 import { EXPORT_DETAIL_LEVELS } from './export-settings';
 import type { ExportDetailLevel } from './export-settings';
-import { sanitizeCharacterGenerationPromptSettings } from './generation-config';
-import type { iCharacterGenerationPromptSettings } from './generation-config';
-import { sanitizeStoredPortraitCropRect } from './portrait-focal-point';
-import type { iPortraitCropRect } from './portrait-focal-point';
 
 export const TENZO_CARD_EXTENSION_KEY = 'tenzo';
 export const TENZO_CARD_EXTENSION_VERSION = 1;

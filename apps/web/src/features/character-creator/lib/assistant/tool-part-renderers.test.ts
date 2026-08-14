@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHARACTER_ASSISTANT_TOOL_NAMES } from '../character-assistant-contracts';
+import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from './tool-part-renderers';
 
 describe('assistant tool renderer registry', () => {

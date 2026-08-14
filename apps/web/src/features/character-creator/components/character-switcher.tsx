@@ -7,7 +7,7 @@ import { cn } from '@~/lib/utils';
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
-import { getCharacterLibraryItemDisplayName } from '../lib/character-library';
+import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
 
 export function CharacterSwitcher() {
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();

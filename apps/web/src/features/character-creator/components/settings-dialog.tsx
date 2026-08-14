@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
-import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/example-characters';
+import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/cards/example-characters';
 import { ConnectionSettings } from './connection-settings';
 import { ExampleCharacters } from './example-characters';
 import { FieldTemplatesPanel } from './field-templates-panel';

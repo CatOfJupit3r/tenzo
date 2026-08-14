@@ -1,7 +1,7 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import { z } from 'zod';
 
-import type { CharacterCard } from '../card-schema';
+import type { CharacterCard } from '../cards/card-schema';
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant-final-response';
 
 export const NEXT_PROMPT_SUGGESTION_KIND_SCHEMA = z.enum(['discover', 'fill-field', 'refine', 'review', 'image']);

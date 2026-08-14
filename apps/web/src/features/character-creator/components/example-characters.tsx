@@ -14,10 +14,10 @@ import {
   MAX_EXAMPLE_CHARACTER_COUNT,
   getExampleCharacterDisplayName,
   hasExampleCharacterContextField,
-} from '../lib/example-characters';
-import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/example-characters';
-import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
-import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/field-templates';
+} from '../lib/cards/example-characters';
+import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/cards/example-characters';
+import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
+import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/cards/field-templates';
 import type { iExampleContextSummary } from '../lib/prompt/example-context-service';
 import { SaveTemplateDialog } from './save-template-dialog';
 

@@ -4,8 +4,8 @@ import type { useCharacterAssistantWorkspace } from '../hooks/use-character-assi
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
-} from '../lib/character-assistant-contracts';
-import type { CharacterEditFieldKey } from '../lib/character-edit-proposal';
+} from '../lib/assistant/character-assistant-contracts';
+import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
 
 export interface iCharacterAssistantContextValue {
   isAssistantOpen: boolean;

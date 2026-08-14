@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from './generation-stream-contracts';
+import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '../generation/generation-stream-contracts';
 
 const CHARACTER_VISION_DATA_URL_MAX_LENGTH = 3_000_000;
 

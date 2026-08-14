@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
+import { sanitizeCharacterGenerationConnectionSettings } from '../generation/generation-config';
+import type { iCharacterGenerationConnectionSettings } from '../generation/generation-config';
 import type { iArchiveFileEntry } from './archive';
 import { sanitizeCharacterLibrary } from './character-library';
 import type { iCharacterLibraryItem } from './character-library';
 import { STORED_EXAMPLE_CHARACTER_SCHEMA } from './example-characters';
 import type { iStoredExampleCharacter } from './example-characters';
-import { sanitizeCharacterGenerationConnectionSettings } from './generation-config';
-import type { iCharacterGenerationConnectionSettings } from './generation-config';
 
 export const TENZO_BACKUP_FORMAT = 'tenzo-backup';
 export const TENZO_BACKUP_VERSION = 1;

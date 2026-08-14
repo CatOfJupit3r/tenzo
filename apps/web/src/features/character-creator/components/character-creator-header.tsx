@@ -17,8 +17,8 @@ import { cn } from '@~/lib/utils';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
-import { getCharacterLibraryItemDisplayName } from '../lib/character-library';
-import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/example-characters';
+import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
+import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/cards/example-characters';
 import { SETTINGS_DIALOG_TABS } from './settings-dialog-tabs';
 import type { SettingsDialogTab } from './settings-dialog-tabs';
 import { TokenStats } from './token-stats';

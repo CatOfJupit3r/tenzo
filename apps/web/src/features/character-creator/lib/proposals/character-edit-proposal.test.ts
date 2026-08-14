@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createEmptyCharacterCard } from '../constants/card-defaults';
+import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import {
   applyCharacterEditProposal,
   CHARACTER_EDIT_PATCH_STATUSES,

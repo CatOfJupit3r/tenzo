@@ -16,16 +16,16 @@ import { SingleSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 
-import type { iCharacterLibraryItem } from '../lib/character-library';
-import { getCharacterLibraryItemDisplayName } from '../lib/character-library';
+import type { iCharacterLibraryItem } from '../lib/cards/character-library';
+import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
 import {
   ARCHIVE_FORMAT_LABELS,
   ARCHIVE_FORMATS,
   EXPORT_DETAIL_LEVEL_DESCRIPTIONS,
   EXPORT_DETAIL_LEVEL_LABELS,
   EXPORT_DETAIL_LEVELS,
-} from '../lib/export-settings';
-import type { ArchiveFormat, ExportDetailLevel, iExportSettings } from '../lib/export-settings';
+} from '../lib/cards/export-settings';
+import type { ArchiveFormat, ExportDetailLevel, iExportSettings } from '../lib/cards/export-settings';
 
 export interface iExportDialogProps {
   isOpen: boolean;

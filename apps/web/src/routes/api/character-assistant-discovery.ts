@@ -5,13 +5,13 @@ import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
   CHARACTER_CONCEPT_SCHEMA,
-} from '@~/features/character-creator/lib/character-assistant-contracts';
-import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation-stream-contracts';
-import { generateValidatedObject } from '@~/features/character-creator/lib/structured-output.server';
+} from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation/generation-stream-contracts';
+import { generateValidatedObject } from '@~/features/character-creator/lib/generation/structured-output.server';
 import {
   createCharacterModelOptions,
   createCharacterTextAdapter,
-} from '@~/features/character-creator/lib/tanstack-ai-text-generation';
+} from '@~/features/character-creator/lib/generation/tanstack-ai-text-generation';
 
 const DISCOVERY_CARD_TITLE_SCHEMA = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA.shape.title
   .min(3, 'Direction titles must be at least 3 characters long.')

@@ -1,5 +1,5 @@
-import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../lib/field-templates';
-import type { iFieldTemplateViewModel } from '../lib/field-templates';
+import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../lib/cards/field-templates';
+import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
 
 export const BUILT_IN_FIELD_TEMPLATE_ID_PREFIX = 'built-in:';
 

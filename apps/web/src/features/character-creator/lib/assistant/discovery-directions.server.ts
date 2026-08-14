@@ -1,16 +1,16 @@
 import { z } from 'zod';
 
+import { generateValidatedObject } from '../generation/structured-output.server';
+import { createCharacterModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES,
-} from '../character-assistant-contracts';
+} from './character-assistant-contracts';
 import type {
   iCharacterAssistantDiscoveryDirectionCard,
   iCharacterAssistantStreamRequest,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
-} from '../character-assistant-contracts';
-import { generateValidatedObject } from '../structured-output.server';
-import { createCharacterModelOptions, createCharacterTextAdapter } from '../tanstack-ai-text-generation';
+} from './character-assistant-contracts';
 
 const GENERATED_CARD_SCHEMA = z.object({
   title: z.string().trim().min(3).max(140),

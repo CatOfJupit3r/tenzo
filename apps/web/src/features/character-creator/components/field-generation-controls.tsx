@@ -19,12 +19,12 @@ import { Switch } from '@~/components/ui/switch';
 import { Textarea } from '@~/components/ui/textarea';
 import { cn } from '@~/lib/utils';
 
-import { TEMPLATE_MODE_LABELS } from '../lib/field-templates';
+import { TEMPLATE_MODE_LABELS } from '../lib/cards/field-templates';
 import type {
   iCreateStoredFieldTemplateInput,
   iFieldTemplateViewModel,
   TemplateFieldKey,
-} from '../lib/field-templates';
+} from '../lib/cards/field-templates';
 import { SaveTemplateDialog } from './save-template-dialog';
 
 const NO_TEMPLATE_OPTION_VALUE = '';

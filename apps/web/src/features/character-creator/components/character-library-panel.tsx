@@ -21,9 +21,9 @@ import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
-import type { iCharacterLibraryItem } from '../lib/character-library';
-import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/character-library';
-import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
+import type { iCharacterLibraryItem } from '../lib/cards/character-library';
+import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/cards/character-library';
+import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait/portrait-focal-point';
 
 interface iCharacterLibraryPanelProps {
   isOpen: boolean;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from './character-assistant-generation-mode';
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
 import {
   CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
   DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS } from '../generation/generation-config';
 import { readArchiveBytes, createArchiveBytes } from './archive';
 import { buildFullBackupFiles, findBackupManifest, parseFullBackup, TENZO_BACKUP_FORMAT } from './backup';
 import { createCharacterLibraryItem } from './character-library';
 import type { iStoredExampleCharacter } from './example-characters';
 import { ARCHIVE_FORMATS } from './export-settings';
-import { DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS } from './generation-config';
 
 function createSampleCharacter() {
   const character = createCharacterLibraryItem();

@@ -1,4 +1,4 @@
-import type { CharacterData, CharacterTextFieldKey } from './card-schema';
+import type { CharacterData, CharacterTextFieldKey } from '../cards/card-schema';
 
 /**
  * SillyTavern's own fallback ratio for estimating tokens when no real tokenizer is

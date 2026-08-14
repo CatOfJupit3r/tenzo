@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ZodError } from 'zod';
 
-import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation-stream-contracts';
-import { streamCharacterText } from '@~/features/character-creator/lib/tanstack-ai-text-generation';
+import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation/generation-stream-contracts';
+import { streamCharacterText } from '@~/features/character-creator/lib/generation/tanstack-ai-text-generation';
 
 export const Route = createFileRoute('/api/character-generate')({
   server: {

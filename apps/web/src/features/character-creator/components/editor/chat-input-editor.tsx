@@ -8,9 +8,9 @@ import { useEffect, useRef } from 'react';
 
 import { cn } from '@~/lib/utils';
 
+import type { iFieldTemplateViewModel } from '../../lib/cards/field-templates';
 import { serializeChatInput } from '../../lib/editor/chat-input-serialization';
 import { buildChatTemplateMentionExtension } from '../../lib/editor/chat-template-mention';
-import type { iFieldTemplateViewModel } from '../../lib/field-templates';
 
 interface iChatInputEditorProps {
   value: string;

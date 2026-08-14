@@ -2,17 +2,21 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { generateUuid } from '@~/utils/uuid';
 
-import type { iCharacterPortraitReference } from '../lib/character-library';
-import { deleteCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/image-store';
-import { invalidatePortraitAsset, PORTRAIT_ASSET_STATUSES, primePortraitAsset } from '../lib/portrait-asset-cache';
+import type { iCharacterPortraitReference } from '../lib/cards/character-library';
+import { deleteCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/cards/image-store';
+import {
+  invalidatePortraitAsset,
+  PORTRAIT_ASSET_STATUSES,
+  primePortraitAsset,
+} from '../lib/portrait/portrait-asset-cache';
 import {
   arePortraitCropRectsEqual,
   getPortraitCropRect,
   readPortraitDimensions,
   renderPortraitThumbnailDataUrl,
   sanitizeStoredPortraitCropRect,
-} from '../lib/portrait-focal-point';
-import type { iPortraitCropRect } from '../lib/portrait-focal-point';
+} from '../lib/portrait/portrait-focal-point';
+import type { iPortraitCropRect } from '../lib/portrait/portrait-focal-point';
 import { useCharacterSession } from './use-character-session';
 import { isPortraitAssetHydrating, usePortraitAsset } from './use-portrait-asset';
 

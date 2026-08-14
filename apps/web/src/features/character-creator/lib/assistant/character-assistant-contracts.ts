@@ -1,14 +1,14 @@
 import { z } from 'zod';
 
-import { CHARACTER_CARD_SCHEMA } from './card-schema';
+import { CHARACTER_CARD_SCHEMA } from '../cards/card-schema';
+import { STORED_FIELD_TEMPLATE_SCHEMA } from '../cards/field-templates';
+import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '../generation/generation-stream-contracts';
+import { CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
+import { PROVIDER_KIND_SCHEMA, PROVIDER_KINDS } from '../provider/provider-health';
 import {
   CHARACTER_ASSISTANT_GENERATION_MODES,
   CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA,
 } from './character-assistant-generation-mode';
-import { CHARACTER_EDIT_FIELD_KEY_SCHEMA } from './character-edit-proposal';
-import { STORED_FIELD_TEMPLATE_SCHEMA } from './field-templates';
-import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from './generation-stream-contracts';
-import { PROVIDER_KIND_SCHEMA, PROVIDER_KINDS } from './provider-health';
 
 export const CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA = z.enum(['card', 'field', 'fields']);
 export const CHARACTER_ASSISTANT_FOCUS_KINDS = CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA.enum;

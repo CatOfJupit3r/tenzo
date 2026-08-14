@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@~/components/ui/tooltip';
 
-import type { CharacterData } from '../lib/card-schema';
-import { computeCharacterTokenStats } from '../lib/token-stats';
+import type { CharacterData } from '../lib/cards/card-schema';
+import { computeCharacterTokenStats } from '../lib/generation/token-stats';
 
 export interface iTokenStatsProps {
   data: CharacterData;

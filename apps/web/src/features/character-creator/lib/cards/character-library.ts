@@ -2,17 +2,17 @@ import { z } from 'zod';
 
 import { generateUuid } from '@~/utils/uuid';
 
-import { createEmptyCharacterCard } from '../constants/card-defaults';
-import type { CharacterCard } from './card-schema';
-import { CHARACTER_CARD_SCHEMA } from './card-schema';
+import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import {
   CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   sanitizeCharacterGenerationPromptSettings,
-} from './generation-config';
-import type { iCharacterGenerationPromptSettings } from './generation-config';
-import { sanitizeStoredPortraitCropRect } from './portrait-focal-point';
-import type { iPortraitCropRect } from './portrait-focal-point';
+} from '../generation/generation-config';
+import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
+import { sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
+import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
+import type { CharacterCard } from './card-schema';
+import { CHARACTER_CARD_SCHEMA } from './card-schema';
 
 export const CHARACTER_LIBRARY_SOURCE_SCHEMA = z.enum(['manual', 'json', 'png']);
 export const CHARACTER_LIBRARY_SOURCES = CHARACTER_LIBRARY_SOURCE_SCHEMA.enum;

@@ -2,9 +2,9 @@ import {
   DEFAULT_CHARACTER_CARD_WRITING_GUIDE,
   DEFAULT_POST_HISTORY_INSTRUCTIONS,
 } from '../../constants/default-prompts';
-import type { CharacterCard } from '../card-schema';
-import type { OutputFormat } from '../generation-config';
-import { getPrefilled } from '../response-parser';
+import type { CharacterCard } from '../cards/card-schema';
+import type { OutputFormat } from '../generation/generation-config';
+import { getPrefilled } from '../generation/response-parser';
 import { CardContextSectionStrategy } from './card-context-section-strategy';
 import { CardContextService } from './card-context-service';
 import { ExampleContextSectionStrategy } from './example-context-section-strategy';

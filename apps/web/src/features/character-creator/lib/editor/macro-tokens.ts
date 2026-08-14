@@ -1,6 +1,6 @@
 import z from 'zod';
 
-import { TEMPLATE_SLOT_PATTERN } from '../field-templates';
+import { TEMPLATE_SLOT_PATTERN } from '../cards/field-templates';
 
 export const macroKindSchema = z.enum(['char', 'user', 'original', 'slot', 'unknown']);
 export const MACRO_KINDS = macroKindSchema.enum;

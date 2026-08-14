@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHARACTER_DATA_EXTENSIONS_SCHEMA } from './card-schema';
-import type { CharacterData } from './card-schema';
+import { CHARACTER_DATA_EXTENSIONS_SCHEMA } from '../cards/card-schema';
+import type { CharacterData } from '../cards/card-schema';
 import { computeCharacterTokenStats, guesstimateTokenCount } from './token-stats';
 
 function buildCharacterData(overrides: Partial<CharacterData>): CharacterData {

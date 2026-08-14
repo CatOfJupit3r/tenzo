@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
+import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '../generation/generation-stream-contracts';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
 } from './character-assistant-contracts';
-import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from './generation-stream-contracts';
 
 interface iGenerateDiscoveryDirectionsOptions extends Omit<
   z.infer<typeof CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA>,

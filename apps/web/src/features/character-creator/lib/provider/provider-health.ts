@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { REQUEST_MODES } from './generation-config';
-import type { RequestMode } from './generation-config';
+import { REQUEST_MODES } from '../generation/generation-config';
+import type { RequestMode } from '../generation/generation-config';
 import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
 
 export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openrouter', 'openai-compatible', 'unknown']);

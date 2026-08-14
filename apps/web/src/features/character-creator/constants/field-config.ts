@@ -1,6 +1,6 @@
 import z from 'zod';
 
-import type { CharacterTextFieldKey } from '../lib/card-schema';
+import type { CharacterTextFieldKey } from '../lib/cards/card-schema';
 
 export const fieldEditorVariantSchema = z.enum(['plain', 'markdown', 'mesExample']);
 export const FIELD_EDITOR_VARIANTS = fieldEditorVariantSchema.enum;

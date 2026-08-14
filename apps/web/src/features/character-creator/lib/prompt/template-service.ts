@@ -1,4 +1,4 @@
-import { parseTemplateSlots, TEMPLATE_MODES } from '../field-templates';
+import { parseTemplateSlots, TEMPLATE_MODES } from '../cards/field-templates';
 import type { iPromptFieldTemplate } from './generation-contracts';
 
 export class TemplateService {

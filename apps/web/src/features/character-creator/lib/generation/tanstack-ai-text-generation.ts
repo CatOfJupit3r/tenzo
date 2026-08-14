@@ -3,8 +3,8 @@ import type { ModelMessage } from '@tanstack/ai';
 import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { createOpenRouterText } from '@tanstack/ai-openrouter';
 
+import { normalizeOpenAiCompatibleBaseUrl } from '../provider/openai-compatible-endpoint';
 import type { iCharacterGenerationStreamRequest } from './generation-stream-contracts';
-import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
 
 export interface iStreamCharacterTextOptions extends iCharacterGenerationStreamRequest {
   signal?: AbortSignal;

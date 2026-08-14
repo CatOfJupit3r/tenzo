@@ -1,7 +1,7 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import { z } from 'zod';
 
-import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from './character-edit-proposal';
+import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../proposals/character-edit-proposal';
 
 const UI_MESSAGE_SCHEMA = z.custom<UIMessage>(
   (value) => {

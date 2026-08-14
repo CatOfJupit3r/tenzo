@@ -1,8 +1,9 @@
 import { chat, maxIterations } from '@tanstack/ai';
 import type { ModelMessage, UIMessage } from '@tanstack/ai';
 
-import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant/assistant-final-response';
-import type { CharacterCard } from './card-schema';
+import type { CharacterCard } from '../cards/card-schema';
+import { createCharacterModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
+import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant-final-response';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
@@ -13,7 +14,6 @@ import type {
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { createCharacterAssistantTools } from './character-assistant-tools';
-import { createCharacterModelOptions, createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 interface iStreamCharacterAssistantOptions {
   card: CharacterCard;

@@ -4,8 +4,10 @@ import { z } from 'zod';
 
 import { generateUuid } from '@~/utils/uuid';
 
-import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant/assistant-final-response';
-import type { CharacterCard } from './card-schema';
+import type { CharacterCard } from '../cards/card-schema';
+import { generateValidatedObject } from '../generation/structured-output.server';
+import { createCharacterModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
+import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant-final-response';
 import { CHARACTER_ASSISTANT_TOOL_NAMES, CHARACTER_CONCEPT_SCHEMA } from './character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
@@ -26,8 +28,6 @@ import {
   SUGGEST_DIRECTIONS_INPUT_SCHEMA,
 } from './character-assistant-tools';
 import type { iCharacterAssistantProposalStore } from './character-assistant-tools';
-import { generateValidatedObject } from './structured-output.server';
-import { createCharacterModelOptions, createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 export const MAX_STRUCTURED_ROUNDS = 4;
 const MAX_TOOL_CALLS_PER_RUN = 12;

@@ -5,7 +5,7 @@ import { Button } from '@~/components/ui/button';
 
 import { useCharacterAssistant } from '../../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
-import { CHARACTER_EDIT_FIELD_KEYS } from '../../lib/character-edit-proposal';
+import { CHARACTER_EDIT_FIELD_KEYS } from '../../lib/proposals/character-edit-proposal';
 import { CharacterAssistantStructuredReview } from '../character-assistant-structured-review';
 import { CharacterBookEditor } from '../character-book-editor';
 import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';

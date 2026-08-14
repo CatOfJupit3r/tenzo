@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/character-creator/lib/character-assistant-contracts';
-import { GENERATION_PROVIDERS } from '@~/features/character-creator/lib/generation-config';
+import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+import { GENERATION_PROVIDERS } from '@~/features/character-creator/lib/generation/generation-config';
 
-import { handleCharacterAssistantDiscoveryRequest } from '../../../routes/api/character-assistant-discovery';
+import { handleCharacterAssistantDiscoveryRequest } from '../../../../routes/api/character-assistant-discovery';
 
 const { generateValidatedObjectMock } = vi.hoisted(() => ({
   generateValidatedObjectMock: vi.fn(),
 }));
 
-vi.mock('@~/features/character-creator/lib/structured-output.server', () => ({
+vi.mock('@~/features/character-creator/lib/generation/structured-output.server', () => ({
   generateValidatedObject: generateValidatedObjectMock,
 }));
 
-vi.mock('@~/features/character-creator/lib/tanstack-ai-text-generation', () => ({
+vi.mock('@~/features/character-creator/lib/generation/tanstack-ai-text-generation', () => ({
   createCharacterTextAdapter: vi.fn(() => ({})),
   createCharacterModelOptions: vi.fn(() => ({})),
 }));

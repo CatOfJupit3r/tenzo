@@ -7,7 +7,7 @@ const { generateValidatedObjectMock } = vi.hoisted(() => ({
   generateValidatedObjectMock: vi.fn(),
 }));
 
-vi.mock('./structured-output.server', () => ({
+vi.mock('../generation/structured-output.server', () => ({
   generateValidatedObject: generateValidatedObjectMock,
 }));
 

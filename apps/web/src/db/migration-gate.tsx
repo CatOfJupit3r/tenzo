@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { z } from 'zod';
 
-import { createEmptyCharacterLibraryItem } from '../features/character-creator/lib/character-library';
+import { createEmptyCharacterLibraryItem } from '../features/character-creator/lib/cards/character-library';
 import { initializeApplicationCollections } from './collections/initialize-collections';
 import { applicationDatabase } from './database';
 import { downloadMigrationBackup, getPendingMigrations, runMigrations } from './migrations';

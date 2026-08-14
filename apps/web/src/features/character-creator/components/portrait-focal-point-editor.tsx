@@ -15,8 +15,8 @@ import {
   MAX_PORTRAIT_EDITOR_ZOOM,
   MIN_PORTRAIT_EDITOR_ZOOM,
   SILLY_TAVERN_PORTRAIT_ASPECT_RATIO,
-} from '../lib/portrait-focal-point';
-import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
+} from '../lib/portrait/portrait-focal-point';
+import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait/portrait-focal-point';
 
 export interface iPortraitFocalPointEditorProps {
   cropRect: iPortraitCropRect;

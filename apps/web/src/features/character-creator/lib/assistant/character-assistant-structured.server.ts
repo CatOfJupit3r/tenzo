@@ -1,5 +1,5 @@
 import { EventType } from '@tanstack/ai';
-import type { ModelMessage, StreamChunk, UIMessage } from '@tanstack/ai';
+import type { ModelMessage, StreamChunk, TokenUsage, UIMessage } from '@tanstack/ai';
 import { z } from 'zod';
 
 import { generateUuid } from '@~/utils/uuid';
@@ -19,6 +19,11 @@ import type {
 } from './character-assistant-contracts';
 import { buildAssistantSystemPrompt } from './character-assistant-runtime.server';
 import {
+  aggregateTokenUsage,
+  MAX_ASSISTANT_PARALLEL_TOOL_CALLS_PER_TURN,
+  MAX_ASSISTANT_TOOL_CALLS_PER_RUN,
+} from './character-assistant-safety';
+import {
   createCharacterAssistantActionHandlers,
   PROPOSE_ALTERNATE_GREETINGS_INPUT_SCHEMA,
   PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA,
@@ -30,8 +35,6 @@ import {
 import type { iCharacterAssistantProposalStore } from './character-assistant-tools';
 
 export const MAX_STRUCTURED_ROUNDS = 4;
-const MAX_TOOL_CALLS_PER_RUN = 12;
-const MAX_PARALLEL_TOOL_CALLS_PER_TURN = 4;
 
 const STRUCTURED_ACTION_SCHEMA = z.discriminatedUnion('action', [
   z.object({ action: z.literal(CHARACTER_ASSISTANT_TOOL_NAMES.record_concept), input: CHARACTER_CONCEPT_SCHEMA }),
@@ -60,7 +63,7 @@ const STRUCTURED_ACTION_SCHEMA = z.discriminatedUnion('action', [
 
 const STRUCTURED_ROUND_SCHEMA = z.object({
   assistantMessage: z.string(),
-  actions: z.array(STRUCTURED_ACTION_SCHEMA).max(MAX_PARALLEL_TOOL_CALLS_PER_TURN),
+  actions: z.array(STRUCTURED_ACTION_SCHEMA).max(MAX_ASSISTANT_PARALLEL_TOOL_CALLS_PER_TURN),
   isDone: z.boolean(),
   followUpSuggestions: z.array(z.string().trim().min(1)).max(3).default([]),
 });
@@ -135,6 +138,10 @@ export async function* generateStructuredCharacterAssistantStream(
   let toolCallCount = 0;
   let finalMessage = '';
   let followUpSuggestions: string[] = [];
+  let usage: TokenUsage | undefined;
+  const trackUsage = (roundUsage: TokenUsage) => {
+    usage = aggregateTokenUsage(usage, roundUsage);
+  };
 
   yield { type: EventType.RUN_STARTED, threadId, runId };
   yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' };
@@ -156,6 +163,7 @@ export async function* generateStructuredCharacterAssistantStream(
         shouldSendDisabledSamplers: options.shouldSendDisabledSamplers ?? false,
       }),
       abortSignal: options.abortSignal,
+      onUsage: trackUsage,
     });
     if (round.assistantMessage.trim()) {
       const delta = `${finalMessage ? '\n\n' : ''}${round.assistantMessage.trim()}`;
@@ -163,7 +171,7 @@ export async function* generateStructuredCharacterAssistantStream(
       yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta };
     }
     followUpSuggestions = round.followUpSuggestions;
-    if (toolCallCount + round.actions.length > MAX_TOOL_CALLS_PER_RUN)
+    if (toolCallCount + round.actions.length > MAX_ASSISTANT_TOOL_CALLS_PER_RUN)
       throw new Error('The assistant exceeded the maximum tool calls for one run.');
     const actionSummaries: string[] = [];
     for (const action of round.actions) {
@@ -234,5 +242,5 @@ export async function* generateStructuredCharacterAssistantStream(
   yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: raw };
   yield { type: EventType.TEXT_MESSAGE_END, messageId };
   yield { type: EventType.CUSTOM, name: 'structured-output.complete', value: { object: finalResponse, raw } };
-  yield { type: EventType.RUN_FINISHED, threadId, runId, finishReason: 'stop' };
+  yield { type: EventType.RUN_FINISHED, threadId, runId, finishReason: 'stop', ...(usage ? { usage } : {}) };
 }

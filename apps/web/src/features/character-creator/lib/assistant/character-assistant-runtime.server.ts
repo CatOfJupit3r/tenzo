@@ -13,6 +13,7 @@ import type {
   iCharacterConcept,
   iChatTemplateRef,
 } from './character-assistant-contracts';
+import { createCharacterAssistantSafetyMiddleware } from './character-assistant-safety';
 import { createCharacterAssistantTools } from './character-assistant-tools';
 
 interface iStreamCharacterAssistantOptions {
@@ -214,6 +215,7 @@ export function streamCharacterAssistant({
     messages,
     agentLoopStrategy: maxIterations(maxSteps),
     outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA,
+    middleware: [createCharacterAssistantSafetyMiddleware()],
     modelOptions: createCharacterModelOptions(generationSettings.endpoint, {
       ...generationSettings,
       shouldSendDisabledSamplers,

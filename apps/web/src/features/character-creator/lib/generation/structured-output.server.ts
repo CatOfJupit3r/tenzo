@@ -1,5 +1,5 @@
-import { chat } from '@tanstack/ai';
-import type { AnyTextAdapter, ModelMessage, UIMessage } from '@tanstack/ai';
+import { chat, defineChatMiddleware } from '@tanstack/ai';
+import type { AnyTextAdapter, ModelMessage, TokenUsage, UIMessage } from '@tanstack/ai';
 import { z } from 'zod';
 
 interface iGenerateValidatedObjectOptions<T> {
@@ -11,6 +11,7 @@ interface iGenerateValidatedObjectOptions<T> {
   messages?: Array<ModelMessage | UIMessage>;
   modelOptions?: Record<string, unknown>;
   abortSignal?: AbortSignal;
+  onUsage?: (usage: TokenUsage) => void;
 }
 
 function buildMessages(prompt?: string, messages?: Array<ModelMessage | UIMessage>): Array<ModelMessage | UIMessage> {
@@ -65,6 +66,7 @@ export async function generateValidatedObject<T>({
   messages,
   modelOptions,
   abortSignal,
+  onUsage,
 }: iGenerateValidatedObjectOptions<T>): Promise<T> {
   const abortController = new AbortController();
   if (abortSignal?.aborted) {
@@ -74,6 +76,14 @@ export async function generateValidatedObject<T>({
   }
 
   const inputMessages = buildMessages(prompt, messages);
+  const middleware = onUsage
+    ? [
+        defineChatMiddleware({
+          name: 'validated-object-usage',
+          onUsage: (_context, usage) => onUsage(usage),
+        }),
+      ]
+    : undefined;
 
   try {
     const output = await chat({
@@ -83,6 +93,7 @@ export async function generateValidatedObject<T>({
       outputSchema: schema.describe(schemaDescription),
       modelOptions,
       abortController,
+      middleware,
     });
 
     return schema.parse(output);
@@ -96,6 +107,7 @@ export async function generateValidatedObject<T>({
         ],
         modelOptions,
         abortController,
+        middleware,
         stream: false,
       });
 

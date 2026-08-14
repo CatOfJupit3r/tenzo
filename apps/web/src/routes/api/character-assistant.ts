@@ -4,6 +4,7 @@ import { ZodError } from 'zod';
 
 import { CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/assistant/character-assistant-generation-mode';
+import { fallbackFromUnsupportedToolUse } from '@~/features/character-creator/lib/assistant/character-assistant-provider-fallback';
 import { streamCharacterAssistant } from '@~/features/character-creator/lib/assistant/character-assistant-runtime.server';
 import { generateStructuredCharacterAssistantStream } from '@~/features/character-creator/lib/assistant/character-assistant-structured.server';
 import { generateCharacterDiscoveryDirections } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
@@ -88,7 +89,9 @@ export const Route = createFileRoute('/api/character-assistant')({
           const stream =
             payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']
               ? generateStructuredCharacterAssistantStream(commonOptions)
-              : streamCharacterAssistant({ ...commonOptions, maxSteps: 8 });
+              : fallbackFromUnsupportedToolUse(streamCharacterAssistant({ ...commonOptions, maxSteps: 8 }), () =>
+                  generateStructuredCharacterAssistantStream(commonOptions),
+                );
 
           const abortController = new AbortController();
           request.signal.addEventListener('abort', () => abortController.abort(request.signal.reason), { once: true });

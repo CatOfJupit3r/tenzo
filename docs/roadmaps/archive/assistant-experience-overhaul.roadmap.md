@@ -1,7 +1,7 @@
 ---
 title: "Character Assistant Experience Overhaul"
 slug: "assistant-experience-overhaul"
-status: "Active backlog"
+status: "Completed"
 roadmap_type: "feature-epic"
 priority: "P1"
 created: "2026-08-14"
@@ -24,9 +24,9 @@ archive_when:
 
 # Character Assistant Experience Overhaul
 
-> Status: Active backlog
+> Status: Completed
 > Last repo audit: 2026-08-14
-> Current summary: The assistant has two parallel creation experiences (free chat and a 7-step guided flow), two divergent model-invocation paths (native tool calls and single-shot structured output), a discovery feature locked inside the guided flow, and a proposal/suggestion UI that under-communicates in chat. This roadmap merges guided setup into the main assistant as suggested next prompts, makes structured-output mode behave agentically, promotes discovery to a first-class chat capability, and consolidates the assistant/editor code that accumulated during the TanStack AI migration — all rebuilt on TanStack AI's chat client (`useChat`/`ChatClient`) and the standard AG-UI event protocol.
+> Current summary: Complete. Character creation now uses one TanStack AI conversation with typed tool results, agentic structured-provider fallback, prompt suggestions, inline discovery and proposal review, organized domain modules, and unified TipTap content editors.
 
 ## 1. Executive Summary
 
@@ -317,10 +317,10 @@ Move files into intent-scoped folders (no `index.ts` barrels, direct imports onl
 
 Pipeline unifications (do during the move, not after):
 
-- [ ] Single `createProposalFromChanges()` used by every tool `.server()` handler and every structured-loop action.
-- [ ] Single `recordConcept()` path.
-- [ ] Single `buildAssistantSystemPrompt({ mode })` producing both variants from shared blocks; mode-specific text lives in one file.
-- [ ] Split what remains of `use-character-assistant-workspace.ts` after Phase 0 (TanStack owns the run lifecycle and message state): extract `use-proposal-actions.ts` (apply/reject/conflicts) from the domain/session state hook.
+- [x] Single `createProposalFromChanges()` used by every tool `.server()` handler and every structured-loop action.
+- [x] Single `recordConcept()` path.
+- [x] Single `buildAssistantSystemPrompt({ mode })` producing both variants from shared blocks; mode-specific text lives in one file.
+- [x] Split what remains of `use-character-assistant-workspace.ts` after Phase 0 (TanStack owns the run lifecycle and message state): extract `use-proposal-actions.ts` (apply/reject/conflicts) from the domain/session state hook.
 
 ### 7.7 Suggested UX flow after overhaul
 
@@ -355,75 +355,84 @@ Acceptable plain inputs (single-line identifiers, not content): name, creator, c
 
 Editor plumbing duplication to consolidate:
 
-- [ ] `use-markdown-field-editor.ts` and `use-mes-example-editor.ts` are identical wrappers over `use-synced-field-editor.ts`; fold into a `createSyncedEditorHook(buildExtensions, serialize, toContent)` factory in `lib/editor/`.
-- [ ] `ChatInputEditor` builds extensions inline with raw `useEditor` instead of the synced hook; align it with the factory (keeping its mention/submit specifics).
-- [ ] Placeholder + MacroHighlight setup duplicated between [markdown-editor-extensions.ts](../../../apps/web/src/features/character-creator/lib/editor/markdown-editor-extensions.ts) and [mes-example-extensions.ts](../../../apps/web/src/features/character-creator/lib/editor/mes-example-extensions.ts); extract shared `buildBaseEditorExtensions(config)`.
-- [ ] Three parallel serializers (`serializeEditorMarkdown`, `serializeMesExampleDoc`, `serializeChatInput`) — keep separate behavior, but define one `iEditorSerializer` interface and colocate them.
-- [ ] Editor accessibility attributes (`role`, `aria-multiline`, `aria-label`) built independently in all three components; extract `buildEditorAccessibilityAttributes()`.
+- [x] `use-markdown-field-editor.ts` and `use-mes-example-editor.ts` are identical wrappers over `use-synced-field-editor.ts`; fold into a `createSyncedEditorHook(buildExtensions, serialize, toContent)` factory in `lib/editor/`.
+- [x] `ChatInputEditor` builds extensions inline with raw `useEditor` instead of the synced hook; align it with the factory (keeping its mention/submit specifics).
+- [x] Placeholder + MacroHighlight setup duplicated between [markdown-editor-extensions.ts](../../../apps/web/src/features/character-creator/lib/editor/markdown-editor-extensions.ts) and [mes-example-extensions.ts](../../../apps/web/src/features/character-creator/lib/editor/mes-example-extensions.ts); extract shared `buildBaseEditorExtensions(config)`.
+- [x] Three parallel serializers (`serializeEditorMarkdown`, `serializeMesExampleDoc`, `serializeChatInput`) — keep separate behavior, but define one `iEditorSerializer` interface and colocate them.
+- [x] Editor accessibility attributes (`role`, `aria-multiline`, `aria-label`) built independently in all three components; extract `buildEditorAccessibilityAttributes()`.
 
 ## 9. Implementation Plan
 
 ### Phase 0 — TanStack chat protocol and client (foundation)
 
-- [ ] Add `@tanstack/ai-react`.
-- [ ] Define `ASSISTANT_FINAL_RESPONSE_SCHEMA` (shared final response for both provider modes).
-- [ ] Make proposal, concept, and discovery tools return their full typed domain payloads (`outputSchema` = domain schema, e.g. `{ proposal: CHARACTER_EDIT_PROPOSAL_SCHEMA }`).
-- [ ] Convert `/api/character-assistant` to standard AG-UI events via `toServerSentEventsResponse`.
-- [ ] Replace the custom stream consumer with `useChat` + `fetchServerSentEvents`; delete `character-assistant-stream.ts` and the runtime-state merging in the workspace hook.
-- [ ] Client-persistence adapter storing `UIMessage[]` through the sessions collection; bump storage key to v4 (v3 transcripts dropped, no conversion).
-- [ ] Tool-part renderer registry for proposal/concept results in the conversation.
-- [ ] TanStack AI devtools, development-only.
-- [ ] Tests: `UIMessage` part fixtures, persistence adapter round-trip, renderer registry dispatch.
+- [x] Add `@tanstack/ai-react`.
+- [x] Define `ASSISTANT_FINAL_RESPONSE_SCHEMA` (shared final response for both provider modes).
+- [x] Make proposal, concept, and discovery tools return their full typed domain payloads (`outputSchema` = domain schema, e.g. `{ proposal: CHARACTER_EDIT_PROPOSAL_SCHEMA }`).
+- [x] Convert `/api/character-assistant` to standard AG-UI events via `toServerSentEventsResponse`.
+- [x] Replace the custom stream consumer with `useChat` + `fetchServerSentEvents`; delete `character-assistant-stream.ts` and the runtime-state merging in the workspace hook.
+- [x] Client-persistence adapter storing `UIMessage[]` through the sessions collection; bump storage key to v4 (v3 transcripts dropped, no conversion).
+- [x] Tool-part renderer registry for proposal/concept results in the conversation.
+- [x] TanStack AI devtools, development-only.
+- [x] Tests: `UIMessage` part fixtures, persistence adapter round-trip, renderer registry dispatch.
 
 ### Phase 1 — Agentic structured loop (server)
 
-- [ ] Rewrite structured single-shot into the bounded multi-round loop (7.3), translating actions into synthetic `TOOL_CALL_START`/`TOOL_CALL_END`/`TOOL_CALL_RESULT` events through shared action handlers.
-- [ ] Extract shared `createProposalFromChanges()` + single `recordConcept()` path; route native tools and loop actions through them.
-- [ ] Remove the 40-word `assistantMessage` cap and finalize-marker machinery.
-- [ ] Emit the final `ASSISTANT_FINAL_RESPONSE_SCHEMA` structured-output part (carries `followUpSuggestions`) in both modes.
-- [ ] Bounded safety middleware: max tool calls per run, max parallel calls per turn, usage aggregation, abort propagation.
-- [ ] Tests: loop continuation on empty-action rounds, round cap, `UIMessage` part parity with tool mode, fallback from unsupported tool use into loop.
+- [x] Rewrite structured single-shot into the bounded multi-round loop (7.3), translating actions into synthetic `TOOL_CALL_START`/`TOOL_CALL_END`/`TOOL_CALL_RESULT` events through shared action handlers.
+- [x] Extract shared `createProposalFromChanges()` + single `recordConcept()` path; route native tools and loop actions through them.
+- [x] Remove the 40-word `assistantMessage` cap and finalize-marker machinery.
+- [x] Emit the final `ASSISTANT_FINAL_RESPONSE_SCHEMA` structured-output part (carries `followUpSuggestions`) in both modes.
+- [x] Bounded safety middleware: max tool calls per run, max parallel calls per turn, usage aggregation, abort propagation.
+- [x] Tests: loop continuation on empty-action rounds, round cap, `UIMessage` part parity with tool mode, fallback from unsupported tool use into loop.
 
 ### Phase 2 — Suggested next prompts (client)
 
-- [ ] `lib/assistant/next-prompt-suggestions.ts` with deterministic heuristics derived from guided step content; merge model suggestions read from the last final `StructuredOutputPart`.
-- [ ] Chip row UI in assistant panel; cold-start set for empty sessions.
-- [ ] Tests: heuristic priorities per card completeness, merge/cap behavior.
+- [x] `lib/assistant/next-prompt-suggestions.ts` with deterministic heuristics derived from guided step content; merge model suggestions read from the last final `StructuredOutputPart`.
+- [x] Chip row UI in assistant panel; cold-start set for empty sessions.
+- [x] Tests: heuristic priorities per card completeness, merge/cap behavior.
 
 ### Phase 3 — Discovery in chat
 
-- [ ] `suggest_character_directions` tool + structured-loop action, optional premise, reusing discovery generation server logic.
-- [ ] Register the discovery tool result in the renderer registry (the tool result is already a persistent message part; no bespoke event or persistence format).
-- [ ] `discovery-card-grid.tsx` inline renderer (selection state local; handoff = formatted user message). Delete `isReadyForHandoff` everywhere.
-- [ ] Tests: zero-premise generation request shape, selection → message formatting, grid rendering with selections.
+- [x] `suggest_character_directions` tool + structured-loop action, optional premise, reusing discovery generation server logic.
+- [x] Register the discovery tool result in the renderer registry (the tool result is already a persistent message part; no bespoke event or persistence format).
+- [x] `discovery-card-grid.tsx` inline renderer (selection state local; handoff = formatted user message). Delete `isReadyForHandoff` everywhere.
+- [x] Tests: zero-premise generation request shape, selection → message formatting, grid rendering with selections.
 
 ### Phase 4 — Delete guided flow
 
-- [ ] Remove guided hook, step panels, step constants, session `guided` branch, guided collection functions, guided branches in panel/conversation/runtime (storage key already bumped in Phase 0).
-- [ ] Library panel: replace guided/discovery entry points with "Create with assistant" (opens chat with cold-start chips).
-- [ ] Update/remove affected tests.
+- [x] Remove guided hook, step panels, step constants, session `guided` branch, guided collection functions, guided branches in panel/conversation/runtime (storage key already bumped in Phase 0).
+- [x] Library panel: replace guided/discovery entry points with "Create with assistant" (opens chat with cold-start chips).
+- [x] Update/remove affected tests.
 
 ### Phase 5 — Proposal display upgrade
 
-- [ ] Inline compact diffs per patch in `ProposalList` (reuse rewrite-diff), collapsible details, jump-to-field.
-- [ ] Tests: apply/reject flows from chat, diff rendering for text/list/book patches.
+- [x] Inline compact diffs per patch in `ProposalList` (reuse rewrite-diff), collapsible details, jump-to-field.
+- [x] Tests: apply/reject flows from chat, diff rendering for text/list/book patches.
 
 ### Phase 6 — Module reorganization
 
-- [ ] Execute the `lib/` split per 7.6 (mechanical moves + import updates; no behavior change).
-- [ ] Split the post-Phase-0 remainder of `use-character-assistant-workspace.ts` into proposal-actions and domain/session hooks (run lifecycle belongs to TanStack).
+- [x] Execute the `lib/` split per 7.6 (mechanical moves + import updates; no behavior change).
+- [x] Split the post-Phase-0 remainder of `use-character-assistant-workspace.ts` into proposal-actions and domain/session hooks (run lifecycle belongs to TanStack).
 
 ### Phase 7 — TipTap unification
 
-- [ ] Convert the three remaining content textareas (Section 8) to `MarkdownFieldEditor`.
-- [ ] Editor factory + shared extension/accessibility consolidation.
-- [ ] Tests: round-trip serialization unchanged for converted surfaces.
+- [x] Convert the three remaining content textareas (Section 8) to `MarkdownFieldEditor`.
+- [x] Editor factory + shared extension/accessibility consolidation.
+- [x] Tests: round-trip serialization unchanged for converted surfaces.
 
 ### Deferred follow-up — resumable streams
 
 - [ ] After all phases: `memoryStream()` + GET resume handler per 7.8; external durability backend only if deployment topology requires it.
 
 Each phase must leave `pnpm run check-types`, `pnpm run lint`, and `pnpm run test` green.
+
+### Completion verification — 2026-08-14
+
+- `pnpm run check-types` — passed.
+- `pnpm run lint` — passed.
+- `pnpm run test` — passed: 44 files, 175 tests.
+- `pnpm run build` — passed for client and SSR production bundles; development-only AI devtools were removed from both outputs.
+- Acceptance greps found no guided-step/finalize-marker identifiers, production character-content textareas, or flat files directly under `lib/`.
+- The resumable-stream item remains explicitly deferred by Section 7.8 and is not part of this completed overhaul.
 
 ## 10. Acceptance Criteria
 
@@ -464,3 +473,4 @@ Each phase must leave `pnpm run check-types`, `pnpm run lint`, and `pnpm run tes
 
 - 2026-08-14 — Roadmap created from repo audit on branch `migrate-to-tanstack-ai`.
 - 2026-08-14 — Adopted TanStack `useChat`/`ChatClient` + AG-UI standard events as the foundation (new Phase 0): custom SSE protocol replaced, proposals/concepts/discovery become typed tool results, structured loop emits synthetic tool events, suggestions move to the final structured-output part, TanStack client persistence over IndexedDB, resumable streams deferred to follow-up.
+- 2026-08-14 — Completed all in-scope phases, recorded verification evidence, and archived the roadmap. Resumable streams remain a separate deferred follow-up.

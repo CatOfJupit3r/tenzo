@@ -1,49 +1,41 @@
-import type { Editor } from '@tiptap/core';
-import { useMemo } from 'react';
-
 import {
   buildMesExampleExtensions,
+  MES_EXAMPLE_EDITOR_SERIALIZER,
   parseMesExampleToDoc,
-  serializeMesExampleDoc,
 } from '../lib/editor/mes-example-extensions';
+import { createSyncedEditorHook } from '../lib/editor/synced-editor-hook';
+import type { iSyncedEditorHookOptions } from '../lib/editor/synced-editor-hook';
 import type { iSyncedEditorContent } from './use-synced-field-editor';
-import { useSyncedFieldEditor } from './use-synced-field-editor';
 
-export interface iUseMesExampleEditorOptions {
-  value: string;
-  isReadOnly?: boolean;
-  isStreaming?: boolean;
+export interface iUseMesExampleEditorOptions
+  extends
+    Partial<Pick<iSyncedEditorHookOptions, 'isReadOnly' | 'isStreaming' | 'editorAttributes'>>,
+    Omit<iSyncedEditorHookOptions, 'isReadOnly' | 'isStreaming' | 'editorAttributes'> {
   placeholder?: string;
-  editorAttributes?: Record<string, string>;
-  onValueChange: (value: string) => void;
 }
 
 function toMesExampleEditorContent(value: string): iSyncedEditorContent {
   return { content: parseMesExampleToDoc(value), contentType: 'json' };
 }
 
-function serializeMesExampleEditor(editor: Editor): string {
-  return serializeMesExampleDoc(editor.state.doc);
+interface iNormalizedMesExampleEditorOptions extends iUseMesExampleEditorOptions {
+  isReadOnly: boolean;
+  isStreaming: boolean;
+  editorAttributes: Record<string, string>;
 }
 
-export function useMesExampleEditor({
-  value,
-  isReadOnly = false,
-  isStreaming = false,
-  placeholder,
-  editorAttributes = {},
-  onValueChange,
-}: iUseMesExampleEditorOptions) {
-  const extensions = useMemo(() => buildMesExampleExtensions({ placeholder }), [placeholder]);
+const useCreatedMesExampleEditor = createSyncedEditorHook<iNormalizedMesExampleEditorOptions>({
+  buildExtensions: ({ placeholder }) => buildMesExampleExtensions({ placeholder }),
+  getExtensionDependencies: ({ placeholder }) => [placeholder],
+  serializeValue: MES_EXAMPLE_EDITOR_SERIALIZER.serialize,
+  toEditorContent: toMesExampleEditorContent,
+});
 
-  return useSyncedFieldEditor({
-    value,
-    isReadOnly,
-    isStreaming,
-    editorAttributes,
-    extensions,
-    toEditorContent: toMesExampleEditorContent,
-    serializeValue: serializeMesExampleEditor,
-    onValueChange,
+export function useMesExampleEditor(options: iUseMesExampleEditorOptions) {
+  return useCreatedMesExampleEditor({
+    ...options,
+    isReadOnly: options.isReadOnly ?? false,
+    isStreaming: options.isStreaming ?? false,
+    editorAttributes: options.editorAttributes ?? {},
   });
 }

@@ -5,6 +5,7 @@ import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
 import { useMesExampleEditor } from '../../hooks/use-mes-example-editor';
+import { buildEditorAccessibilityAttributes } from '../../lib/editor/editor-contracts';
 
 export interface iMesExampleEditorProps {
   fieldId: string;
@@ -38,13 +39,7 @@ export function MesExampleEditor({
     isReadOnly,
     isStreaming,
     placeholder,
-    editorAttributes: {
-      id: fieldId,
-      role: 'textbox',
-      'aria-multiline': 'true',
-      ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
-      ...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {}),
-    },
+    editorAttributes: buildEditorAccessibilityAttributes({ id: fieldId, ariaLabelledBy, ariaDescribedBy }),
     onValueChange,
   });
 

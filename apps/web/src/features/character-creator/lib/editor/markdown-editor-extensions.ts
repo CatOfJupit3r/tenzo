@@ -1,9 +1,9 @@
 import type { Editor, Extensions } from '@tiptap/core';
-import { Placeholder } from '@tiptap/extensions';
 import { Markdown } from '@tiptap/markdown';
 import { StarterKit } from '@tiptap/starter-kit';
 
-import { MacroHighlight } from './macro-highlight-extension';
+import { buildBaseEditorExtensions } from './base-editor-extensions';
+import type { iEditorSerializer } from './editor-contracts';
 
 export interface iBuildMarkdownEditorExtensionsOptions {
   placeholder?: string;
@@ -20,6 +20,8 @@ export function serializeEditorMarkdown(editor: Editor): string {
   return editor.getMarkdown().replace(INTRAWORD_ESCAPED_UNDERSCORE_PATTERN, '_');
 }
 
+export const MARKDOWN_EDITOR_SERIALIZER = { serialize: serializeEditorMarkdown } satisfies iEditorSerializer;
+
 export function buildMarkdownEditorExtensions(options: iBuildMarkdownEditorExtensionsOptions = {}): Extensions {
   return [
     StarterKit.configure({
@@ -28,10 +30,6 @@ export function buildMarkdownEditorExtensions(options: iBuildMarkdownEditorExten
       underline: false,
     }),
     Markdown,
-    Placeholder.configure({ placeholder: options.placeholder ?? '' }),
-    MacroHighlight.configure({
-      doesAllowOriginalMacro: options.doesAllowOriginalMacro ?? false,
-      doesHighlightTemplateSlots: options.doesHighlightTemplateSlots ?? false,
-    }),
+    ...buildBaseEditorExtensions(options),
   ];
 }

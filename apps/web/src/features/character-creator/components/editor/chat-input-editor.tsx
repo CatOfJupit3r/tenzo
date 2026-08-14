@@ -2,15 +2,17 @@ import type { JSONContent } from '@tiptap/core';
 import { Document } from '@tiptap/extension-document';
 import { Paragraph } from '@tiptap/extension-paragraph';
 import { Text } from '@tiptap/extension-text';
-import { Placeholder, UndoRedo } from '@tiptap/extensions';
+import { UndoRedo } from '@tiptap/extensions';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { useEffect, useRef } from 'react';
 
 import { cn } from '@~/lib/utils';
 
 import type { iFieldTemplateViewModel } from '../../lib/cards/field-templates';
-import { serializeChatInput } from '../../lib/editor/chat-input-serialization';
+import { buildBaseEditorExtensions } from '../../lib/editor/base-editor-extensions';
+import { CHAT_INPUT_EDITOR_SERIALIZER } from '../../lib/editor/chat-input-serialization';
 import { buildChatTemplateMentionExtension } from '../../lib/editor/chat-template-mention';
+import { buildEditorAccessibilityAttributes } from '../../lib/editor/editor-contracts';
 
 interface iChatInputEditorProps {
   value: string;
@@ -61,18 +63,16 @@ export function ChatInputEditor({
       Paragraph,
       Text,
       UndoRedo,
-      Placeholder.configure({ placeholder: placeholder ?? '' }),
+      ...buildBaseEditorExtensions({ placeholder, doesIncludeMacroHighlight: false }),
       buildChatTemplateMentionExtension({ templates, preferredFieldKeys }),
     ],
     content: content ?? createInitialContent(value),
     editable: !isDisabled,
     editorProps: {
-      attributes: {
-        role: 'textbox',
-        'aria-multiline': 'true',
-        ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
-        class: 'min-h-20 max-h-36 overflow-y-auto px-3 py-2 text-sm outline-none',
-      },
+      attributes: buildEditorAccessibilityAttributes({
+        ariaLabel,
+        className: 'min-h-20 max-h-36 overflow-y-auto px-3 py-2 text-sm outline-none',
+      }),
       handleKeyDown: (_view, event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
@@ -84,7 +84,7 @@ export function ChatInputEditor({
       },
     },
     onUpdate: ({ editor: updatedEditor }) => {
-      const serialized = serializeChatInput(updatedEditor.getJSON());
+      const serialized = CHAT_INPUT_EDITOR_SERIALIZER.serialize(updatedEditor.getJSON());
       const hasSameTemplateIds =
         serialized.templateIds.length === lastEmittedInputRef.current.templateIds.length &&
         serialized.templateIds.every(
@@ -131,7 +131,7 @@ export function ChatInputEditor({
     lastDocumentRef.current = nextDocument;
     lastEmittedInputRef.current = {
       text: value,
-      templateIds: content ? serializeChatInput(content).templateIds : [],
+      templateIds: content ? CHAT_INPUT_EDITOR_SERIALIZER.serialize(content).templateIds : [],
     };
 
     if (value || content) {

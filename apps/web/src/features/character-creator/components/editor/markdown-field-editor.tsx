@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { cn } from '@~/lib/utils';
 
 import { useMarkdownFieldEditor } from '../../hooks/use-markdown-field-editor';
+import { buildEditorAccessibilityAttributes } from '../../lib/editor/editor-contracts';
 import { MarkdownEditorToolbar } from './markdown-editor-toolbar';
 
 export interface iMarkdownFieldEditorProps {
@@ -46,14 +47,7 @@ export function MarkdownFieldEditor({
     placeholder,
     doesAllowOriginalMacro,
     doesHighlightTemplateSlots,
-    editorAttributes: {
-      id: fieldId,
-      role: 'textbox',
-      'aria-multiline': 'true',
-      ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
-      ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
-      ...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {}),
-    },
+    editorAttributes: buildEditorAccessibilityAttributes({ id: fieldId, ariaLabel, ariaLabelledBy, ariaDescribedBy }),
     onValueChange,
   });
 

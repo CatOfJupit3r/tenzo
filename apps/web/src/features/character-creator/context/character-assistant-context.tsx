@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
 
-import { startGuidedSession } from '../collections/character-assistant-sessions.collection';
 import { useCharacterAssistantWorkspace } from '../hooks/use-character-assistant-workspace';
 import { useGuidedCharacterFlow } from '../hooks/use-guided-character-flow';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/character-assistant-contracts';
@@ -29,9 +28,20 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     updateGeneralCharacterIdea,
     connectionHealth,
   } = useCharacterCreatorContext();
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [assistantFocus, setAssistantFocus] = useState<CharacterAssistantFocus>(DEFAULT_ASSISTANT_FOCUS);
   const [contextAttachments, setContextAttachments] = useState<iCharacterAssistantContextAttachment[]>([]);
+  const previousCharacterIdRef = useRef(activeCharacterId);
+
+  useEffect(() => {
+    if (previousCharacterIdRef.current === activeCharacterId) {
+      return;
+    }
+
+    previousCharacterIdRef.current = activeCharacterId;
+    setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
+    setContextAttachments([]);
+  }, [activeCharacterId]);
 
   const openAssistant = useCallback(() => {
     setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
@@ -68,25 +78,44 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     generationSettings,
     generalCharacterIdea,
     shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
+    providerKind: connectionHealth.providerKind,
     focus: assistantFocus,
     contextAttachments,
   });
   const guidedFlow = useGuidedCharacterFlow({
     characterId: activeCharacterId,
     apiKey,
+    provider: generationSettings.provider,
     endpoint: generationSettings.endpoint,
-    model: generationSettings.visionModel.trim() || generationSettings.model,
+    model: generationSettings.model,
+    visionModel: generationSettings.visionModel.trim() || generationSettings.model,
+    topP: generationSettings.topP,
+    frequencyPenalty: generationSettings.frequencyPenalty,
+    presencePenalty: generationSettings.presencePenalty,
+    topK: generationSettings.topK,
+    minP: generationSettings.minP,
     maxTokens: generationSettings.maxTokens,
     temperature: generationSettings.temperature,
     updateGeneralCharacterIdea,
     workspace,
   });
 
-  const openAssistantInGuidedMode = useCallback(async (characterId: string) => {
-    await startGuidedSession(characterId);
-    setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
-    setIsAssistantOpen(true);
-  }, []);
+  const openAssistantInGuidedMode = useCallback(
+    async (characterId: string, options: { mode?: 'direct' | 'discovery'; originalPremise?: string } = {}) => {
+      const isDiscoveryMode = options.mode === 'discovery';
+      const trimmedPremise = options.originalPremise?.trim();
+
+      setAssistantFocus(DEFAULT_ASSISTANT_FOCUS);
+      setIsAssistantOpen(true);
+
+      if (isDiscoveryMode && trimmedPremise) {
+        await guidedFlow.startGuidedDiscoverySession(trimmedPremise, characterId);
+      } else {
+        await guidedFlow.openGuidedSession(characterId);
+      }
+    },
+    [guidedFlow],
+  );
 
   const value = useMemo(
     () => ({

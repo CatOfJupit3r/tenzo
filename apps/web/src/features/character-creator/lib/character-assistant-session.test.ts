@@ -1,15 +1,39 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  characterAssistantComposerDraftsCollection,
+  clearCharacterAssistantComposerDraft,
+  saveCharacterAssistantComposerDraft,
+} from '../collections/character-assistant-composer-drafts.collection';
+import {
   advanceGuidedStep,
   characterAssistantSessionsCollection,
+  removeCharacterAssistantSession,
+  finishGuidedDiscovery,
+  restartGuidedDiscovery,
+  replaceGeneratedGuidedDiscoveryCardsByCategory,
+  startGuidedDiscovery,
   startGuidedSession,
+  updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
 import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
-import { CHARACTER_ASSISTANT_ATTACHMENT_KINDS } from './character-assistant-contracts';
+import {
+  CHARACTER_ASSISTANT_ATTACHMENT_KINDS,
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES,
+} from './character-assistant-contracts';
+import type { iCharacterAssistantDiscoveryDirectionCard } from './character-assistant-contracts';
+import {
+  createCustomizedDirectionCard,
+  replaceGeneratedDiscoveryCardsByCategory,
+  buildDeterministicDiscoveryHandoffSummary,
+  removeStaleDirectionCardSelections,
+  sanitizeCharacterAssistantDiscoveryState,
+  toggleDirectionCardSelection,
+} from './character-assistant-discovery-state';
 import {
   CHARACTER_ASSISTANT_SESSION_SCHEMA,
   createCharacterAssistantSession,
+  createDiscoveryHandoffSummaryDefault,
   sanitizeCharacterAssistantSession,
 } from './character-assistant-session';
 import { migrateCharacterAssistantSessionStorage } from './character-assistant-session-storage';
@@ -27,6 +51,51 @@ describe('character assistant sessions', () => {
   it('uses one deterministic session identity per character', () => {
     expect(createCharacterAssistantSession('character-1').id).toBe('character-1');
     expect(createCharacterAssistantSession('character-1').id).toBe('character-1');
+  });
+
+  it('clears a persisted Tiptap draft without changing conversation messages', async () => {
+    const characterId = 'draft-isolation-character';
+    const session = createCharacterAssistantSession(characterId);
+    session.messages.push({
+      id: 'message-1',
+      role: 'user',
+      content: 'Keep this message',
+      createdAt: '2026-08-14T00:00:00.000Z',
+    });
+    characterAssistantSessionsCollection.insert(session);
+
+    await saveCharacterAssistantComposerDraft({
+      characterId,
+      text: 'Persist this draft',
+      templateIds: ['voice'],
+      scopeLabel: 'Voice',
+      document: { type: 'doc', content: [{ type: 'paragraph' }] },
+    });
+    await clearCharacterAssistantComposerDraft(characterId);
+
+    expect(characterAssistantComposerDraftsCollection.get(characterId)).toMatchObject({
+      text: '',
+      templateIds: [],
+      document: null,
+    });
+    expect(characterAssistantSessionsCollection.get(characterId)?.messages).toHaveLength(1);
+
+    characterAssistantComposerDraftsCollection.delete(characterId);
+    characterAssistantSessionsCollection.delete(characterId);
+  });
+
+  it('removes only the targeted provisional character session', async () => {
+    const provisionalCharacterId = 'provisional-character-session';
+    const existingCharacterId = 'existing-character-session';
+    await startGuidedSession(provisionalCharacterId);
+    await startGuidedSession(existingCharacterId);
+
+    await removeCharacterAssistantSession(provisionalCharacterId);
+
+    expect(characterAssistantSessionsCollection.get(provisionalCharacterId)).toBeUndefined();
+    expect(characterAssistantSessionsCollection.get(existingCharacterId)).toBeDefined();
+
+    await removeCharacterAssistantSession(existingCharacterId);
   });
 
   it('sanitizes legacy agent sessions into conversation and proposal state', () => {
@@ -101,6 +170,37 @@ describe('character assistant sessions', () => {
 
     expect(session?.guided?.concept?.premise).toContain('archivist');
     expect(session?.guided?.attachments).toHaveLength(1);
+  });
+
+  it('retains guided-step ownership for persisted conversation results', () => {
+    const session = sanitizeCharacterAssistantSession({
+      ...createCharacterAssistantSession('character-1'),
+      messages: [
+        {
+          id: 'message-1',
+          role: 'assistant',
+          content: 'Appearance is ready.',
+          createdAt: '2026-08-13T10:00:00.000Z',
+          guidedStepId: GUIDED_STEP_IDS.appearance,
+        },
+      ],
+      proposals: [
+        {
+          id: 'proposal-1',
+          characterId: 'character-1',
+          baseRevision: 'revision-1',
+          patches: [],
+          status: 'review',
+          guidedStepId: GUIDED_STEP_IDS.appearance,
+          errorMessage: null,
+          createdAt: '2026-08-13T10:00:00.000Z',
+          updatedAt: '2026-08-13T10:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(session?.messages[0]?.guidedStepId).toBe(GUIDED_STEP_IDS.appearance);
+    expect(session?.proposals[0]?.guidedStepId).toBe(GUIDED_STEP_IDS.appearance);
   });
 
   it('advances all guided steps and returns to chat after review', async () => {
@@ -178,5 +278,488 @@ describe('character assistant sessions', () => {
 
     expect(storage.getItem(legacyStorageKey)).toBe(legacyValue);
     expect(storage.getItem(storageKey)).toBeNull();
+  });
+
+  it('replaces only one category with up to three generated direction cards', () => {
+    const discoveryState = sanitizeCharacterAssistantDiscoveryState({
+      originalPremise: 'A rival and a reluctant ally begin a shared operation.',
+      cards: [
+        {
+          id: 'concept-source',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'Original concept',
+          description: 'Source concept text.',
+          sourceCardId: 'concept-source',
+          isUserAuthored: true,
+        },
+        {
+          id: 'concept-generated-old',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'Old concept direction',
+          description: 'Generated concept direction.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'scenario-source',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+          title: 'Scenario direction',
+          description: 'Keep this scenario card.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'tone-source',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          title: 'Tone direction',
+          description: 'Keep this tone card.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ],
+      selectedCardIds: ['concept-generated-old', 'scenario-source', 'missing-selection'],
+      isReadyForHandoff: false,
+    });
+
+    const updatedDiscoveryState = replaceGeneratedDiscoveryCardsByCategory(
+      discoveryState,
+      CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+      [
+        {
+          id: 'concept-generated-new-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'Concept direction 1',
+          description: 'Generated concept direction 1.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'concept-generated-new-2',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'Concept direction 2',
+          description: 'Generated concept direction 2.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'concept-generated-new-3',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'Concept direction 3',
+          description: 'Generated concept direction 3.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'concept-generated-new-4',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'Concept direction 4',
+          description: 'Generated concept direction 4.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ],
+    );
+
+    const conceptCards = updatedDiscoveryState.cards.filter(
+      (card) => card.category === CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+    );
+
+    expect(conceptCards).toHaveLength(4);
+    expect(conceptCards.map((card) => card.id)).toEqual([
+      'concept-source',
+      'concept-generated-new-1',
+      'concept-generated-new-2',
+      'concept-generated-new-3',
+    ]);
+    expect(updatedDiscoveryState.selectedCardIds).toEqual(['scenario-source']);
+    expect(updatedDiscoveryState.isReadyForHandoff).toBe(true);
+  });
+
+  it('toggles multiple direction selections and keeps readiness derived from selections', () => {
+    const discoveryState = sanitizeCharacterAssistantDiscoveryState({
+      originalPremise: 'A quiet village wakes.',
+      cards: [
+        {
+          id: 'scenario-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+          title: 'Scenario 1',
+          description: 'A hidden courtyard.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'tone-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          title: 'Tone 1',
+          description: 'Measured and observant.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ],
+      selectedCardIds: ['scenario-1'],
+      isReadyForHandoff: true,
+    });
+
+    const afterAdd = toggleDirectionCardSelection(discoveryState, 'tone-1');
+    const afterRemove = toggleDirectionCardSelection(afterAdd, 'scenario-1');
+
+    expect(afterAdd.selectedCardIds).toEqual(['scenario-1', 'tone-1']);
+    expect(afterAdd.isReadyForHandoff).toBe(true);
+    expect(afterRemove.selectedCardIds).toEqual(['tone-1']);
+    expect(afterRemove.isReadyForHandoff).toBe(true);
+  });
+
+  it('creates a user-authored customized direction card while preserving source', () => {
+    const discoveryState = sanitizeCharacterAssistantDiscoveryState({
+      originalPremise: 'An exhausted negotiator needs a secret.',
+      cards: [
+        {
+          id: 'scenario-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+          title: 'Scenario 1',
+          description: 'A diplomatic summit.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ],
+      selectedCardIds: ['scenario-1'],
+      isReadyForHandoff: true,
+    });
+
+    const customState = createCustomizedDirectionCard(discoveryState, 'scenario-1', {
+      id: 'scenario-custom',
+      title: 'Custom scenario',
+      description: 'A customs office standoff.',
+    });
+
+    expect(customState.cards).toHaveLength(2);
+    expect(customState.cards.find((card) => card.id === 'scenario-custom')).toMatchObject({
+      id: 'scenario-custom',
+      category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+      sourceCardId: 'scenario-1',
+      isUserAuthored: true,
+    });
+    expect(customState.cards.find((card) => card.id === 'scenario-1')).toBeDefined();
+    expect(customState.selectedCardIds).toEqual(['scenario-custom']);
+    expect(customState.isReadyForHandoff).toBe(true);
+  });
+
+  it('removes stale selections from discovery state', () => {
+    const discoveryState = sanitizeCharacterAssistantDiscoveryState({
+      originalPremise: 'A quiet village wakes.',
+      cards: [
+        {
+          id: 'tone-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          title: 'Tone 1',
+          description: 'Measured and observant.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ],
+      selectedCardIds: ['tone-1', 'missing-selection'],
+      isReadyForHandoff: true,
+    });
+
+    expect(removeStaleDirectionCardSelections(discoveryState).selectedCardIds).toEqual(['tone-1']);
+  });
+
+  it('builds deterministic handoff summary grouped by category', () => {
+    const discoveryState = sanitizeCharacterAssistantDiscoveryState({
+      originalPremise: 'A quiet village wakes.',
+      cards: [
+        {
+          id: 'tone-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          title: 'Tone 1',
+          description: 'Measured and observant.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'concept-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'Concept 1',
+          description: 'A rival mentor.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'scenario-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+          title: 'Scenario 1',
+          description: 'A city on lockdown.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ],
+      selectedCardIds: ['scenario-1', 'concept-1', 'tone-1'],
+      isReadyForHandoff: false,
+    });
+    const handoffSummary = buildDeterministicDiscoveryHandoffSummary(discoveryState);
+
+    expect(handoffSummary).toMatchObject({
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept']]: [
+        {
+          id: 'concept-1',
+          title: 'Concept 1',
+        },
+      ],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone]: [{ id: 'tone-1', title: 'Tone 1' }],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]: [{ id: 'scenario-1', title: 'Scenario 1' }],
+    });
+    expect(handoffSummary[CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['relationship-dynamic']]).toEqual([]);
+    expect(handoffSummary[CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept']][0].description).toBe(
+      'A rival mentor.',
+    );
+  });
+
+  it('sanitizes guided sessions without discovery payload into defaults', () => {
+    const recoveredSession = sanitizeCharacterAssistantSession({
+      ...createCharacterAssistantSession('character-1'),
+      mode: 'guided',
+      guided: {
+        currentStep: GUIDED_STEP_IDS.concept,
+        completedSteps: [],
+        concept: null,
+        attachments: [],
+      },
+    });
+
+    expect(recoveredSession?.guided?.discovery).toEqual({
+      originalPremise: '',
+      cards: [],
+      selectedCardIds: [],
+      isReadyForHandoff: false,
+    });
+    expect(recoveredSession?.mode).toBe('guided');
+  });
+
+  it('removes stale guided discovery selections and derives handoff readiness in session sanitization', () => {
+    const recoveredSession = sanitizeCharacterAssistantSession({
+      ...createCharacterAssistantSession('character-1'),
+      mode: 'guided',
+      guided: {
+        currentStep: GUIDED_STEP_IDS.appearance,
+        completedSteps: [GUIDED_STEP_IDS.concept],
+        concept: null,
+        attachments: [],
+        discovery: {
+          originalPremise: 'A quiet village wakes.',
+          cards: [
+            {
+              id: 'tone-1',
+              category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+              title: 'Tone 1',
+              description: 'Measured and observant.',
+              sourceCardId: null,
+              isUserAuthored: false,
+            },
+          ],
+          selectedCardIds: ['tone-1', 'missing-selection'],
+          isReadyForHandoff: false,
+        },
+      },
+    });
+
+    expect(recoveredSession?.guided?.discovery?.selectedCardIds).toEqual(['tone-1']);
+    expect(recoveredSession?.guided?.discovery?.isReadyForHandoff).toBe(true);
+  });
+
+  it('sanitizes discovery state by deduping selections and deriving readiness', () => {
+    const sanitizedDiscoveryState = sanitizeCharacterAssistantDiscoveryState({
+      originalPremise: 'A quiet village wakes.',
+      cards: [
+        {
+          id: 'tone-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          title: 'Tone 1',
+          description: 'Measured and observant.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ] satisfies readonly iCharacterAssistantDiscoveryDirectionCard[],
+      selectedCardIds: ['tone-1', 'tone-1', 'missing-selection'],
+      isReadyForHandoff: false,
+    });
+
+    expect(sanitizedDiscoveryState.selectedCardIds).toEqual(['tone-1']);
+    expect(sanitizedDiscoveryState.isReadyForHandoff).toBe(true);
+  });
+
+  it('starts guided discovery with a validated premise', async () => {
+    const characterId = 'guided-discovery-start';
+    await startGuidedSession(characterId);
+    await startGuidedDiscovery(characterId, 'A rival and a reluctant ally find common cause in a city of secrets.');
+
+    const session = characterAssistantSessionsCollection.get(characterId);
+    expect(session?.guided?.discovery?.originalPremise).toBe(
+      'A rival and a reluctant ally find common cause in a city of secrets.',
+    );
+    expect(session?.guided?.discovery?.cards).toEqual([]);
+    expect(session?.guided?.discovery?.selectedCardIds).toEqual([]);
+    expect(session?.guided?.discovery?.isReadyForHandoff).toBe(false);
+
+    await expect(startGuidedDiscovery(characterId, '')).rejects.toThrowError();
+    characterAssistantSessionsCollection.delete(characterId);
+  });
+
+  it('replaces generated cards in one discovery category atomically', async () => {
+    const characterId = 'guided-discovery-replace';
+    await startGuidedSession(characterId);
+    await updateCharacterAssistantSession(characterId, (draft) => {
+      if (!draft.guided) {
+        return;
+      }
+
+      draft.guided.discovery = {
+        originalPremise: 'A city remembers everything the city forgets.',
+        cards: [
+          {
+            id: 'concept-source',
+            category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+            title: 'Concept source',
+            description: 'A base concept card kept by hand.',
+            sourceCardId: 'source-card',
+            isUserAuthored: true,
+          },
+          {
+            id: 'concept-generated-old',
+            category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+            title: 'Old generated concept',
+            description: 'The old generated concept idea.',
+            sourceCardId: null,
+            isUserAuthored: false,
+          },
+          {
+            id: 'tone-selected',
+            category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+            title: 'Warm and ironic',
+            description: 'A warm, ironic voice.',
+            sourceCardId: null,
+            isUserAuthored: false,
+          },
+        ],
+        selectedCardIds: ['concept-generated-old', 'tone-selected'],
+        isReadyForHandoff: true,
+      };
+      draft.guided.discoveryHandoffSummary = buildDeterministicDiscoveryHandoffSummary(draft.guided.discovery);
+    });
+
+    const updated = await replaceGeneratedGuidedDiscoveryCardsByCategory(
+      characterId,
+      CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+      [
+        {
+          id: 'concept-generated-new-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'A concept with consequence.',
+          description: 'A character builds identity from debt.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'concept-generated-new-2',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'A concept with conflict.',
+          description: 'A character rejects their own memory.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+        {
+          id: 'concept-generated-new-3',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+          title: 'A concept with choice.',
+          description: 'A character balances mercy and profit.',
+          sourceCardId: null,
+          isUserAuthored: false,
+        },
+      ],
+    );
+    const updatedDiscovery = updated?.guided?.discovery;
+
+    expect(
+      updatedDiscovery?.cards
+        .filter((card) => card.category === CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'])
+        .map((card) => card.id),
+    ).toEqual(['concept-source', 'concept-generated-new-1', 'concept-generated-new-2', 'concept-generated-new-3']);
+    expect(updatedDiscovery?.selectedCardIds).toEqual(['tone-selected']);
+  });
+
+  it('finishes discovery with deterministic handoff summary and preserves premise on restart', async () => {
+    const characterId = 'guided-discovery-finish-restart';
+    await startGuidedSession(characterId);
+    await updateCharacterAssistantSession(characterId, (draft) => {
+      if (!draft.guided) {
+        return;
+      }
+
+      draft.guided.discovery = {
+        originalPremise: 'A courier bargains with a demon for passage.',
+        cards: [
+          {
+            id: 'tone-1',
+            category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+            title: 'Bitter but funny',
+            description: 'A dry wit keeps the fear honest.',
+            sourceCardId: null,
+            isUserAuthored: false,
+          },
+          {
+            id: 'scenario-1',
+            category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+            title: 'Neon checkpoint',
+            description: 'The handoff starts at a rain-soaked checkpoint.',
+            sourceCardId: null,
+            isUserAuthored: false,
+          },
+        ],
+        selectedCardIds: ['tone-1', 'scenario-1'],
+        isReadyForHandoff: true,
+      };
+    });
+
+    const finishedSession = await finishGuidedDiscovery(characterId);
+    const handoffSummary = finishedSession.guided?.discoveryHandoffSummary;
+    expect(handoffSummary?.[CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone]).toEqual([
+      {
+        id: 'tone-1',
+        category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+        title: 'Bitter but funny',
+        description: 'A dry wit keeps the fear honest.',
+        sourceCardId: null,
+        isUserAuthored: false,
+      },
+    ]);
+    expect(handoffSummary?.[CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]).toEqual([
+      {
+        id: 'scenario-1',
+        category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+        title: 'Neon checkpoint',
+        description: 'The handoff starts at a rain-soaked checkpoint.',
+        sourceCardId: null,
+        isUserAuthored: false,
+      },
+    ]);
+
+    const restartedSession = await restartGuidedDiscovery(characterId);
+    expect(restartedSession.guided?.discovery?.originalPremise).toBe('A courier bargains with a demon for passage.');
+    expect(restartedSession.guided?.discovery?.cards).toEqual([]);
+    expect(restartedSession.guided?.discovery?.selectedCardIds).toEqual([]);
+    expect(restartedSession.guided?.discovery?.isReadyForHandoff).toBe(false);
+    expect(restartedSession.guided?.discoveryHandoffSummary).toEqual(createDiscoveryHandoffSummaryDefault());
+    characterAssistantSessionsCollection.delete(characterId);
+  });
+
+  it('requires a selection before finishing discovery', async () => {
+    const characterId = 'guided-discovery-empty-handoff';
+    await startGuidedSession(characterId);
+    await startGuidedDiscovery(characterId, 'Two strangers inherit opposite halves of an impossible map.');
+
+    await expect(finishGuidedDiscovery(characterId)).rejects.toThrowError(
+      'Select at least one discovery direction before continuing.',
+    );
+
+    characterAssistantSessionsCollection.delete(characterId);
   });
 });

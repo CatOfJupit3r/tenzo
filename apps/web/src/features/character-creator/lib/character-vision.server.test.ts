@@ -3,14 +3,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { analyzeCharacterImage } from './character-vision.server';
 
-const { generateObjectMock, generateTextMock } = vi.hoisted(() => ({
-  generateObjectMock: vi.fn(),
-  generateTextMock: vi.fn(),
+const { generateValidatedObjectMock } = vi.hoisted(() => ({
+  generateValidatedObjectMock: vi.fn(),
 }));
 
-vi.mock('ai', () => ({
-  generateObject: generateObjectMock,
-  generateText: generateTextMock,
+vi.mock('./structured-output.server', () => ({
+  generateValidatedObject: generateValidatedObjectMock,
 }));
 
 const request = {
@@ -40,20 +38,20 @@ const analysis = {
   confidence: 0.8,
   warnings: [],
 };
-const mockModel = {} as LanguageModel;
+const mockModel = {} as Exclude<LanguageModel, string>;
 
 describe('character vision analysis', () => {
   it('returns a validated structured analysis', async () => {
-    generateObjectMock.mockResolvedValueOnce({ object: analysis });
+    generateValidatedObjectMock.mockResolvedValueOnce(analysis);
 
     await expect(analyzeCharacterImage(request, mockModel)).resolves.toEqual(analysis);
-    expect(generateObjectMock).toHaveBeenCalledOnce();
+    expect(generateValidatedObjectMock).toHaveBeenCalledOnce();
   });
 
-  it('falls back to JSON text and clamps oversized arrays', async () => {
-    generateObjectMock.mockRejectedValueOnce(new Error('The endpoint returned invalid structured output.'));
-    generateTextMock.mockResolvedValueOnce({
-      text: JSON.stringify({ ...analysis, suggestedTags: Array.from({ length: 12 }, (_, index) => `tag-${index}`) }),
+  it('clamps oversized arrays returned by structured generation', async () => {
+    generateValidatedObjectMock.mockResolvedValueOnce({
+      ...analysis,
+      suggestedTags: Array.from({ length: 12 }, (_, index) => `tag-${index}`),
     });
 
     const result = await analyzeCharacterImage(request, mockModel);

@@ -1,14 +1,21 @@
-import { useLiveQuery } from '@tanstack/react-db';
-import { useAtom } from 'jotai';
+import { atom, useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { usePersistentCollection } from '@~/db/persistent-collection';
 import { generateUuid } from '@~/utils/uuid';
 
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
+import { removeCharacterAssistantSession } from '../collections/character-assistant-sessions.collection';
 import { characterLibraryCollection } from '../collections/character-library.collection';
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
-import type { CharacterCard, CharacterTextFieldKey, CustomField } from '../lib/card-schema';
+import type {
+  CharacterBook,
+  CharacterBookEntry,
+  CharacterCard,
+  CharacterTextFieldKey,
+  CustomField,
+} from '../lib/card-schema';
 import {
   createCharacterLibraryItem,
   createDuplicateCharacterName,
@@ -32,14 +39,35 @@ import { ensurePortraitAssetLoaded } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
 import { useCharacterLibraryList } from './use-character-library-list';
 
+interface iCharacterSaveActivityState {
+  activeAttemptId: string | null;
+  errorMessage: string | null;
+  hasPersistedEdits: boolean;
+  isSaving: boolean;
+  lastSavedAt: Date | null;
+}
+
+const EMPTY_CHARACTER_SAVE_ACTIVITY = {
+  activeAttemptId: null,
+  errorMessage: null,
+  hasPersistedEdits: false,
+  isSaving: false,
+  lastSavedAt: null,
+} satisfies iCharacterSaveActivityState;
+
+const characterSaveActivitiesAtom = atom<Record<string, iCharacterSaveActivityState>>({});
+
 export function useCharacterSession() {
   const [activeCharacterId, setActiveCharacterId] = useAtom(activeCharacterIdAtom);
+  const [saveActivities, setSaveActivities] = useAtom(characterSaveActivitiesAtom);
   const backfilledThumbnailIdsRef = useRef<Set<string>>(new Set());
 
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
 
-  const { data: exampleCharacters } = useLiveQuery((query) =>
-    query.from({ example: exampleCharactersCollection }).orderBy(({ example }) => example.fileName, 'asc'),
+  const storedExampleCharacters = usePersistentCollection(exampleCharactersCollection);
+  const exampleCharacters = useMemo(
+    () => [...storedExampleCharacters].sort((first, second) => first.fileName.localeCompare(second.fileName)),
+    [storedExampleCharacters],
   );
 
   const activeCharacter = useMemo(
@@ -88,6 +116,9 @@ export function useCharacterSession() {
   const promptSettings = activeCharacter?.promptSettings ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS;
   const portraitReference = activeCharacter?.portrait ?? null;
   const activeCharacterKey = activeCharacter?.id ?? null;
+  const saveActivity = activeCharacterKey
+    ? (saveActivities[activeCharacterKey] ?? EMPTY_CHARACTER_SAVE_ACTIVITY)
+    : EMPTY_CHARACTER_SAVE_ACTIVITY;
 
   const mutateActiveCharacter = useCallback(
     (recipe: (draft: iCharacterLibraryItem) => unknown) => {
@@ -95,14 +126,69 @@ export function useCharacterSession() {
         return null;
       }
 
-      return characterLibraryCollection.update(activeCharacterKey, (draft) => {
+      const characterId = activeCharacterKey;
+      const transaction = characterLibraryCollection.update(activeCharacterKey, (draft) => {
         // The card schema applies defaults, so the draft's input type widens some
         // fields to optional; at runtime they are always populated.
-        recipe(draft as iCharacterLibraryItem);
+        recipe(draft);
         draft.updatedAt = new Date().toISOString();
       });
+
+      const attemptId = generateUuid();
+      setSaveActivities((currentActivities) => ({
+        ...currentActivities,
+        [characterId]: {
+          ...(currentActivities[characterId] ?? EMPTY_CHARACTER_SAVE_ACTIVITY),
+          activeAttemptId: attemptId,
+          errorMessage: null,
+          isSaving: true,
+        },
+      }));
+
+      void transaction.isPersisted.promise
+        .then(() => {
+          setSaveActivities((currentActivities) => {
+            const currentActivity = currentActivities[characterId];
+
+            if (currentActivity?.activeAttemptId !== attemptId) {
+              return currentActivities;
+            }
+
+            return {
+              ...currentActivities,
+              [characterId]: {
+                activeAttemptId: null,
+                errorMessage: null,
+                hasPersistedEdits: true,
+                isSaving: false,
+                lastSavedAt: new Date(),
+              },
+            };
+          });
+        })
+        .catch(() => {
+          setSaveActivities((currentActivities) => {
+            const currentActivity = currentActivities[characterId];
+
+            if (currentActivity?.activeAttemptId !== attemptId) {
+              return currentActivities;
+            }
+
+            return {
+              ...currentActivities,
+              [characterId]: {
+                ...currentActivity,
+                activeAttemptId: null,
+                errorMessage: 'Changes could not be saved locally.',
+                isSaving: false,
+              },
+            };
+          });
+        });
+
+      return transaction;
     },
-    [activeCharacterKey],
+    [activeCharacterKey, setSaveActivities],
   );
 
   const updateField = useCallback(
@@ -194,6 +280,88 @@ export function useCharacterSession() {
         draft.card.data.extensions.custom_fields = draft.card.data.extensions.custom_fields.filter(
           (field) => field.id !== id,
         );
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const createCharacterBook = useCallback(() => {
+    mutateActiveCharacter((draft) => {
+      draft.card.data.character_book ??= { extensions: {}, entries: [] };
+    });
+  }, [mutateActiveCharacter]);
+
+  const removeCharacterBook = useCallback(() => {
+    mutateActiveCharacter((draft) => {
+      delete draft.card.data.character_book;
+    });
+  }, [mutateActiveCharacter]);
+
+  const updateCharacterBook = useCallback(
+    (patch: Partial<Omit<CharacterBook, 'entries' | 'extensions'>>) => {
+      mutateActiveCharacter((draft) => {
+        if (draft.card.data.character_book) {
+          Object.assign(draft.card.data.character_book, patch);
+        }
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const addCharacterBookEntry = useCallback(() => {
+    mutateActiveCharacter((draft) => {
+      const characterBook = draft.card.data.character_book;
+
+      if (!characterBook) {
+        return;
+      }
+
+      characterBook.entries.push({
+        keys: [],
+        content: '',
+        extensions: {},
+        enabled: true,
+        insertion_order: characterBook.entries.length,
+      });
+    });
+  }, [mutateActiveCharacter]);
+
+  const updateCharacterBookEntry = useCallback(
+    (index: number, patch: Partial<Omit<CharacterBookEntry, 'extensions'>>) => {
+      mutateActiveCharacter((draft) => {
+        const entry = draft.card.data.character_book?.entries[index];
+
+        if (entry) {
+          Object.assign(entry, patch);
+        }
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const removeCharacterBookEntry = useCallback(
+    (index: number) => {
+      mutateActiveCharacter((draft) => {
+        draft.card.data.character_book?.entries.splice(index, 1);
+      });
+    },
+    [mutateActiveCharacter],
+  );
+
+  const reorderCharacterBookEntries = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      mutateActiveCharacter((draft) => {
+        const entries = draft.card.data.character_book?.entries;
+
+        if (!entries || toIndex < 0 || toIndex >= entries.length) {
+          return;
+        }
+
+        const [movedEntry] = entries.splice(fromIndex, 1);
+
+        if (movedEntry) {
+          entries.splice(toIndex, 0, movedEntry);
+        }
       });
     },
     [mutateActiveCharacter],
@@ -325,34 +493,66 @@ export function useCharacterSession() {
     [setActiveCharacterId],
   );
 
-  const removeCharacter = useCallback(
-    (id: string) => {
-      const characterToRemove = characterLibraryCollection.get(id);
+  const removeCharacterRecord = useCallback(
+    async (id: string) => {
+      const persistenceTasks: Promise<unknown>[] = [];
       if (characterLibraryCollection.has(id)) {
-        characterLibraryCollection.delete(id);
+        persistenceTasks.push(characterLibraryCollection.delete(id).isPersisted.promise);
       }
-      void Promise.all([
-        characterToRemove?.portrait ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId) : Promise.resolve(),
-        deleteGuidedReferenceAssetBlobs(id),
-      ]);
 
       if (characterLibraryCollection.size === 0) {
         const fallbackCharacter = createEmptyCharacterLibraryItem();
-        characterLibraryCollection.insert(fallbackCharacter);
+        persistenceTasks.push(characterLibraryCollection.insert(fallbackCharacter).isPersisted.promise);
         setActiveCharacterId(fallbackCharacter.id);
-        return;
+      } else {
+        const nextActiveCharacter = characterLibraryCollection.values().next().value;
+        setActiveCharacterId((currentActiveCharacterId) =>
+          currentActiveCharacterId === id
+            ? (nextActiveCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID)
+            : currentActiveCharacterId,
+        );
       }
 
-      if (activeCharacterId === id) {
-        const nextActiveCharacter = characterLibraryCollection.values().next().value;
-        setActiveCharacterId(nextActiveCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID);
-      }
+      await Promise.all(persistenceTasks);
     },
-    [activeCharacterId, setActiveCharacterId],
+    [setActiveCharacterId],
+  );
+
+  const removeCharacter = useCallback(
+    (id: string) => {
+      const characterToRemove = characterLibraryCollection.get(id);
+      void Promise.all([
+        characterToRemove?.portrait ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId) : Promise.resolve(),
+        deleteGuidedReferenceAssetBlobs(id),
+        removeCharacterRecord(id),
+      ]);
+    },
+    [removeCharacterRecord],
+  );
+
+  const discardProvisionalCharacter = useCallback(
+    async (id: string) => {
+      const characterToRemove = characterLibraryCollection.get(id);
+      await Promise.all([
+        Promise.allSettled([
+          characterToRemove?.portrait
+            ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId)
+            : Promise.resolve(),
+          deleteGuidedReferenceAssetBlobs(id),
+        ]),
+        removeCharacterAssistantSession(id),
+        removeCharacterRecord(id),
+      ]);
+    },
+    [removeCharacterRecord],
   );
 
   return {
     isCharacterLibraryReady,
+    isSaving: saveActivity.isSaving,
+    saveErrorMessage: saveActivity.errorMessage,
+    hasPersistedEdits: saveActivity.hasPersistedEdits,
+    lastSavedAt: saveActivity.lastSavedAt,
     characterLibrary,
     activeCharacterId: activeCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
     card,
@@ -368,6 +568,13 @@ export function useCharacterSession() {
     addCustomField,
     updateCustomField,
     removeCustomField,
+    createCharacterBook,
+    removeCharacterBook,
+    updateCharacterBook,
+    addCharacterBookEntry,
+    updateCharacterBookEntry,
+    removeCharacterBookEntry,
+    reorderCharacterBookEntries,
     updatePromptSettings,
     replacePromptSettings,
     addExampleCharacters,
@@ -378,6 +585,7 @@ export function useCharacterSession() {
     selectCharacter,
     duplicateCharacter,
     removeCharacter,
+    discardProvisionalCharacter,
     setActiveCharacterPortrait,
   };
 }

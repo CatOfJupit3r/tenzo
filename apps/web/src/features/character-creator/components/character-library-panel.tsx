@@ -1,7 +1,18 @@
 import { useAtomValue } from 'jotai';
-import { memo, useCallback, useMemo } from 'react';
-import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuSparkles, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
+import { memo, useCallback, useMemo, useState } from 'react';
+import {
+  LuCircleAlert,
+  LuCopy,
+  LuFolderOpen,
+  LuImage,
+  LuPlus,
+  LuSparkles,
+  LuTrash2,
+  LuUserPen,
+  LuX,
+} from 'react-icons/lu';
 
+import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,13 +25,16 @@ import {
   AlertDialogTrigger,
 } from '@~/components/ui/alert-dialog';
 import { Badge } from '@~/components/ui/badge';
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
+import { Input } from '@~/components/ui/input';
+import { Label } from '@~/components/ui/label';
 import { cn } from '@~/lib/utils';
 
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
+import { CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH } from '../lib/character-assistant-contracts';
 import type { iCharacterLibraryItem } from '../lib/character-library';
 import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/character-library';
 import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
@@ -28,6 +42,7 @@ import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point'
 interface iCharacterLibraryPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  onGuidedStartFailure: () => void;
 }
 
 interface iCharacterLibraryItemProps {
@@ -105,7 +120,12 @@ const CharacterLibraryItem = memo(
                 </span>
               ) : null}
               {hasTags ? <span>{character.card.data.tags.length} tags</span> : null}
-              {hasAlternateGreetings ? <span>{character.card.data.alternate_greetings.length} greetings</span> : null}
+              {hasAlternateGreetings ? (
+                <span>
+                  {character.card.data.alternate_greetings.length}{' '}
+                  {character.card.data.alternate_greetings.length === 1 ? 'greeting' : 'greetings'}
+                </span>
+              ) : null}
             </div>
           </div>
         </button>
@@ -154,22 +174,110 @@ const CharacterLibraryItem = memo(
   },
 );
 
-export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPanelProps) {
+export function CharacterLibraryPanel({ isOpen, onClose, onGuidedStartFailure }: iCharacterLibraryPanelProps) {
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
   const activeCharacterId = useAtomValue(activeCharacterIdAtom);
   const {
     handleCreateCharacter,
+    createProvisionalCharacter,
     handleSelectCharacter,
     handleDuplicateCharacter,
     handleRemoveCharacter,
+    discardProvisionalCharacter,
     openImportDialog,
   } = useCharacterCreatorActions();
-  const { openAssistantInGuidedMode } = useCharacterAssistant();
+  const { openAssistantInGuidedMode, closeAssistant, workspace } = useCharacterAssistant();
+  const [discoveryPremise, setDiscoveryPremise] = useState('');
+  const [assistantCreationError, setAssistantCreationError] = useState<string | null>(null);
+  const [isStartingAssistant, setIsStartingAssistant] = useState(false);
+
+  const getAssistantCreationError = useCallback((error: unknown) => {
+    if (error instanceof Error && error.message.trim()) {
+      return error.message;
+    }
+
+    return 'Guided creation could not be started. Check Settings > Connection and try again.';
+  }, []);
+
+  const preflightAssistantConnection = useCallback(() => {
+    if (workspace.isConnectionConfigured) {
+      return true;
+    }
+
+    setAssistantCreationError(
+      'Connection setup is required. Open Settings > Connection and set an endpoint, model, and API key.',
+    );
+    return false;
+  }, [workspace.isConnectionConfigured]);
+
+  const discardFailedAssistantCreation = useCallback(
+    async (characterId: string, error: unknown) => {
+      const creationError = getAssistantCreationError(error);
+      try {
+        await discardProvisionalCharacter(characterId);
+        setAssistantCreationError(creationError);
+      } catch {
+        setAssistantCreationError(`${creationError} The incomplete card could not be cleaned up automatically.`);
+      } finally {
+        closeAssistant();
+        onGuidedStartFailure();
+      }
+    },
+    [closeAssistant, discardProvisionalCharacter, getAssistantCreationError, onGuidedStartFailure],
+  );
 
   const handleCreateWithAssistant = useCallback(async () => {
-    const characterId = handleCreateCharacter();
-    await openAssistantInGuidedMode(characterId);
-  }, [handleCreateCharacter, openAssistantInGuidedMode]);
+    if (!preflightAssistantConnection()) {
+      return;
+    }
+
+    setAssistantCreationError(null);
+    setIsStartingAssistant(true);
+    const characterId = createProvisionalCharacter();
+
+    try {
+      await openAssistantInGuidedMode(characterId);
+    } catch (error) {
+      await discardFailedAssistantCreation(characterId, error);
+    } finally {
+      setIsStartingAssistant(false);
+    }
+  }, [
+    discardFailedAssistantCreation,
+    createProvisionalCharacter,
+    openAssistantInGuidedMode,
+    preflightAssistantConnection,
+  ]);
+
+  const handleCreateWithDiscovery = useCallback(async () => {
+    const normalizedPremise = discoveryPremise.trim();
+    if (!normalizedPremise) {
+      return;
+    }
+
+    if (!preflightAssistantConnection()) {
+      return;
+    }
+
+    setAssistantCreationError(null);
+    setIsStartingAssistant(true);
+    const characterId = createProvisionalCharacter();
+
+    try {
+      await openAssistantInGuidedMode(characterId, { mode: 'discovery', originalPremise: normalizedPremise });
+      setDiscoveryPremise('');
+    } catch (error) {
+      await discardFailedAssistantCreation(characterId, error);
+    } finally {
+      setIsStartingAssistant(false);
+    }
+  }, [
+    discoveryPremise,
+    discardFailedAssistantCreation,
+    createProvisionalCharacter,
+    openAssistantInGuidedMode,
+    preflightAssistantConnection,
+  ]);
 
   const characterCountLabel = useMemo(() => {
     if (!isCharacterLibraryReady && characterLibrary.length === 0) {
@@ -232,15 +340,52 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" size="sm" onClick={handleCreateWithAssistant}>
+          <div className="grid gap-2">
+            <div className="grid gap-2">
+              <Button type="button" size="sm" disabled={isStartingAssistant} onClick={handleCreateWithAssistant}>
+                <LuSparkles className="size-4" />
+                Start guided creation
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isStartingAssistant}
+                onClick={handleCreateCharacter}
+              >
+                <LuPlus className="size-4" />
+                New blank card
+              </Button>
+            </div>
+            <Label htmlFor="discovery-premise" className="text-xs text-muted-foreground">
+              Create from a broad premise
+            </Label>
+            <Input
+              id="discovery-premise"
+              value={discoveryPremise}
+              onChange={(event) => {
+                setDiscoveryPremise(event.target.value);
+              }}
+              maxLength={CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH}
+              placeholder="Describe a broad character premise"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={discoveryPremise.trim().length === 0 || isStartingAssistant}
+              onClick={handleCreateWithDiscovery}
+            >
               <LuSparkles className="size-4" />
-              Create with Assistant
+              Discover directions
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={handleCreateCharacter}>
-              <LuPlus className="size-4" />
-              New
-            </Button>
+            {assistantCreationError ? (
+              <Alert variant="destructive">
+                <LuCircleAlert />
+                <AlertTitle>Guided creation unavailable</AlertTitle>
+                <AlertDescription>{assistantCreationError}</AlertDescription>
+              </Alert>
+            ) : null}
           </div>
           <Button type="button" size="sm" variant="outline" onClick={openImportDialog}>
             <LuFolderOpen className="size-4" />

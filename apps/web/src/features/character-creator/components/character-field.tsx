@@ -2,7 +2,7 @@ import type { ChangeEvent } from 'react';
 import { LuSparkles } from 'react-icons/lu';
 
 import { Badge } from '@~/components/ui/badge';
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 
@@ -29,6 +29,7 @@ export interface iCharacterFieldProps {
   editorVariant?: FieldEditorVariant;
   doesAllowOriginalMacro?: boolean;
   shouldUseGeneralCharacterIdea?: boolean;
+  shouldShowGeneralCharacterIdeaToggle?: boolean;
   instructionValue?: string;
   generationErrorMessage?: string | null;
   isGenerating?: boolean;
@@ -66,6 +67,7 @@ export function CharacterField({
   editorVariant,
   doesAllowOriginalMacro = false,
   shouldUseGeneralCharacterIdea = true,
+  shouldShowGeneralCharacterIdeaToggle = true,
   instructionValue = '',
   generationErrorMessage = null,
   isGenerating = false,
@@ -93,10 +95,10 @@ export function CharacterField({
   onApplyAssistantProposal,
   onRejectAssistantProposal,
 }: iCharacterFieldProps) {
-  const hasGenerationControls =
-    onShouldUseGeneralCharacterIdeaChange && onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
+  const hasGenerationControls = onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
 
   const resolvedVariant = editorVariant ?? (rows <= 1 ? FIELD_EDITOR_VARIANTS.plain : FIELD_EDITOR_VARIANTS.markdown);
+  const labelId = `${fieldId}-label`;
   const hintId = hint ? `${fieldId}-hint` : undefined;
   const shouldShowRewriteReview =
     isRewriteReviewPending && rewriteBackupValue !== null && !isGenerating && onResolveRewriteReview && onAcceptRewrite;
@@ -153,6 +155,7 @@ export function CharacterField({
           rows={rows}
           isReadOnly={isGenerating}
           isStreaming={isGenerating}
+          ariaLabelledBy={labelId}
           ariaDescribedBy={hintId}
           onValueChange={onValueChange}
         />
@@ -166,6 +169,7 @@ export function CharacterField({
         isReadOnly={isGenerating}
         isStreaming={isGenerating}
         doesAllowOriginalMacro={doesAllowOriginalMacro}
+        ariaLabelledBy={labelId}
         ariaDescribedBy={hintId}
         onValueChange={onValueChange}
       />
@@ -175,7 +179,9 @@ export function CharacterField({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <Label htmlFor={fieldId}>{label}</Label>
+        <Label id={labelId} htmlFor={fieldId}>
+          {label}
+        </Label>
         {onAskAssistant ? (
           <Button type="button" size="sm" variant="ghost" onClick={onAskAssistant}>
             <LuSparkles className="size-3.5" />
@@ -188,6 +194,7 @@ export function CharacterField({
           fieldId={fieldId}
           label={label}
           shouldUseGeneralCharacterIdea={shouldUseGeneralCharacterIdea}
+          shouldShowGeneralCharacterIdeaToggle={shouldShowGeneralCharacterIdeaToggle}
           instructionValue={instructionValue}
           errorMessage={generationErrorMessage}
           hasExistingValue={value.trim().length > 0}

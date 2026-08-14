@@ -1,7 +1,7 @@
 import type { ChangeEvent } from 'react';
 import { LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
 
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
@@ -149,6 +149,7 @@ export function CustomFields({
                     placeholder="Value"
                     isReadOnly={isGenerating}
                     isStreaming={isGenerating}
+                    ariaLabel={`${field.label.trim() || 'Custom field'} value`}
                     onValueChange={(value) => onUpdate(field.id, { value })}
                   />
                 )}

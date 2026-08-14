@@ -197,13 +197,7 @@ export function createDuplicateCharacterName(name: string) {
 }
 
 export function getCharacterLibraryItemSummary(character: iCharacterLibraryItem) {
-  const { data } = character.card;
-  const summarySource =
-    data.description.trim() ||
-    data.personality.trim() ||
-    data.scenario.trim() ||
-    data.first_mes.trim() ||
-    data.creator_notes.trim();
+  const summarySource = character.card.data.description.trim().replace(/\s+/g, ' ');
 
   if (summarySource === '') {
     return 'Ready for details, dialogue, and portrait work.';

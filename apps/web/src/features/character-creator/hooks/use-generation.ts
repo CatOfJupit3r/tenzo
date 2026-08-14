@@ -14,7 +14,7 @@ import {
   sanitizeCharacterGenerationSettings,
 } from '../lib/generation-config';
 import type { iCharacterGenerationConnectionSettings } from '../lib/generation-config';
-import { GENERATION_MODES, getGenerationTargetKey } from '../lib/prompt/generation-contracts';
+import { GENERATION_MODES, GENERATION_TARGET_KINDS, getGenerationTargetKey } from '../lib/prompt/generation-contracts';
 import type {
   GenerationMode,
   iFieldGenerationTarget,
@@ -481,13 +481,16 @@ export function useGeneration() {
           seed: SeededRandom.generateSeed(),
           mode,
           generalCharacterIdea: promptSettings.generalCharacterIdea,
-          shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
+          shouldUseGeneralCharacterIdea:
+            target.kind !== GENERATION_TARGET_KINDS['general-character-idea'] &&
+            shouldUseGeneralCharacterIdea(fieldKey),
           userInstructions: getFieldInstruction(fieldKey),
           fieldTemplate,
           exampleCharacters,
           maxExampleContextCharacters,
         });
         const requestData = {
+          provider: connectionSettings.provider,
           endpoint: connectionSettings.endpoint,
           apiKey,
           model: connectionSettings.model,

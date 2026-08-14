@@ -84,6 +84,61 @@ describe('card-format', () => {
     expect(roundTripCard.data.character_book?.extensions).toEqual({ keep_book: true });
     expect(roundTripCard.data.character_book?.entries[0]?.extensions).toEqual({ keep_entry: true });
   });
+
+  it('preserves unknown character book extensions through import, edit, and export', () => {
+    const importedCard = parseCharacterCardJson(
+      JSON.stringify({
+        spec: 'chara_card_v2',
+        spec_version: '2.0',
+        data: {
+          name: 'Archivist',
+          character_book: {
+            name: 'Imported archive',
+            extensions: { book_plugin: { mode: 'lunar' } },
+            entries: [
+              {
+                keys: ['archive'],
+                content: 'Original lore.',
+                extensions: { entry_plugin: ['keep', 'this'] },
+                enabled: true,
+                insertion_order: 12,
+                priority: 50,
+              },
+            ],
+          },
+        },
+      }),
+    );
+
+    const characterBook = importedCard.data.character_book;
+    expect(characterBook).toBeDefined();
+    if (!characterBook) {
+      return;
+    }
+
+    characterBook.description = 'Edited after import.';
+    Object.assign(characterBook.entries[0], {
+      keys: ['archive', 'records'],
+      content: 'Edited lore.',
+    });
+
+    const exportedCard = parseCharacterCardJson(serializeCharacterCard(importedCard));
+    expect(exportedCard.data.character_book).toMatchObject({
+      name: 'Imported archive',
+      description: 'Edited after import.',
+      extensions: { book_plugin: { mode: 'lunar' } },
+      entries: [
+        {
+          keys: ['archive', 'records'],
+          content: 'Edited lore.',
+          extensions: { entry_plugin: ['keep', 'this'] },
+          enabled: true,
+          insertion_order: 12,
+          priority: 50,
+        },
+      ],
+    });
+  });
 });
 
 describe('card export detail levels', () => {

@@ -3,7 +3,7 @@ import { LuCopy, LuLock, LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Badge } from '@~/components/ui/badge';
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 import { MultiSelect, SingleSelect } from '@~/components/ui/select';
@@ -224,7 +224,9 @@ export function FieldTemplatesPanel({
             </div>
 
             <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="template-content">Template content</Label>
+              <Label id="template-content-label" htmlFor="template-content">
+                Template content
+              </Label>
               <MarkdownFieldEditor
                 fieldId="template-content"
                 value={selectedTemplate.content}
@@ -237,6 +239,7 @@ export function FieldTemplatesPanel({
                 isReadOnly={selectedTemplate.isBuiltIn}
                 doesAllowOriginalMacro={hasOriginalMacroCapableField}
                 doesHighlightTemplateSlots
+                ariaLabelledBy="template-content-label"
                 onValueChange={(value) => onUpdateTemplate(selectedTemplate.id, { content: value })}
               />
               {selectedTemplate.mode === TEMPLATE_MODES.strict ? (

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --recursive run dev",
+    "dev": "pnpm --recursive --stream run dev",
     "build": "pnpm --recursive run build",
     "test": "pnpm --recursive --stream run test",
     "check-types": "pnpm --recursive --stream --no-bail run check-types",

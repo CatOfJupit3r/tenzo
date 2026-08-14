@@ -16,7 +16,10 @@ export interface iCharacterAssistantContextValue {
   guidedFlow: ReturnType<typeof useGuidedCharacterFlow>;
   openAssistant: () => void;
   openAssistantForField: (fieldKey: CharacterEditFieldKey) => void;
-  openAssistantInGuidedMode: (characterId: string) => Promise<void>;
+  openAssistantInGuidedMode: (
+    characterId: string,
+    options?: { mode?: 'direct' | 'discovery'; originalPremise?: string },
+  ) => Promise<void>;
   closeAssistant: () => void;
   addContextAttachment: (attachment: iCharacterAssistantContextAttachment) => void;
   removeContextAttachment: (attachmentId: string) => void;

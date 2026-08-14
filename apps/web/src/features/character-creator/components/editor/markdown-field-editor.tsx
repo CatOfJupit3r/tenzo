@@ -1,4 +1,5 @@
 import { EditorContent } from '@tiptap/react';
+import { useEffect } from 'react';
 
 import { cn } from '@~/lib/utils';
 
@@ -14,6 +15,8 @@ export interface iMarkdownFieldEditorProps {
   isStreaming?: boolean;
   doesAllowOriginalMacro?: boolean;
   doesHighlightTemplateSlots?: boolean;
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
   ariaDescribedBy?: string;
   onValueChange: (value: string) => void;
 }
@@ -31,6 +34,8 @@ export function MarkdownFieldEditor({
   isStreaming = false,
   doesAllowOriginalMacro = false,
   doesHighlightTemplateSlots = false,
+  ariaLabel,
+  ariaLabelledBy,
   ariaDescribedBy,
   onValueChange,
 }: iMarkdownFieldEditorProps) {
@@ -45,10 +50,25 @@ export function MarkdownFieldEditor({
       id: fieldId,
       role: 'textbox',
       'aria-multiline': 'true',
+      ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
+      ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
       ...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {}),
     },
     onValueChange,
   });
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    if (ariaLabel) {
+      editor.view.dom.setAttribute('aria-label', ariaLabel);
+      return;
+    }
+
+    editor.view.dom.removeAttribute('aria-label');
+  }, [ariaLabel, editor]);
 
   return (
     <div

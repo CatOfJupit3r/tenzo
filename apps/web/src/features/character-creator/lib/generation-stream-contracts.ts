@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import {
   FREQUENCY_PENALTY_RANGE,
+  GENERATION_PROVIDER_SCHEMA,
   MIN_P_RANGE,
   PRESENCE_PENALTY_RANGE,
   TEMPERATURE_RANGE,
@@ -16,6 +17,7 @@ export const GENERATION_STREAM_MESSAGE_SCHEMA = z.object({
 });
 
 export const CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA = z.object({
+  provider: GENERATION_PROVIDER_SCHEMA,
   endpoint: z.string().trim().min(1),
   apiKey: z.string().trim().min(1),
   model: z.string().trim().min(1),

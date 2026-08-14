@@ -1,6 +1,6 @@
 import { LuChevronDown, LuChevronUp, LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
 
-import { Button } from '@~/components/ui/button';
+import { Button } from '@~/components/ui/button/button';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
 import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
@@ -77,6 +77,7 @@ export function AlternateGreetings({
           {greetings.map((greeting, index) => {
             const generationState = generationStates[index];
             const isGenerating = generationState?.isGenerating ?? false;
+            const labelId = `alternate-greeting-${index}-label`;
             const shouldShowRewriteReview =
               (generationState?.isRewriteReviewPending ?? false) &&
               generationState?.rewriteBackupValue != null &&
@@ -86,12 +87,15 @@ export function AlternateGreetings({
               // eslint-disable-next-line react/no-array-index-key
               <div key={index} className="space-y-3 rounded-md border p-3">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-sm font-medium">Greeting {index + 1}</span>
+                  <span id={labelId} className="text-sm font-medium">
+                    Greeting {index + 1}
+                  </span>
                   <div className="flex gap-1">
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Move greeting ${index + 1} up`}
                       disabled={index === 0}
                       tooltip="Move up"
                       onClick={() => onMove(index, index - 1)}
@@ -102,6 +106,7 @@ export function AlternateGreetings({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Move greeting ${index + 1} down`}
                       disabled={index === greetings.length - 1}
                       tooltip="Move down"
                       onClick={() => onMove(index, index + 1)}
@@ -112,6 +117,7 @@ export function AlternateGreetings({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Remove greeting ${index + 1}`}
                       tooltip="Remove greeting"
                       onClick={() => onRemove(index)}
                     >
@@ -160,6 +166,7 @@ export function AlternateGreetings({
                     rows={4}
                     isReadOnly={isGenerating}
                     isStreaming={isGenerating}
+                    ariaLabelledBy={labelId}
                     onValueChange={(value) => onChange(index, value)}
                   />
                 )}

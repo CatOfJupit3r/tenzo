@@ -59,6 +59,10 @@ export class VariationService {
       return false;
     }
 
+    if (target.kind === GENERATION_TARGET_KINDS['general-character-idea']) {
+      return false;
+    }
+
     if (target.kind !== GENERATION_TARGET_KINDS.field) {
       return true;
     }

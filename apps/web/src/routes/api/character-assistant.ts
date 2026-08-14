@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
+import type { ModelMessage } from 'ai';
 import { ZodError } from 'zod';
 
-import { GUIDED_STEP_DEFINITIONS } from '@~/features/character-creator/constants/guided-flow';
+import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_IDS } from '@~/features/character-creator/constants/guided-flow';
 import type { CharacterCard } from '@~/features/character-creator/lib/card-schema';
 import { CHARACTER_TEXT_FIELD_KEYS } from '@~/features/character-creator/lib/card-schema';
 import {
@@ -22,10 +23,17 @@ import type {
   CharacterAssistantToolName,
   iCharacterAssistantStreamEvent,
 } from '@~/features/character-creator/lib/character-assistant-contracts';
-import { createCharacterAssistantMastra } from '@~/features/character-creator/lib/character-assistant-mastra.server';
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/character-assistant-generation-mode';
+import { shouldFallbackFromToolCalling } from '@~/features/character-creator/lib/character-assistant-provider-errors';
+import {
+  CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER,
+  streamCharacterAssistant,
+} from '@~/features/character-creator/lib/character-assistant-runtime.server';
+import { generateStructuredCharacterAssistant } from '@~/features/character-creator/lib/character-assistant-structured.server';
 import { createCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
 import type { iCharacterEditProposal } from '@~/features/character-creator/lib/character-edit-proposal';
 import { TEMPLATE_FIELD_KEYS } from '@~/features/character-creator/lib/field-templates';
+import { generateUuid } from '@~/utils/uuid';
 
 const MAX_CHARACTER_ASSISTANT_STEPS = 12;
 const MAX_GUIDED_ASSISTANT_STEPS = 6;
@@ -35,14 +43,12 @@ function encodeServerEvent(event: iCharacterAssistantStreamEvent) {
   return textEncoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
 }
 
-function toMastraMessage(
+function toModelMessage(
   message: (typeof CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA)['shape']['messages']['element']['_output'],
-) {
+): ModelMessage {
   return {
-    id: message.id,
     role: message.role,
-    content: message.content,
-    createdAt: new Date(message.createdAt),
+    content: message.content.replaceAll(CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER, '').trim(),
   };
 }
 
@@ -228,7 +234,98 @@ export const Route = createFileRoute('/api/character-assistant')({
                     );
                   },
                 };
-                const { assistant } = createCharacterAssistantMastra({
+
+                const runStructuredAssistant = async () => {
+                  const result = await generateStructuredCharacterAssistant({
+                    card: projectedCard,
+                    focus: effectiveFocus,
+                    contextAttachments: payload.contextAttachments,
+                    apiKey: payload.apiKey,
+                    generationSettings: {
+                      endpoint: payload.endpoint,
+                      model: payload.model,
+                      maxTokens: payload.maxTokens,
+                      temperature: payload.temperature,
+                      topP: payload.topP,
+                      frequencyPenalty: payload.frequencyPenalty,
+                      presencePenalty: payload.presencePenalty,
+                      topK: payload.topK,
+                      minP: payload.minP,
+                    },
+                    shouldSendDisabledSamplers: payload.shouldSendDisabledSamplers,
+                    generalCharacterIdea: payload.generalCharacterIdea,
+                    guidedStep: payload.guidedStep,
+                    concept: payload.concept,
+                    discoveryContext: payload.discoveryContext,
+                    templates: payload.templates,
+                    messages: payload.messages.map(toModelMessage),
+                    abortSignal: request.signal,
+                  });
+
+                  if (result.concept) {
+                    store.recordConcept(result.concept);
+                  }
+
+                  if (result.hasChanges) {
+                    store.appendProposedCard({
+                      toolCallId: `structured-output-${generateUuid()}`,
+                      summary: result.summary,
+                      proposedCard: result.proposedCard,
+                    });
+                  }
+
+                  return result.assistantMessage;
+                };
+                const enqueueComplete = (assistantMessage: string) => {
+                  const hasCompletedGuidedStep =
+                    payload.guidedStep === undefined ||
+                    (latestProposal !== null &&
+                      (payload.guidedStep !== GUIDED_STEP_IDS.concept || recordedConcept !== undefined));
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_COMPLETE_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete,
+                      assistantMessage: assistantMessage.trim() || 'The proposed changes are ready for review.',
+                      proposals: latestProposal ? [latestProposal] : [],
+                      concept: recordedConcept,
+                      hasCompletedGuidedStep,
+                    }),
+                  );
+                };
+                const isCompatibleGuidedChat =
+                  payload.guidedStep !== undefined &&
+                  payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'];
+                const hasUserRequestedFinalization = payload.messages
+                  .at(-1)
+                  ?.content.includes(CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER);
+
+                if (isCompatibleGuidedChat && hasUserRequestedFinalization) {
+                  const assistantMessage = await runStructuredAssistant();
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                      textDelta: assistantMessage,
+                    }),
+                  );
+                  enqueueComplete(assistantMessage);
+                  return;
+                }
+
+                if (
+                  payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'] &&
+                  !isCompatibleGuidedChat
+                ) {
+                  const assistantMessage = await runStructuredAssistant();
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                      textDelta: assistantMessage,
+                    }),
+                  );
+                  enqueueComplete(assistantMessage);
+                  return;
+                }
+
+                const output = streamCharacterAssistant({
                   card: payload.card,
                   focus: effectiveFocus,
                   contextAttachments: payload.contextAttachments,
@@ -248,66 +345,83 @@ export const Route = createFileRoute('/api/character-assistant')({
                   generalCharacterIdea: payload.generalCharacterIdea,
                   guidedStep: payload.guidedStep,
                   concept: payload.concept,
+                  discoveryContext: payload.discoveryContext,
                   templates: payload.templates,
                   allowedToolNames,
+                  shouldUseNativeTools: !isCompatibleGuidedChat,
                   store,
-                });
-                const output = await assistant.stream(payload.messages.map(toMastraMessage), {
+                  messages: payload.messages.map(toModelMessage),
                   maxSteps: payload.guidedStep ? MAX_GUIDED_ASSISTANT_STEPS : MAX_CHARACTER_ASSISTANT_STEPS,
-                  modelSettings: {
-                    maxOutputTokens: payload.maxTokens,
-                    temperature: payload.temperature,
-                    topP: payload.topP,
-                    frequencyPenalty: payload.frequencyPenalty,
-                    presencePenalty: payload.presencePenalty,
-                  },
                   abortSignal: request.signal,
                 });
+                try {
+                  for await (const chunk of output.fullStream) {
+                    if (chunk.type === 'error') {
+                      throw chunk.error;
+                    }
 
-                for await (const chunk of output.fullStream) {
-                  if (chunk.type === 'text-delta') {
-                    enqueueEvent(
-                      CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
-                        type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
-                        textDelta: chunk.payload.text,
-                      }),
-                    );
-                    continue;
+                    if (chunk.type === 'text-delta') {
+                      enqueueEvent(
+                        CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                          type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                          textDelta: chunk.text,
+                        }),
+                      );
+                      continue;
+                    }
+
+                    if (chunk.type === 'tool-call' && isCharacterAssistantToolName(chunk.toolName)) {
+                      enqueueEvent(
+                        CHARACTER_ASSISTANT_TOOL_CALL_START_EVENT_SCHEMA.parse({
+                          type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-start'],
+                          toolCallId: chunk.toolCallId,
+                          toolName: chunk.toolName,
+                        }),
+                      );
+                      continue;
+                    }
+
+                    if (chunk.type === 'tool-error' && isCharacterAssistantToolName(chunk.toolName)) {
+                      enqueueEvent(
+                        CHARACTER_ASSISTANT_TOOL_CALL_ERROR_EVENT_SCHEMA.parse({
+                          type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-error'],
+                          toolCallId: chunk.toolCallId,
+                          toolName: chunk.toolName,
+                          message: chunk.error instanceof Error ? chunk.error.message : 'Proposal tool failed.',
+                        }),
+                      );
+                    }
                   }
 
-                  if (chunk.type === 'tool-call' && isCharacterAssistantToolName(chunk.payload.toolName)) {
-                    enqueueEvent(
-                      CHARACTER_ASSISTANT_TOOL_CALL_START_EVENT_SCHEMA.parse({
-                        type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-start'],
-                        toolCallId: chunk.payload.toolCallId,
-                        toolName: chunk.payload.toolName,
-                      }),
-                    );
-                    continue;
+                  const assistantMessage = await output.text;
+                  const visibleAssistantMessage = assistantMessage
+                    .replaceAll(CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER, '')
+                    .trim();
+
+                  enqueueComplete(visibleAssistantMessage);
+                } catch (error) {
+                  if (
+                    !shouldFallbackFromToolCalling({
+                      error,
+                      isGuidedRun: payload.guidedStep !== undefined,
+                      isConceptStep: payload.guidedStep === GUIDED_STEP_IDS.concept,
+                      doesRequestStructuredFinalization: false,
+                      hasProposal: latestProposal !== null,
+                      hasConcept: recordedConcept !== undefined,
+                    })
+                  ) {
+                    throw error;
                   }
 
-                  if (chunk.type === 'tool-error' && isCharacterAssistantToolName(chunk.payload.toolName)) {
-                    enqueueEvent(
-                      CHARACTER_ASSISTANT_TOOL_CALL_ERROR_EVENT_SCHEMA.parse({
-                        type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['tool-call-error'],
-                        toolCallId: chunk.payload.toolCallId,
-                        toolName: chunk.payload.toolName,
-                        message:
-                          chunk.payload.error instanceof Error ? chunk.payload.error.message : 'Proposal tool failed.',
-                      }),
-                    );
-                  }
+                  const assistantMessage = await runStructuredAssistant();
+                  enqueueEvent(
+                    CHARACTER_ASSISTANT_TEXT_DELTA_EVENT_SCHEMA.parse({
+                      type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta'],
+                      textDelta: assistantMessage,
+                    }),
+                  );
+                  enqueueComplete(assistantMessage);
                 }
-
-                const fullOutput = await output.getFullOutput();
-                enqueueEvent(
-                  CHARACTER_ASSISTANT_COMPLETE_EVENT_SCHEMA.parse({
-                    type: CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete,
-                    assistantMessage: fullOutput.text.trim() || 'The proposed changes are ready for review.',
-                    proposals: latestProposal ? [latestProposal] : [],
-                    concept: recordedConcept,
-                  }),
-                );
               } catch (error) {
                 enqueueEvent(
                   CHARACTER_ASSISTANT_ERROR_EVENT_SCHEMA.parse({

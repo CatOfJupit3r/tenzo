@@ -128,7 +128,8 @@ export function createCharacterAssistantTools({
   });
 
   const proposeAlternateGreetingsTool = tool({
-    description: 'Propose a complete ordered replacement for the alternate greetings.',
+    description:
+      'Create, add, revise, remove, or reorder alternate greetings by proposing the complete ordered list. Preserve worthwhile existing greetings unless the user asks to replace them.',
     inputSchema: z.object({
       greetings: z.array(z.string()),
       summary: z.string().trim().min(1),

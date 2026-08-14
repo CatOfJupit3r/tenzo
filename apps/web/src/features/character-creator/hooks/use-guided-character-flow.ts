@@ -1,56 +1,311 @@
-import { useLiveQuery } from '@tanstack/react-db';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { usePersistentCollection } from '@~/db/persistent-collection';
+import { generateUuid } from '@~/utils/uuid';
 
 import {
+  addCustomizedGuidedDiscoveryCard,
   advanceGuidedStep,
   characterAssistantSessionsCollection,
   exitGuidedSession,
+  finishGuidedDiscovery,
   removeGuidedAttachment,
+  replaceGeneratedGuidedDiscoveryCardsByCategory,
+  selectGuidedStep,
+  startGuidedDiscovery,
   startGuidedSession,
+  toggleGuidedDiscoveryCardSelection,
 } from '../collections/character-assistant-sessions.collection';
-import { GUIDED_STEP_DEFINITIONS } from '../constants/guided-flow';
+import { GUIDED_STEP_DEFINITIONS, GUIDED_STEP_IDS } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-step-id';
+import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '../lib/character-assistant-contracts';
+import type { iCharacterAssistantDiscoveryDirectionCategory } from '../lib/character-assistant-contracts';
+import { generateCharacterAssistantDiscoveryDirections } from '../lib/character-assistant-discovery-client';
+import {
+  buildDeterministicDiscoveryHandoffSummary,
+  hasDiscoveryHandoffSelections,
+} from '../lib/character-assistant-discovery-state';
+import { CHARACTER_ASSISTANT_SESSION_MODES } from '../lib/character-assistant-session';
 import { analyzeCharacterImage } from '../lib/character-vision-client';
 import type { iCharacterImageAnalysis } from '../lib/character-vision-contracts';
+import type { GenerationProvider } from '../lib/generation-config';
 import { deleteCharacterAssetBlob } from '../lib/image-store';
+
+type iDiscoveryCategoryGenerationState = Record<
+  iCharacterAssistantDiscoveryDirectionCategory,
+  {
+    isRunning: boolean;
+    elapsedSeconds: number;
+    isLongRunning: boolean;
+    errorMessage: string | null;
+  }
+>;
 
 interface iUseGuidedCharacterFlowOptions {
   characterId: string;
   apiKey: string;
+  provider: GenerationProvider;
   endpoint: string;
   model: string;
+  visionModel: string;
   maxTokens: number;
   temperature: number;
+  topP: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  topK: number;
+  minP: number;
   updateGeneralCharacterIdea: (value: string) => void;
   workspace: {
     hasCompletedCurrentGuidedStepRun: boolean;
+    hasUnresolvedProposals: boolean;
   };
+}
+
+export const DISCOVERY_LONG_RUNNING_THRESHOLD_MS = 10_000;
+export const DISCOVERY_CATEGORY_TIMEOUT_MS = 45_000;
+const DISCOVERY_CATEGORY_TIMEOUT_MESSAGE = 'Generation timed out. Retry this category.';
+
+const DISCOVERY_CATEGORIES = [
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept'],
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['relationship-dynamic'],
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario,
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+] as const satisfies readonly iCharacterAssistantDiscoveryDirectionCategory[];
+
+function createEmptyDiscoveryCategoryGenerationState() {
+  const state = {} as iDiscoveryCategoryGenerationState;
+
+  DISCOVERY_CATEGORIES.forEach((category) => {
+    state[category] = { isRunning: false, elapsedSeconds: 0, isLongRunning: false, errorMessage: null };
+  });
+
+  return state;
+}
+
+function isAbortError(error: unknown) {
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError';
+}
+
+function createDiscoveryControllerMap() {
+  const entries = DISCOVERY_CATEGORIES.map((category) => [category, null] as const);
+  return Object.fromEntries(entries) as Record<iCharacterAssistantDiscoveryDirectionCategory, AbortController | null>;
 }
 
 export function useGuidedCharacterFlow({
   characterId,
   apiKey,
+  provider,
   endpoint,
   model,
+  visionModel,
   maxTokens,
   temperature,
+  topP,
+  frequencyPenalty,
+  presencePenalty,
+  topK,
+  minP,
   updateGeneralCharacterIdea,
   workspace,
 }: iUseGuidedCharacterFlowOptions) {
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [imageAnalysisError, setImageAnalysisError] = useState<string | null>(null);
   const [latestAnalysis, setLatestAnalysis] = useState<iCharacterImageAnalysis | null>(null);
-  const { data: storedSessions } = useLiveQuery((query) =>
-    query.from({ session: characterAssistantSessionsCollection }),
-  );
+  const [discoveryCategoryGenerationState, setDiscoveryCategoryGenerationState] =
+    useState<iDiscoveryCategoryGenerationState>(createEmptyDiscoveryCategoryGenerationState);
+  const discoveryControllersRef = useRef(createDiscoveryControllerMap());
+  const storedSessions = usePersistentCollection(characterAssistantSessionsCollection);
   const session = useMemo(
     () => storedSessions.find((storedSession) => storedSession.id === characterId) ?? null,
     [characterId, storedSessions],
   );
-  const guidedState = session?.mode === 'guided' ? session.guided : null;
-  const isGuidedComplete = Boolean(session?.mode === 'chat' && session.guided?.completedSteps.includes('review'));
+  const savedGuidedState = session?.guided ?? null;
+  const guidedState = session?.mode === CHARACTER_ASSISTANT_SESSION_MODES.guided ? session.guided : null;
+  const discoveryState = guidedState?.discovery;
+  const hasCompletedDiscovery = guidedState
+    ? hasDiscoveryHandoffSelections(guidedState.discoveryHandoffSummary)
+    : false;
+  const isGuidedDiscoveryMode =
+    guidedState?.currentStep === GUIDED_STEP_IDS.concept &&
+    Boolean(discoveryState?.originalPremise.trim()) &&
+    !hasCompletedDiscovery;
+  const isGuidedComplete = Boolean(
+    session?.mode === CHARACTER_ASSISTANT_SESSION_MODES.chat &&
+    session.guided?.completedSteps.includes(GUIDED_STEP_IDS.review),
+  );
   const currentStepDefinition = guidedState ? GUIDED_STEP_DEFINITIONS[guidedState.currentStep] : null;
+  const hasPersistedCurrentGuidedStepRun = Boolean(guidedState?.completedSteps.includes(guidedState.currentStep));
   const canContinue = Boolean(
-    currentStepDefinition && (currentStepDefinition.isSkippable || workspace.hasCompletedCurrentGuidedStepRun),
+    currentStepDefinition &&
+    !(currentStepDefinition.id === GUIDED_STEP_IDS.review && workspace.hasUnresolvedProposals) &&
+    (isGuidedDiscoveryMode
+      ? guidedState?.discovery?.isReadyForHandoff
+      : currentStepDefinition.isSkippable ||
+        workspace.hasCompletedCurrentGuidedStepRun ||
+        hasPersistedCurrentGuidedStepRun),
+  );
+  const discoveryHandoffSummary = guidedState ? buildDeterministicDiscoveryHandoffSummary(guidedState.discovery) : null;
+
+  useEffect(
+    () => () => {
+      DISCOVERY_CATEGORIES.forEach((category) => {
+        discoveryControllersRef.current[category]?.abort();
+        discoveryControllersRef.current[category] = null;
+      });
+    },
+    [],
+  );
+
+  const setCategoryGenerationState = useCallback(
+    (
+      category: iCharacterAssistantDiscoveryDirectionCategory,
+      patch: Partial<iDiscoveryCategoryGenerationState[iCharacterAssistantDiscoveryDirectionCategory]>,
+    ) => {
+      setDiscoveryCategoryGenerationState((currentState) => ({
+        ...currentState,
+        [category]: {
+          ...currentState[category],
+          ...patch,
+        },
+      }));
+    },
+    [],
+  );
+
+  const generateDirectionsForCategory = useCallback(
+    async (
+      category: iCharacterAssistantDiscoveryDirectionCategory,
+      originalPremise: string,
+      targetCharacterId = characterId,
+    ) => {
+      const controller = new AbortController();
+      const previousController = discoveryControllersRef.current[category];
+      if (previousController) {
+        previousController.abort();
+      }
+
+      discoveryControllersRef.current[category] = controller;
+      const startedAt = Date.now();
+      let didTimeOut = false;
+      const elapsedTimer = window.setInterval(() => {
+        if (discoveryControllersRef.current[category] !== controller) {
+          return;
+        }
+
+        const elapsedMilliseconds = Date.now() - startedAt;
+        setCategoryGenerationState(category, {
+          elapsedSeconds: Math.floor(elapsedMilliseconds / 1000),
+          isLongRunning: elapsedMilliseconds >= DISCOVERY_LONG_RUNNING_THRESHOLD_MS,
+        });
+      }, 1000);
+      const timeoutTimer = window.setTimeout(() => {
+        if (discoveryControllersRef.current[category] !== controller) {
+          return;
+        }
+
+        didTimeOut = true;
+        controller.abort();
+      }, DISCOVERY_CATEGORY_TIMEOUT_MS);
+      setCategoryGenerationState(category, {
+        isRunning: true,
+        elapsedSeconds: 0,
+        isLongRunning: false,
+        errorMessage: null,
+      });
+
+      try {
+        const cards = await generateCharacterAssistantDiscoveryDirections({
+          provider,
+          endpoint,
+          apiKey,
+          model,
+          maxTokens,
+          temperature,
+          topP,
+          frequencyPenalty,
+          presencePenalty,
+          topK,
+          minP,
+          originalPremise,
+          category,
+          signal: controller.signal,
+        });
+
+        await replaceGeneratedGuidedDiscoveryCardsByCategory(targetCharacterId, category, cards);
+        return true;
+      } catch (error) {
+        if (didTimeOut) {
+          const timeoutError = new Error(DISCOVERY_CATEGORY_TIMEOUT_MESSAGE);
+          if (discoveryControllersRef.current[category] === controller) {
+            setCategoryGenerationState(category, { errorMessage: timeoutError.message });
+          }
+          throw timeoutError;
+        }
+
+        if (!isAbortError(error)) {
+          const message = error instanceof Error ? error.message : 'Discovery directions could not be regenerated.';
+          if (discoveryControllersRef.current[category] === controller) {
+            setCategoryGenerationState(category, { errorMessage: message });
+          }
+          throw error;
+        }
+
+        return false;
+      } finally {
+        window.clearInterval(elapsedTimer);
+        window.clearTimeout(timeoutTimer);
+        if (discoveryControllersRef.current[category] === controller) {
+          discoveryControllersRef.current[category] = null;
+          setCategoryGenerationState(category, { isRunning: false });
+        }
+      }
+    },
+    [
+      apiKey,
+      provider,
+      endpoint,
+      frequencyPenalty,
+      maxTokens,
+      minP,
+      model,
+      presencePenalty,
+      setCategoryGenerationState,
+      topK,
+      topP,
+      temperature,
+      characterId,
+    ],
+  );
+
+  const startGuidedDiscoverySession = useCallback(
+    async (originalPremise: string, targetCharacterId = characterId) => {
+      const normalizedPremise = originalPremise.trim();
+      if (!normalizedPremise) {
+        throw new Error('Discovery premise must not be empty.');
+      }
+
+      setDiscoveryCategoryGenerationState(createEmptyDiscoveryCategoryGenerationState());
+      await startGuidedSession(targetCharacterId);
+      await startGuidedDiscovery(targetCharacterId, normalizedPremise);
+
+      const generationResults = await Promise.allSettled(
+        DISCOVERY_CATEGORIES.map(async (category) =>
+          generateDirectionsForCategory(category, normalizedPremise, targetCharacterId),
+        ),
+      );
+      const hasGeneratedDirections = generationResults.some((result) => result.status === 'fulfilled' && result.value);
+
+      if (!hasGeneratedDirections) {
+        const firstFailure = generationResults.find((result) => result.status === 'rejected');
+        const failureMessage =
+          firstFailure?.status === 'rejected' && firstFailure.reason instanceof Error
+            ? firstFailure.reason.message
+            : 'Discovery generation did not produce any directions.';
+        throw new Error(`Guided discovery could not start. ${failureMessage}`);
+      }
+    },
+    [characterId, generateDirectionsForCategory],
   );
 
   const continueToNextStep = useCallback(async () => {
@@ -58,10 +313,16 @@ export function useGuidedCharacterFlow({
       return false;
     }
 
+    if (isGuidedDiscoveryMode) {
+      await finishGuidedDiscovery(characterId);
+      setLatestAnalysis(null);
+      return true;
+    }
+
     await advanceGuidedStep(characterId);
     setLatestAnalysis(null);
     return true;
-  }, [canContinue, characterId]);
+  }, [canContinue, characterId, isGuidedDiscoveryMode]);
 
   const skipStep = useCallback(async () => {
     if (!currentStepDefinition?.isSkippable) {
@@ -72,6 +333,20 @@ export function useGuidedCharacterFlow({
     setLatestAnalysis(null);
     return true;
   }, [characterId, currentStepDefinition?.isSkippable]);
+
+  const navigateToStep = useCallback(
+    async (stepId: GuidedStepId) => {
+      if (!savedGuidedState) {
+        return false;
+      }
+
+      await selectGuidedStep(characterId, stepId);
+      setLatestAnalysis(null);
+      setImageAnalysisError(null);
+      return true;
+    },
+    [characterId, savedGuidedState],
+  );
 
   const analyzeImage = useCallback(
     async (file: File, userHint?: string) => {
@@ -88,7 +363,7 @@ export function useGuidedCharacterFlow({
           file,
           endpoint,
           apiKey,
-          model,
+          model: visionModel,
           maxTokens,
           temperature,
           userHint,
@@ -103,7 +378,7 @@ export function useGuidedCharacterFlow({
         setIsAnalyzingImage(false);
       }
     },
-    [apiKey, characterId, currentStepDefinition?.isImageStepAllowed, endpoint, maxTokens, model, temperature],
+    [apiKey, characterId, currentStepDefinition?.isImageStepAllowed, endpoint, maxTokens, temperature, visionModel],
   );
 
   const applyConceptToCard = useCallback(() => {
@@ -122,14 +397,64 @@ export function useGuidedCharacterFlow({
     [characterId],
   );
 
-  const openGuidedSession = useCallback(async () => {
-    await startGuidedSession(characterId);
-  }, [characterId]);
+  const regenerateDiscoveryCategory = useCallback(
+    async (category: iCharacterAssistantDiscoveryDirectionCategory) => {
+      const normalizedPremise = discoveryState?.originalPremise.trim() ?? '';
+      if (!normalizedPremise) {
+        return;
+      }
+
+      await generateDirectionsForCategory(category, normalizedPremise);
+    },
+    [discoveryState?.originalPremise, generateDirectionsForCategory],
+  );
+
+  const toggleDiscoverySelection = useCallback(
+    async (cardId: string) => {
+      await toggleGuidedDiscoveryCardSelection(characterId, cardId);
+    },
+    [characterId],
+  );
+
+  const createDiscoveryCustomVariant = useCallback(
+    async (sourceCardId: string, title: string, description: string) => {
+      await addCustomizedGuidedDiscoveryCard(characterId, sourceCardId, {
+        id: generateUuid(),
+        title,
+        description,
+      });
+    },
+    [characterId],
+  );
+
+  const cancelDiscoveryGeneration = useCallback(
+    (category: iCharacterAssistantDiscoveryDirectionCategory) => {
+      const controller = discoveryControllersRef.current[category];
+      if (controller) {
+        controller.abort();
+        discoveryControllersRef.current[category] = null;
+      }
+
+      setCategoryGenerationState(category, { isRunning: false });
+    },
+    [setCategoryGenerationState],
+  );
+
+  const openGuidedSession = useCallback(
+    async (targetCharacterId = characterId) => {
+      await startGuidedSession(targetCharacterId);
+      setLatestAnalysis(null);
+      setImageAnalysisError(null);
+      setDiscoveryCategoryGenerationState(createEmptyDiscoveryCategoryGenerationState());
+    },
+    [characterId],
+  );
 
   const restartGuidedSession = useCallback(async () => {
     await startGuidedSession(characterId);
     setLatestAnalysis(null);
     setImageAnalysisError(null);
+    setDiscoveryCategoryGenerationState(createEmptyDiscoveryCategoryGenerationState());
   }, [characterId]);
 
   const leaveGuidedMode = useCallback(async () => {
@@ -138,6 +463,7 @@ export function useGuidedCharacterFlow({
 
   return {
     guidedState,
+    savedGuidedState,
     isGuidedComplete,
     currentStepDefinition,
     canContinue,
@@ -146,11 +472,20 @@ export function useGuidedCharacterFlow({
     latestAnalysis,
     continueToNextStep,
     skipStep,
+    navigateToStep,
     analyzeImage,
     applyConceptToCard,
     removeImageAttachment,
     openGuidedSession,
     restartGuidedSession,
     exitGuidedMode: leaveGuidedMode,
+    isGuidedDiscoveryMode,
+    discoveryCategoryGenerationState,
+    discoveryHandoffSummary,
+    startGuidedDiscoverySession,
+    regenerateDiscoveryCategory,
+    cancelDiscoveryGeneration,
+    toggleDiscoverySelection,
+    createDiscoveryCustomVariant,
   };
 }

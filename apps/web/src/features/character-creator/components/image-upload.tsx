@@ -61,14 +61,14 @@ export function ImageUpload({
 
   if (isPortraitLoading) {
     portraitContent = (
-      <div className="flex aspect-2/3 w-full items-center justify-center rounded-[20px] border bg-muted/20 px-4 text-center text-sm text-muted-foreground">
+      <div className="flex aspect-2/3 w-full items-center justify-center rounded-xl border bg-muted/20 px-3 text-center text-xs text-muted-foreground">
         Loading saved portrait...
       </div>
     );
   } else if (isPortraitReady) {
     portraitContent = (
       <div className="space-y-4">
-        <div className="group relative overflow-hidden rounded-[20px] border bg-black/95 shadow-sm">
+        <div className="group relative overflow-hidden rounded-xl border bg-black/95 shadow-sm">
           <PortraitPreviewSurface
             alt={portraitFileName ?? 'Selected portrait preview'}
             className="w-full"
@@ -119,14 +119,12 @@ export function ImageUpload({
     portraitContent = (
       <label
         htmlFor={portraitFileInputId}
-        className="flex aspect-2/3 w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-[20px] border border-dashed border-border bg-muted/30 p-6 text-center transition-colors hover:border-foreground/40 hover:bg-muted/50"
+        className="flex aspect-2/3 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-center transition-colors hover:border-foreground/40 hover:bg-muted/50"
       >
         <LuImagePlus className="size-5" />
         <div className="space-y-1">
-          <p className="text-sm font-medium">Drop portrait here</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            The portrait stays local. You can zoom, pan, and export the final crop directly into the PNG card.
-          </p>
+          <p className="text-sm font-medium">Add portrait</p>
+          <p className="text-xs text-muted-foreground">Stored locally. Click the portrait to crop it.</p>
         </div>
       </label>
     );

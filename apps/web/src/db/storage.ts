@@ -1,12 +1,11 @@
-import type { StorageApi } from '@tanstack/react-db';
+export interface iStorageApi {
+  getItem: (key: string) => string | null;
+  removeItem: (key: string) => void;
+  setItem: (key: string, value: string) => void;
+}
 
-/**
- * TanStack DB's localStorage collections read/write synchronously at creation
- * time. Because this app is server-rendered (TanStack Start), `window` is not
- * available during SSR, so we hand collections a no-op in-memory store on the
- * server and the real `localStorage`/`sessionStorage` in the browser.
- */
-const createMemoryStorage = (): StorageApi => {
+/** Browser storage adapter for Jotai settings and one-time legacy imports. */
+const createMemoryStorage = (): iStorageApi => {
   const map = new Map<string, string>();
   return {
     getItem: (key) => map.get(key) ?? null,
@@ -21,6 +20,6 @@ const createMemoryStorage = (): StorageApi => {
 
 const isBrowser = typeof window !== 'undefined';
 
-export const localStorageApi: StorageApi = isBrowser ? window.localStorage : createMemoryStorage();
+export const localStorageApi: iStorageApi = isBrowser ? window.localStorage : createMemoryStorage();
 
-export const sessionStorageApi: StorageApi = isBrowser ? window.sessionStorage : createMemoryStorage();
+export const sessionStorageApi: iStorageApi = isBrowser ? window.sessionStorage : createMemoryStorage();

@@ -14,12 +14,19 @@ import { TagsInput } from '../tags-input';
 import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
 
 export function MetadataTab() {
-  const { openAssistantForField, workspace } = useCharacterAssistant();
+  const { openAssistant, openAssistantForField, workspace } = useCharacterAssistant();
   const {
     data,
     updateTags,
     generalCharacterIdea,
     updateGeneralCharacterIdea,
+    generalCharacterIdeaGenerationState,
+    generateGeneralCharacterIdea,
+    cancelGeneralCharacterIdeaGeneration,
+    revertGeneralCharacterIdeaRewrite,
+    resolveGeneralCharacterIdeaRewriteReview,
+    acceptGeneralCharacterIdeaRewrite,
+    updateGeneralCharacterIdeaInstruction,
     addCustomField,
     updateCustomField,
     handleRemoveCustomField,
@@ -54,7 +61,23 @@ export function MetadataTab() {
           rows={4}
           editorVariant={FIELD_EDITOR_VARIANTS.markdown}
           hint="Shared concept, tone, or high-level direction available to every field generation."
+          shouldShowGeneralCharacterIdeaToggle={false}
+          instructionValue={generalCharacterIdeaGenerationState.instructionValue}
+          generationErrorMessage={generalCharacterIdeaGenerationState.errorMessage}
+          isGenerating={generalCharacterIdeaGenerationState.isGenerating}
+          hasRewriteBackup={generalCharacterIdeaGenerationState.hasRewriteBackup}
+          isRewriteReviewPending={generalCharacterIdeaGenerationState.isRewriteReviewPending}
+          rewriteBackupValue={generalCharacterIdeaGenerationState.rewriteBackupValue}
           onValueChange={updateGeneralCharacterIdea}
+          onInstructionChange={updateGeneralCharacterIdeaInstruction}
+          onGenerate={async () => generateGeneralCharacterIdea(GENERATION_MODES.generate)}
+          onContinue={async () => generateGeneralCharacterIdea(GENERATION_MODES.continue)}
+          onRewrite={async () => generateGeneralCharacterIdea(GENERATION_MODES.rewrite)}
+          onRevertRewrite={revertGeneralCharacterIdeaRewrite}
+          onAcceptRewrite={acceptGeneralCharacterIdeaRewrite}
+          onResolveRewriteReview={resolveGeneralCharacterIdeaRewriteReview}
+          onCancel={cancelGeneralCharacterIdeaGeneration}
+          onAskAssistant={openAssistant}
         />
       </div>
 

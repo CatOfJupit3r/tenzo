@@ -36,7 +36,11 @@ import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBl
 import { invalidatePortraitAsset } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
 import { ExampleContextService } from '../lib/prompt/example-context-service';
-import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
+import {
+  GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY,
+  GENERATION_MODES,
+  GENERATION_TARGET_KINDS,
+} from '../lib/prompt/generation-contracts';
 import type { GenerationMode, iFieldGenerationTarget, iPromptFieldTemplate } from '../lib/prompt/generation-contracts';
 import { useCharacterPortrait } from './use-character-portrait';
 import { useCharacterSession } from './use-character-session';
@@ -109,6 +113,10 @@ export function useCharacterCreatorPage() {
 
   const {
     isCharacterLibraryReady,
+    isSaving,
+    saveErrorMessage,
+    hasPersistedEdits,
+    lastSavedAt,
     characterLibrary,
     activeCharacterId,
     card,
@@ -122,6 +130,13 @@ export function useCharacterCreatorPage() {
     addCustomField,
     updateCustomField,
     removeCustomField,
+    createCharacterBook,
+    removeCharacterBook,
+    updateCharacterBook,
+    addCharacterBookEntry,
+    updateCharacterBookEntry,
+    removeCharacterBookEntry,
+    reorderCharacterBookEntries,
     exampleCharacters,
     addExampleCharacters,
     updateExampleCharacterIncludedFields,
@@ -131,6 +146,7 @@ export function useCharacterCreatorPage() {
     selectCharacter,
     duplicateCharacter,
     removeCharacter,
+    discardProvisionalCharacter,
   } = useCharacterSession();
 
   const {
@@ -368,6 +384,50 @@ export function useCharacterCreatorPage() {
   const updateStandardFieldTemplateId = useCallback(
     (key: CharacterTextFieldKey, templateId: string | null) => updateFieldTemplateId(`field:${key}`, templateId),
     [updateFieldTemplateId],
+  );
+
+  const generalCharacterIdeaGenerationState = getGenerationState(GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY);
+
+  const generateGeneralCharacterIdea = useCallback(
+    async (mode: GenerationMode = GENERATION_MODES.generate) => {
+      await runGeneration(
+        {
+          key: GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY,
+          label: 'General Character Idea',
+          value: generalCharacterIdea,
+          kind: GENERATION_TARGET_KINDS['general-character-idea'],
+        },
+        updateGeneralCharacterIdea,
+        mode,
+      );
+    },
+    [generalCharacterIdea, runGeneration, updateGeneralCharacterIdea],
+  );
+
+  const cancelGeneralCharacterIdeaGeneration = useCallback(
+    () => cancelGeneration(GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY),
+    [cancelGeneration],
+  );
+
+  const revertGeneralCharacterIdeaRewrite = useCallback(
+    () => revertFieldRewrite(GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY, updateGeneralCharacterIdea),
+    [revertFieldRewrite, updateGeneralCharacterIdea],
+  );
+
+  const resolveGeneralCharacterIdeaRewriteReview = useCallback(
+    (mergedValue: string) =>
+      resolveFieldRewriteReview(GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY, mergedValue, updateGeneralCharacterIdea),
+    [resolveFieldRewriteReview, updateGeneralCharacterIdea],
+  );
+
+  const acceptGeneralCharacterIdeaRewrite = useCallback(
+    () => acceptFieldRewrite(GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY),
+    [acceptFieldRewrite],
+  );
+
+  const updateGeneralCharacterIdeaInstruction = useCallback(
+    (value: string) => updateFieldInstruction(GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY, value),
+    [updateFieldInstruction],
   );
 
   const getTemplateOptionsForTargetKey = useCallback(
@@ -893,11 +953,15 @@ export function useCharacterCreatorPage() {
       openImportDialog,
       openExportDialog,
       handleCreateCharacter,
+      createProvisionalCharacter: createCharacter,
       handleSelectCharacter,
       handleDuplicateCharacter,
       handleRemoveCharacter,
+      discardProvisionalCharacter,
     }),
     [
+      createCharacter,
+      discardProvisionalCharacter,
       handleCreateCharacter,
       handleDuplicateCharacter,
       handleRemoveCharacter,
@@ -910,6 +974,10 @@ export function useCharacterCreatorPage() {
   return {
     actions,
     isCharacterLibraryReady,
+    isSaving,
+    saveErrorMessage,
+    hasPersistedEdits,
+    lastSavedAt,
     characterLibrary,
     activeCharacterId,
     card,
@@ -924,6 +992,13 @@ export function useCharacterCreatorPage() {
     addCustomField,
     updateCustomField,
     handleRemoveCustomField,
+    createCharacterBook,
+    removeCharacterBook,
+    updateCharacterBook,
+    addCharacterBookEntry,
+    updateCharacterBookEntry,
+    removeCharacterBookEntry,
+    reorderCharacterBookEntries,
 
     exampleCharacters,
     exampleContextSummary,
@@ -947,6 +1022,13 @@ export function useCharacterCreatorPage() {
     handleHealthCheck,
     generalCharacterIdea,
     updateGeneralCharacterIdea,
+    generalCharacterIdeaGenerationState,
+    generateGeneralCharacterIdea,
+    cancelGeneralCharacterIdeaGeneration,
+    revertGeneralCharacterIdeaRewrite,
+    resolveGeneralCharacterIdeaRewriteReview,
+    acceptGeneralCharacterIdeaRewrite,
+    updateGeneralCharacterIdeaInstruction,
     selectedRequestModeLabel,
     maxExampleContextCharacters,
 
@@ -1007,5 +1089,6 @@ export function useCharacterCreatorPage() {
     handleSelectCharacter,
     handleDuplicateCharacter,
     handleRemoveCharacter,
+    discardProvisionalCharacter,
   };
 }

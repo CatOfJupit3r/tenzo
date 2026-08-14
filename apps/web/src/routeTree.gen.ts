@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root';
 import { Route as IndexRouteImport } from './routes/index';
 import { Route as ApiCharacterVisionRouteImport } from './routes/api/character-vision';
 import { Route as ApiCharacterGenerateRouteImport } from './routes/api/character-generate';
+import { Route as ApiCharacterAssistantDiscoveryRouteImport } from './routes/api/character-assistant-discovery';
 import { Route as ApiCharacterAssistantRouteImport } from './routes/api/character-assistant';
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,12 @@ const ApiCharacterGenerateRoute = ApiCharacterGenerateRouteImport.update({
   path: '/api/character-generate',
   getParentRoute: () => rootRouteImport,
 } as any);
+const ApiCharacterAssistantDiscoveryRoute =
+  ApiCharacterAssistantDiscoveryRouteImport.update({
+    id: '/api/character-assistant-discovery',
+    path: '/api/character-assistant-discovery',
+    getParentRoute: () => rootRouteImport,
+  } as any);
 const ApiCharacterAssistantRoute = ApiCharacterAssistantRouteImport.update({
   id: '/api/character-assistant',
   path: '/api/character-assistant',
@@ -38,12 +45,14 @@ const ApiCharacterAssistantRoute = ApiCharacterAssistantRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute;
   '/api/character-assistant': typeof ApiCharacterAssistantRoute;
+  '/api/character-assistant-discovery': typeof ApiCharacterAssistantDiscoveryRoute;
   '/api/character-generate': typeof ApiCharacterGenerateRoute;
   '/api/character-vision': typeof ApiCharacterVisionRoute;
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute;
   '/api/character-assistant': typeof ApiCharacterAssistantRoute;
+  '/api/character-assistant-discovery': typeof ApiCharacterAssistantDiscoveryRoute;
   '/api/character-generate': typeof ApiCharacterGenerateRoute;
   '/api/character-vision': typeof ApiCharacterVisionRoute;
 }
@@ -51,6 +60,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport;
   '/': typeof IndexRoute;
   '/api/character-assistant': typeof ApiCharacterAssistantRoute;
+  '/api/character-assistant-discovery': typeof ApiCharacterAssistantDiscoveryRoute;
   '/api/character-generate': typeof ApiCharacterGenerateRoute;
   '/api/character-vision': typeof ApiCharacterVisionRoute;
 }
@@ -59,18 +69,21 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api/character-assistant'
+    | '/api/character-assistant-discovery'
     | '/api/character-generate'
     | '/api/character-vision';
   fileRoutesByTo: FileRoutesByTo;
   to:
     | '/'
     | '/api/character-assistant'
+    | '/api/character-assistant-discovery'
     | '/api/character-generate'
     | '/api/character-vision';
   id:
     | '__root__'
     | '/'
     | '/api/character-assistant'
+    | '/api/character-assistant-discovery'
     | '/api/character-generate'
     | '/api/character-vision';
   fileRoutesById: FileRoutesById;
@@ -78,6 +91,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute;
   ApiCharacterAssistantRoute: typeof ApiCharacterAssistantRoute;
+  ApiCharacterAssistantDiscoveryRoute: typeof ApiCharacterAssistantDiscoveryRoute;
   ApiCharacterGenerateRoute: typeof ApiCharacterGenerateRoute;
   ApiCharacterVisionRoute: typeof ApiCharacterVisionRoute;
 }
@@ -105,6 +119,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCharacterGenerateRouteImport;
       parentRoute: typeof rootRouteImport;
     };
+    '/api/character-assistant-discovery': {
+      id: '/api/character-assistant-discovery';
+      path: '/api/character-assistant-discovery';
+      fullPath: '/api/character-assistant-discovery';
+      preLoaderRoute: typeof ApiCharacterAssistantDiscoveryRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
     '/api/character-assistant': {
       id: '/api/character-assistant';
       path: '/api/character-assistant';
@@ -118,6 +139,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiCharacterAssistantRoute: ApiCharacterAssistantRoute,
+  ApiCharacterAssistantDiscoveryRoute: ApiCharacterAssistantDiscoveryRoute,
   ApiCharacterGenerateRoute: ApiCharacterGenerateRoute,
   ApiCharacterVisionRoute: ApiCharacterVisionRoute,
 };

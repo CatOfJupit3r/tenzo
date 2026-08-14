@@ -1,15 +1,25 @@
-import { useLiveQuery } from '@tanstack/react-db';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { toastError, toastInfo, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
+import { usePersistentCollection } from '@~/db/persistent-collection';
 import { generateUuid } from '@~/utils/uuid';
 
+import {
+  characterAssistantComposerDraftsCollection,
+  clearCharacterAssistantComposerDraft,
+  createCharacterAssistantComposerDraft,
+  ensureCharacterAssistantComposerDraft,
+  saveCharacterAssistantComposerDraft,
+} from '../collections/character-assistant-composer-drafts.collection';
+import type { iCharacterAssistantComposerDraft } from '../collections/character-assistant-composer-drafts.collection';
 import {
   recordGuidedConcept,
   characterAssistantSessionsCollection,
   ensureCharacterAssistantSession,
+  recordGuidedStepRunCompletion,
   updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import type { CharacterCard } from '../lib/card-schema';
 import {
   CHARACTER_ASSISTANT_MESSAGE_ROLES,
@@ -21,12 +31,18 @@ import type {
   iChatTemplateRef,
   iCharacterAssistantMessage,
 } from '../lib/character-assistant-contracts';
+import {
+  buildBoundedDiscoveryContext,
+  buildDeterministicDiscoveryHandoffSummary,
+  hasDiscoveryHandoffSelections,
+} from '../lib/character-assistant-discovery-state';
 import { consumeCharacterAssistantStream } from '../lib/character-assistant-stream';
 import {
   applyCharacterEditProposal,
   CHARACTER_EDIT_PATCH_STATUSES,
   CHARACTER_EDIT_PROPOSAL_STATUSES,
   reduceCharacterEditProposal,
+  upsertCharacterEditProposal,
 } from '../lib/character-edit-proposal';
 import type {
   CharacterEditFieldKey,
@@ -36,6 +52,7 @@ import type {
   iCharacterEditProposal,
 } from '../lib/character-edit-proposal';
 import type { iCharacterGenerationSettings } from '../lib/generation-config';
+import type { ProviderKind } from '../lib/provider-health';
 
 interface iUseCharacterAssistantWorkspaceOptions {
   characterId: string;
@@ -45,6 +62,7 @@ interface iUseCharacterAssistantWorkspaceOptions {
   generationSettings: iCharacterGenerationSettings;
   generalCharacterIdea: string;
   shouldSendDisabledSamplers: boolean;
+  providerKind: ProviderKind | null;
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
 }
@@ -55,6 +73,7 @@ interface iCharacterAssistantRuntimeState {
   streamingMessage: string;
   activityLabel: string | null;
   proposals: iCharacterEditProposal[];
+  guidedStepId: GuidedStepId | null;
   hasCompletedCurrentGuidedStepRun: boolean;
 }
 
@@ -70,6 +89,7 @@ const INITIAL_RUNTIME_STATE: iCharacterAssistantRuntimeState = {
   streamingMessage: '',
   activityLabel: null,
   proposals: [],
+  guidedStepId: null,
   hasCompletedCurrentGuidedStepRun: false,
 };
 
@@ -87,26 +107,22 @@ const ACTIVE_PATCH_STATUSES = new Set<CharacterEditPatchStatus>([
   CHARACTER_EDIT_PATCH_STATUSES.conflict,
 ]);
 
-function createMessage(role: iCharacterAssistantMessage['role'], content: string): iCharacterAssistantMessage {
+function createMessage(
+  role: iCharacterAssistantMessage['role'],
+  content: string,
+  guidedStepId?: GuidedStepId,
+): iCharacterAssistantMessage {
   return {
     id: generateUuid(),
     role,
     content,
     createdAt: new Date().toISOString(),
+    guidedStepId,
   };
 }
 
-function upsertRunProposal(
-  proposals: iCharacterEditProposal[],
-  nextProposal: iCharacterEditProposal,
-): iCharacterEditProposal[] {
-  const proposalsWithoutCurrentRun = proposals.filter((proposal) =>
-    nextProposal.sourceMessageId
-      ? proposal.sourceMessageId !== nextProposal.sourceMessageId
-      : proposal.id !== nextProposal.id,
-  );
-
-  return [...proposalsWithoutCurrentRun, nextProposal];
+function assignGuidedStep(proposal: iCharacterEditProposal, guidedStepId?: GuidedStepId) {
+  return guidedStepId ? { ...proposal, guidedStepId } : proposal;
 }
 
 function isAbortError(error: unknown) {
@@ -125,17 +141,21 @@ export function useCharacterAssistantWorkspace({
   generationSettings,
   generalCharacterIdea,
   shouldSendDisabledSamplers,
+  providerKind,
   focus,
   contextAttachments,
 }: iUseCharacterAssistantWorkspaceOptions) {
   const [runtimeState, setRuntimeState] = useState<iCharacterAssistantRuntimeState>(INITIAL_RUNTIME_STATE);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { data: storedSessions } = useLiveQuery((query) =>
-    query.from({ session: characterAssistantSessionsCollection }),
-  );
+  const storedSessions = usePersistentCollection(characterAssistantSessionsCollection);
+  const storedComposerDrafts = usePersistentCollection(characterAssistantComposerDraftsCollection);
   const session = useMemo(
     () => storedSessions.find((storedSession) => storedSession.id === characterId) ?? null,
     [characterId, storedSessions],
+  );
+  const storedComposerDraft = useMemo(
+    () => storedComposerDrafts.find((draft) => draft.characterId === characterId) ?? null,
+    [characterId, storedComposerDrafts],
   );
   const previousGuidedStepRef = useRef<string | null>(null);
 
@@ -160,13 +180,26 @@ export function useCharacterAssistantWorkspace({
     });
   }, [characterId, session]);
 
+  useEffect(() => {
+    if (!characterId || storedComposerDraft) {
+      return;
+    }
+
+    void ensureCharacterAssistantComposerDraft(characterId).catch((error: unknown) => {
+      setRuntimeState((currentState) => ({
+        ...currentState,
+        errorMessage: error instanceof Error ? error.message : 'Assistant draft could not be created.',
+      }));
+    });
+  }, [characterId, storedComposerDraft]);
+
   const isConnectionConfigured = Boolean(
     generationSettings.endpoint.trim() && generationSettings.model.trim() && apiKey.trim(),
   );
   const proposals = useMemo(() => {
     let mergedProposals = session?.proposals ?? [];
     runtimeState.proposals.forEach((proposal) => {
-      mergedProposals = upsertRunProposal(mergedProposals, proposal);
+      mergedProposals = upsertCharacterEditProposal(mergedProposals, proposal);
     });
     return mergedProposals;
   }, [runtimeState.proposals, session?.proposals]);
@@ -196,25 +229,37 @@ export function useCharacterAssistantWorkspace({
 
     return [
       ...storedMessages,
-      createMessage(CHARACTER_ASSISTANT_MESSAGE_ROLES.assistant, runtimeState.streamingMessage),
+      createMessage(
+        CHARACTER_ASSISTANT_MESSAGE_ROLES.assistant,
+        runtimeState.streamingMessage,
+        runtimeState.guidedStepId ?? undefined,
+      ),
     ];
-  }, [runtimeState.streamingMessage, session?.messages]);
+  }, [runtimeState.guidedStepId, runtimeState.streamingMessage, session?.messages]);
+  const composerDraft = storedComposerDraft ?? createCharacterAssistantComposerDraft(characterId);
+
+  const updateComposerDraft = useCallback(
+    async (nextDraft: Omit<iCharacterAssistantComposerDraft, 'characterId'>) => {
+      await saveCharacterAssistantComposerDraft({ characterId, ...nextDraft });
+    },
+    [characterId],
+  );
 
   const persistProposal = useCallback(
     async (nextProposal: iCharacterEditProposal) => {
       await updateCharacterAssistantSession(characterId, (draft) => {
-        draft.proposals = upsertRunProposal(draft.proposals, nextProposal);
+        draft.proposals = upsertCharacterEditProposal(draft.proposals, nextProposal);
       });
     },
     [characterId],
   );
 
-  const sendMessage = useCallback(
-    async (input: string, options: { templates?: iChatTemplateRef[] } = {}) => {
-      const trimmedInput = input.trim();
+  const runAssistant = useCallback(
+    async (input: string | null, options: { templates?: iChatTemplateRef[] } = {}) => {
+      const trimmedInput = input?.trim() ?? '';
 
-      if (!trimmedInput || runtimeState.isRunning) {
-        return;
+      if ((input !== null && !trimmedInput) || runtimeState.isRunning) {
+        return false;
       }
 
       if (!isConnectionConfigured) {
@@ -222,9 +267,21 @@ export function useCharacterAssistantWorkspace({
       }
 
       const currentSession = await ensureCharacterAssistantSession(characterId);
+      if (input === null && currentSession.messages.length === 0) {
+        return false;
+      }
+
       const isGuidedRun = currentSession.mode === 'guided' && currentSession.guided !== null;
       const guidedStep = isGuidedRun ? currentSession.guided?.currentStep : undefined;
       const guidedConcept = isGuidedRun ? (currentSession.guided?.concept ?? undefined) : undefined;
+      const guidedDiscovery = isGuidedRun ? currentSession.guided?.discovery : undefined;
+      const hasDiscoveryContext = Boolean(
+        guidedDiscovery &&
+        (guidedDiscovery.originalPremise.trim() ||
+          hasDiscoveryHandoffSelections(buildDeterministicDiscoveryHandoffSummary(guidedDiscovery))),
+      );
+      const discoveryContext =
+        guidedDiscovery && hasDiscoveryContext ? buildBoundedDiscoveryContext(guidedDiscovery) : undefined;
       const combinedAttachments = [
         ...contextAttachments,
         ...(isGuidedRun ? (currentSession.guided?.attachments ?? []) : []),
@@ -232,11 +289,28 @@ export function useCharacterAssistantWorkspace({
         (attachment, index, attachments) =>
           attachments.findIndex((candidate) => candidate.id === attachment.id) === index,
       );
-      const userMessage = createMessage(CHARACTER_ASSISTANT_MESSAGE_ROLES.user, trimmedInput);
-      const conversationMessages = [...currentSession.messages, userMessage];
-      await updateCharacterAssistantSession(currentSession.id, (draft) => {
-        draft.messages.push(userMessage);
-      });
+      const userMessage = trimmedInput
+        ? createMessage(CHARACTER_ASSISTANT_MESSAGE_ROLES.user, trimmedInput, guidedStep)
+        : null;
+      const lastStoredMessage = currentSession.messages.at(-1);
+      const continuationMessage =
+        !userMessage && lastStoredMessage?.role === CHARACTER_ASSISTANT_MESSAGE_ROLES.assistant
+          ? createMessage(
+              CHARACTER_ASSISTANT_MESSAGE_ROLES.user,
+              'Continue the conversation and provide the next useful response.',
+              guidedStep,
+            )
+          : null;
+      const conversationMessages = [
+        ...currentSession.messages,
+        ...(userMessage ? [userMessage] : []),
+        ...(continuationMessage ? [continuationMessage] : []),
+      ];
+      if (userMessage) {
+        await updateCharacterAssistantSession(currentSession.id, (draft) => {
+          draft.messages.push(userMessage);
+        });
+      }
 
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
@@ -246,6 +320,7 @@ export function useCharacterAssistantWorkspace({
         streamingMessage: '',
         activityLabel: 'Reviewing character',
         proposals: [],
+        guidedStepId: guidedStep ?? null,
         hasCompletedCurrentGuidedStepRun: false,
       });
 
@@ -258,6 +333,7 @@ export function useCharacterAssistantWorkspace({
           signal: abortController.signal,
           body: JSON.stringify({
             characterId,
+            provider: generationSettings.provider,
             endpoint: generationSettings.endpoint,
             apiKey,
             model: generationSettings.model,
@@ -269,6 +345,8 @@ export function useCharacterAssistantWorkspace({
             topK: generationSettings.topK,
             minP: generationSettings.minP,
             shouldSendDisabledSamplers,
+            assistantGenerationMode: generationSettings.assistantGenerationMode,
+            providerKind: providerKind ?? undefined,
             card,
             focus,
             messages: conversationMessages,
@@ -276,12 +354,14 @@ export function useCharacterAssistantWorkspace({
             contextAttachments: combinedAttachments,
             guidedStep,
             concept: guidedConcept,
+            discoveryContext,
             templates: options.templates ?? [],
           }),
         });
 
         let completedMessage = '';
         let completedProposals: iCharacterEditProposal[] = [];
+        let hasCompletedGuidedStep = false;
         let didEncounterRunError = false;
         await consumeCharacterAssistantStream(response, async (streamEvent) => {
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES['text-delta']) {
@@ -302,9 +382,10 @@ export function useCharacterAssistantWorkspace({
           }
 
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.proposal) {
+            const guidedProposal = assignGuidedStep(streamEvent.proposal, guidedStep);
             setRuntimeState((currentState) => ({
               ...currentState,
-              proposals: upsertRunProposal(currentState.proposals, streamEvent.proposal),
+              proposals: upsertCharacterEditProposal(currentState.proposals, guidedProposal),
               activityLabel: `Proposed ${streamEvent.proposal.patches.length} change${streamEvent.proposal.patches.length === 1 ? '' : 's'}`,
             }));
             return;
@@ -331,7 +412,8 @@ export function useCharacterAssistantWorkspace({
 
           if (streamEvent.type === CHARACTER_ASSISTANT_STREAM_EVENT_TYPES.complete) {
             completedMessage = streamEvent.assistantMessage;
-            completedProposals = streamEvent.proposals;
+            completedProposals = streamEvent.proposals.map((proposal) => assignGuidedStep(proposal, guidedStep));
+            hasCompletedGuidedStep = streamEvent.hasCompletedGuidedStep;
             if (isGuidedRun && streamEvent.concept) {
               await recordGuidedConcept(characterId, streamEvent.concept);
             }
@@ -347,22 +429,27 @@ export function useCharacterAssistantWorkspace({
         const assistantMessage = createMessage(
           CHARACTER_ASSISTANT_MESSAGE_ROLES.assistant,
           completedMessage || 'The proposed changes are ready for review.',
+          guidedStep,
         );
         await updateCharacterAssistantSession(currentSession.id, (draft) => {
           draft.messages.push(assistantMessage);
           completedProposals.forEach((proposal) => {
-            draft.proposals = upsertRunProposal(draft.proposals, proposal);
+            draft.proposals = upsertCharacterEditProposal(draft.proposals, proposal);
           });
         });
+        if (isGuidedRun && guidedStep && !didEncounterRunError && hasCompletedGuidedStep) {
+          await recordGuidedStepRunCompletion(characterId, guidedStep);
+        }
         setRuntimeState({
           ...INITIAL_RUNTIME_STATE,
-          hasCompletedCurrentGuidedStepRun: isGuidedRun && !didEncounterRunError,
+          hasCompletedCurrentGuidedStepRun: isGuidedRun && !didEncounterRunError && hasCompletedGuidedStep,
         });
+        return !didEncounterRunError;
       } catch (error) {
         if (isAbortError(error)) {
           setRuntimeState(INITIAL_RUNTIME_STATE);
           toastInfo('Assistant stopped', 'The current assistant run was cancelled.');
-          return;
+          return false;
         }
 
         const errorMessage = error instanceof Error ? error.message : 'Character assistant failed.';
@@ -373,6 +460,7 @@ export function useCharacterAssistantWorkspace({
           errorMessage,
         }));
         toastError('Character Assistant failed', errorMessage);
+        return false;
       } finally {
         if (abortControllerRef.current === abortController) {
           abortControllerRef.current = null;
@@ -389,8 +477,19 @@ export function useCharacterAssistantWorkspace({
       generationSettings,
       isConnectionConfigured,
       runtimeState.isRunning,
+      providerKind,
       shouldSendDisabledSamplers,
     ],
+  );
+
+  const sendMessage = useCallback(
+    async (input: string, options: { templates?: iChatTemplateRef[] } = {}) => runAssistant(input, options),
+    [runAssistant],
+  );
+
+  const requestResponse = useCallback(
+    async (options: { templates?: iChatTemplateRef[] } = {}) => runAssistant(null, options),
+    [runAssistant],
   );
 
   const applyProposalFields = useCallback(
@@ -533,18 +632,25 @@ export function useCharacterAssistantWorkspace({
     await updateCharacterAssistantSession(currentSession.id, (draft) => {
       draft.messages = [];
     });
+    setRuntimeState(INITIAL_RUNTIME_STATE);
+    await clearCharacterAssistantComposerDraft(characterId);
   }, [characterId]);
 
   return {
+    composerDraft,
+    composerDraftSessionId: storedComposerDraft?.characterId ?? null,
     messages,
     activeProposals,
     activePatches,
+    hasUnresolvedProposals: activeProposals.length > 0,
     isConnectionConfigured,
     isRunning: runtimeState.isRunning,
     errorMessage: runtimeState.errorMessage,
     activityLabel: runtimeState.activityLabel,
     hasCompletedCurrentGuidedStepRun: runtimeState.hasCompletedCurrentGuidedStepRun,
     sendMessage,
+    requestResponse,
+    updateComposerDraft,
     cancelRun: () => abortControllerRef.current?.abort(),
     applyProposalFields,
     applyAllProposals,

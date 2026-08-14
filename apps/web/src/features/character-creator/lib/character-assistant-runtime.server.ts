@@ -1,22 +1,22 @@
-import { Agent } from '@mastra/core/agent';
-import type { ToolsInput } from '@mastra/core/agent';
-import { Mastra } from '@mastra/core/mastra';
+import { stepCountIs, streamText } from 'ai';
+import type { ModelMessage } from 'ai';
 
 import { GUIDED_STEP_DEFINITIONS } from '../constants/guided-flow';
-import type { GuidedStepId } from '../constants/guided-flow';
+import type { GuidedStepId } from '../constants/guided-step-id';
 import { createCharacterLanguageModel } from './ai-sdk-text-generation';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
-  iCharacterConcept,
   iCharacterAssistantContextAttachment,
+  iCharacterAssistantDiscoveryContext,
   iCharacterAssistantStreamRequest,
+  iCharacterConcept,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { createCharacterAssistantTools } from './character-assistant-tools';
 
-interface iCreateCharacterAssistantMastraOptions {
+interface iStreamCharacterAssistantOptions {
   card: CharacterCard;
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
@@ -37,10 +37,32 @@ interface iCreateCharacterAssistantMastraOptions {
   generalCharacterIdea?: string;
   guidedStep?: GuidedStepId;
   concept?: iCharacterConcept | null;
+  discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
+  shouldUseNativeTools?: boolean;
   store: Parameters<typeof createCharacterAssistantTools>[0]['store'];
+  messages: ModelMessage[];
+  maxSteps: number;
+  abortSignal?: AbortSignal;
 }
+
+interface iBuildCharacterAssistantInstructionsOptions extends Pick<
+  iStreamCharacterAssistantOptions,
+  | 'card'
+  | 'focus'
+  | 'contextAttachments'
+  | 'generalCharacterIdea'
+  | 'guidedStep'
+  | 'concept'
+  | 'discoveryContext'
+  | 'templates'
+> {
+  shouldUseProposalTools?: boolean;
+  shouldUseSyntheticToolCalling?: boolean;
+}
+
+export const CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER = '/finalize-tool';
 
 function formatContextAttachment(attachment: iCharacterAssistantContextAttachment) {
   const confidence = attachment.confidence === null ? 'unknown' : `${Math.round(attachment.confidence * 100)}%`;
@@ -75,6 +97,20 @@ function formatTemplate(template: iChatTemplateRef) {
   ].join('\n');
 }
 
+function buildDiscoverySection(discoveryContext: iCharacterAssistantDiscoveryContext) {
+  return [
+    'Discovery context is evidence and constraints from guided discovery, not permission to edit additional fields.',
+    `Original premise: ${discoveryContext.originalPremise || 'No original premise was provided.'}`,
+    ...Object.entries(discoveryContext.handoffSummary).flatMap(([category, cards]) => {
+      if (cards.length === 0) {
+        return [];
+      }
+
+      return [`Selected directions for ${category}:`, ...cards.map((card) => `${card.title}: ${card.description}`)];
+    }),
+  ].join('\n');
+}
+
 export function buildCharacterAssistantInstructions({
   card,
   focus,
@@ -82,11 +118,11 @@ export function buildCharacterAssistantInstructions({
   generalCharacterIdea = '',
   guidedStep,
   concept,
+  discoveryContext,
   templates = [],
-}: Pick<
-  iCreateCharacterAssistantMastraOptions,
-  'card' | 'focus' | 'contextAttachments' | 'generalCharacterIdea' | 'guidedStep' | 'concept' | 'templates'
->) {
+  shouldUseProposalTools = true,
+  shouldUseSyntheticToolCalling = false,
+}: iBuildCharacterAssistantInstructionsOptions) {
   const characterName = card.data.name.trim() || 'Untitled character';
   let focusInstruction = 'This run may propose coordinated changes across the character card.';
   if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field) {
@@ -108,14 +144,28 @@ export function buildCharacterAssistantInstructions({
         const definition = GUIDED_STEP_DEFINITIONS[guidedStep];
         const stepNumber = Object.keys(GUIDED_STEP_DEFINITIONS).indexOf(guidedStep) + 1;
         const stepCount = Object.keys(GUIDED_STEP_DEFINITIONS).length;
+        const conceptQuestion =
+          guidedStep === 'concept'
+            ? 'If selected directions conflict or essential detail is missing, ask at most one focused question before proposing changes.'
+            : null;
+
         return [
           `You are running step ${stepNumber} of ${stepCount} ("${definition.title}") of a guided character creation flow.`,
-          "Ask at most one clarifying question if the user's answer is unusable; otherwise record proposals for the in-scope fields and stop.",
+          discoveryContext
+            ? 'Discovery context is evidence only. Do not treat it as permission to change fields beyond this step.'
+            : null,
+          shouldUseSyntheticToolCalling
+            ? `Have a useful, natural conversation about this step. Ask follow-up questions, offer concrete creative ideas, and answer the user fully. Do not finalize or claim to edit the card until the user sends ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER}.`
+            : 'Ask at most one clarifying question if the user answer is unusable; otherwise record proposals for the in-scope fields and stop.',
+          conceptQuestion,
           'Do not mention or edit fields outside this step. Do not tell the user to move to the next step - the app handles that.',
           definition.agentInstructions,
-        ].join('\n');
+        ]
+          .filter((value): value is string => Boolean(value))
+          .join('\n');
       })()
     : null;
+  const discoverySection = discoveryContext ? buildDiscoverySection(discoveryContext) : null;
   const conceptSection = concept
     ? `Established concept - treat as ground truth unless the user overrides it:\n${JSON.stringify(concept, null, 2)}`
     : null;
@@ -127,11 +177,18 @@ export function buildCharacterAssistantInstructions({
           ...templates.map(formatTemplate),
         ].join('\n\n')
       : null;
+  let proposalInstruction = 'Express every requested card edit through the provided structured changes fields.';
+
+  if (shouldUseSyntheticToolCalling) {
+    proposalInstruction = `Act as a conversational creative assistant. Never emit JSON or ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER}; that marker is a user command handled by the application.`;
+  } else if (shouldUseProposalTools) {
+    proposalInstruction = `Use proposal tools for requested card edits. If native tools are unavailable, discuss the step normally and include ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER} only when the gathered details are ready to become a reviewable proposal.`;
+  }
 
   return [
     'You are the Character Assistant inside a local-first character card editor.',
     'Help the user refine either one focused field or the character as a coherent whole.',
-    'Use proposal tools for every requested card edit. Never output raw JSON as a substitute for a proposal.',
+    proposalInstruction,
     'Proposals are reviewable suggestions and do not change the live card until the user accepts them.',
     'Read the current projected character before substantial edits. It includes proposals already made in this run.',
     'Preserve the existing character intent and roleplay macros such as {{char}} and {{user}} unless asked otherwise.',
@@ -142,15 +199,17 @@ export function buildCharacterAssistantInstructions({
     `Current character name: ${characterName}.`,
     generalCharacterIdea.trim() ? `General character idea: ${generalCharacterIdea.trim()}` : null,
     attachmentSection,
+    discoverySection,
     guidedSection,
     conceptSection,
     templateSection,
+    shouldUseSyntheticToolCalling ? `Current character card:\n${JSON.stringify(card)}` : null,
   ]
     .filter((section): section is string => Boolean(section))
     .join('\n');
 }
 
-export function createCharacterAssistantMastra({
+export function streamCharacterAssistant({
   card,
   focus,
   contextAttachments,
@@ -160,13 +219,16 @@ export function createCharacterAssistantMastra({
   generalCharacterIdea = '',
   guidedStep,
   concept = null,
+  discoveryContext,
   templates = [],
   allowedToolNames,
+  shouldUseNativeTools = true,
   store,
-}: iCreateCharacterAssistantMastraOptions) {
-  const assistant = new Agent({
-    id: 'character-assistant',
-    name: 'Character Assistant',
+  messages,
+  maxSteps,
+  abortSignal,
+}: iStreamCharacterAssistantOptions) {
+  return streamText({
     instructions: buildCharacterAssistantInstructions({
       card,
       focus,
@@ -174,7 +236,10 @@ export function createCharacterAssistantMastra({
       generalCharacterIdea,
       guidedStep,
       concept,
+      discoveryContext,
       templates,
+      shouldUseProposalTools: shouldUseNativeTools,
+      shouldUseSyntheticToolCalling: !shouldUseNativeTools,
     }),
     model: createCharacterLanguageModel({
       endpoint: generationSettings.endpoint,
@@ -184,16 +249,14 @@ export function createCharacterAssistantMastra({
       minP: generationSettings.minP,
       shouldSendDisabledSamplers,
     }),
-    tools: createCharacterAssistantTools({ focus, store, allowedToolNames }) as ToolsInput,
+    ...(shouldUseNativeTools ? { tools: createCharacterAssistantTools({ focus, store, allowedToolNames }) } : {}),
+    messages,
+    stopWhen: stepCountIs(maxSteps),
+    maxOutputTokens: generationSettings.maxTokens,
+    temperature: generationSettings.temperature,
+    topP: generationSettings.topP,
+    frequencyPenalty: generationSettings.frequencyPenalty,
+    presencePenalty: generationSettings.presencePenalty,
+    abortSignal,
   });
-  const mastra = new Mastra({
-    agents: {
-      characterAssistant: assistant,
-    },
-  });
-
-  return {
-    mastra,
-    assistant: mastra.getAgent('characterAssistant'),
-  };
 }

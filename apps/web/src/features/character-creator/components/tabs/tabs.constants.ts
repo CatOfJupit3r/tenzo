@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-export const characterCreatorTabs = z.enum(['core', 'dialogue', 'overrides', 'metadata']);
+export const characterCreatorTabs = z.enum(['core', 'dialogue', 'character_book', 'overrides', 'metadata']);
 export const CHARACTER_CREATOR_TABS = characterCreatorTabs.enum;
+export type CharacterCreatorTab = z.infer<typeof characterCreatorTabs>;
 
 export const FIELD_PANEL_CLASS_NAME = 'rounded-2xl border bg-card/70 p-4 shadow-sm';
 

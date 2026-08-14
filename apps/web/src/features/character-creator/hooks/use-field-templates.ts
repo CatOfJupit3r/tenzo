@@ -1,5 +1,6 @@
-import { useLiveQuery } from '@tanstack/react-db';
 import { useCallback, useMemo } from 'react';
+
+import { usePersistentCollection } from '@~/db/persistent-collection';
 
 import { fieldTemplatesCollection } from '../collections/field-templates.collection';
 import { BUILT_IN_FIELD_TEMPLATES } from '../constants/default-field-templates';
@@ -14,8 +15,10 @@ import type {
 export type FieldTemplatePatch = Partial<Omit<iStoredFieldTemplate, 'id' | 'createdAt' | 'updatedAt'>>;
 
 export function useFieldTemplates() {
-  const { data: storedTemplates } = useLiveQuery((query) =>
-    query.from({ template: fieldTemplatesCollection }).orderBy(({ template }) => template.name, 'asc'),
+  const storedTemplateRows = usePersistentCollection(fieldTemplatesCollection);
+  const storedTemplates = useMemo(
+    () => [...storedTemplateRows].sort((first, second) => first.name.localeCompare(second.name)),
+    [storedTemplateRows],
   );
 
   const fieldTemplates = useMemo<iFieldTemplateViewModel[]>(

@@ -1,10 +1,8 @@
-import { useLiveQuery } from '@tanstack/react-db';
-import { useRef, useState } from 'react';
+import { useMemo } from 'react';
 
-import { useIsomorphicLayoutEffect } from '@~/hooks/use-isomorphic-layout-effect';
+import { usePersistentCollection } from '@~/db/persistent-collection';
 
 import { characterLibraryCollection } from '../collections/character-library.collection';
-import { ensureCharacterCreatorSessionInitialized } from '../lib/character-library-migration';
 
 /**
  * Reactive view of the character library ordered by creation time. Owns the
@@ -13,25 +11,14 @@ import { ensureCharacterCreatorSessionInitialized } from '../lib/character-libra
  * page context.
  */
 export function useCharacterLibraryList() {
-  const hasInitializedRef = useRef(false);
-  const [isSessionInitialized, setIsSessionInitialized] = useState(false);
-
-  useIsomorphicLayoutEffect(() => {
-    if (hasInitializedRef.current) {
-      return;
-    }
-
-    hasInitializedRef.current = true;
-    ensureCharacterCreatorSessionInitialized();
-    setIsSessionInitialized(true);
-  }, []);
-
-  const { data: characterLibrary, isReady: isLibraryQueryReady } = useLiveQuery((query) =>
-    query.from({ character: characterLibraryCollection }).orderBy(({ character }) => character.createdAt, 'asc'),
+  const storedCharacters = usePersistentCollection(characterLibraryCollection);
+  const characterLibrary = useMemo(
+    () => [...storedCharacters].sort((first, second) => first.createdAt.localeCompare(second.createdAt)),
+    [storedCharacters],
   );
 
   return {
     characterLibrary,
-    isCharacterLibraryReady: isSessionInitialized && isLibraryQueryReady,
+    isCharacterLibraryReady: true,
   };
 }

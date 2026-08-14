@@ -7,9 +7,16 @@ export const GENERATION_MODE_SCHEMA = z.enum(['generate', 'continue', 'rewrite']
 export const GENERATION_MODES = GENERATION_MODE_SCHEMA.enum;
 export type GenerationMode = z.infer<typeof GENERATION_MODE_SCHEMA>;
 
-export const GENERATION_TARGET_KIND_SCHEMA = z.enum(['field', 'alternate-greeting', 'custom-field']);
+export const GENERATION_TARGET_KIND_SCHEMA = z.enum([
+  'field',
+  'alternate-greeting',
+  'custom-field',
+  'general-character-idea',
+]);
 export const GENERATION_TARGET_KINDS = GENERATION_TARGET_KIND_SCHEMA.enum;
 export type GenerationTargetKind = z.infer<typeof GENERATION_TARGET_KIND_SCHEMA>;
+
+export const GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY = 'general-character-idea';
 
 export interface iGenerationMessage {
   role: 'system' | 'user' | 'assistant';

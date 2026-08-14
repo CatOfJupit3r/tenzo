@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createCharacterLibraryItem } from './character-library';
-import { characterLibraryStorageParser } from './character-library-storage';
+import { readStoredCharacterLibrary } from './character-library-storage';
 
 describe('character library storage', () => {
   it('hydrates saved characters through the compatibility sanitizer', () => {
@@ -17,27 +17,24 @@ describe('character library storage', () => {
       },
     });
 
-    const parsed = characterLibraryStorageParser.parse(storedValue) as Record<
-      string,
-      { versionKey: string; data: typeof character }
-    >;
+    const parsed = readStoredCharacterLibrary(storedValue);
 
-    expect(parsed[`s:${character.id}`]?.data.card.data.name).toBe('Recovered character');
-    expect(parsed[`s:${character.id}`]?.data.promptSettings.fieldTemplateIds).toEqual({});
+    expect(parsed[0]?.card.data.name).toBe('Recovered character');
+    expect(parsed[0]?.promptSettings.fieldTemplateIds).toEqual({});
   });
 
   it('does not let one malformed entry hide valid saved characters', () => {
     const character = createCharacterLibraryItem();
     character.card.data.name = 'Still here';
 
-    const parsed = characterLibraryStorageParser.parse(
+    const parsed = readStoredCharacterLibrary(
       JSON.stringify({
         broken: { versionKey: 'broken', data: null },
         [`s:${character.id}`]: { versionKey: 'valid', data: character },
       }),
-    ) as Record<string, { data: typeof character }>;
+    );
 
-    expect(Object.keys(parsed)).toEqual([`s:${character.id}`]);
-    expect(parsed[`s:${character.id}`]?.data.card.data.name).toBe('Still here');
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.card.data.name).toBe('Still here');
   });
 });

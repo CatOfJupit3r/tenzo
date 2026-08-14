@@ -1,7 +1,7 @@
-import { createCollection, localStorageCollectionOptions } from '@tanstack/react-db';
 import { z } from 'zod';
 
-import { localStorageApi } from '@~/db/storage';
+import { applicationDatabase } from '@~/db/database';
+import { PersistentCollection } from '@~/db/persistent-collection';
 
 import { GUIDED_STEP_IDS, getNextGuidedStepId } from '../constants/guided-flow';
 import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-step-id';
@@ -31,7 +31,6 @@ import {
   createDiscoveryHandoffSummaryDefault,
 } from '../lib/character-assistant-session';
 import type { iCharacterAssistantSession } from '../lib/character-assistant-session';
-import { migrateCharacterAssistantSessionStorage } from '../lib/character-assistant-session-storage';
 import { deleteGuidedReferenceAssetBlobs } from '../lib/image-store';
 
 const CUSTOMIZED_DISCOVERY_CARD_SCHEMA = z.object({
@@ -43,27 +42,18 @@ const DISCOVERY_PREMISE_SCHEMA = CHARACTER_CONCEPT_SCHEMA.shape.premise;
 const DISCOVERY_CATEGORY_SCHEMA = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA;
 
 export const CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY = 'tenzo:character-creator:assistant-sessions:v3';
-const LEGACY_CHARACTER_AGENT_SESSION_STORAGE_KEYS = [
+export const LEGACY_CHARACTER_AGENT_SESSION_STORAGE_KEYS = [
   'tenzo:character-creator:assistant-sessions:v2',
   'tenzo:character-creator:assistant-sessions:v1',
   'tenzo:character-creator:agent-sessions:v2',
   'tenzo:character-creator:agent-sessions:v1',
 ];
 
-migrateCharacterAssistantSessionStorage({
-  storage: localStorageApi,
-  legacyStorageKeys: LEGACY_CHARACTER_AGENT_SESSION_STORAGE_KEYS,
-  storageKey: CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY,
+export const characterAssistantSessionsCollection = new PersistentCollection({
+  table: applicationDatabase.characterAssistantSessions,
+  getKey: (item) => item.id,
+  schema: CHARACTER_ASSISTANT_SESSION_SCHEMA,
 });
-
-export const characterAssistantSessionsCollection = createCollection(
-  localStorageCollectionOptions({
-    storageKey: CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY,
-    storage: localStorageApi,
-    getKey: (item) => item.id,
-    schema: CHARACTER_ASSISTANT_SESSION_SCHEMA,
-  }),
-);
 
 export async function ensureCharacterAssistantSession(characterId: string) {
   await characterAssistantSessionsCollection.preload();
@@ -97,7 +87,7 @@ export async function updateCharacterAssistantSession(
   }
 
   const transaction = characterAssistantSessionsCollection.update(sessionId, (draft) => {
-    recipe(draft as iCharacterAssistantSession);
+    recipe(draft);
     draft.updatedAt = new Date().toISOString();
   });
   await transaction.isPersisted.promise;

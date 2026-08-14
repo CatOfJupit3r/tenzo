@@ -1,5 +1,4 @@
-import type { StorageApi } from '@tanstack/react-db';
-
+import type { iStorageApi } from '@~/db/storage';
 import { generateUuid } from '@~/utils/uuid';
 
 import { sanitizeCharacterAssistantSession } from './character-assistant-session';
@@ -11,12 +10,12 @@ interface iStoredCollectionItem {
 }
 
 interface iMigrateCharacterAssistantSessionStorageOptions {
-  storage: StorageApi;
+  storage: iStorageApi;
   legacyStorageKeys: string[];
   storageKey: string;
 }
 
-function readStoredCollectionItems(value: string | null) {
+export function readStoredCollectionItems(value: string | null) {
   if (!value) {
     return [];
   }
@@ -39,7 +38,7 @@ function readStoredCollectionItems(value: string | null) {
   }
 }
 
-function selectLatestSessions(values: unknown[]) {
+export function selectLatestSessions(values: unknown[]) {
   const sessionsByCharacterId = new Map<string, iCharacterAssistantSession>();
 
   values.forEach((value) => {

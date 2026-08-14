@@ -1,8 +1,7 @@
-import type { Parser } from '@tanstack/react-db';
-
 import { localStorageApi } from '@~/db/storage';
 
 import { sanitizeCharacterLibraryItem } from './character-library';
+import type { iCharacterLibraryItem } from './character-library';
 
 interface iStoredCharacterLibraryEntry {
   versionKey: string;
@@ -22,25 +21,25 @@ function sanitizeStoredEntry(value: unknown): iStoredCharacterLibraryEntry | nul
   return character ? { versionKey: value.versionKey, data: character } : null;
 }
 
-export const characterLibraryStorageParser = {
-  parse(value: string) {
-    const parsed = JSON.parse(value) as unknown;
+export function readStoredCharacterLibrary(value: string | null): iCharacterLibraryItem[] {
+  if (!value) {
+    return [];
+  }
 
+  try {
+    const parsed = JSON.parse(value) as unknown;
     if (!isRecord(parsed)) {
-      return parsed;
+      return [];
     }
 
-    return Object.fromEntries(
-      Object.entries(parsed).flatMap(([key, storedValue]) => {
-        const storedEntry = sanitizeStoredEntry(storedValue);
-        return storedEntry ? [[key, storedEntry]] : [];
-      }),
-    );
-  },
-  stringify(value: unknown) {
-    return JSON.stringify(value);
-  },
-} satisfies Parser;
+    return Object.values(parsed).flatMap((storedValue) => {
+      const storedEntry = sanitizeStoredEntry(storedValue);
+      return storedEntry ? [storedEntry.data as iCharacterLibraryItem] : [];
+    });
+  } catch {
+    return [];
+  }
+}
 
 export function hasStoredCharacterLibraryEntries(storageKey: string) {
   const storedValue = localStorageApi.getItem(storageKey);

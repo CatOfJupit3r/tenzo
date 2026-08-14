@@ -1,7 +1,7 @@
-import { useLiveQuery } from '@tanstack/react-db';
 import { atom, useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { usePersistentCollection } from '@~/db/persistent-collection';
 import { generateUuid } from '@~/utils/uuid';
 
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
@@ -64,8 +64,10 @@ export function useCharacterSession() {
 
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
 
-  const { data: exampleCharacters } = useLiveQuery((query) =>
-    query.from({ example: exampleCharactersCollection }).orderBy(({ example }) => example.fileName, 'asc'),
+  const storedExampleCharacters = usePersistentCollection(exampleCharactersCollection);
+  const exampleCharacters = useMemo(
+    () => [...storedExampleCharacters].sort((first, second) => first.fileName.localeCompare(second.fileName)),
+    [storedExampleCharacters],
   );
 
   const activeCharacter = useMemo(
@@ -128,7 +130,7 @@ export function useCharacterSession() {
       const transaction = characterLibraryCollection.update(activeCharacterKey, (draft) => {
         // The card schema applies defaults, so the draft's input type widens some
         // fields to optional; at runtime they are always populated.
-        recipe(draft as iCharacterLibraryItem);
+        recipe(draft);
         draft.updatedAt = new Date().toISOString();
       });
 
@@ -503,9 +505,7 @@ export function useCharacterSession() {
         persistenceTasks.push(characterLibraryCollection.insert(fallbackCharacter).isPersisted.promise);
         setActiveCharacterId(fallbackCharacter.id);
       } else {
-        const nextActiveCharacter = characterLibraryCollection.values().next().value as
-          | iCharacterLibraryItem
-          | undefined;
+        const nextActiveCharacter = characterLibraryCollection.values().next().value;
         setActiveCharacterId((currentActiveCharacterId) =>
           currentActiveCharacterId === id
             ? (nextActiveCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID)

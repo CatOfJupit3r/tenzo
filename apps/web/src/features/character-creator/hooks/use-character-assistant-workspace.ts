@@ -1,7 +1,7 @@
-import { useLiveQuery } from '@tanstack/react-db';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { toastError, toastInfo, toastSuccess } from '@~/components/toastifications/create-jsx-toasts';
+import { usePersistentCollection } from '@~/db/persistent-collection';
 import { generateUuid } from '@~/utils/uuid';
 
 import {
@@ -147,12 +147,8 @@ export function useCharacterAssistantWorkspace({
 }: iUseCharacterAssistantWorkspaceOptions) {
   const [runtimeState, setRuntimeState] = useState<iCharacterAssistantRuntimeState>(INITIAL_RUNTIME_STATE);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { data: storedSessions } = useLiveQuery((query) =>
-    query.from({ session: characterAssistantSessionsCollection }),
-  );
-  const { data: storedComposerDrafts } = useLiveQuery((query) =>
-    query.from({ draft: characterAssistantComposerDraftsCollection }),
-  );
+  const storedSessions = usePersistentCollection(characterAssistantSessionsCollection);
+  const storedComposerDrafts = usePersistentCollection(characterAssistantComposerDraftsCollection);
   const session = useMemo(
     () => storedSessions.find((storedSession) => storedSession.id === characterId) ?? null,
     [characterId, storedSessions],

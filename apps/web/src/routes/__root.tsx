@@ -6,6 +6,7 @@ import { NuqsAdapter } from 'nuqs/adapters/react';
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';
 import { ThemeProvider } from '@~/components/themes/theme-provider';
 import ToasterContainer from '@~/components/toastifications/toaster-container';
+import { MigrationGate } from '@~/db/migration-gate';
 import { seo } from '@~/utils/seo';
 
 import appCss from '../index.css?url';
@@ -59,10 +60,12 @@ function RootComponent() {
       <body>
         <ThemeProvider initialTheme={initialTheme}>
           <NuqsAdapter>
-            <div className="grid h-svh min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
-              <Outlet />
-            </div>
-            <ToasterContainer />
+            <MigrationGate>
+              <div className="grid h-svh min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden">
+                <Outlet />
+              </div>
+              <ToasterContainer />
+            </MigrationGate>
           </NuqsAdapter>
         </ThemeProvider>
         <Scripts />

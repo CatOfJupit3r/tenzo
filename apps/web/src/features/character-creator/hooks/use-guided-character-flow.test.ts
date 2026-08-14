@@ -93,8 +93,8 @@ function createDiscoverySession(characterId: string): iMockSession {
   } satisfies iMockSession;
 }
 
-vi.mock('@tanstack/react-db', () => ({
-  useLiveQuery: vi.fn(() => ({ data: [...mockSessions.values()] })),
+vi.mock('@~/db/persistent-collection', () => ({
+  usePersistentCollection: vi.fn(() => [...mockSessions.values()]),
 }));
 
 vi.mock('../collections/character-assistant-sessions.collection', () => ({

@@ -17,8 +17,8 @@ const sessionTestState = vi.hoisted(() => ({
   updateCharacter: vi.fn<iCharacterUpdate>(),
 }));
 
-vi.mock('@tanstack/react-db', () => ({
-  useLiveQuery: vi.fn(() => ({ data: [] })),
+vi.mock('@~/db/persistent-collection', () => ({
+  usePersistentCollection: vi.fn(() => []),
 }));
 
 vi.mock('../atoms/character-session.atom', async () => {

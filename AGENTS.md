@@ -30,7 +30,6 @@ Examples:
 ## What To Read First
 
 - `AGENTS.md` for repo-wide conventions, workflow, and codebase standards
-- `.agents/skills/*/SKILL.md` for task-specific implementation guidance
 
 ## Core Conventions
 
@@ -39,8 +38,8 @@ Examples:
 - Use shared contracts and generated helpers instead of duplicating types, keys, or API shapes.
 - Prefer ASCII in new or edited text unless a file already uses another encoding or character set.
 - Avoid generating large summary docs unless the user explicitly asks for them.
-- Before starting implementation, load the most relevant skills from `.agents/skills/`.
 - No backwards compatibility debt. Koneko has a full rewrite opportunity. Avoid legacy cruft and old assumptions. If some concept evolves, it should prefer new ways of doing things, not trying to support old workflows.
+- Run pnpm commands outside of sandbox due to "Fetch failed" issues in sandbox. Every other command can be run in sandbox.
 
 ## Project Standards
 

@@ -1,8 +1,8 @@
-import { createCollection, localStorageCollectionOptions } from '@tanstack/react-db';
 import type { JSONContent } from '@tiptap/core';
 import { z } from 'zod';
 
-import { localStorageApi } from '@~/db/storage';
+import { applicationDatabase } from '@~/db/database';
+import { PersistentCollection } from '@~/db/persistent-collection';
 
 export const CHARACTER_ASSISTANT_COMPOSER_DRAFT_SCHEMA = z.object({
   characterId: z.string().trim().min(1),
@@ -24,14 +24,13 @@ export function createCharacterAssistantComposerDraft(characterId: string): iCha
   };
 }
 
-export const characterAssistantComposerDraftsCollection = createCollection(
-  localStorageCollectionOptions({
-    storageKey: 'tenzo:character-creator:assistant-composer-drafts:v1',
-    storage: localStorageApi,
-    getKey: (draft) => draft.characterId,
-    schema: CHARACTER_ASSISTANT_COMPOSER_DRAFT_SCHEMA,
-  }),
-);
+export const CHARACTER_ASSISTANT_COMPOSER_DRAFTS_STORAGE_KEY = 'tenzo:character-creator:assistant-composer-drafts:v1';
+
+export const characterAssistantComposerDraftsCollection = new PersistentCollection({
+  table: applicationDatabase.characterAssistantComposerDrafts,
+  getKey: (draft) => draft.characterId,
+  schema: CHARACTER_ASSISTANT_COMPOSER_DRAFT_SCHEMA,
+});
 
 export async function ensureCharacterAssistantComposerDraft(characterId: string) {
   await characterAssistantComposerDraftsCollection.preload();

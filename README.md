@@ -9,7 +9,7 @@ A standalone, client-only web app for authoring [SillyTavern-compatible V2 chara
 - Feed in example character cards as reference material for generation.
 - Import existing cards from PNG (embedded `chara` tEXt chunk) or JSON, and re-export the same way.
 - Upload a portrait and export a spec-compliant PNG with the JSON embedded, or export JSON alone.
-- Everything lives in the browser — session state in localStorage, images/examples in IndexedDB. No server, no accounts, no database.
+- Everything lives in the browser — application data and images are stored in IndexedDB, with a small amount of localStorage for settings. No server or accounts.
 
 See [docs/roadmaps/active/character-card-creator.roadmap.md](docs/roadmaps/active/character-card-creator.roadmap.md) for the full spec, phase status, and design decisions.
 

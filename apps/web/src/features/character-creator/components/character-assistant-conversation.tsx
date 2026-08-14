@@ -33,7 +33,7 @@ function formatFieldLabel(fieldKey: CharacterEditFieldKey) {
 
 function stringifyPatchValue(patch: iCharacterEditPatch, side: 'old' | 'new') {
   const value = side === 'old' ? patch.oldValue : patch.newValue;
-  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  return typeof value === 'string' ? value : JSON.stringify(value ?? null, null, 2);
 }
 
 function CompactPatchDiff({ patch }: { patch: iCharacterEditPatch }) {

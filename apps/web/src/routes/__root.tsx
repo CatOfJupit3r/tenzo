@@ -3,6 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { NuqsAdapter } from 'nuqs/adapters/react';
 
+import { AiDevtools } from '@~/components/ai-devtools';
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';
 import { ThemeProvider } from '@~/components/themes/theme-provider';
 import ToasterContainer from '@~/components/toastifications/toaster-container';
@@ -65,6 +66,7 @@ function RootComponent() {
                 <Outlet />
               </div>
               <ToasterContainer />
+              <AiDevtools />
             </MigrationGate>
           </NuqsAdapter>
         </ThemeProvider>

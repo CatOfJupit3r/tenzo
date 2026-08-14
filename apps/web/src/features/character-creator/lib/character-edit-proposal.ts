@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import { generateUuid } from '@~/utils/uuid';
 
-import { GUIDED_STEP_ID_SCHEMA } from '../constants/guided-step-id';
 import {
   CHARACTER_BOOK_SCHEMA,
   CHARACTER_CARD_SCHEMA,
@@ -91,7 +90,6 @@ export const CHARACTER_EDIT_PROPOSAL_SCHEMA = z.object({
   sourceMessageId: z.string().optional(),
   toolCallId: z.string().optional(),
   summary: z.string().optional(),
-  guidedStepId: GUIDED_STEP_ID_SCHEMA.optional(),
   errorMessage: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),

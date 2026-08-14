@@ -1,5 +1,5 @@
 import { chat } from '@tanstack/ai';
-import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
+import type { AnyTextAdapter, ModelMessage, UIMessage } from '@tanstack/ai';
 import { z } from 'zod';
 
 interface iGenerateValidatedObjectOptions<T> {
@@ -8,12 +8,12 @@ interface iGenerateValidatedObjectOptions<T> {
   schemaDescription: string;
   system: string;
   prompt?: string;
-  messages?: ModelMessage[];
+  messages?: Array<ModelMessage | UIMessage>;
   modelOptions?: Record<string, unknown>;
   abortSignal?: AbortSignal;
 }
 
-function buildMessages(prompt?: string, messages?: ModelMessage[]): ModelMessage[] {
+function buildMessages(prompt?: string, messages?: Array<ModelMessage | UIMessage>): Array<ModelMessage | UIMessage> {
   if (messages) {
     return messages;
   }

@@ -60,10 +60,6 @@ function CharacterCreatorWorkspace() {
     setIsCharacterLibraryPanelOpen(false);
   }, []);
 
-  const openCharacterLibraryPanel = useCallback(() => {
-    setIsCharacterLibraryPanelOpen(true);
-  }, []);
-
   const openSettingsDialog = useCallback((tab: SettingsDialogTab) => {
     setActiveSettingsTab(tab);
     setIsSettingsDialogOpen(true);
@@ -106,11 +102,7 @@ function CharacterCreatorWorkspace() {
               />
             ) : null}
 
-            <CharacterLibraryPanel
-              isOpen={isCharacterLibraryPanelVisible}
-              onClose={closeCharacterLibraryPanel}
-              onGuidedStartFailure={openCharacterLibraryPanel}
-            />
+            <CharacterLibraryPanel isOpen={isCharacterLibraryPanelVisible} onClose={closeCharacterLibraryPanel} />
 
             <CharacterSectionPanel
               activeTab={activeCharacterTab}

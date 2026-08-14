@@ -1,8 +1,7 @@
 import { chat, maxIterations } from '@tanstack/ai';
-import type { ModelMessage } from '@tanstack/ai';
+import type { ModelMessage, UIMessage } from '@tanstack/ai';
 
-import { GUIDED_STEP_DEFINITIONS } from '../constants/guided-flow';
-import type { GuidedStepId } from '../constants/guided-step-id';
+import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant/assistant-final-response';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
@@ -35,34 +34,23 @@ interface iStreamCharacterAssistantOptions {
   >;
   shouldSendDisabledSamplers?: boolean;
   generalCharacterIdea?: string;
-  guidedStep?: GuidedStepId;
   concept?: iCharacterConcept | null;
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
   shouldUseNativeTools?: boolean;
   store: Parameters<typeof createCharacterAssistantTools>[0]['store'];
-  messages: ModelMessage[];
+  messages: Array<ModelMessage | UIMessage>;
   maxSteps: number;
   abortSignal?: AbortSignal;
 }
 
 interface iBuildCharacterAssistantInstructionsOptions extends Pick<
   iStreamCharacterAssistantOptions,
-  | 'card'
-  | 'focus'
-  | 'contextAttachments'
-  | 'generalCharacterIdea'
-  | 'guidedStep'
-  | 'concept'
-  | 'discoveryContext'
-  | 'templates'
+  'card' | 'focus' | 'contextAttachments' | 'generalCharacterIdea' | 'concept' | 'discoveryContext' | 'templates'
 > {
-  shouldUseProposalTools?: boolean;
-  shouldUseSyntheticToolCalling?: boolean;
+  mode: 'tool-call' | 'structured-output';
 }
-
-export const CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER = '/finalize-tool';
 
 function formatContextAttachment(attachment: iCharacterAssistantContextAttachment) {
   const confidence = attachment.confidence === null ? 'unknown' : `${Math.round(attachment.confidence * 100)}%`;
@@ -99,7 +87,7 @@ function formatTemplate(template: iChatTemplateRef) {
 
 function buildDiscoverySection(discoveryContext: iCharacterAssistantDiscoveryContext) {
   return [
-    'Discovery context is evidence and constraints from guided discovery, not permission to edit additional fields.',
+    'Discovery context is evidence and constraints selected by the user, not permission to edit additional fields.',
     `Original premise: ${discoveryContext.originalPremise || 'No original premise was provided.'}`,
     ...Object.entries(discoveryContext.handoffSummary).flatMap(([category, cards]) => {
       if (cards.length === 0) {
@@ -111,17 +99,15 @@ function buildDiscoverySection(discoveryContext: iCharacterAssistantDiscoveryCon
   ].join('\n');
 }
 
-export function buildCharacterAssistantInstructions({
+export function buildAssistantSystemPrompt({
   card,
   focus,
   contextAttachments,
   generalCharacterIdea = '',
-  guidedStep,
   concept,
   discoveryContext,
   templates = [],
-  shouldUseProposalTools = true,
-  shouldUseSyntheticToolCalling = false,
+  mode,
 }: iBuildCharacterAssistantInstructionsOptions) {
   const characterName = card.data.name.trim() || 'Untitled character';
   let focusInstruction = 'This run may propose coordinated changes across the character card.';
@@ -139,32 +125,6 @@ export function buildCharacterAssistantInstructions({
           ...contextAttachments.map(formatContextAttachment),
         ].join('\n\n')
       : null;
-  const guidedSection = guidedStep
-    ? (() => {
-        const definition = GUIDED_STEP_DEFINITIONS[guidedStep];
-        const stepNumber = Object.keys(GUIDED_STEP_DEFINITIONS).indexOf(guidedStep) + 1;
-        const stepCount = Object.keys(GUIDED_STEP_DEFINITIONS).length;
-        const conceptQuestion =
-          guidedStep === 'concept'
-            ? 'If selected directions conflict or essential detail is missing, ask at most one focused question before proposing changes.'
-            : null;
-
-        return [
-          `You are running step ${stepNumber} of ${stepCount} ("${definition.title}") of a guided character creation flow.`,
-          discoveryContext
-            ? 'Discovery context is evidence only. Do not treat it as permission to change fields beyond this step.'
-            : null,
-          shouldUseSyntheticToolCalling
-            ? `Have a useful, natural conversation about this step. Ask follow-up questions, offer concrete creative ideas, and answer the user fully. Do not finalize or claim to edit the card until the user sends ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER}.`
-            : 'Ask at most one clarifying question if the user answer is unusable; otherwise record proposals for the in-scope fields and stop.',
-          conceptQuestion,
-          'Do not mention or edit fields outside this step. Do not tell the user to move to the next step - the app handles that.',
-          definition.agentInstructions,
-        ]
-          .filter((value): value is string => Boolean(value))
-          .join('\n');
-      })()
-    : null;
   const discoverySection = discoveryContext ? buildDiscoverySection(discoveryContext) : null;
   const conceptSection = concept
     ? `Established concept - treat as ground truth unless the user overrides it:\n${JSON.stringify(concept, null, 2)}`
@@ -177,13 +137,10 @@ export function buildCharacterAssistantInstructions({
           ...templates.map(formatTemplate),
         ].join('\n\n')
       : null;
-  let proposalInstruction = 'Express every requested card edit through the provided structured changes fields.';
-
-  if (shouldUseSyntheticToolCalling) {
-    proposalInstruction = `Act as a conversational creative assistant. Never emit JSON or ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER}; that marker is a user command handled by the application.`;
-  } else if (shouldUseProposalTools) {
-    proposalInstruction = `Use proposal tools for requested card edits. If native tools are unavailable, discuss the step normally and include ${CHARACTER_ASSISTANT_FINALIZE_TOOL_MARKER} only when the gathered details are ready to become a reviewable proposal.`;
-  }
+  const proposalInstruction =
+    mode === 'tool-call'
+      ? 'Use proposal tools for requested card edits and return a concise final response with useful follow-up suggestions.'
+      : 'Express every requested card edit through the structured action schema and keep the conversation natural.';
 
   return [
     'You are the Character Assistant inside a local-first character card editor.',
@@ -200,10 +157,9 @@ export function buildCharacterAssistantInstructions({
     generalCharacterIdea.trim() ? `General character idea: ${generalCharacterIdea.trim()}` : null,
     attachmentSection,
     discoverySection,
-    guidedSection,
     conceptSection,
     templateSection,
-    shouldUseSyntheticToolCalling ? `Current character card:\n${JSON.stringify(card)}` : null,
+    mode === 'structured-output' ? `Current character card:\n${JSON.stringify(card)}` : null,
   ]
     .filter((section): section is string => Boolean(section))
     .join('\n');
@@ -217,7 +173,6 @@ export function streamCharacterAssistant({
   generationSettings,
   shouldSendDisabledSamplers = false,
   generalCharacterIdea = '',
-  guidedStep,
   concept = null,
   discoveryContext,
   templates = [],
@@ -242,17 +197,15 @@ export function streamCharacterAssistant({
       model: generationSettings.model,
     }),
     systemPrompts: [
-      buildCharacterAssistantInstructions({
+      buildAssistantSystemPrompt({
         card,
         focus,
         contextAttachments,
         generalCharacterIdea,
-        guidedStep,
         concept,
         discoveryContext,
         templates,
-        shouldUseProposalTools: shouldUseNativeTools,
-        shouldUseSyntheticToolCalling: !shouldUseNativeTools,
+        mode: shouldUseNativeTools ? 'tool-call' : 'structured-output',
       }),
     ],
     ...(shouldUseNativeTools
@@ -260,6 +213,7 @@ export function streamCharacterAssistant({
       : {}),
     messages,
     agentLoopStrategy: maxIterations(maxSteps),
+    outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA,
     modelOptions: createCharacterModelOptions(generationSettings.endpoint, {
       ...generationSettings,
       shouldSendDisabledSamplers,

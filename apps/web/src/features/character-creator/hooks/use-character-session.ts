@@ -34,7 +34,7 @@ import {
   sanitizeCharacterGenerationPromptSettings,
 } from '../lib/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../lib/generation-config';
-import { deleteCharacterAssetBlob, deleteGuidedReferenceAssetBlobs } from '../lib/image-store';
+import { deleteCharacterAssetBlob } from '../lib/image-store';
 import { ensurePortraitAssetLoaded } from '../lib/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
 import { useCharacterLibraryList } from './use-character-library-list';
@@ -523,7 +523,6 @@ export function useCharacterSession() {
       const characterToRemove = characterLibraryCollection.get(id);
       void Promise.all([
         characterToRemove?.portrait ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId) : Promise.resolve(),
-        deleteGuidedReferenceAssetBlobs(id),
         removeCharacterRecord(id),
       ]);
     },
@@ -538,7 +537,6 @@ export function useCharacterSession() {
           characterToRemove?.portrait
             ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId)
             : Promise.resolve(),
-          deleteGuidedReferenceAssetBlobs(id),
         ]),
         removeCharacterAssistantSession(id),
         removeCharacterRecord(id),

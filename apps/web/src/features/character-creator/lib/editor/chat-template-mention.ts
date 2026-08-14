@@ -3,7 +3,7 @@ import { ReactRenderer } from '@tiptap/react';
 import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { createElement } from 'react';
 
-import type { iFieldTemplateViewModel } from '../field-templates';
+import type { iFieldTemplateViewModel } from '../cards/field-templates';
 
 type iChatTemplateSuggestionProps = SuggestionProps<iFieldTemplateViewModel, iFieldTemplateViewModel>;
 

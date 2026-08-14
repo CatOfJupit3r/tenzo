@@ -4,8 +4,8 @@ import { ZodError } from 'zod';
 import {
   CHARACTER_VISION_REQUEST_SCHEMA,
   CHARACTER_VISION_RESPONSE_SCHEMA,
-} from '@~/features/character-creator/lib/character-vision-contracts';
-import { analyzeCharacterImage } from '@~/features/character-creator/lib/character-vision.server';
+} from '@~/features/character-creator/lib/vision/character-vision-contracts';
+import { analyzeCharacterImage } from '@~/features/character-creator/lib/vision/character-vision.server';
 
 const MAX_VISION_REQUEST_BYTES = 3_000_000;
 

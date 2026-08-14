@@ -1,4 +1,4 @@
-import type { CharacterCard } from '../lib/card-schema';
+import type { CharacterCard } from '../lib/cards/card-schema';
 
 export const createEmptyCharacterCard = (): CharacterCard => ({
   spec: 'chara_card_v2',

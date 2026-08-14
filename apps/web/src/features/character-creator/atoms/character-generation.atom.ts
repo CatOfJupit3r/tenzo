@@ -2,8 +2,8 @@ import { atomWithStorage, createJSONStorage } from 'jotai/utils';
 
 import { localStorageApi } from '@~/db/storage';
 
-import { DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS } from '../lib/generation-config';
-import type { iCharacterGenerationConnectionSettings } from '../lib/generation-config';
+import { DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS } from '../lib/generation/generation-config';
+import type { iCharacterGenerationConnectionSettings } from '../lib/generation/generation-config';
 
 const generationSettingsStorage = createJSONStorage<iCharacterGenerationConnectionSettings>(() => localStorageApi);
 

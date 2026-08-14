@@ -15,28 +15,28 @@ import type {
   CharacterCard,
   CharacterTextFieldKey,
   CustomField,
-} from '../lib/card-schema';
+} from '../lib/cards/card-schema';
 import {
   createCharacterLibraryItem,
   createDuplicateCharacterName,
   createEmptyCharacterLibraryItem,
   DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
-} from '../lib/character-library';
+} from '../lib/cards/character-library';
 import type {
   CharacterLibrarySource,
   iCharacterLibraryItem,
   iCharacterPortraitReference,
-} from '../lib/character-library';
-import { sanitizeExampleCharacterIncludedFieldKeys } from '../lib/example-characters';
-import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/example-characters';
+} from '../lib/cards/character-library';
+import { sanitizeExampleCharacterIncludedFieldKeys } from '../lib/cards/example-characters';
+import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/cards/example-characters';
+import { deleteCharacterAssetBlob } from '../lib/cards/image-store';
 import {
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   sanitizeCharacterGenerationPromptSettings,
-} from '../lib/generation-config';
-import type { iCharacterGenerationPromptSettings } from '../lib/generation-config';
-import { deleteCharacterAssetBlob, deleteGuidedReferenceAssetBlobs } from '../lib/image-store';
-import { ensurePortraitAssetLoaded } from '../lib/portrait-asset-cache';
-import { renderPortraitThumbnailDataUrl } from '../lib/portrait-focal-point';
+} from '../lib/generation/generation-config';
+import type { iCharacterGenerationPromptSettings } from '../lib/generation/generation-config';
+import { ensurePortraitAssetLoaded } from '../lib/portrait/portrait-asset-cache';
+import { renderPortraitThumbnailDataUrl } from '../lib/portrait/portrait-focal-point';
 import { useCharacterLibraryList } from './use-character-library-list';
 
 interface iCharacterSaveActivityState {
@@ -523,7 +523,6 @@ export function useCharacterSession() {
       const characterToRemove = characterLibraryCollection.get(id);
       void Promise.all([
         characterToRemove?.portrait ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId) : Promise.resolve(),
-        deleteGuidedReferenceAssetBlobs(id),
         removeCharacterRecord(id),
       ]);
     },
@@ -538,7 +537,6 @@ export function useCharacterSession() {
           characterToRemove?.portrait
             ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId)
             : Promise.resolve(),
-          deleteGuidedReferenceAssetBlobs(id),
         ]),
         removeCharacterAssistantSession(id),
         removeCharacterRecord(id),

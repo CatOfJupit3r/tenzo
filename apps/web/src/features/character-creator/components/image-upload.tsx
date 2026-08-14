@@ -5,8 +5,8 @@ import { LuFocus, LuImagePlus, LuRefreshCw, LuTrash2 } from 'react-icons/lu';
 import { Button } from '@~/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
 
-import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait-focal-point';
-import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
+import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait/portrait-focal-point';
+import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait/portrait-focal-point';
 import { PortraitAvatarPreview } from './portrait-avatar-preview';
 import { PortraitFocalPointEditor } from './portrait-focal-point-editor';
 import { PortraitPreviewSurface } from './portrait-preview-surface';

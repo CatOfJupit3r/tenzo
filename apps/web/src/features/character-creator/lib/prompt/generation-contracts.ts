@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import type { CustomField } from '../card-schema';
-import type { TemplateMode } from '../field-templates';
+import type { CustomField } from '../cards/card-schema';
+import type { TemplateMode } from '../cards/field-templates';
 
 export const GENERATION_MODE_SCHEMA = z.enum(['generate', 'continue', 'rewrite']);
 export const GENERATION_MODES = GENERATION_MODE_SCHEMA.enum;

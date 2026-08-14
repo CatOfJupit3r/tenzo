@@ -1,9 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { createTextStreamResponse } from 'ai';
 import { ZodError } from 'zod';
 
-import { streamCharacterText } from '@~/features/character-creator/lib/ai-sdk-text-generation';
-import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation-stream-contracts';
+import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation/generation-stream-contracts';
+import { streamCharacterText } from '@~/features/character-creator/lib/generation/tanstack-ai-text-generation';
 
 export const Route = createFileRoute('/api/character-generate')({
   server: {
@@ -16,11 +15,11 @@ export const Route = createFileRoute('/api/character-generate')({
             signal: request.signal,
           });
 
-          return createTextStreamResponse({
+          return new Response(result.textStream.pipeThrough(new TextEncoderStream()), {
             headers: {
               'Cache-Control': 'no-store',
+              'Content-Type': 'text/plain; charset=utf-8',
             },
-            stream: result.textStream,
           });
         } catch (error) {
           return new Response(error instanceof Error ? error.message : 'Generation failed.', {

@@ -1,14 +1,15 @@
-import type { Extensions, JSONContent } from '@tiptap/core';
+import type { Editor, Extensions, JSONContent } from '@tiptap/core';
 import { Extension } from '@tiptap/core';
 import { Document } from '@tiptap/extension-document';
 import { Paragraph } from '@tiptap/extension-paragraph';
 import { Text } from '@tiptap/extension-text';
-import { Placeholder, UndoRedo } from '@tiptap/extensions';
+import { UndoRedo } from '@tiptap/extensions';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
-import { MacroHighlight } from './macro-highlight-extension';
+import { buildBaseEditorExtensions } from './base-editor-extensions';
+import type { iEditorSerializer } from './editor-contracts';
 import { MES_EXAMPLE_LINE_KINDS, classifyMesExampleLine, getSpeakerPrefixLength } from './mes-example-format';
 
 export function parseMesExampleToDoc(raw: string): JSONContent {
@@ -28,6 +29,10 @@ export function serializeMesExampleDoc(doc: ProseMirrorNode): string {
   });
   return lines.join('\n');
 }
+
+export const MES_EXAMPLE_EDITOR_SERIALIZER = {
+  serialize: (editor: Editor) => serializeMesExampleDoc(editor.state.doc),
+} satisfies iEditorSerializer;
 
 const mesExampleDecorationsPluginKey = new PluginKey<DecorationSet>('mesExampleDecorations');
 
@@ -81,8 +86,7 @@ export function buildMesExampleExtensions(options: iBuildMesExampleExtensionsOpt
     Paragraph,
     Text,
     UndoRedo,
-    Placeholder.configure({ placeholder: options.placeholder ?? '' }),
     MesExampleDecorations,
-    MacroHighlight.configure({ doesAllowOriginalMacro: false }),
+    ...buildBaseEditorExtensions({ placeholder: options.placeholder }),
   ];
 }

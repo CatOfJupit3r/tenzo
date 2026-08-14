@@ -4,8 +4,8 @@ import {
   getPortraitCropRect,
   getSillyTavernAvatarCropRect,
   SILLY_TAVERN_PORTRAIT_ASPECT_RATIO,
-} from '../lib/portrait-focal-point';
-import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait-focal-point';
+} from '../lib/portrait/portrait-focal-point';
+import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait/portrait-focal-point';
 import { PortraitPreviewSurface } from './portrait-preview-surface';
 
 export interface iPortraitAvatarPreviewProps {

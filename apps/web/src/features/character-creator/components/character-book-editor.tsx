@@ -5,7 +5,7 @@ import { Checkbox } from '@~/components/ui/checkbox';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 
-import type { CharacterBook, CharacterBookEntry } from '../lib/card-schema';
+import type { CharacterBook, CharacterBookEntry } from '../lib/cards/card-schema';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 
 interface iCharacterBookEditorProps {

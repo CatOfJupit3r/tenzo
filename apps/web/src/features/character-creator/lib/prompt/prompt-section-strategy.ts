@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import type { CharacterCard } from '../card-schema';
-import type { OutputFormat } from '../generation-config';
+import type { CharacterCard } from '../cards/card-schema';
+import type { OutputFormat } from '../generation/generation-config';
 import type { iExampleContextSummary } from './example-context-service';
 import type { GenerationMode, iFieldGenerationTarget, iPromptFieldTemplate } from './generation-contracts';
 

@@ -14,15 +14,15 @@ import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 import { MultiSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
-import { Textarea } from '@~/components/ui/textarea';
 
 import {
   sanitizeTemplateFieldKeys,
   TEMPLATE_FIELD_KEY_LABELS,
   TEMPLATE_FIELD_KEY_SCHEMA,
   TEMPLATE_MODES,
-} from '../lib/field-templates';
-import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/field-templates';
+} from '../lib/cards/field-templates';
+import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/cards/field-templates';
+import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 
 const templateFieldKeyOptions: iOptionType[] = TEMPLATE_FIELD_KEY_SCHEMA.options.map((fieldKey) => ({
   label: TEMPLATE_FIELD_KEY_LABELS[fieldKey],
@@ -106,11 +106,12 @@ export function SaveTemplateDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="save-template-content">Template content</Label>
-            <Textarea
-              id="save-template-content"
+            <MarkdownFieldEditor
+              fieldId="save-template-content"
               rows={8}
               value={content}
-              onChange={(event) => setContent(event.target.value)}
+              doesHighlightTemplateSlots
+              onValueChange={setContent}
             />
           </div>
         </div>

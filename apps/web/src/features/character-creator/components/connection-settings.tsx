@@ -9,15 +9,15 @@ import type { iOptionType } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
 import { cn } from '@~/lib/utils';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/character-assistant-generation-mode';
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/assistant/character-assistant-generation-mode';
 import {
   GENERATION_PROVIDER_DEFAULTS,
   GENERATION_PROVIDERS,
   OUTPUT_FORMATS,
   REQUEST_MODES,
-} from '../lib/generation-config';
-import type { iCharacterGenerationSettings } from '../lib/generation-config';
-import type { ProviderKind } from '../lib/provider-health';
+} from '../lib/generation/generation-config';
+import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import type { ProviderKind } from '../lib/provider/provider-health';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iConnectionHealthViewModel {
@@ -63,9 +63,9 @@ const providerOptions: iOptionType[] = [
 
 const assistantGenerationModeOptions: iOptionType[] = [
   {
-    label: 'Compatible guided chat',
+    label: 'Structured agent loop',
     value: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
-    description: 'Chat normally with any model, then synthesize reviewable edits when the step is ready.',
+    description: 'Bounded multi-round agent behavior for models without reliable native tool calls.',
   },
   {
     label: 'Tool calls',
@@ -151,9 +151,7 @@ export function ConnectionSettings({
             value={generationSettings.visionModel}
             onChange={(event) => onSettingsChange({ visionModel: event.target.value })}
           />
-          <p className="text-sm text-muted-foreground">
-            Optional. Used for reference-image analysis during guided setup.
-          </p>
+          <p className="text-sm text-muted-foreground">Optional. Used for reference-image analysis in the assistant.</p>
         </div>
 
         <div className="flex items-end">
@@ -219,8 +217,7 @@ export function ConnectionSettings({
             }}
           />
           <p className="text-sm text-muted-foreground">
-            Compatible guided chat works without native tools. Tool calls expose native agent behavior for models that
-            support it reliably.
+            The structured agent loop works without native tools. Tool calls use provider-native function calling.
           </p>
         </div>
 

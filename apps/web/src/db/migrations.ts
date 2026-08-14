@@ -12,32 +12,32 @@ import {
 import { CHARACTER_LIBRARY_COLLECTION_STORAGE_KEY } from '../features/character-creator/collections/character-library.collection';
 import { EXAMPLE_CHARACTERS_COLLECTION_STORAGE_KEY } from '../features/character-creator/collections/example-characters.collection';
 import { FIELD_TEMPLATES_COLLECTION_STORAGE_KEY } from '../features/character-creator/collections/field-templates.collection';
-import { createArchiveBlob } from '../features/character-creator/lib/archive';
-import { buildFullBackupFiles } from '../features/character-creator/lib/backup';
-import type { iBackupPortraitAsset } from '../features/character-creator/lib/backup';
 import {
   readStoredCollectionItems,
   selectLatestSessions,
-} from '../features/character-creator/lib/character-assistant-session-storage';
+} from '../features/character-creator/lib/assistant/character-assistant-session-storage';
+import { createArchiveBlob } from '../features/character-creator/lib/cards/archive';
+import { buildFullBackupFiles } from '../features/character-creator/lib/cards/backup';
+import type { iBackupPortraitAsset } from '../features/character-creator/lib/cards/backup';
 import {
   CHARACTER_LIBRARY_SOURCES,
   DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
   hasMeaningfulCharacterCardData,
   sanitizeCharacterLibrary,
   sanitizeCharacterPortraitReference,
-} from '../features/character-creator/lib/character-library';
-import type { iCharacterLibraryItem } from '../features/character-creator/lib/character-library';
-import { readStoredCharacterLibrary } from '../features/character-creator/lib/character-library-storage';
-import { STORED_EXAMPLE_CHARACTER_SCHEMA } from '../features/character-creator/lib/example-characters';
-import { ARCHIVE_FORMATS } from '../features/character-creator/lib/export-settings';
-import { STORED_FIELD_TEMPLATE_SCHEMA } from '../features/character-creator/lib/field-templates';
+} from '../features/character-creator/lib/cards/character-library';
+import type { iCharacterLibraryItem } from '../features/character-creator/lib/cards/character-library';
+import { readStoredCharacterLibrary } from '../features/character-creator/lib/cards/character-library-storage';
+import { STORED_EXAMPLE_CHARACTER_SCHEMA } from '../features/character-creator/lib/cards/example-characters';
+import { ARCHIVE_FORMATS } from '../features/character-creator/lib/cards/export-settings';
+import { STORED_FIELD_TEMPLATE_SCHEMA } from '../features/character-creator/lib/cards/field-templates';
+import { readCharacterAssetBlob } from '../features/character-creator/lib/cards/image-store';
+import { downloadBlob } from '../features/character-creator/lib/cards/image-utils';
 import {
   sanitizeCharacterGenerationConnectionSettings,
   sanitizeCharacterGenerationPromptSettings,
   sanitizeCharacterGenerationSettings,
-} from '../features/character-creator/lib/generation-config';
-import { readCharacterAssetBlob } from '../features/character-creator/lib/image-store';
-import { downloadBlob } from '../features/character-creator/lib/image-utils';
+} from '../features/character-creator/lib/generation/generation-config';
 import { UI_PREFERENCE_SCHEMA } from './collections/ui-preferences.collection';
 import { applicationDatabase } from './database';
 

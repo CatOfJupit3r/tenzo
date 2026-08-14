@@ -8,8 +8,8 @@ import {
   TEMPERATURE_RANGE,
   TOP_K_RANGE,
   TOP_P_RANGE,
-} from '../lib/generation-config';
-import type { iCharacterGenerationSettings } from '../lib/generation-config';
+} from '../lib/generation/generation-config';
+import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iSamplingSettingsProps {

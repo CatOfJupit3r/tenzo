@@ -4,7 +4,7 @@ import { cn } from '@~/lib/utils';
 import type { iCharacterFieldConfig } from '../constants/field-config';
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
-import { getTemplateFieldKeyForTargetKey } from '../lib/field-templates';
+import { getTemplateFieldKeyForTargetKey } from '../lib/cards/field-templates';
 import { GENERATION_MODES } from '../lib/prompt/generation-contracts';
 import { CharacterField } from './character-field';
 import { FIELD_PANEL_CLASS_NAME } from './tabs/tabs.constants';

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
-import { TEMPLATE_MODES } from '../field-templates';
-import { OUTPUT_FORMATS } from '../generation-config';
+import { TEMPLATE_MODES } from '../cards/field-templates';
+import { OUTPUT_FORMATS } from '../generation/generation-config';
 import { ExampleContextService } from './example-context-service';
 import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { iFieldGenerationTarget, iPromptExampleCharacter } from './generation-contracts';

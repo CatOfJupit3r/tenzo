@@ -3,17 +3,19 @@ import { useAtom } from 'jotai';
 import { startTransition, useCallback, useMemo, useRef, useState } from 'react';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
-import { streamCharacterText } from '../lib/ai-sdk-text-generation';
-import type { CharacterCard } from '../lib/card-schema';
-import { TEMPLATE_MODES } from '../lib/field-templates';
+import type { CharacterCard } from '../lib/cards/card-schema';
+import { TEMPLATE_MODES } from '../lib/cards/field-templates';
 import {
   decodeStoredSecret,
   encodeStoredSecret,
   REQUEST_MODES,
   sanitizeCharacterGenerationConnectionSettings,
   sanitizeCharacterGenerationSettings,
-} from '../lib/generation-config';
-import type { iCharacterGenerationConnectionSettings } from '../lib/generation-config';
+} from '../lib/generation/generation-config';
+import type { iCharacterGenerationConnectionSettings } from '../lib/generation/generation-config';
+import { getPrefilled, parseResponse } from '../lib/generation/response-parser';
+import { parseSlotResponse, renderStrictTemplate } from '../lib/generation/strict-template-renderer';
+import { streamCharacterText } from '../lib/generation/tanstack-ai-text-generation';
 import { GENERATION_MODES, GENERATION_TARGET_KINDS, getGenerationTargetKey } from '../lib/prompt/generation-contracts';
 import type {
   GenerationMode,
@@ -23,11 +25,9 @@ import type {
 } from '../lib/prompt/generation-contracts';
 import { characterPromptPipeline } from '../lib/prompt/prompt-pipeline';
 import { SeededRandom } from '../lib/prompt/seeded-random';
-import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider-health';
-import type { ProviderKind } from '../lib/provider-health';
-import { requestProviderHealthProxy } from '../lib/provider-health-proxy';
-import { getPrefilled, parseResponse } from '../lib/response-parser';
-import { parseSlotResponse, renderStrictTemplate } from '../lib/strict-template-renderer';
+import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider/provider-health';
+import type { ProviderKind } from '../lib/provider/provider-health';
+import { requestProviderHealthProxy } from '../lib/provider/provider-health-proxy';
 import { useCharacterSession } from './use-character-session';
 
 interface iFieldGenerationRuntimeState {

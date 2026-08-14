@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CharacterBook } from '../lib/card-schema';
+import type { CharacterBook } from '../lib/cards/card-schema';
 import { CharacterBookEditor } from './character-book-editor';
 
 vi.mock('./editor/markdown-field-editor', () => ({

@@ -1,7 +1,7 @@
 import { applicationDatabase } from '@~/db/database';
 import { PersistentCollection } from '@~/db/persistent-collection';
 
-import { STORED_EXAMPLE_CHARACTER_SCHEMA } from '../lib/example-characters';
+import { STORED_EXAMPLE_CHARACTER_SCHEMA } from '../lib/cards/example-characters';
 
 export const EXAMPLE_CHARACTERS_COLLECTION_STORAGE_KEY = 'tenzo:character-creator:example-characters:v2';
 

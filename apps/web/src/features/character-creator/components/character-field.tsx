@@ -8,13 +8,13 @@ import { Label } from '@~/components/ui/label';
 
 import type { FieldEditorVariant } from '../constants/field-config';
 import { FIELD_EDITOR_VARIANTS } from '../constants/field-config';
-import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
-import type { iCharacterEditPatch } from '../lib/character-edit-proposal';
 import type {
   iCreateStoredFieldTemplateInput,
   iFieldTemplateViewModel,
   TemplateFieldKey,
-} from '../lib/field-templates';
+} from '../lib/cards/field-templates';
+import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/proposals/character-edit-proposal';
+import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { MesExampleEditor } from './editor/mes-example-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';

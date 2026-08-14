@@ -5,9 +5,9 @@ import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
-import type { CustomField } from '../lib/card-schema';
-import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
-import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/field-templates';
+import type { CustomField } from '../lib/cards/card-schema';
+import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
+import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';

@@ -1,5 +1,7 @@
 import type { JSONContent } from '@tiptap/core';
 
+import type { iEditorSerializer } from './editor-contracts';
+
 export interface iSerializedChatInput {
   text: string;
   templateIds: string[];
@@ -40,3 +42,7 @@ export function serializeChatInput(document: JSONContent): iSerializedChatInput 
     templateIds,
   };
 }
+
+export const CHAT_INPUT_EDITOR_SERIALIZER = {
+  serialize: serializeChatInput,
+} satisfies iEditorSerializer<JSONContent, iSerializedChatInput>;

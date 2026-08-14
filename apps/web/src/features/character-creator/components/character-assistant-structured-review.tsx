@@ -1,8 +1,8 @@
 import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button';
 
-import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/character-edit-proposal';
-import type { iCharacterEditPatch } from '../lib/character-edit-proposal';
+import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/proposals/character-edit-proposal';
+import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
 
 interface iCharacterAssistantStructuredReviewProps {
   patch: Exclude<iCharacterEditPatch, { kind: 'text' }>;

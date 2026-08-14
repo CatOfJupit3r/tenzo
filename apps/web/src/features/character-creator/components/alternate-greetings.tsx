@@ -3,8 +3,8 @@ import { LuChevronDown, LuChevronUp, LuPlus, LuSparkles, LuTrash2 } from 'react-
 import { Button } from '@~/components/ui/button/button';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
-import { TEMPLATE_FIELD_KEYS } from '../lib/field-templates';
-import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/field-templates';
+import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
+import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';

@@ -79,7 +79,13 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
           </TabsContent>
 
           <TabsContent value={SETTINGS_DIALOG_TABS.sampling} className="min-h-0 overflow-y-auto pt-2 pr-1">
-            <SamplingSettings generationSettings={generationSettings} onSettingsChange={updateGenerationSettings} />
+            <SamplingSettings
+              generationSettings={generationSettings}
+              availableModels={connectionHealth.availableModels}
+              detectedContextSize={connectionHealth.detectedContextSize}
+              modelContextSizes={connectionHealth.modelContextSizes}
+              onSettingsChange={updateGenerationSettings}
+            />
           </TabsContent>
 
           <TabsContent value={SETTINGS_DIALOG_TABS.templates} className="min-h-0 overflow-y-auto pt-2 pr-1">

@@ -142,7 +142,7 @@ export function FieldTemplatesPanel({
               {selectedTemplate.isBuiltIn ? (
                 <Badge variant="secondary">
                   <LuLock className="size-3" />
-                  Built-in â€” duplicate to edit
+                  Built-in | duplicate to edit
                 </Badge>
               ) : null}
             </div>

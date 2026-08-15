@@ -53,6 +53,7 @@ interface iConnectionHealthState {
   availableModels: string[];
   detectedModel: string | null;
   detectedContextSize: number | null;
+  modelContextSizes: Record<string, number>;
 }
 
 function removeFieldInstruction(instructions: Record<string, string>, instructionKey: string) {
@@ -188,6 +189,7 @@ export function useGeneration() {
     availableModels: [],
     detectedModel: null,
     detectedContextSize: null,
+    modelContextSizes: {},
   });
   const abortControllersRef = useRef<Record<string, AbortController>>({});
 
@@ -377,6 +379,7 @@ export function useGeneration() {
         endpoint: connectionSettings.endpoint,
         apiKey,
         requestMode: connectionSettings.requestMode,
+        model: connectionSettings.model,
       };
       const result =
         connectionSettings.requestMode === REQUEST_MODES.browser
@@ -397,6 +400,7 @@ export function useGeneration() {
         availableModels: result.models,
         detectedModel: nextModel,
         detectedContextSize: result.contextSize,
+        modelContextSizes: result.modelContextSizes,
       });
 
       setGenerationSettings((prev) => ({

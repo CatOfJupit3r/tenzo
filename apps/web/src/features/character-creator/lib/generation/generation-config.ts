@@ -29,7 +29,10 @@ export const GENERATION_PROVIDER_DEFAULTS = {
   },
 } satisfies Record<GenerationProvider, { endpoint: string; model: string }>;
 
-export const DEFAULT_CONTEXT_SIZE = 8_192;
+export const DEFAULT_CONTEXT_SIZE = 32_768;
+export const DEFAULT_MAX_TOKENS = 2_048;
+export const RECOMMENDED_MINIMUM_CONTEXT_SIZE = 32_768;
+export const RECOMMENDED_MINIMUM_MAX_TOKENS = 1_024;
 
 export const TEMPERATURE_RANGE = { min: 0, max: 2 } as const;
 export const TOP_P_RANGE = { min: 0, max: 1 } as const;
@@ -75,7 +78,7 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   visionModel: '',
   apiKeyCiphertext: '',
   contextSize: DEFAULT_CONTEXT_SIZE,
-  maxTokens: 600,
+  maxTokens: DEFAULT_MAX_TOKENS,
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
   assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],

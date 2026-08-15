@@ -15,7 +15,7 @@ vi.mock('@~/features/character-creator/lib/generation/structured-output.server',
 
 vi.mock('@~/features/character-creator/lib/generation/tanstack-ai-text-generation', () => ({
   createCharacterTextAdapter: vi.fn(() => ({})),
-  createCharacterModelOptions: vi.fn(() => ({})),
+  createCharacterStructuredModelOptions: vi.fn(() => ({})),
 }));
 
 const BASE_REQUEST = {

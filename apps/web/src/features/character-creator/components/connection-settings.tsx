@@ -28,6 +28,7 @@ export interface iConnectionHealthViewModel {
   availableModels: string[];
   detectedModel: string | null;
   detectedContextSize: number | null;
+  modelContextSizes: Record<string, number>;
 }
 
 const outputFormatOptions: iOptionType[] = [
@@ -93,10 +94,6 @@ export function ConnectionSettings({
 }: iConnectionSettingsProps) {
   const isUsingProxy = generationSettings.requestMode === REQUEST_MODES.proxy;
   const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.openrouter;
-  const hasDetectedModels = connectionHealth.availableModels.length > 0;
-  const modelHelperText = hasDetectedModels
-    ? `Detected models: ${connectionHealth.availableModels.join(', ')}`
-    : 'Run health check to infer available models from the endpoint.';
 
   return (
     <div className="space-y-4">
@@ -130,28 +127,6 @@ export function ConnectionSettings({
               ? 'Managed by OpenRouter with zero-retention and data-collection-denied routing.'
               : 'Use the KoboldCpp server base URL.'}
           </p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="api-model">Model</Label>
-          <Input
-            id="api-model"
-            placeholder={isUsingOpenRouter ? 'anthropic/claude-sonnet-4' : 'local-model'}
-            value={generationSettings.model}
-            onChange={(event) => onSettingsChange({ model: event.target.value })}
-          />
-          <p className="text-sm text-muted-foreground">{modelHelperText}</p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="vision-model">Vision model</Label>
-          <Input
-            id="vision-model"
-            placeholder="Same as the main model"
-            value={generationSettings.visionModel}
-            onChange={(event) => onSettingsChange({ visionModel: event.target.value })}
-          />
-          <p className="text-sm text-muted-foreground">Optional. Used for reference-image analysis in the assistant.</p>
         </div>
 
         <div className="flex items-end">

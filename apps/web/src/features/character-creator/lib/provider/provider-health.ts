@@ -16,6 +16,7 @@ export interface iConnectionHealthRequest {
   endpoint: string;
   apiKey: string;
   requestMode: RequestMode;
+  model?: string;
 }
 
 export interface iConnectionHealthResult {
@@ -24,6 +25,7 @@ export interface iConnectionHealthResult {
   models: string[];
   currentModel: string | null;
   contextSize: number | null;
+  modelContextSizes: Record<string, number>;
 }
 
 interface iFetchJsonResult {
@@ -148,6 +150,36 @@ function extractModels(payload: unknown): string[] {
   return [...discoveredModels];
 }
 
+function extractModelContextSizes(payload: unknown) {
+  const modelContextSizes: Record<string, number> = {};
+  let candidates: unknown[] = [];
+
+  if (Array.isArray(payload)) {
+    candidates = payload;
+  } else if (payload && typeof payload === 'object') {
+    const data = Reflect.get(payload, 'data');
+    candidates = Array.isArray(data) ? data : [];
+  }
+
+  candidates.forEach((entry: unknown) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+
+    const model = readString(Reflect.get(entry, 'id')) ?? readString(Reflect.get(entry, 'name'));
+    const contextSize =
+      readPositiveInteger(Reflect.get(entry, 'context_length')) ??
+      readPositiveInteger(Reflect.get(entry, 'context_window')) ??
+      readPositiveInteger(Reflect.get(entry, 'max_context_length'));
+
+    if (model && contextSize) {
+      modelContextSizes[model] = contextSize;
+    }
+  });
+
+  return modelContextSizes;
+}
+
 function extractCurrentModel(payload: unknown) {
   if (payload && typeof payload === 'object') {
     const result = Reflect.get(payload, 'result');
@@ -213,12 +245,14 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   ]);
 
   const models = modelsResponse?.isOk ? extractModels(modelsResponse.data) : [];
-  const currentModel =
-    (koboldModelResponse?.isOk ? extractCurrentModel(koboldModelResponse.data) : null) ?? models[0] ?? null;
-  const contextSize =
+  const modelContextSizes = modelsResponse?.isOk ? extractModelContextSizes(modelsResponse.data) : {};
+  const currentModel = koboldModelResponse?.isOk ? extractCurrentModel(koboldModelResponse.data) : null;
+  const endpointContextSize =
     (koboldContextResponse?.isOk ? extractContextSize(koboldContextResponse.data) : null) ??
     (koboldPublicContextResponse?.isOk ? extractContextSize(koboldPublicContextResponse.data) : null) ??
     (propsResponse?.isOk ? extractContextSize(propsResponse.data) : null);
+  const selectedModel = readString(request.model) ?? currentModel;
+  const contextSize = endpointContextSize ?? (selectedModel ? (modelContextSizes[selectedModel] ?? null) : null);
 
   const detectedModels = currentModel && !models.includes(currentModel) ? [currentModel, ...models] : models;
   const providerName = serviceInfoResponse?.isOk ? extractProviderName(serviceInfoResponse.data) : null;
@@ -268,6 +302,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     models: detectedModels,
     currentModel,
     contextSize,
+    modelContextSizes,
   } satisfies iConnectionHealthResult;
 }
 

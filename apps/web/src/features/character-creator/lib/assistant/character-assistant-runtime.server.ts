@@ -14,7 +14,6 @@ import type {
   iCharacterAssistantContextAttachment,
   iCharacterAssistantDiscoveryContext,
   iCharacterAssistantStreamRequest,
-  iCharacterConcept,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { createCharacterAssistantSafetyMiddleware } from './character-assistant-safety';
@@ -39,7 +38,6 @@ interface iStreamCharacterAssistantOptions {
   >;
   shouldSendDisabledSamplers?: boolean;
   generalCharacterIdea?: string;
-  concept?: iCharacterConcept | null;
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
@@ -52,7 +50,7 @@ interface iStreamCharacterAssistantOptions {
 
 interface iBuildCharacterAssistantInstructionsOptions extends Pick<
   iStreamCharacterAssistantOptions,
-  'card' | 'focus' | 'contextAttachments' | 'generalCharacterIdea' | 'concept' | 'discoveryContext' | 'templates'
+  'card' | 'focus' | 'contextAttachments' | 'generalCharacterIdea' | 'discoveryContext' | 'templates'
 > {
   mode: 'tool-call' | 'structured-output';
 }
@@ -109,7 +107,6 @@ export function buildAssistantSystemPrompt({
   focus,
   contextAttachments,
   generalCharacterIdea = '',
-  concept,
   discoveryContext,
   templates = [],
   mode,
@@ -131,9 +128,6 @@ export function buildAssistantSystemPrompt({
         ].join('\n\n')
       : null;
   const discoverySection = discoveryContext ? buildDiscoverySection(discoveryContext) : null;
-  const conceptSection = concept
-    ? `Established concept - treat as ground truth unless the user overrides it:\n${JSON.stringify(concept, null, 2)}`
-    : null;
   const templateSection =
     templates.length > 0
       ? [
@@ -162,7 +156,6 @@ export function buildAssistantSystemPrompt({
     generalCharacterIdea.trim() ? `General character idea: ${generalCharacterIdea.trim()}` : null,
     attachmentSection,
     discoverySection,
-    conceptSection,
     templateSection,
     mode === 'structured-output' ? `Current character card:\n${JSON.stringify(card)}` : null,
   ]
@@ -178,7 +171,6 @@ export function streamCharacterAssistant({
   generationSettings,
   shouldSendDisabledSamplers = false,
   generalCharacterIdea = '',
-  concept = null,
   discoveryContext,
   templates = [],
   allowedToolNames,
@@ -207,7 +199,6 @@ export function streamCharacterAssistant({
         focus,
         contextAttachments,
         generalCharacterIdea,
-        concept,
         discoveryContext,
         templates,
         mode: shouldUseNativeTools ? 'tool-call' : 'structured-output',

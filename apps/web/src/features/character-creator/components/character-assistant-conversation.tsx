@@ -7,10 +7,7 @@ import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
-import {
-  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
-  CHARACTER_CONCEPT_SCHEMA,
-} from '../lib/assistant/character-assistant-contracts';
+import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA } from '../lib/assistant/character-assistant-contracts';
 import { groupCharacterAssistantConversationMessages } from '../lib/assistant/conversation-message-groups';
 import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from '../lib/assistant/tool-part-renderers';
 import { readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
@@ -260,13 +257,7 @@ export function CharacterAssistantConversation({
               );
             }
             if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.concept) {
-              const result = CHARACTER_CONCEPT_SCHEMA.safeParse((part.output as { concept?: unknown }).concept);
-              return result.success ? (
-                <div key={partKey} className="rounded-md border bg-muted/30 p-2">
-                  <p className="text-xs font-medium">Concept recorded</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{result.data.premise}</p>
-                </div>
-              ) : null;
+              return null;
             }
             if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.discovery && onSendMessage) {
               const result = z

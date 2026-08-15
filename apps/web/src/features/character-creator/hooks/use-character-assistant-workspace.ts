@@ -18,13 +18,13 @@ import {
   updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
-import { CHARACTER_CONCEPT_SCHEMA } from '../lib/assistant/character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
   iChatTemplateRef,
 } from '../lib/assistant/character-assistant-contracts';
 import { createCharacterAssistantMessagePersistence } from '../lib/assistant/message-persistence';
+import { readNewRecordedCharacterConcept } from '../lib/assistant/recorded-character-concept';
 import type { CharacterCard } from '../lib/cards/card-schema';
 import { buildChatInputContentParts } from '../lib/editor/chat-input-attachments';
 import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
@@ -45,6 +45,7 @@ interface iUseCharacterAssistantWorkspaceOptions {
   apiKey: string;
   generationSettings: iCharacterGenerationSettings;
   generalCharacterIdea: string;
+  updateGeneralCharacterIdea: (value: string) => unknown;
   shouldSendDisabledSamplers: boolean;
   providerKind: ProviderKind | null;
   focus: CharacterAssistantFocus;
@@ -64,6 +65,7 @@ export function useCharacterAssistantWorkspace({
   apiKey,
   generationSettings,
   generalCharacterIdea,
+  updateGeneralCharacterIdea,
   shouldSendDisabledSamplers,
   providerKind,
   focus,
@@ -124,31 +126,24 @@ export function useCharacterAssistantWorkspace({
         return result.success ? [result.data] : [];
       }),
     );
-    const concepts = chat.messages.flatMap((message) =>
-      message.parts.flatMap((part) => {
-        if (part.type !== 'tool-call' || !part.output || typeof part.output !== 'object') return [];
-        const result = CHARACTER_CONCEPT_SCHEMA.safeParse((part.output as { concept?: unknown }).concept);
-        return result.success ? [result.data] : [];
-      }),
-    );
     const missingProposals = proposals.filter(
       (proposal) => !session.proposals.some((storedProposal) => storedProposal.id === proposal.id),
     );
-    const latestConcept = concepts.at(-1);
-    if (
-      missingProposals.length === 0 &&
-      (!latestConcept || JSON.stringify(latestConcept) === JSON.stringify(session.concept))
-    ) {
+    const newConcept = readNewRecordedCharacterConcept(chat.messages, session.lastRecordedConceptToolCallId);
+    if (missingProposals.length === 0 && !newConcept) {
       return;
     }
+    if (newConcept) updateGeneralCharacterIdea(newConcept.concept.premise);
     void updateCharacterAssistantSession(session.id, (draft) => {
       missingProposals.forEach((proposal) => {
         draft.proposals = supersedeOverlappingCharacterEditProposals(draft.proposals, proposal);
         draft.proposals.push(proposal);
       });
-      if (latestConcept) draft.concept = latestConcept;
+      if (newConcept) {
+        draft.lastRecordedConceptToolCallId = newConcept.toolCallId;
+      }
     });
-  }, [chat.messages, session]);
+  }, [chat.messages, session, updateGeneralCharacterIdea]);
 
   const proposalActions = useProposalActions({
     characterId,
@@ -195,7 +190,6 @@ export function useCharacterAssistantWorkspace({
     chat.clear();
     await clearCharacterAssistantComposerDraft(characterId);
   }, [characterId, chat]);
-
   return {
     composerDraft,
     composerDraftSessionId: storedComposerDraft?.characterId ?? null,

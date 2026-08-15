@@ -48,7 +48,6 @@ function createOptions() {
       appendProposedCard: vi.fn(() => {
         throw new Error('No proposal was expected in this fixture.');
       }),
-      recordConcept: vi.fn(),
       suggestDirections: vi.fn(),
     },
   };
@@ -197,7 +196,6 @@ describe('structured character assistant loop', () => {
 
     const chunks = await collect(generateStructuredCharacterAssistantStream(options));
 
-    expect(options.store.recordConcept).toHaveBeenCalledWith(concept);
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_RESULT)).toBe(true);
   });
 });

@@ -32,7 +32,6 @@ export interface iCharacterAssistantProposalStore {
     summary: string;
     proposedCard: CharacterCard;
   }) => iCharacterEditProposal;
-  recordConcept?: (concept: iCharacterConcept) => void;
   suggestDirections?: (premise?: string) => Promise<{ cards: iCharacterAssistantDiscoveryDirectionCard[] }>;
 }
 
@@ -96,9 +95,7 @@ export function createProposalFromChanges({
   return { proposal: store.appendProposedCard({ toolCallId: toolCallId ?? generateUuid(), summary, proposedCard }) };
 }
 
-export function recordConcept(store: iCharacterAssistantProposalStore, concept: iCharacterConcept) {
-  if (!store.recordConcept) throw new Error('Concept recording is unavailable for this run.');
-  store.recordConcept(concept);
+export function recordConcept(concept: iCharacterConcept) {
   return { concept };
 }
 
@@ -111,7 +108,7 @@ export function createCharacterAssistantActionHandlers({
 }) {
   return {
     readCharacter: () => ({ card: store.getCard() }),
-    recordConcept: (concept: iCharacterConcept) => recordConcept(store, concept),
+    recordConcept: (concept: iCharacterConcept) => recordConcept(concept),
     proposeCharacterFields: (input: z.infer<typeof PROPOSE_CHARACTER_FIELDS_INPUT_SCHEMA>, toolCallId?: string) =>
       createProposalFromChanges({
         store,

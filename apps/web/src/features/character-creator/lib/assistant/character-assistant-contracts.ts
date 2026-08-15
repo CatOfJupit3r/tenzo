@@ -142,7 +142,6 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   messages: z.array(z.unknown()).min(1),
   generalCharacterIdea: z.string().optional(),
   contextAttachments: z.array(CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA).max(8).optional().default([]),
-  concept: CHARACTER_CONCEPT_SCHEMA.optional(),
   discoveryContext: CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA.optional(),
   templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(4).optional().default([]),
   assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.optional().default(

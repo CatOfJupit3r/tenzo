@@ -20,7 +20,6 @@ function createRunStore(
   suggestDirections: (premise?: string) => ReturnType<typeof generateCharacterDiscoveryDirections>,
 ) {
   let projectedCard = structuredClone(initialCard);
-  let concept: unknown;
   const proposals: iCharacterEditProposal[] = [];
 
   return {
@@ -45,10 +44,6 @@ function createRunStore(
       proposals.push(proposal);
       return proposal;
     },
-    recordConcept(nextConcept: unknown) {
-      concept = structuredClone(nextConcept);
-    },
-    getConcept: () => concept,
     getProposals: () => proposals,
     suggestDirections,
   };
@@ -82,7 +77,6 @@ export const Route = createFileRoute('/api/character-assistant')({
             generationSettings: payload,
             shouldSendDisabledSamplers: payload.shouldSendDisabledSamplers,
             generalCharacterIdea: payload.generalCharacterIdea,
-            concept: payload.concept,
             discoveryContext: payload.discoveryContext,
             templates: payload.templates,
             store,

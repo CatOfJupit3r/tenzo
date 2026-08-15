@@ -21,7 +21,6 @@ import type {
   iCharacterAssistantContextAttachment,
   iCharacterAssistantDiscoveryContext,
   iCharacterAssistantStreamRequest,
-  iCharacterConcept,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { buildAssistantSystemPrompt } from './character-assistant-runtime.server';
@@ -133,7 +132,6 @@ interface iStructuredAssistantOptions {
   >;
   shouldSendDisabledSamplers?: boolean;
   generalCharacterIdea?: string;
-  concept?: iCharacterConcept | null;
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
   store: iCharacterAssistantProposalStore;
@@ -188,7 +186,6 @@ export async function* generateStructuredCharacterAssistantStream(
       focus: options.focus,
       contextAttachments: options.contextAttachments,
       generalCharacterIdea: options.generalCharacterIdea,
-      concept: options.concept,
       discoveryContext: options.discoveryContext,
       templates: options.templates,
       mode: 'structured-output',

@@ -24,7 +24,7 @@ export const CHARACTER_ASSISTANT_SESSION_SCHEMA = z.object({
   characterId: z.string(),
   messages: z.array(UI_MESSAGE_SCHEMA),
   proposals: z.array(CHARACTER_EDIT_PROPOSAL_SCHEMA),
-  concept: z.unknown().nullable().default(null),
+  lastRecordedConceptToolCallId: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -65,7 +65,8 @@ export function sanitizeCharacterAssistantSession(value: unknown): iCharacterAss
     characterId,
     messages,
     proposals,
-    concept: candidate.concept ?? null,
+    lastRecordedConceptToolCallId:
+      typeof candidate.lastRecordedConceptToolCallId === 'string' ? candidate.lastRecordedConceptToolCallId : null,
     createdAt: readTimestamp(candidate.createdAt, fallbackTimestamp),
     updatedAt: readTimestamp(candidate.updatedAt, fallbackTimestamp),
   });
@@ -78,7 +79,7 @@ export function createCharacterAssistantSession(characterId: string): iCharacter
     characterId,
     messages: [],
     proposals: [],
-    concept: null,
+    lastRecordedConceptToolCallId: null,
     createdAt: now,
     updatedAt: now,
   };

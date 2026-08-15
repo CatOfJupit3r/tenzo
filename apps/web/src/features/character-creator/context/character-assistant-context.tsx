@@ -17,8 +17,16 @@ const DEFAULT_ASSISTANT_FOCUS = {
 } satisfies CharacterAssistantFocus;
 
 export function CharacterAssistantProvider({ children }: PropsWithChildren) {
-  const { activeCharacterId, card, replaceCard, apiKey, generationSettings, generalCharacterIdea, connectionHealth } =
-    useCharacterCreatorContext();
+  const {
+    activeCharacterId,
+    card,
+    replaceCard,
+    apiKey,
+    generationSettings,
+    generalCharacterIdea,
+    updateGeneralCharacterIdea,
+    connectionHealth,
+  } = useCharacterCreatorContext();
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
   const [assistantFocus, setAssistantFocus] = useState<CharacterAssistantFocus>(DEFAULT_ASSISTANT_FOCUS);
   const [contextAttachments, setContextAttachments] = useState<iCharacterAssistantContextAttachment[]>([]);
@@ -68,6 +76,7 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     apiKey,
     generationSettings,
     generalCharacterIdea,
+    updateGeneralCharacterIdea,
     shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
     providerKind: connectionHealth.providerKind,
     focus: assistantFocus,

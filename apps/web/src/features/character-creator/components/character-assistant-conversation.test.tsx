@@ -9,7 +9,54 @@ import { CHARACTER_ASSISTANT_TOOL_NAMES } from '../lib/assistant/character-assis
 import { createCharacterEditProposal } from '../lib/proposals/character-edit-proposal';
 import { CharacterAssistantConversation } from './character-assistant-conversation';
 
-describe('CharacterAssistantConversation proposals', () => {
+describe('CharacterAssistantConversation', () => {
+  it('does not render historical concept tool calls as recorded character data', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'assistant-message',
+        role: 'assistant',
+        createdAt: new Date('2026-08-14T00:00:00.000Z'),
+        parts: [
+          {
+            type: 'tool-call',
+            id: 'concept-call',
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.record_concept,
+            arguments: '{}',
+            state: 'complete',
+            output: {
+              concept: {
+                premise: 'A hidden premise.',
+                archetype: '',
+                keyTraits: [],
+                flaws: [],
+                nameCandidates: [],
+                suggestedTags: [],
+              },
+            },
+          },
+        ],
+      },
+    ];
+
+    render(
+      <CharacterAssistantConversation
+        messages={messages}
+        proposals={[]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('Concept recorded')).toBeNull();
+    expect(screen.queryByText('A hidden premise.')).toBeNull();
+  });
+
   it('renders markdown formatting and project macros in chat messages', async () => {
     const messages: UIMessage[] = [
       {

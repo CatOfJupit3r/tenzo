@@ -126,7 +126,10 @@ export function CharacterAssistantPanel({
           <LuX className="size-4" />
         </Button>
       </header>
-      <div className="min-h-0 overflow-y-auto overscroll-contain p-4" aria-label="Assistant conversation">
+      <div
+        className="scroll-fade-y min-h-0 overflow-y-auto overscroll-contain p-4 [scrollbar-gutter:stable]"
+        aria-label="Assistant conversation"
+      >
         <CharacterAssistantConversation
           messages={workspace.messages}
           proposals={workspace.activeProposals}

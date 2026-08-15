@@ -256,7 +256,7 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
           </Button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="scroll-fade-y min-h-0 flex-1 overflow-y-auto px-3 py-4 [scrollbar-gutter:stable]">
           {!isCharacterLibraryReady && characterLibrary.length === 0 ? (
             <CharacterLibraryLoadingState />
           ) : (

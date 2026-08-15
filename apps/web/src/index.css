@@ -138,6 +138,25 @@ body {
   z-index: 1050 !important;
 }
 
+.scroll-fade-y {
+  --scroll-fade-size: 1rem;
+
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black var(--scroll-fade-size),
+    black calc(100% - var(--scroll-fade-size)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black var(--scroll-fade-size),
+    black calc(100% - var(--scroll-fade-size)),
+    transparent
+  );
+}
+
 .character-markdown-editor .ProseMirror {
   @apply min-h-full px-3 py-2 text-base outline-none md:text-sm;
 }

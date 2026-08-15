@@ -200,7 +200,7 @@ export function RewriteDiffReview({
           )}
         </div>
       </div>
-      <div className="max-h-[480px] overflow-y-auto py-1 text-base md:text-sm">
+      <div className="scroll-fade-y max-h-[480px] overflow-y-auto py-4 text-base [scrollbar-gutter:stable] md:text-sm">
         {hunks.map((hunk) =>
           hunk.isChanged ? (
             <ChangedHunk

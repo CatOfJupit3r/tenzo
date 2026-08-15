@@ -10,6 +10,9 @@ import { SamplingSettings } from './sampling-settings';
 import { SETTINGS_DIALOG_TABS, settingsDialogTabSchema } from './settings-dialog-tabs';
 import type { SettingsDialogTab } from './settings-dialog-tabs';
 
+const SETTINGS_TAB_CONTENT_CLASS_NAME =
+  'scroll-fade-y min-h-0 overflow-y-auto overscroll-contain py-4 pr-1 [scrollbar-gutter:stable]';
+
 export interface iSettingsDialogProps {
   isOpen: boolean;
   activeTab: SettingsDialogTab;
@@ -67,7 +70,7 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.connection} className="min-h-0 overflow-y-auto pt-2 pr-1">
+          <TabsContent value={SETTINGS_DIALOG_TABS.connection} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <ConnectionSettings
               generationSettings={generationSettings}
               apiKey={apiKey}
@@ -78,7 +81,7 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
             />
           </TabsContent>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.sampling} className="min-h-0 overflow-y-auto pt-2 pr-1">
+          <TabsContent value={SETTINGS_DIALOG_TABS.sampling} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <SamplingSettings
               generationSettings={generationSettings}
               availableModels={connectionHealth.availableModels}
@@ -88,7 +91,7 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
             />
           </TabsContent>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.templates} className="min-h-0 overflow-y-auto pt-2 pr-1">
+          <TabsContent value={SETTINGS_DIALOG_TABS.templates} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <FieldTemplatesPanel
               fieldTemplates={fieldTemplates}
               onAddTemplate={addFieldTemplate}
@@ -98,7 +101,7 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
             />
           </TabsContent>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.examples} className="min-h-0 overflow-y-auto pt-2 pr-1">
+          <TabsContent value={SETTINGS_DIALOG_TABS.examples} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <ExampleCharacters
               exampleCharacters={exampleCharacters}
               contextSummary={exampleContextSummary}

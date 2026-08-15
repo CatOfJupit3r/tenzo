@@ -15,7 +15,7 @@ interface iCharacterFieldPanelProps {
 }
 
 export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProps) {
-  const { openAssistantForField, workspace } = useCharacterAssistant();
+  const { workspace } = useCharacterAssistant();
   const {
     data,
     updateField,
@@ -82,7 +82,6 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
         onAcceptRewrite={() => acceptStandardFieldRewrite(config.key)}
         onResolveRewriteReview={(mergedValue) => resolveStandardFieldRewriteReview(config.key, mergedValue)}
         onCancel={() => cancelStandardFieldGeneration(config.key)}
-        onAskAssistant={() => openAssistantForField(config.key)}
         assistantPatch={assistantPatchView?.patch.kind === 'text' ? assistantPatchView.patch : null}
         onApplyAssistantProposal={
           assistantPatchView

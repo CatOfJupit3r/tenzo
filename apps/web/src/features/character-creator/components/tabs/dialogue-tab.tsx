@@ -14,7 +14,7 @@ import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
 const DIALOGUE_FIELD_KEYS = new Set(['first_mes', 'mes_example']);
 
 export function DialogueTab() {
-  const { openAssistantForField, workspace } = useCharacterAssistant();
+  const { workspace } = useCharacterAssistant();
   const {
     data,
     addGreeting,
@@ -88,7 +88,6 @@ export function DialogueTab() {
           onAcceptRewrite={acceptAlternateGreetingRewrite}
           onResolveRewriteReview={resolveAlternateGreetingRewriteReview}
           onCancel={cancelAlternateGreetingGeneration}
-          onAskAssistant={() => openAssistantForField(CHARACTER_EDIT_FIELD_KEYS.alternate_greetings)}
         />
       </div>
     </div>

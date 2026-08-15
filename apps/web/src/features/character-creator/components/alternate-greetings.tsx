@@ -1,4 +1,4 @@
-import { LuChevronDown, LuChevronUp, LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
+import { LuChevronDown, LuChevronUp, LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button/button';
 
@@ -28,7 +28,6 @@ export interface iAlternateGreetingsProps {
   onAcceptRewrite: (index: number) => void;
   onResolveRewriteReview: (index: number, mergedValue: string) => void;
   onCancel: (index: number) => void;
-  onAskAssistant?: () => void;
 }
 
 export function AlternateGreetings({
@@ -50,19 +49,12 @@ export function AlternateGreetings({
   onAcceptRewrite,
   onResolveRewriteReview,
   onCancel,
-  onAskAssistant,
 }: iAlternateGreetingsProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm leading-none font-medium">Alternate Greetings</span>
         <div className="flex gap-2">
-          {onAskAssistant ? (
-            <Button type="button" variant="ghost" size="sm" onClick={onAskAssistant}>
-              <LuSparkles className="size-3.5" />
-              Ask AI
-            </Button>
-          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={onAdd}>
             <LuPlus className="size-4" />
             Add greeting
@@ -91,6 +83,32 @@ export function AlternateGreetings({
                     Greeting {index + 1}
                   </span>
                   <div className="flex gap-1">
+                    <FieldGenerationControls
+                      fieldId={`alternate-greeting-${index}`}
+                      label={`Alternate Greeting ${index + 1}`}
+                      shouldUseGeneralCharacterIdea={generationState?.shouldUseGeneralCharacterIdea ?? true}
+                      instructionValue={generationState?.instructionValue ?? ''}
+                      errorMessage={generationState?.errorMessage ?? null}
+                      hasExistingValue={greeting.trim().length > 0}
+                      hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
+                      isGenerating={isGenerating}
+                      templateOptions={templateOptions}
+                      templateId={generationState?.templateId ?? null}
+                      isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
+                      fieldValue={greeting}
+                      templateFieldKey={TEMPLATE_FIELD_KEYS.alternate_greeting}
+                      onTemplateIdChange={(templateId) => onTemplateIdChange(index, templateId)}
+                      onSaveTemplate={onSaveTemplate}
+                      onShouldUseGeneralCharacterIdeaChange={(value) =>
+                        onShouldUseGeneralCharacterIdeaChange(index, value)
+                      }
+                      onInstructionChange={(value) => onInstructionChange(index, value)}
+                      onGenerate={() => onGenerate(index)}
+                      onContinue={() => onContinue(index)}
+                      onRewrite={() => onRewrite(index)}
+                      onRevertRewrite={() => onRevertRewrite(index)}
+                      onCancel={() => onCancel(index)}
+                    />
                     <Button
                       type="button"
                       variant="ghost"
@@ -125,31 +143,6 @@ export function AlternateGreetings({
                     </Button>
                   </div>
                 </div>
-
-                <FieldGenerationControls
-                  fieldId={`alternate-greeting-${index}`}
-                  label={`Alternate Greeting ${index + 1}`}
-                  shouldUseGeneralCharacterIdea={generationState?.shouldUseGeneralCharacterIdea ?? true}
-                  instructionValue={generationState?.instructionValue ?? ''}
-                  errorMessage={generationState?.errorMessage ?? null}
-                  hasExistingValue={greeting.trim().length > 0}
-                  hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
-                  isGenerating={isGenerating}
-                  templateOptions={templateOptions}
-                  templateId={generationState?.templateId ?? null}
-                  isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
-                  fieldValue={greeting}
-                  templateFieldKey={TEMPLATE_FIELD_KEYS.alternate_greeting}
-                  onTemplateIdChange={(templateId) => onTemplateIdChange(index, templateId)}
-                  onSaveTemplate={onSaveTemplate}
-                  onShouldUseGeneralCharacterIdeaChange={(value) => onShouldUseGeneralCharacterIdeaChange(index, value)}
-                  onInstructionChange={(value) => onInstructionChange(index, value)}
-                  onGenerate={() => onGenerate(index)}
-                  onContinue={() => onContinue(index)}
-                  onRewrite={() => onRewrite(index)}
-                  onRevertRewrite={() => onRevertRewrite(index)}
-                  onCancel={() => onCancel(index)}
-                />
 
                 {shouldShowRewriteReview ? (
                   <RewriteDiffReview

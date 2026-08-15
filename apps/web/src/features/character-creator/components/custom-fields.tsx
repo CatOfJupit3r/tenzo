@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
+import { LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
@@ -30,7 +30,6 @@ export interface iCustomFieldsProps {
   onAcceptRewrite: (id: string) => void;
   onResolveRewriteReview: (id: string, mergedValue: string) => void;
   onCancel: (id: string) => void;
-  onAskAssistant?: () => void;
 }
 
 export function CustomFields({
@@ -51,19 +50,12 @@ export function CustomFields({
   onAcceptRewrite,
   onResolveRewriteReview,
   onCancel,
-  onAskAssistant,
 }: iCustomFieldsProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm leading-none font-medium">Custom Fields</span>
         <div className="flex gap-2">
-          {onAskAssistant ? (
-            <Button type="button" variant="ghost" size="sm" onClick={onAskAssistant}>
-              <LuSparkles className="size-3.5" />
-              Ask AI
-            </Button>
-          ) : null}
           <Button type="button" variant="outline" size="sm" onClick={onAdd}>
             <LuPlus className="size-4" />
             Add field
@@ -95,6 +87,32 @@ export function CustomFields({
                       onUpdate(field.id, { label: event.target.value })
                     }
                   />
+                  <FieldGenerationControls
+                    fieldId={`custom-field-${field.id}`}
+                    label={field.label.trim() || 'Custom Field'}
+                    shouldUseGeneralCharacterIdea={generationState?.shouldUseGeneralCharacterIdea ?? true}
+                    instructionValue={generationState?.instructionValue ?? ''}
+                    errorMessage={generationState?.errorMessage ?? null}
+                    hasExistingValue={field.value.trim().length > 0}
+                    hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
+                    isGenerating={isGenerating}
+                    templateOptions={templateOptions}
+                    templateId={generationState?.templateId ?? null}
+                    isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
+                    fieldValue={field.value}
+                    templateFieldKey={TEMPLATE_FIELD_KEYS.custom_field}
+                    onTemplateIdChange={(templateId) => onTemplateIdChange(field.id, templateId)}
+                    onSaveTemplate={onSaveTemplate}
+                    onShouldUseGeneralCharacterIdeaChange={(value) =>
+                      onShouldUseGeneralCharacterIdeaChange(field.id, value)
+                    }
+                    onInstructionChange={(value) => onInstructionChange(field.id, value)}
+                    onGenerate={() => onGenerate(field.id)}
+                    onContinue={() => onContinue(field.id)}
+                    onRewrite={() => onRewrite(field.id)}
+                    onRevertRewrite={() => onRevertRewrite(field.id)}
+                    onCancel={() => onCancel(field.id)}
+                  />
                   <Button
                     type="button"
                     variant="ghost"
@@ -105,33 +123,6 @@ export function CustomFields({
                     <LuTrash2 className="size-4" />
                   </Button>
                 </div>
-
-                <FieldGenerationControls
-                  fieldId={`custom-field-${field.id}`}
-                  label={field.label.trim() || 'Custom Field'}
-                  shouldUseGeneralCharacterIdea={generationState?.shouldUseGeneralCharacterIdea ?? true}
-                  instructionValue={generationState?.instructionValue ?? ''}
-                  errorMessage={generationState?.errorMessage ?? null}
-                  hasExistingValue={field.value.trim().length > 0}
-                  hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
-                  isGenerating={isGenerating}
-                  templateOptions={templateOptions}
-                  templateId={generationState?.templateId ?? null}
-                  isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
-                  fieldValue={field.value}
-                  templateFieldKey={TEMPLATE_FIELD_KEYS.custom_field}
-                  onTemplateIdChange={(templateId) => onTemplateIdChange(field.id, templateId)}
-                  onSaveTemplate={onSaveTemplate}
-                  onShouldUseGeneralCharacterIdeaChange={(value) =>
-                    onShouldUseGeneralCharacterIdeaChange(field.id, value)
-                  }
-                  onInstructionChange={(value) => onInstructionChange(field.id, value)}
-                  onGenerate={() => onGenerate(field.id)}
-                  onContinue={() => onContinue(field.id)}
-                  onRewrite={() => onRewrite(field.id)}
-                  onRevertRewrite={() => onRevertRewrite(field.id)}
-                  onCancel={() => onCancel(field.id)}
-                />
 
                 {shouldShowRewriteReview ? (
                   <RewriteDiffReview

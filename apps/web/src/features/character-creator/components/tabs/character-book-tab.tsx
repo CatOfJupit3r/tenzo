@@ -1,4 +1,4 @@
-import { LuBookOpen, LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
+import { LuBookOpen, LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { Button } from '@~/components/ui/button';
@@ -11,7 +11,7 @@ import { CharacterBookEditor } from '../character-book-editor';
 import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
 
 export function CharacterBookTab() {
-  const { openAssistantForField, workspace } = useCharacterAssistant();
+  const { workspace } = useCharacterAssistant();
   const {
     data,
     createCharacterBook,
@@ -36,15 +36,6 @@ export function CharacterBookTab() {
           <h2 className="text-sm font-semibold">Character Book</h2>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => openAssistantForField(CHARACTER_EDIT_FIELD_KEYS.character_book)}
-          >
-            <LuSparkles className="size-3.5" />
-            Ask AI
-          </Button>
           {data.character_book ? (
             <Button type="button" variant="outline" size="sm" onClick={removeCharacterBook}>
               <LuTrash2 className="size-4" />

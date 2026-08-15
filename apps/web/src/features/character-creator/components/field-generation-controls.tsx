@@ -103,12 +103,13 @@ export function FieldGenerationControls({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            size="sm"
-            variant="outline"
-            className={cn('w-fit', shouldShowErrorState ? 'border-destructive/60 text-destructive' : null)}
+            size="icon"
+            variant="ghost"
+            aria-label={`AI generation for ${label}`}
+            title={isGenerating ? 'Generating' : 'AI Generation'}
+            className={cn(shouldShowErrorState ? 'text-destructive' : null)}
           >
             {isGenerating ? <LuLoaderCircle className="size-4 animate-spin" /> : <LuSparkles className="size-4" />}
-            {isGenerating ? 'Generating' : 'AI Generation'}
           </Button>
         </PopoverTrigger>
 

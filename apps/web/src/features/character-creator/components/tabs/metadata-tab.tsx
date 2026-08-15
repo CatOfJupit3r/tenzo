@@ -14,7 +14,7 @@ import { TagsInput } from '../tags-input';
 import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
 
 export function MetadataTab() {
-  const { openAssistant, openAssistantForField, workspace } = useCharacterAssistant();
+  const { workspace } = useCharacterAssistant();
   const {
     data,
     updateTags,
@@ -77,7 +77,6 @@ export function MetadataTab() {
           onAcceptRewrite={acceptGeneralCharacterIdeaRewrite}
           onResolveRewriteReview={resolveGeneralCharacterIdeaRewriteReview}
           onCancel={cancelGeneralCharacterIdeaGeneration}
-          onAskAssistant={openAssistant}
         />
       </div>
 
@@ -99,11 +98,7 @@ export function MetadataTab() {
             />
           </div>
         ) : null}
-        <TagsInput
-          value={data.tags}
-          onChange={updateTags}
-          onAskAssistant={() => openAssistantForField(CHARACTER_EDIT_FIELD_KEYS.tags)}
-        />
+        <TagsInput value={data.tags} onChange={updateTags} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -154,7 +149,6 @@ export function MetadataTab() {
           onAcceptRewrite={acceptCustomFieldRewrite}
           onResolveRewriteReview={resolveCustomFieldRewriteReview}
           onCancel={cancelCustomFieldGeneration}
-          onAskAssistant={() => openAssistantForField(CHARACTER_EDIT_FIELD_KEYS.custom_fields)}
         />
       </div>
     </div>

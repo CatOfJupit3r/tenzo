@@ -1,8 +1,6 @@
 import type { ChangeEvent } from 'react';
-import { LuSparkles } from 'react-icons/lu';
 
 import { Badge } from '@~/components/ui/badge';
-import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 
@@ -52,7 +50,6 @@ export interface iCharacterFieldProps {
   onAcceptRewrite?: () => void;
   onResolveRewriteReview?: (mergedValue: string) => void;
   onCancel?: () => void;
-  onAskAssistant?: () => void;
   assistantPatch?: Extract<iCharacterEditPatch, { kind: 'text' }> | null;
   onApplyAssistantProposal?: (resolvedValue?: string) => void;
   onRejectAssistantProposal?: () => void;
@@ -90,7 +87,6 @@ export function CharacterField({
   onAcceptRewrite,
   onResolveRewriteReview,
   onCancel,
-  onAskAssistant,
   assistantPatch = null,
   onApplyAssistantProposal,
   onRejectAssistantProposal,
@@ -182,40 +178,34 @@ export function CharacterField({
         <Label id={labelId} htmlFor={fieldId}>
           {label}
         </Label>
-        {onAskAssistant ? (
-          <Button type="button" size="sm" variant="ghost" onClick={onAskAssistant}>
-            <LuSparkles className="size-3.5" />
-            Ask AI
-          </Button>
+        {hasGenerationControls ? (
+          <FieldGenerationControls
+            fieldId={fieldId}
+            label={label}
+            shouldUseGeneralCharacterIdea={shouldUseGeneralCharacterIdea}
+            shouldShowGeneralCharacterIdeaToggle={shouldShowGeneralCharacterIdeaToggle}
+            instructionValue={instructionValue}
+            errorMessage={generationErrorMessage}
+            hasExistingValue={value.trim().length > 0}
+            hasRewriteBackup={hasRewriteBackup}
+            isGenerating={isGenerating}
+            templateOptions={templateOptions}
+            templateId={templateId}
+            isStrictTemplateSelected={isStrictTemplateSelected}
+            fieldValue={value}
+            templateFieldKey={templateFieldKey}
+            onTemplateIdChange={onTemplateIdChange}
+            onSaveTemplate={onSaveTemplate}
+            onShouldUseGeneralCharacterIdeaChange={onShouldUseGeneralCharacterIdeaChange}
+            onInstructionChange={onInstructionChange}
+            onGenerate={onGenerate}
+            onContinue={onContinue}
+            onRewrite={onRewrite}
+            onRevertRewrite={onRevertRewrite ?? (() => undefined)}
+            onCancel={onCancel}
+          />
         ) : null}
       </div>
-      {hasGenerationControls ? (
-        <FieldGenerationControls
-          fieldId={fieldId}
-          label={label}
-          shouldUseGeneralCharacterIdea={shouldUseGeneralCharacterIdea}
-          shouldShowGeneralCharacterIdeaToggle={shouldShowGeneralCharacterIdeaToggle}
-          instructionValue={instructionValue}
-          errorMessage={generationErrorMessage}
-          hasExistingValue={value.trim().length > 0}
-          hasRewriteBackup={hasRewriteBackup}
-          isGenerating={isGenerating}
-          templateOptions={templateOptions}
-          templateId={templateId}
-          isStrictTemplateSelected={isStrictTemplateSelected}
-          fieldValue={value}
-          templateFieldKey={templateFieldKey}
-          onTemplateIdChange={onTemplateIdChange}
-          onSaveTemplate={onSaveTemplate}
-          onShouldUseGeneralCharacterIdeaChange={onShouldUseGeneralCharacterIdeaChange}
-          onInstructionChange={onInstructionChange}
-          onGenerate={onGenerate}
-          onContinue={onContinue}
-          onRewrite={onRewrite}
-          onRevertRewrite={onRevertRewrite ?? (() => undefined)}
-          onCancel={onCancel}
-        />
-      ) : null}
       {renderFieldBody()}
       {hint ? (
         <p id={`${fieldId}-hint`} className="text-sm text-muted-foreground">

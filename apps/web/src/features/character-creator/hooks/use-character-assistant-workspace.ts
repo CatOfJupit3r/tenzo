@@ -29,7 +29,7 @@ import type { iCharacterAssistantSession } from '../lib/assistant/character-assi
 import { createCharacterAssistantMessagePersistence } from '../lib/assistant/message-persistence';
 import { readNewRecordedCharacterConcept } from '../lib/assistant/recorded-character-concept';
 import type { CharacterCard } from '../lib/cards/card-schema';
-import { buildChatInputContentParts } from '../lib/editor/chat-input-attachments';
+import { buildChatInputContentParts, readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
 import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import {
@@ -63,6 +63,22 @@ export interface iCharacterAssistantPatchView {
 
 function sortAssistantSessions(sessions: readonly iCharacterAssistantSession[]) {
   return [...sessions].sort((first, second) => second.updatedAt.localeCompare(first.updatedAt));
+}
+
+function readProposalIds(messages: readonly iCharacterAssistantSession['messages'][number][]) {
+  return new Set(
+    messages.flatMap((message) =>
+      message.parts.flatMap((part) => {
+        if (part.type !== 'tool-call' || !part.output || typeof part.output !== 'object') return [];
+        const result = CHARACTER_EDIT_PROPOSAL_SCHEMA.safeParse((part.output as { proposal?: unknown }).proposal);
+        return result.success ? [result.data.id] : [];
+      }),
+    ),
+  );
+}
+
+function hasToolCall(messages: readonly iCharacterAssistantSession['messages'][number][], toolCallId: string) {
+  return messages.some((message) => message.parts.some((part) => part.type === 'tool-call' && part.id === toolCallId));
 }
 
 export function useCharacterAssistantWorkspace({
@@ -205,6 +221,54 @@ export function useCharacterAssistantWorkspace({
     },
     [chat, forwardedProps],
   );
+  const replaceConversationMessages = useCallback(
+    async (nextMessages: typeof chat.messages) => {
+      chat.setMessages(nextMessages);
+      const retainedProposalIds = readProposalIds(nextMessages);
+      await updateCharacterAssistantSession(sessionId, (draft) => {
+        draft.messages = structuredClone(nextMessages);
+        draft.proposals = draft.proposals.filter((proposal) => retainedProposalIds.has(proposal.id));
+        if (draft.lastRecordedConceptToolCallId && !hasToolCall(nextMessages, draft.lastRecordedConceptToolCallId)) {
+          draft.lastRecordedConceptToolCallId = null;
+        }
+      });
+    },
+    [chat, sessionId],
+  );
+  const deleteConversationFromMessage = useCallback(
+    async (messageId: string) => {
+      if (chat.isLoading) return;
+      const messageIndex = chat.messages.findIndex((message) => message.id === messageId);
+      if (messageIndex < 0) throw new Error('The selected conversation message is unavailable.');
+      await replaceConversationMessages(chat.messages.slice(0, messageIndex));
+    },
+    [chat.isLoading, chat.messages, replaceConversationMessages],
+  );
+  const editLastUserMessage = useCallback(
+    async (messageId: string, content: string) => {
+      if (chat.isLoading) return;
+      const trimmedContent = content.trim();
+      if (!trimmedContent) throw new Error('A message cannot be empty.');
+      const messageIndex = chat.messages.findIndex((message) => message.id === messageId);
+      const message = chat.messages[messageIndex];
+      const lastUserMessageIndex = chat.messages.findLastIndex((candidate) => candidate.role === 'user');
+      if (message?.role !== 'user' || messageIndex !== lastUserMessageIndex) {
+        throw new Error('Only the latest user message can be edited.');
+      }
+      const editablePartIndex = message.parts.findIndex(
+        (part) => part.type === 'text' && !readChatAttachmentMetadata('metadata' in part ? part.metadata : undefined),
+      );
+      if (editablePartIndex < 0) throw new Error('This message does not contain editable text.');
+
+      const editedMessage = structuredClone(message);
+      const editablePart = editedMessage.parts[editablePartIndex];
+      if (editablePart?.type !== 'text') throw new Error('This message does not contain editable text.');
+      editablePart.content = trimmedContent;
+      await replaceConversationMessages([...chat.messages.slice(0, messageIndex), editedMessage]);
+      await chat.reload();
+    },
+    [chat, replaceConversationMessages],
+  );
   const clearConversation = useCallback(async () => {
     chat.clear();
     await clearCharacterAssistantComposerDraft(characterId);
@@ -273,5 +337,7 @@ export function useCharacterAssistantWorkspace({
     createConversation,
     selectConversation,
     deleteConversation,
+    deleteConversationFromMessage,
+    editLastUserMessage,
   };
 }

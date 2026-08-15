@@ -1,7 +1,7 @@
 import type { UIMessage } from '@tanstack/ai-react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createRef } from 'react';
+import { createRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createEmptyCharacterCard } from '../constants/card-defaults';
@@ -289,5 +289,57 @@ describe('CharacterAssistantConversation', () => {
     expect(screen.getAllByLabelText('Assistant message')).toHaveLength(1);
     expect(screen.getByText('I will build the concept.')).toBeTruthy();
     expect(screen.getByText('The character is ready.')).toBeTruthy();
+  });
+
+  it('shifts the editable user message after later messages are deleted', async () => {
+    const user = userEvent.setup();
+    const initialMessages: UIMessage[] = [
+      { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'First prompt' }] },
+      { id: 'assistant-1', role: 'assistant', parts: [{ type: 'text', content: 'First response' }] },
+      { id: 'user-2', role: 'user', parts: [{ type: 'text', content: 'Second prompt' }] },
+      { id: 'assistant-2', role: 'assistant', parts: [{ type: 'text', content: 'Second response' }] },
+    ];
+    const onEdit = vi.fn().mockResolvedValue(undefined);
+
+    function ConversationHarness() {
+      const [messages, setMessages] = useState(initialMessages);
+      return (
+        <CharacterAssistantConversation
+          messages={messages}
+          proposals={[]}
+          isRunning={false}
+          activityLabel={null}
+          errorMessage={null}
+          settledOutcomeRef={createRef<HTMLDivElement>()}
+          onApply={vi.fn()}
+          onReject={vi.fn()}
+          onApplyAll={vi.fn()}
+          onRejectAll={vi.fn()}
+          onDeleteFromMessage={async (messageId) => {
+            setMessages((current) =>
+              current.slice(
+                0,
+                current.findIndex((message) => message.id === messageId),
+              ),
+            );
+          }}
+          onEditLastUserMessage={onEdit}
+        />
+      );
+    }
+
+    render(<ConversationHarness />);
+    const secondUserMessage = screen.getAllByLabelText('User message')[1];
+    await user.click(within(secondUserMessage).getByRole('button', { name: 'Delete from this message' }));
+    expect(screen.getByRole('alertdialog').textContent).toContain('Delete 2 messages?');
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(screen.getAllByLabelText('User message')).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Edit latest message' }));
+    const editor = screen.getByRole('textbox', { name: 'Edit message' });
+    await user.clear(editor);
+    await user.type(editor, 'Updated first prompt');
+    await user.click(screen.getByRole('button', { name: 'Save and resend' }));
+    expect(onEdit).toHaveBeenCalledWith('user-1', 'Updated first prompt');
   });
 });

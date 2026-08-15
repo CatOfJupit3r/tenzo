@@ -197,6 +197,22 @@ export function CharacterAssistantPanel({
           onSendMessage={(message) => {
             void send(message);
           }}
+          onDeleteFromMessage={async (messageId) => {
+            try {
+              await workspace.deleteConversationFromMessage(messageId);
+            } catch (error) {
+              toastError('Messages were not deleted', getErrorMessage(error));
+              throw error;
+            }
+          }}
+          onEditLastUserMessage={async (messageId, content) => {
+            try {
+              await workspace.editLastUserMessage(messageId, content);
+            } catch (error) {
+              toastError('Message was not edited', getErrorMessage(error));
+              throw error;
+            }
+          }}
         />
         <div ref={conversationEndRef} aria-hidden="true" />
       </div>

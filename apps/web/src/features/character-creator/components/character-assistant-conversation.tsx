@@ -1,9 +1,28 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import { useMemo, useState } from 'react';
-import { LuChevronDown, LuExternalLink, LuFileText, LuLoaderCircle, LuTriangleAlert } from 'react-icons/lu';
+import {
+  LuChevronDown,
+  LuExternalLink,
+  LuFileText,
+  LuLoaderCircle,
+  LuPencil,
+  LuTrash2,
+  LuTriangleAlert,
+} from 'react-icons/lu';
 import { z } from 'zod';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@~/components/ui/alert-dialog';
 import { Button } from '@~/components/ui/button/button';
+import { Textarea } from '@~/components/ui/textarea';
 import { cn } from '@~/lib/utils';
 
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
@@ -40,6 +59,17 @@ function formatFileSize(size: number) {
 
 function readMessagePartMetadata(part: object) {
   return 'metadata' in part ? part.metadata : undefined;
+}
+
+function readEditableMessageText(message: UIMessage) {
+  const text = message.parts
+    .flatMap((part) => {
+      if (part.type !== 'text' || readChatAttachmentMetadata(readMessagePartMetadata(part))) return [];
+      return [part.content];
+    })
+    .join('\n')
+    .trim();
+  return text || null;
 }
 
 function stringifyPatchValue(patch: iCharacterEditPatch, side: 'old' | 'new') {
@@ -154,6 +184,8 @@ export interface iCharacterAssistantConversationProps {
   onRejectAll: () => void;
   onJumpToField?: iProposalCardProps['onJumpToField'];
   onSendMessage?: (message: string) => void;
+  onDeleteFromMessage?: (messageId: string) => Promise<unknown>;
+  onEditLastUserMessage?: (messageId: string, content: string) => Promise<unknown>;
 }
 
 export function CharacterAssistantConversation({
@@ -169,9 +201,21 @@ export function CharacterAssistantConversation({
   onRejectAll,
   onJumpToField,
   onSendMessage,
+  onDeleteFromMessage,
+  onEditLastUserMessage,
 }: iCharacterAssistantConversationProps) {
+  const [messagePendingDeletion, setMessagePendingDeletion] = useState<UIMessage | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageWidth, setEditingMessageWidth] = useState<number | null>(null);
+  const [editedMessage, setEditedMessage] = useState('');
+  const [isUpdatingMessages, setIsUpdatingMessages] = useState(false);
   const proposalsById = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   const conversationMessages = useMemo(() => groupCharacterAssistantConversationMessages(messages), [messages]);
+  const lastUserMessageId = conversationMessages.findLast((message) => message.role === 'user')?.id ?? null;
+  const deletionStartIndex = messagePendingDeletion
+    ? conversationMessages.findIndex((message) => message.id === messagePendingDeletion.id)
+    : -1;
+  const deletionCount = deletionStartIndex < 0 ? 0 : conversationMessages.length - deletionStartIndex;
   return (
     <div className="grid gap-4">
       {conversationMessages.length === 0 ? (
@@ -182,95 +226,226 @@ export function CharacterAssistantConversation({
       {conversationMessages.map((message) => (
         <div
           key={message.id}
+          data-conversation-message
           aria-label={message.role === 'user' ? 'User message' : 'Assistant message'}
-          className={cn(
-            'grid max-w-[92%] gap-2 rounded-xl px-3 py-2 text-sm',
-            message.role === 'user' ? 'ml-auto bg-primary text-primary-foreground' : 'border bg-card',
-          )}
+          className={cn('group grid max-w-[92%] gap-1', message.role === 'user' ? 'ml-auto' : 'mr-auto')}
+          style={editingMessageId === message.id && editingMessageWidth ? { width: editingMessageWidth } : undefined}
         >
-          {message.parts.map((part, partIndex) => {
-            let partKey = `${part.type}-${partIndex}`;
-            if (part.type === 'tool-call') partKey = part.id;
-            if (part.type === 'text') partKey = `text-${partIndex}`;
-            if (part.type === 'text') {
-              const attachment = readChatAttachmentMetadata(readMessagePartMetadata(part));
-              if (attachment)
-                return (
-                  <div
-                    key={partKey}
-                    className="flex items-center gap-2 rounded-md border border-current/20 px-2 py-1.5"
-                  >
-                    <LuFileText className="size-4 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
-                    <span className="shrink-0 text-xs opacity-70">{formatFileSize(attachment.size)}</span>
-                  </div>
-                );
-              return <CharacterAssistantMessageText key={partKey} content={part.content} />;
-            }
-            if (part.type === 'image') {
-              const attachment = readChatAttachmentMetadata(part.metadata);
-              const source =
-                part.source.type === 'data'
-                  ? `data:${part.source.mimeType};base64,${part.source.value}`
-                  : part.source.value;
-              return (
-                <figure key={partKey} className="grid gap-1">
-                  <img
-                    src={source}
-                    alt={attachment?.name ?? 'Attached image'}
-                    className="max-h-64 w-auto max-w-full rounded-md border object-contain"
-                  />
-                  {attachment ? (
-                    <figcaption className="text-xs opacity-70">
-                      {attachment.name} · {formatFileSize(attachment.size)}
-                    </figcaption>
-                  ) : null}
-                </figure>
-              );
-            }
-            if (part.type === 'structured-output' && part.status === 'complete') {
-              const hasStreamedText = message.parts.some(
-                (messagePart) => messagePart.type === 'text' && messagePart.content.trim().length > 0,
-              );
-              if (hasStreamedText) return null;
-              const result = ASSISTANT_FINAL_RESPONSE_SCHEMA.safeParse(part.data);
-              return result.success ? (
-                <CharacterAssistantMessageText key={partKey} content={result.data.assistantMessage} />
-              ) : null;
-            }
-            if (part.type !== 'tool-call' || !part.output) return null;
-            const rendererKind = getAssistantToolRendererKind(part.name);
-            if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.proposal) {
-              const result = CHARACTER_EDIT_PROPOSAL_SCHEMA.safeParse((part.output as { proposal?: unknown }).proposal);
-              if (!result.success) return null;
-              const storedProposal = proposalsById.get(result.data.id);
-              if (!storedProposal && !isRunning) return null;
-              const proposal = storedProposal ?? result.data;
-              return (
-                <ProposalCard
-                  key={partKey}
-                  proposal={proposal}
-                  onApply={onApply}
-                  onReject={onReject}
-                  onJumpToField={onJumpToField}
+          <div
+            className={cn(
+              'grid gap-2 rounded-2xl text-sm leading-relaxed',
+              editingMessageId === message.id ? 'p-1.5' : 'px-0.5 py-0.25',
+              message.role === 'user'
+                ? 'rounded-br-md bg-secondary text-secondary-foreground'
+                : 'rounded-bl-md border bg-card',
+            )}
+          >
+            {editingMessageId === message.id ? (
+              <form
+                className="grid gap-2 text-foreground"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!onEditLastUserMessage || !editedMessage.trim()) return;
+                  setIsUpdatingMessages(true);
+                  void onEditLastUserMessage(message.id, editedMessage)
+                    .then(() => {
+                      setEditingMessageId(null);
+                      setEditingMessageWidth(null);
+                      setEditedMessage('');
+                    })
+                    .catch(() => undefined)
+                    .finally(() => setIsUpdatingMessages(false));
+                }}
+              >
+                <Textarea
+                  value={editedMessage}
+                  className="min-h-16"
+                  aria-label="Edit message"
+                  autoFocus
+                  disabled={isUpdatingMessages}
+                  onChange={(event) => setEditedMessage(event.target.value)}
                 />
-              );
-            }
-            if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.concept) {
-              return null;
-            }
-            if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.discovery && onSendMessage) {
-              const result = z
-                .array(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA)
-                .safeParse((part.output as { cards?: unknown }).cards);
-              return result.success ? (
-                <DiscoveryCardGrid key={partKey} cards={result.data} onUseDirections={onSendMessage} />
-              ) : null;
-            }
-            return null;
-          })}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isUpdatingMessages}
+                    onClick={() => {
+                      setEditingMessageId(null);
+                      setEditingMessageWidth(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" size="sm" disabled={isUpdatingMessages || !editedMessage.trim()}>
+                    Save and resend
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              message.parts.map((part, partIndex) => {
+                let partKey = `${part.type}-${partIndex}`;
+                if (part.type === 'tool-call') partKey = part.id;
+                if (part.type === 'text') partKey = `text-${partIndex}`;
+                if (part.type === 'text') {
+                  const attachment = readChatAttachmentMetadata(readMessagePartMetadata(part));
+                  if (attachment)
+                    return (
+                      <div
+                        key={partKey}
+                        className="flex items-center gap-2 rounded-md border border-current/20 px-2 py-1.5"
+                      >
+                        <LuFileText className="size-4 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
+                        <span className="shrink-0 text-xs opacity-70">{formatFileSize(attachment.size)}</span>
+                      </div>
+                    );
+                  return <CharacterAssistantMessageText key={partKey} content={part.content} />;
+                }
+                if (part.type === 'image') {
+                  const attachment = readChatAttachmentMetadata(part.metadata);
+                  const source =
+                    part.source.type === 'data'
+                      ? `data:${part.source.mimeType};base64,${part.source.value}`
+                      : part.source.value;
+                  return (
+                    <figure key={partKey} className="grid gap-1">
+                      <img
+                        src={source}
+                        alt={attachment?.name ?? 'Attached image'}
+                        className="max-h-64 w-auto max-w-full rounded-md border object-contain"
+                      />
+                      {attachment ? (
+                        <figcaption className="text-xs opacity-70">
+                          {attachment.name} · {formatFileSize(attachment.size)}
+                        </figcaption>
+                      ) : null}
+                    </figure>
+                  );
+                }
+                if (part.type === 'structured-output' && part.status === 'complete') {
+                  const hasStreamedText = message.parts.some(
+                    (messagePart) => messagePart.type === 'text' && messagePart.content.trim().length > 0,
+                  );
+                  if (hasStreamedText) return null;
+                  const result = ASSISTANT_FINAL_RESPONSE_SCHEMA.safeParse(part.data);
+                  return result.success ? (
+                    <CharacterAssistantMessageText key={partKey} content={result.data.assistantMessage} />
+                  ) : null;
+                }
+                if (part.type !== 'tool-call' || !part.output) return null;
+                const rendererKind = getAssistantToolRendererKind(part.name);
+                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.proposal) {
+                  const result = CHARACTER_EDIT_PROPOSAL_SCHEMA.safeParse(
+                    (part.output as { proposal?: unknown }).proposal,
+                  );
+                  if (!result.success) return null;
+                  const storedProposal = proposalsById.get(result.data.id);
+                  if (!storedProposal && !isRunning) return null;
+                  const proposal = storedProposal ?? result.data;
+                  return (
+                    <ProposalCard
+                      key={partKey}
+                      proposal={proposal}
+                      onApply={onApply}
+                      onReject={onReject}
+                      onJumpToField={onJumpToField}
+                    />
+                  );
+                }
+                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.concept) {
+                  return null;
+                }
+                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.discovery && onSendMessage) {
+                  const result = z
+                    .array(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA)
+                    .safeParse((part.output as { cards?: unknown }).cards);
+                  return result.success ? (
+                    <DiscoveryCardGrid key={partKey} cards={result.data} onUseDirections={onSendMessage} />
+                  ) : null;
+                }
+                return null;
+              })
+            )}
+          </div>
+          {!isRunning && (onDeleteFromMessage || (message.id === lastUserMessageId && onEditLastUserMessage)) ? (
+            <div
+              className={cn(
+                'flex items-center gap-0.5 px-1 text-muted-foreground opacity-75 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
+                message.role === 'user' ? 'justify-end' : 'justify-start',
+              )}
+            >
+              {message.id === lastUserMessageId && onEditLastUserMessage && readEditableMessageText(message) ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="size-6 p-0 hover:text-foreground"
+                  aria-label="Edit latest message"
+                  disabled={isUpdatingMessages}
+                  onClick={(event) => {
+                    const messageContainer = event.currentTarget.closest<HTMLElement>('[data-conversation-message]');
+                    setEditingMessageWidth(messageContainer?.getBoundingClientRect().width ?? null);
+                    setEditingMessageId(message.id);
+                    setEditedMessage(readEditableMessageText(message) ?? '');
+                  }}
+                >
+                  <LuPencil className="size-3.5" />
+                </Button>
+              ) : null}
+              {onDeleteFromMessage ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="size-6 p-0 hover:text-destructive"
+                  aria-label="Delete from this message"
+                  disabled={isUpdatingMessages}
+                  onClick={() => setMessagePendingDeletion(message)}
+                >
+                  <LuTrash2 className="size-3.5" />
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ))}
+      <AlertDialog
+        open={messagePendingDeletion !== null}
+        onOpenChange={(nextIsOpen) => {
+          if (!nextIsOpen) setMessagePendingDeletion(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deletionCount === 1 ? 'this message' : `${deletionCount} messages`}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the selected message and every message after it. Applied character changes are not reverted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                if (!messagePendingDeletion || !onDeleteFromMessage) return;
+                setIsUpdatingMessages(true);
+                void onDeleteFromMessage(messagePendingDeletion.id)
+                  .catch(() => undefined)
+                  .finally(() => setIsUpdatingMessages(false));
+                setMessagePendingDeletion(null);
+                setEditingMessageId(null);
+                setEditingMessageWidth(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {proposals.length > 1 ? (
         <div className="flex justify-end gap-2">
           <Button type="button" size="sm" variant="outline" onClick={onRejectAll}>

@@ -1,4 +1,3 @@
-import { useAtomValue } from 'jotai';
 import { memo, useCallback, useMemo } from 'react';
 import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuSparkles, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
 
@@ -17,9 +16,9 @@ import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
-import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
+import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
 import type { iCharacterLibraryItem } from '../lib/cards/character-library';
 import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/cards/character-library';
@@ -161,7 +160,7 @@ const CharacterLibraryItem = memo(
 
 export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPanelProps) {
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
-  const activeCharacterId = useAtomValue(activeCharacterIdAtom);
+  const { activeCharacterId } = useCharacterCreatorContext();
   const {
     handleCreateCharacter,
     createProvisionalCharacter,

@@ -1,10 +1,9 @@
-import { useAtom } from 'jotai';
+import { parseAsString, useQueryState } from 'nuqs';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { usePersistentCollection } from '@~/db/persistent-collection';
 import { generateUuid } from '@~/utils/uuid';
 
-import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { removeCharacterAssistantComposerDraft } from '../collections/character-assistant-composer-drafts.collection';
 import { removeCharacterAssistantSessions } from '../collections/character-assistant-sessions.collection';
 import { characterLibraryCollection } from '../collections/character-library.collection';
@@ -41,7 +40,10 @@ import { renderPortraitThumbnailDataUrl } from '../lib/portrait/portrait-focal-p
 import { useCharacterLibraryList } from './use-character-library-list';
 
 export function useCharacterSession() {
-  const [activeCharacterId, setActiveCharacterId] = useAtom(activeCharacterIdAtom);
+  const [activeCharacterId, setActiveCharacterId] = useQueryState(
+    'character',
+    parseAsString.withDefault(DEFAULT_CHARACTER_LIBRARY_ITEM_ID),
+  );
   const backfilledThumbnailIdsRef = useRef<Set<string>>(new Set());
 
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
@@ -59,7 +61,7 @@ export function useCharacterSession() {
 
   useEffect(() => {
     if (activeCharacter && activeCharacter.id !== activeCharacterId) {
-      setActiveCharacterId(activeCharacter.id);
+      void setActiveCharacterId(activeCharacter.id);
     }
   }, [activeCharacter, activeCharacterId, setActiveCharacterId]);
 
@@ -379,7 +381,7 @@ export function useCharacterSession() {
       });
 
       characterLibraryCollection.insert(nextCharacter);
-      setActiveCharacterId(nextCharacter.id);
+      void setActiveCharacterId(nextCharacter.id);
 
       return nextCharacter.id;
     },
@@ -388,7 +390,7 @@ export function useCharacterSession() {
 
   const selectCharacter = useCallback(
     (id: string) => {
-      setActiveCharacterId(id);
+      void setActiveCharacterId(id);
     },
     [setActiveCharacterId],
   );
@@ -411,7 +413,7 @@ export function useCharacterSession() {
       nextCharacter.card.data.name = createDuplicateCharacterName(characterToDuplicate.card.data.name);
 
       characterLibraryCollection.insert(nextCharacter);
-      setActiveCharacterId(nextCharacter.id);
+      void setActiveCharacterId(nextCharacter.id);
 
       return nextCharacter.id;
     },
@@ -428,10 +430,10 @@ export function useCharacterSession() {
       if (characterLibraryCollection.size === 0) {
         const fallbackCharacter = createEmptyCharacterLibraryItem();
         persistenceTasks.push(characterLibraryCollection.insert(fallbackCharacter).isPersisted.promise);
-        setActiveCharacterId(fallbackCharacter.id);
+        await setActiveCharacterId(fallbackCharacter.id);
       } else {
         const nextActiveCharacter = characterLibraryCollection.values().next().value;
-        setActiveCharacterId((currentActiveCharacterId) =>
+        await setActiveCharacterId((currentActiveCharacterId) =>
           currentActiveCharacterId === id
             ? (nextActiveCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID)
             : currentActiveCharacterId,

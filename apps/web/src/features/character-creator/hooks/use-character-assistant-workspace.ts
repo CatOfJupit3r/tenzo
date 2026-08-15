@@ -1,5 +1,6 @@
 import { fetchServerSentEvents, useChat } from '@tanstack/ai-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { parseAsString, useQueryState } from 'nuqs';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { toastError, toastInfo } from '@~/components/toastifications/create-jsx-toasts';
 import { usePersistentCollection } from '@~/db/persistent-collection';
@@ -100,7 +101,7 @@ export function useCharacterAssistantWorkspace({
     () => sortAssistantSessions(sessions.filter((candidate) => candidate.characterId === characterId)),
     [characterId, sessions],
   );
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useQueryState('chat', parseAsString);
   const session =
     characterSessions.find((candidate) => candidate.id === selectedSessionId) ?? characterSessions[0] ?? null;
   const sessionId = session?.id ?? characterId;
@@ -144,9 +145,13 @@ export function useCharacterAssistantWorkspace({
   useEffect(() => {
     if (!characterId || session) return;
     void ensureCharacterAssistantSession(sessionId, characterId).then((createdSession) => {
-      setSelectedSessionId(createdSession.id);
+      void setSelectedSessionId(createdSession.id);
     });
-  }, [characterId, session, sessionId]);
+  }, [characterId, session, sessionId, setSelectedSessionId]);
+  useEffect(() => {
+    if (!session || selectedSessionId === session.id) return;
+    void setSelectedSessionId(session.id);
+  }, [selectedSessionId, session, setSelectedSessionId]);
   useEffect(() => {
     if (!characterId || storedComposerDraft) return;
     void ensureCharacterAssistantComposerDraft(characterId);
@@ -277,14 +282,14 @@ export function useCharacterAssistantWorkspace({
     if (chat.isLoading) chat.stop();
     const createdSession = await createCharacterAssistantSessionRecord(characterId);
     await clearCharacterAssistantComposerDraft(characterId);
-    setSelectedSessionId(createdSession.id);
-  }, [characterId, chat]);
+    await setSelectedSessionId(createdSession.id);
+  }, [characterId, chat, setSelectedSessionId]);
   const selectConversation = useCallback(
     (nextSessionId: string) => {
       if (chat.isLoading || !characterSessions.some((candidate) => candidate.id === nextSessionId)) return;
-      setSelectedSessionId(nextSessionId);
+      void setSelectedSessionId(nextSessionId);
     },
-    [characterSessions, chat.isLoading],
+    [characterSessions, chat.isLoading, setSelectedSessionId],
   );
   const deleteConversation = useCallback(
     async (sessionIdToDelete: string) => {
@@ -292,13 +297,13 @@ export function useCharacterAssistantWorkspace({
       const remainingSessions = characterSessions.filter((candidate) => candidate.id !== sessionIdToDelete);
       if (remainingSessions.length === 0) {
         const replacementSession = await createCharacterAssistantSessionRecord(characterId);
-        setSelectedSessionId(replacementSession.id);
+        await setSelectedSessionId(replacementSession.id);
       } else if (sessionIdToDelete === sessionId) {
-        setSelectedSessionId(remainingSessions[0]?.id ?? null);
+        await setSelectedSessionId(remainingSessions[0]?.id ?? null);
       }
       await removeCharacterAssistantSession(sessionIdToDelete);
     },
-    [characterId, characterSessions, chat.isLoading, sessionId],
+    [characterId, characterSessions, chat.isLoading, sessionId, setSelectedSessionId],
   );
   return {
     sessionId,

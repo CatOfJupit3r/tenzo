@@ -1,6 +1,4 @@
 import { act, renderHook } from '@testing-library/react';
-import { Provider } from 'jotai';
-import type { ReactNode } from 'react';
 import { expect, it, vi } from 'vitest';
 
 import { createEmptyCharacterLibraryItem, DEFAULT_CHARACTER_LIBRARY_ITEM_ID } from '../lib/cards/character-library';
@@ -21,13 +19,13 @@ vi.mock('@~/db/persistent-collection', () => ({
   usePersistentCollection: vi.fn(() => []),
 }));
 
-vi.mock('../atoms/character-session.atom', async () => {
-  const [{ atom }, { DEFAULT_CHARACTER_LIBRARY_ITEM_ID: defaultCharacterId }] = await Promise.all([
-    import('jotai'),
-    import('../lib/cards/character-library'),
-  ]);
+vi.mock('nuqs', async () => {
+  const { DEFAULT_CHARACTER_LIBRARY_ITEM_ID: defaultCharacterId } = await import('../lib/cards/character-library');
 
-  return { activeCharacterIdAtom: atom(defaultCharacterId) };
+  return {
+    parseAsString: { withDefault: () => ({}) },
+    useQueryState: () => [defaultCharacterId, vi.fn()],
+  };
 });
 
 vi.mock('../collections/character-library.collection', () => ({
@@ -55,10 +53,6 @@ vi.mock('./use-character-library-list', () => ({
     isCharacterLibraryReady: true,
   }),
 }));
-
-function CharacterSessionTestProvider({ children }: { children: ReactNode }) {
-  return <Provider>{children}</Provider>;
-}
 
 it('creates, edits, reorders, and removes character book entries without dropping extensions', () => {
   const character = createEmptyCharacterLibraryItem(DEFAULT_CHARACTER_LIBRARY_ITEM_ID);
@@ -88,7 +82,7 @@ it('creates, edits, reorders, and removes character book entries without droppin
     };
   });
 
-  const { result } = renderHook(() => useCharacterSession(), { wrapper: CharacterSessionTestProvider });
+  const { result } = renderHook(() => useCharacterSession());
 
   act(() => result.current.addCharacterBookEntry());
   act(() => result.current.updateCharacterBook({ description: 'Edited description' }));

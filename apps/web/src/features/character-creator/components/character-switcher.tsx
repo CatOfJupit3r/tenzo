@@ -1,4 +1,3 @@
-import { useAtomValue } from 'jotai';
 import { LuImage, LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import {
@@ -15,14 +14,14 @@ import {
 import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
-import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
+import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
 import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
 
 export function CharacterSwitcher() {
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
-  const activeCharacterId = useAtomValue(activeCharacterIdAtom);
+  const { activeCharacterId } = useCharacterCreatorContext();
   const { handleCreateCharacter, handleRemoveCharacter, handleSelectCharacter } = useCharacterCreatorActions();
 
   return (

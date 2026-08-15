@@ -1,3 +1,4 @@
+import { parseAsStringEnum, useQueryState } from 'nuqs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cn } from '@~/lib/utils';
@@ -25,7 +26,12 @@ function CharacterCreatorWorkspace() {
   const [isCharacterLibraryPanelOpen, setIsCharacterLibraryPanelOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsDialogTab>(SETTINGS_DIALOG_TABS.connection);
-  const [activeCharacterTab, setActiveCharacterTab] = useState<CharacterCreatorTab>(CHARACTER_CREATOR_TABS.core);
+  const [activeCharacterTab, setActiveCharacterTab] = useQueryState(
+    'tab',
+    parseAsStringEnum<CharacterCreatorTab>(Object.values(CHARACTER_CREATOR_TABS)).withDefault(
+      CHARACTER_CREATOR_TABS.core,
+    ),
+  );
   const [isAssistantColumnViewport, setIsAssistantColumnViewport] = useState(false);
   const assistantToggleRef = useRef<HTMLButtonElement>(null);
   const { isAssistantOpen } = useCharacterAssistant();

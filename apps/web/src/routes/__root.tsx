@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import type { QueryClient } from '@tanstack/react-query';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
-import { NuqsAdapter } from 'nuqs/adapters/react';
+import { NuqsAdapter } from 'nuqs/adapters/tanstack-router';
 
 import { AiDevtools } from '@~/components/ai-devtools';
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';

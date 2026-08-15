@@ -1,4 +1,4 @@
-import { atom, useAtom } from 'jotai';
+import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { usePersistentCollection } from '@~/db/persistent-collection';
@@ -40,27 +40,8 @@ import { ensurePortraitAssetLoaded } from '../lib/portrait/portrait-asset-cache'
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait/portrait-focal-point';
 import { useCharacterLibraryList } from './use-character-library-list';
 
-interface iCharacterSaveActivityState {
-  activeAttemptId: string | null;
-  errorMessage: string | null;
-  hasPersistedEdits: boolean;
-  isSaving: boolean;
-  lastSavedAt: Date | null;
-}
-
-const EMPTY_CHARACTER_SAVE_ACTIVITY = {
-  activeAttemptId: null,
-  errorMessage: null,
-  hasPersistedEdits: false,
-  isSaving: false,
-  lastSavedAt: null,
-} satisfies iCharacterSaveActivityState;
-
-const characterSaveActivitiesAtom = atom<Record<string, iCharacterSaveActivityState>>({});
-
 export function useCharacterSession() {
   const [activeCharacterId, setActiveCharacterId] = useAtom(activeCharacterIdAtom);
-  const [saveActivities, setSaveActivities] = useAtom(characterSaveActivitiesAtom);
   const backfilledThumbnailIdsRef = useRef<Set<string>>(new Set());
 
   const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
@@ -117,17 +98,12 @@ export function useCharacterSession() {
   const promptSettings = activeCharacter?.promptSettings ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS;
   const portraitReference = activeCharacter?.portrait ?? null;
   const activeCharacterKey = activeCharacter?.id ?? null;
-  const saveActivity = activeCharacterKey
-    ? (saveActivities[activeCharacterKey] ?? EMPTY_CHARACTER_SAVE_ACTIVITY)
-    : EMPTY_CHARACTER_SAVE_ACTIVITY;
-
   const mutateActiveCharacter = useCallback(
     (recipe: (draft: iCharacterLibraryItem) => unknown) => {
       if (!activeCharacterKey || !characterLibraryCollection.has(activeCharacterKey)) {
         return null;
       }
 
-      const characterId = activeCharacterKey;
       const transaction = characterLibraryCollection.update(activeCharacterKey, (draft) => {
         // The card schema applies defaults, so the draft's input type widens some
         // fields to optional; at runtime they are always populated.
@@ -135,61 +111,9 @@ export function useCharacterSession() {
         draft.updatedAt = new Date().toISOString();
       });
 
-      const attemptId = generateUuid();
-      setSaveActivities((currentActivities) => ({
-        ...currentActivities,
-        [characterId]: {
-          ...(currentActivities[characterId] ?? EMPTY_CHARACTER_SAVE_ACTIVITY),
-          activeAttemptId: attemptId,
-          errorMessage: null,
-          isSaving: true,
-        },
-      }));
-
-      void transaction.isPersisted.promise
-        .then(() => {
-          setSaveActivities((currentActivities) => {
-            const currentActivity = currentActivities[characterId];
-
-            if (currentActivity?.activeAttemptId !== attemptId) {
-              return currentActivities;
-            }
-
-            return {
-              ...currentActivities,
-              [characterId]: {
-                activeAttemptId: null,
-                errorMessage: null,
-                hasPersistedEdits: true,
-                isSaving: false,
-                lastSavedAt: new Date(),
-              },
-            };
-          });
-        })
-        .catch(() => {
-          setSaveActivities((currentActivities) => {
-            const currentActivity = currentActivities[characterId];
-
-            if (currentActivity?.activeAttemptId !== attemptId) {
-              return currentActivities;
-            }
-
-            return {
-              ...currentActivities,
-              [characterId]: {
-                ...currentActivity,
-                activeAttemptId: null,
-                errorMessage: 'Changes could not be saved locally.',
-                isSaving: false,
-              },
-            };
-          });
-        });
-
       return transaction;
     },
-    [activeCharacterKey, setSaveActivities],
+    [activeCharacterKey],
   );
 
   const updateField = useCallback(
@@ -551,10 +475,6 @@ export function useCharacterSession() {
 
   return {
     isCharacterLibraryReady,
-    isSaving: saveActivity.isSaving,
-    saveErrorMessage: saveActivity.errorMessage,
-    hasPersistedEdits: saveActivity.hasPersistedEdits,
-    lastSavedAt: saveActivity.lastSavedAt,
     characterLibrary,
     activeCharacterId: activeCharacter?.id ?? DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
     card,

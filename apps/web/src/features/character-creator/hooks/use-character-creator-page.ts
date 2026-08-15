@@ -113,10 +113,6 @@ export function useCharacterCreatorPage() {
 
   const {
     isCharacterLibraryReady,
-    isSaving,
-    saveErrorMessage,
-    hasPersistedEdits,
-    lastSavedAt,
     characterLibrary,
     activeCharacterId,
     card,
@@ -974,10 +970,6 @@ export function useCharacterCreatorPage() {
   return {
     actions,
     isCharacterLibraryReady,
-    isSaving,
-    saveErrorMessage,
-    hasPersistedEdits,
-    lastSavedAt,
     characterLibrary,
     activeCharacterId,
     card,

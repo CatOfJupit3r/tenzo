@@ -1,3 +1,4 @@
+import { Debouncer } from '@tanstack/pacer';
 import { liveQuery } from 'dexie';
 import type { EntityTable } from 'dexie';
 import { useSyncExternalStore } from 'react';
@@ -11,8 +12,19 @@ interface iPersistenceResult {
 
 interface iPersistentCollectionOptions<T, TPrimaryKey extends keyof T> {
   getKey: (item: T) => T[TPrimaryKey] & string;
+  persistenceWait?: number;
   schema: z.ZodType<T>;
   table: EntityTable<T, TPrimaryKey>;
+}
+
+interface iPendingUpdate<T> {
+  debouncer: Debouncer<() => void>;
+  latestRevision: number;
+  latestValue: T;
+  previousValue: T;
+  promise: Promise<undefined>;
+  reject: (reason?: unknown) => unknown;
+  resolve: (value: undefined) => unknown;
 }
 
 interface iInitializableCollection {
@@ -30,9 +42,15 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
 
   readonly #listeners = new Set<() => unknown>();
 
+  readonly #persistenceWait: number | undefined;
+
   #items = new Map<T[TPrimaryKey] & string, T>();
 
   #pendingMutationCounts = new Map<T[TPrimaryKey] & string, number>();
+
+  #pendingUpdates = new Map<T[TPrimaryKey] & string, iPendingUpdate<T>>();
+
+  #updatePersistenceChains = new Map<T[TPrimaryKey] & string, Promise<unknown>>();
 
   #revisions = new Map<T[TPrimaryKey] & string, number>();
 
@@ -40,8 +58,9 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
 
   #isInitialized = false;
 
-  constructor({ getKey, schema, table }: iPersistentCollectionOptions<T, TPrimaryKey>) {
+  constructor({ getKey, persistenceWait, schema, table }: iPersistentCollectionOptions<T, TPrimaryKey>) {
     this.#getKey = getKey;
+    this.#persistenceWait = persistenceWait;
     this.#schema = schema;
     this.#table = table;
     persistentCollections.add(this);
@@ -125,6 +144,10 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
     const revision = this.#beginMutation(key);
     this.#emit();
 
+    if (this.#persistenceWait !== undefined) {
+      return this.#scheduleUpdate(key, previousValue, parsedValue, revision);
+    }
+
     const promise = this.#table.put(structuredClone(parsedValue)).then(
       () => {
         this.#endMutation(key);
@@ -143,20 +166,26 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
     return { isPersisted: { promise } };
   }
 
+  async flushPendingUpdates() {
+    this.#pendingUpdates.forEach((pendingUpdate) => pendingUpdate.debouncer.flush());
+    await Promise.all(this.#updatePersistenceChains.values());
+  }
+
   delete(key: T[TPrimaryKey] & string): iPersistenceResult {
     const previousValue = this.#items.get(key);
     if (!previousValue) {
       return { isPersisted: { promise: Promise.resolve(undefined) } };
     }
 
+    this.#pendingUpdates.get(key)?.debouncer.flush();
     this.#items.delete(key);
     const revision = this.#beginMutation(key);
     this.#emit();
 
-    const promise = this.#table
-      .where(':id')
-      .equals(key)
-      .delete()
+    const previousPersistence = this.#updatePersistenceChains.get(key) ?? Promise.resolve();
+    const promise = previousPersistence
+      .catch(() => undefined)
+      .then(async () => this.#table.where(':id').equals(key).delete())
       .then(
         () => {
           this.#endMutation(key);
@@ -214,6 +243,73 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
     this.#revisions.set(key, revision);
     this.#pendingMutationCounts.set(key, (this.#pendingMutationCounts.get(key) ?? 0) + 1);
     return revision;
+  }
+
+  #scheduleUpdate(key: T[TPrimaryKey] & string, previousValue: T, latestValue: T, revision: number) {
+    const existingUpdate = this.#pendingUpdates.get(key);
+
+    if (existingUpdate) {
+      existingUpdate.latestRevision = revision;
+      existingUpdate.latestValue = latestValue;
+      existingUpdate.debouncer.maybeExecute();
+      this.#endMutation(key);
+      return { isPersisted: { promise: existingUpdate.promise } };
+    }
+
+    let resolve: iPendingUpdate<T>['resolve'] = () => undefined;
+    let reject: iPendingUpdate<T>['reject'] = () => undefined;
+    const promise = new Promise<undefined>((resolvePromise, rejectPromise) => {
+      resolve = resolvePromise;
+      reject = rejectPromise;
+    });
+    void promise.catch(() => undefined);
+
+    const pendingUpdate = {
+      latestRevision: revision,
+      latestValue,
+      previousValue,
+      promise,
+      reject,
+      resolve,
+      debouncer: new Debouncer(
+        () => {
+          this.#pendingUpdates.delete(key);
+          this.#persistUpdate(key, pendingUpdate);
+        },
+        { wait: this.#persistenceWait ?? 0 },
+      ),
+    } satisfies iPendingUpdate<T>;
+
+    this.#pendingUpdates.set(key, pendingUpdate);
+    pendingUpdate.debouncer.maybeExecute();
+    return { isPersisted: { promise } };
+  }
+
+  #persistUpdate(key: T[TPrimaryKey] & string, pendingUpdate: iPendingUpdate<T>) {
+    const previousPersistence = this.#updatePersistenceChains.get(key) ?? Promise.resolve();
+    const persistence = previousPersistence
+      .catch(() => undefined)
+      .then(async () => this.#table.put(structuredClone(pendingUpdate.latestValue)))
+      .then(
+        () => {
+          pendingUpdate.resolve(undefined);
+        },
+        (error: unknown) => {
+          if (this.#revisions.get(key) === pendingUpdate.latestRevision) {
+            this.#items.set(key, pendingUpdate.previousValue);
+            this.#emit();
+          }
+          pendingUpdate.reject(error);
+        },
+      )
+      .finally(() => {
+        this.#endMutation(key);
+        if (this.#updatePersistenceChains.get(key) === persistence) {
+          this.#updatePersistenceChains.delete(key);
+        }
+      });
+
+    this.#updatePersistenceChains.set(key, persistence);
   }
 
   #endMutation(key: T[TPrimaryKey] & string) {

@@ -8,5 +8,6 @@ export const CHARACTER_LIBRARY_COLLECTION_STORAGE_KEY = 'tenzo:character-creator
 export const characterLibraryCollection = new PersistentCollection({
   table: applicationDatabase.characterLibrary,
   getKey: (item) => item.id,
+  persistenceWait: 300,
   schema: CHARACTER_LIBRARY_ITEM_SCHEMA,
 });

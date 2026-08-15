@@ -6,7 +6,6 @@ import {
   LuDownload,
   LuFileUp,
   LuLoaderCircle,
-  LuSave,
   LuSettings,
   LuSparkles,
 } from 'react-icons/lu';
@@ -39,10 +38,6 @@ export function CharacterCreatorHeader({
   const {
     data,
     isCharacterLibraryReady,
-    isSaving,
-    saveErrorMessage,
-    hasPersistedEdits,
-    lastSavedAt,
     characterLibrary,
     activeCharacterId,
     generationSettings,
@@ -85,24 +80,6 @@ export function CharacterCreatorHeader({
     ConnectionStatusIcon = LuCircleCheck;
   }
 
-  let saveStatusLabel = 'Local autosave';
-
-  if (isSaving) {
-    saveStatusLabel = 'Saving...';
-  } else if (saveErrorMessage) {
-    saveStatusLabel = 'Save failed';
-  } else if (hasPersistedEdits) {
-    saveStatusLabel = 'Saved locally';
-  }
-
-  let saveStatusTitle = 'Changes are saved to this browser automatically.';
-
-  if (saveErrorMessage) {
-    saveStatusTitle = saveErrorMessage;
-  } else if (lastSavedAt) {
-    saveStatusTitle = `Last saved locally at ${lastSavedAt.toLocaleTimeString()}`;
-  }
-
   const endpointLabel = generationSettings.endpoint.trim() ? generationSettings.endpoint : 'Not set';
   const modelLabel = generationSettings.model.trim() ? generationSettings.model : 'Not set';
 
@@ -121,20 +98,6 @@ export function CharacterCreatorHeader({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              <span
-                role="status"
-                aria-live="polite"
-                className={cn(
-                  'inline-flex items-center gap-1',
-                  saveErrorMessage ? 'text-destructive' : null,
-                  hasPersistedEdits && !isSaving && !saveErrorMessage ? 'text-emerald-700 dark:text-emerald-300' : null,
-                )}
-                title={saveStatusTitle}
-              >
-                {isSaving ? <LuLoaderCircle className="size-3 animate-spin" /> : <LuSave className="size-3" />}
-                {saveStatusLabel}
-              </span>
-              <span aria-hidden="true">|</span>
               <TokenStats data={data} />
               <Popover>
                 <PopoverTrigger asChild>

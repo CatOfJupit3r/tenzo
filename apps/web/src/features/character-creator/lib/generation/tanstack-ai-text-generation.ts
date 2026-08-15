@@ -4,6 +4,7 @@ import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { createOpenRouterText } from '@tanstack/ai-openrouter';
 
 import { normalizeOpenAiCompatibleBaseUrl } from '../provider/openai-compatible-endpoint';
+import { suppressGenerationAbort } from './abort-safe-stream';
 import type { iCharacterGenerationStreamRequest } from './generation-stream-contracts';
 
 export interface iStreamCharacterTextOptions extends iCharacterGenerationStreamRequest {
@@ -28,7 +29,7 @@ interface iCharacterModelOptions {
 }
 
 const OPENROUTER_PROVIDER_PRIVACY_OPTIONS = {
-  data_collection: 'deny',
+  dataCollection: 'deny',
   zdr: true,
 } as const;
 
@@ -116,7 +117,7 @@ export function createCharacterModelOptions(
 
   if (isOpenRouter) {
     return {
-      maxCompletionTokens: Math.max(1, Math.floor(maxTokens)),
+      maxTokens: Math.max(1, Math.floor(maxTokens)),
       temperature,
       topP,
       frequencyPenalty,
@@ -132,6 +133,37 @@ export function createCharacterModelOptions(
     frequency_penalty: frequencyPenalty,
     presence_penalty: presencePenalty,
     ...buildSamplerOverrides({ topK, minP, shouldSendDisabledSamplers }),
+  };
+}
+
+export function createCharacterStructuredModelOptions(endpoint: string, generationSettings: iCharacterModelOptions) {
+  const modelOptions = createCharacterModelOptions(endpoint, generationSettings);
+  const isOpenRouter = normalizeOpenAiCompatibleBaseUrl(endpoint).toLowerCase().includes('openrouter.ai/api');
+  if (!isOpenRouter) {
+    return modelOptions;
+  }
+  return {
+    ...modelOptions,
+    plugins: [{ id: 'response-healing' as const }],
+    provider: {
+      ...modelOptions.provider,
+      requireParameters: true,
+    },
+  };
+}
+
+export function createCharacterToolModelOptions(endpoint: string, generationSettings: iCharacterModelOptions) {
+  const modelOptions = createCharacterModelOptions(endpoint, generationSettings);
+  const isOpenRouter = normalizeOpenAiCompatibleBaseUrl(endpoint).toLowerCase().includes('openrouter.ai/api');
+  if (!isOpenRouter) {
+    return modelOptions;
+  }
+  return {
+    ...modelOptions,
+    provider: {
+      ...modelOptions.provider,
+      requireParameters: true,
+    },
   };
 }
 
@@ -161,6 +193,6 @@ async function* streamTextEvents({ signal, ...options }: iStreamCharacterTextOpt
 
 export function streamCharacterText(options: iStreamCharacterTextOptions) {
   return {
-    textStream: toTextReadableStream(streamTextEvents(options)),
+    textStream: toTextReadableStream(suppressGenerationAbort(streamTextEvents(options), options.signal)),
   };
 }

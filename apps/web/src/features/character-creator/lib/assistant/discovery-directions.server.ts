@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
 import { generateValidatedObject } from '../generation/structured-output.server';
-import { createCharacterModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
+import {
+  createCharacterStructuredModelOptions,
+  createCharacterTextAdapter,
+} from '../generation/tanstack-ai-text-generation';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES,
@@ -68,7 +71,7 @@ export async function generateCharacterDiscoveryCategory({
     schemaDescription: 'Exactly three distinct character discovery direction cards.',
     system: 'Generate high-signal, materially distinct creative directions for character design.',
     prompt: `Create exactly three directions for category ${category}. ${premiseInstruction}`,
-    modelOptions: createCharacterModelOptions(endpoint, generationSettings),
+    modelOptions: createCharacterStructuredModelOptions(endpoint, generationSettings),
     abortSignal,
   });
   if (!isMateriallyDistinct(generated.cards)) {

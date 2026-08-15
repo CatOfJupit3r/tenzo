@@ -4,7 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GENERATION_PROVIDERS } from './generation-config';
 import {
   createCharacterModelOptions,
+  createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
+  createCharacterToolModelOptions,
   streamCharacterText,
 } from './tanstack-ai-text-generation';
 
@@ -66,8 +68,41 @@ describe('TanStack AI text generation', () => {
         minP: 0,
       }),
     ).toMatchObject({
-      maxCompletionTokens: 400,
-      provider: { data_collection: 'deny', zdr: true },
+      maxTokens: 400,
+      provider: { dataCollection: 'deny', zdr: true },
+    });
+  });
+
+  it('enables OpenRouter response healing and parameter-aware routing for structured output', () => {
+    expect(
+      createCharacterStructuredModelOptions('https://openrouter.ai/api', {
+        maxTokens: 400,
+        temperature: 0.8,
+        topP: 0.9,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        topK: 0,
+        minP: 0,
+      }),
+    ).toMatchObject({
+      plugins: [{ id: 'response-healing' }],
+      provider: { dataCollection: 'deny', zdr: true, requireParameters: true },
+    });
+  });
+
+  it('restricts OpenRouter tool requests to providers that support every requested parameter', () => {
+    expect(
+      createCharacterToolModelOptions('https://openrouter.ai/api', {
+        maxTokens: 400,
+        temperature: 0.8,
+        topP: 0.9,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        topK: 0,
+        minP: 0,
+      }),
+    ).toMatchObject({
+      provider: { dataCollection: 'deny', zdr: true, requireParameters: true },
     });
   });
 

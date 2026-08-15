@@ -62,3 +62,10 @@ export async function saveCharacterAssistantComposerDraft(draft: iCharacterAssis
 export async function clearCharacterAssistantComposerDraft(characterId: string) {
   await saveCharacterAssistantComposerDraft(createCharacterAssistantComposerDraft(characterId));
 }
+
+export async function removeCharacterAssistantComposerDraft(characterId: string) {
+  await characterAssistantComposerDraftsCollection.preload();
+  if (!characterAssistantComposerDraftsCollection.has(characterId)) return;
+  const transaction = characterAssistantComposerDraftsCollection.delete(characterId);
+  await transaction.isPersisted.promise;
+}

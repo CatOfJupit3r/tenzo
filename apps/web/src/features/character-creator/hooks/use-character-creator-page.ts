@@ -31,7 +31,7 @@ import {
 } from '../lib/cards/example-characters';
 import type { iExportSettings } from '../lib/cards/export-settings';
 import { getTemplateFieldKeyForTargetKey, TEMPLATE_MODES } from '../lib/cards/field-templates';
-import { deleteCharacterAssetBlob, readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/cards/image-store';
+import { readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/cards/image-store';
 import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation/generation-config';
 import { invalidatePortraitAsset } from '../lib/portrait/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait/portrait-focal-point';
@@ -623,15 +623,15 @@ export function useCharacterCreatorPage() {
 
   const handleRemoveCharacter = useCallback(
     async (id: string) => {
-      const character = characterLibraryCollection.get(id);
-
-      if (character?.portrait) {
-        await deleteCharacterAssetBlob(character.portrait.assetId);
-        invalidatePortraitAsset(character.portrait.assetId);
+      try {
+        const portraitAssetId = characterLibraryCollection.get(id)?.portrait?.assetId;
+        await removeCharacter(id);
+        if (portraitAssetId) invalidatePortraitAsset(portraitAssetId);
+        toastSuccess('Character deleted', 'The character and its local data were removed from this browser.');
+      } catch (error) {
+        toastError('Character was not deleted', error instanceof Error ? error.message : 'The action failed.');
+        throw error;
       }
-
-      removeCharacter(id);
-      toastSuccess('Character removed', 'The library entry has been cleared from this browser.');
     },
     [removeCharacter],
   );

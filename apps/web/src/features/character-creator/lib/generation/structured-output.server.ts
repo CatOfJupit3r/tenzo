@@ -1,6 +1,6 @@
 import { chat, defineChatMiddleware } from '@tanstack/ai';
 import type { AnyTextAdapter, ModelMessage, TokenUsage, UIMessage } from '@tanstack/ai';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 interface iGenerateValidatedObjectOptions<T> {
   adapter: AnyTextAdapter;
@@ -26,34 +26,56 @@ function buildMessages(prompt?: string, messages?: Array<ModelMessage | UIMessag
   throw new Error('Structured generation requires a prompt or messages.');
 }
 
-function extractFirstJsonValue(content: string) {
-  for (let start = 0; start < content.length; start += 1) {
-    if (content[start] !== '{' && content[start] !== '[') {
-      continue;
-    }
-
-    for (let end = content.length; end > start; end -= 1) {
-      try {
-        const candidate = content.slice(start, end);
-        JSON.parse(candidate);
-        return candidate;
-      } catch {
-        // Continue until the first complete JSON value is isolated.
+function createNonStreamingStructuredOutputAdapter(adapter: AnyTextAdapter): AnyTextAdapter {
+  return new Proxy(adapter, {
+    get(target, property) {
+      if (property === 'structuredOutputStream') {
+        return undefined;
       }
-    }
+      const value = Reflect.get(target, property, target) as unknown;
+      if (typeof value !== 'function') {
+        return value;
+      }
+      const method = value as (...args: unknown[]) => unknown;
+      return (...args: unknown[]) => Reflect.apply(method, target, args);
+    },
+  });
+}
+
+function collectGenerationErrorDetails(error: unknown, details: string[], visited: Set<unknown>) {
+  if (error === null || error === undefined || visited.has(error)) {
+    return;
+  }
+  visited.add(error);
+
+  if (typeof error === 'string') {
+    details.push(error);
+    return;
+  }
+  if (typeof error !== 'object') {
+    return;
   }
 
-  throw new Error('The model response did not contain a complete JSON value.');
+  collectGenerationErrorDetails(Reflect.get(error, 'rawValue'), details, visited);
+  collectGenerationErrorDetails(Reflect.get(error, 'error'), details, visited);
+  for (const key of ['message', 'code', 'responseBody'] as const) {
+    const value = Reflect.get(error, key);
+    if (typeof value === 'string' && value.trim()) {
+      details.push(value);
+    }
+  }
+  collectGenerationErrorDetails(Reflect.get(error, 'cause'), details, visited);
+  const nestedErrors = Reflect.get(error, 'errors');
+  if (Array.isArray(nestedErrors)) {
+    nestedErrors.forEach((nestedError) => collectGenerationErrorDetails(nestedError, details, visited));
+  }
+  collectGenerationErrorDetails(Reflect.get(error, 'rawEvent'), details, visited);
 }
 
 function describeGenerationError(error: unknown) {
-  if (!(error instanceof Error)) {
-    return 'Unknown provider error.';
-  }
-
-  const responseBody = Reflect.get(error, 'responseBody');
-  const details = typeof responseBody === 'string' && responseBody.trim() ? responseBody : error.message;
-  const compactMessage = details.replace(/\s+/g, ' ').trim();
+  const details: string[] = [];
+  collectGenerationErrorDetails(error, details, new Set());
+  const compactMessage = [...new Set(details)].join(' ').replace(/\s+/g, ' ').trim() || 'Unknown provider error.';
   return compactMessage.length > 300 ? `${compactMessage.slice(0, 297)}...` : compactMessage;
 }
 
@@ -87,36 +109,18 @@ export async function generateValidatedObject<T>({
 
   try {
     const output = await chat({
-      adapter,
+      adapter: createNonStreamingStructuredOutputAdapter(adapter),
       messages: inputMessages,
       systemPrompts: [system],
       outputSchema: schema.describe(schemaDescription),
       modelOptions,
       abortController,
       middleware,
+      stream: false,
     });
-
     return schema.parse(output);
-  } catch (structuredOutputError) {
-    try {
-      const text = await chat({
-        adapter,
-        messages: inputMessages,
-        systemPrompts: [
-          `${system}\nReturn only one JSON value matching this JSON Schema: ${JSON.stringify(z.toJSONSchema(schema))}`,
-        ],
-        modelOptions,
-        abortController,
-        middleware,
-        stream: false,
-      });
-
-      return schema.parse(JSON.parse(extractFirstJsonValue(text)) as unknown);
-    } catch (fallbackError) {
-      throw new AggregateError(
-        [structuredOutputError, fallbackError],
-        `The model did not return valid structured JSON. Structured response: ${describeGenerationError(structuredOutputError)} JSON fallback: ${describeGenerationError(fallbackError)}`,
-      );
-    }
+  } catch (error) {
+    if (abortController.signal.aborted) throw error;
+    throw new Error(describeGenerationError(error), { cause: error });
   }
 }

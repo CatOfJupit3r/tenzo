@@ -1,7 +1,10 @@
 import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
 
 import { generateValidatedObject } from '../generation/structured-output.server';
-import { createCharacterModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
+import {
+  createCharacterStructuredModelOptions,
+  createCharacterTextAdapter,
+} from '../generation/tanstack-ai-text-generation';
 import { CHARACTER_IMAGE_ANALYSIS_SCHEMA, CHARACTER_VISION_REQUEST_SCHEMA } from './character-vision-contracts';
 import type { iCharacterImageAnalysis, iCharacterVisionRequest } from './character-vision-contracts';
 
@@ -65,7 +68,7 @@ export async function analyzeCharacterImage(
     messages,
     schema: CHARACTER_IMAGE_ANALYSIS_SCHEMA,
     schemaDescription: 'Visible character appearance details with uncertainty and suggested tags.',
-    modelOptions: createCharacterModelOptions(parsedRequest.endpoint, {
+    modelOptions: createCharacterStructuredModelOptions(parsedRequest.endpoint, {
       maxTokens: parsedRequest.maxTokens,
       temperature: parsedRequest.temperature,
       topK: 0,

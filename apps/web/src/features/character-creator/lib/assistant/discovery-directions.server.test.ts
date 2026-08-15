@@ -12,7 +12,7 @@ vi.mock('../generation/structured-output.server', () => ({
 
 vi.mock('../generation/tanstack-ai-text-generation', () => ({
   createCharacterTextAdapter: vi.fn(() => ({})),
-  createCharacterModelOptions: vi.fn(() => ({})),
+  createCharacterStructuredModelOptions: vi.fn(() => ({})),
 }));
 
 describe('character discovery directions', () => {

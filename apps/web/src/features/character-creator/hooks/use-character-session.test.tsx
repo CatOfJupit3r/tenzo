@@ -37,6 +37,10 @@ vi.mock('../collections/character-library.collection', () => ({
   },
 }));
 
+vi.mock('../collections/character-assistant-composer-drafts.collection', () => ({
+  removeCharacterAssistantComposerDraft: vi.fn(),
+}));
+
 vi.mock('../collections/character-assistant-sessions.collection', () => ({
   removeCharacterAssistantSession: vi.fn(),
 }));

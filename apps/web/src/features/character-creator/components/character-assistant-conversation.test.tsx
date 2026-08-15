@@ -81,4 +81,135 @@ describe('CharacterAssistantConversation proposals', () => {
     expect(onReject).toHaveBeenCalledWith(proposal.id, ['tags']);
     expect(onJumpToField).toHaveBeenCalledWith('character_book');
   });
+
+  it('hides the stale tool payload after a proposal is settled', () => {
+    const baseCard = createEmptyCharacterCard();
+    const proposedCard = structuredClone(baseCard);
+    proposedCard.data.name = 'Mira';
+    const proposal = createCharacterEditProposal({
+      characterId: 'character',
+      baseCard,
+      proposedCard,
+      toolCallId: 'tool-call',
+    });
+    const messages: UIMessage[] = [
+      {
+        id: 'assistant-message',
+        role: 'assistant',
+        createdAt: new Date('2026-08-14T00:00:00.000Z'),
+        parts: [
+          {
+            type: 'tool-call',
+            id: 'tool-call',
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            arguments: '{}',
+            state: 'complete',
+            output: { proposal },
+          },
+        ],
+      },
+    ];
+
+    render(
+      <CharacterAssistantConversation
+        messages={messages}
+        proposals={[]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('region', { name: 'Assistant proposal' })).toBeNull();
+  });
+
+  it('does not repeat streamed text from the final structured output', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'assistant-message',
+        role: 'assistant',
+        createdAt: new Date('2026-08-14T00:00:00.000Z'),
+        parts: [
+          { type: 'text', content: 'The character is ready.' },
+          {
+            type: 'structured-output',
+            status: 'complete',
+            raw: '{}',
+            data: { assistantMessage: 'The character is ready.', followUpSuggestions: [] },
+          },
+        ],
+      },
+    ];
+
+    render(
+      <CharacterAssistantConversation
+        messages={messages}
+        proposals={[]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByText('The character is ready.')).toHaveLength(1);
+  });
+
+  it('presents internal assistant and tool steps as one assistant turn', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'user-message',
+        role: 'user',
+        createdAt: new Date('2026-08-14T00:00:00.000Z'),
+        parts: [{ type: 'text', content: 'Create a character.' }],
+      },
+      {
+        id: 'assistant-tool-call',
+        role: 'assistant',
+        createdAt: new Date('2026-08-14T00:00:01.000Z'),
+        parts: [{ type: 'text', content: 'I will build the concept.' }],
+      },
+      {
+        id: 'tool-result',
+        role: 'assistant',
+        createdAt: new Date('2026-08-14T00:00:02.000Z'),
+        parts: [{ type: 'tool-result', toolCallId: 'tool-call', content: 'Complete', state: 'complete' }],
+      },
+      {
+        id: 'assistant-result',
+        role: 'assistant',
+        createdAt: new Date('2026-08-14T00:00:03.000Z'),
+        parts: [{ type: 'text', content: 'The character is ready.' }],
+      },
+    ];
+
+    render(
+      <CharacterAssistantConversation
+        messages={messages}
+        proposals={[]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByLabelText('User message')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Assistant message')).toHaveLength(1);
+    expect(screen.getByText('I will build the concept.')).toBeTruthy();
+    expect(screen.getByText('The character is ready.')).toBeTruthy();
+  });
 });

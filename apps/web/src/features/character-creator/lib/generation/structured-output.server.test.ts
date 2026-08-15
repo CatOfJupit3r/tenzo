@@ -16,7 +16,8 @@ vi.mock('@tanstack/ai', async () => ({
 const RESPONSE_SCHEMA = z.object({
   cards: z.array(z.object({ title: z.string() })).length(1),
 });
-const adapter = {} as AnyTextAdapter;
+const structuredOutputStream = vi.fn();
+const adapter = { structuredOutputStream } as unknown as AnyTextAdapter;
 
 beforeEach(() => {
   chatMock.mockReset();
@@ -39,13 +40,16 @@ describe('structured output generation', () => {
     ).resolves.toEqual(structuredValue);
     expect(chatMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        adapter,
         messages: [{ role: 'user', content: 'Create it.' }],
         systemPrompts: ['Generate a card.'],
         outputSchema: expect.any(Object),
         modelOptions: { max_tokens: 100, temperature: 0.5 },
+        stream: false,
       }),
     );
+    const structuredAdapter = chatMock.mock.calls[0]?.[0].adapter as AnyTextAdapter;
+    expect(structuredAdapter).not.toBe(adapter);
+    expect(structuredAdapter.structuredOutputStream).toBeUndefined();
   });
 
   it('requires either prompt text or messages', async () => {
@@ -60,24 +64,7 @@ describe('structured output generation', () => {
     expect(chatMock).not.toHaveBeenCalled();
   });
 
-  it('falls back to extracted JSON through TanStack AI for compatible servers without response formats', async () => {
-    chatMock
-      .mockRejectedValueOnce(new Error('Structured output is unsupported.'))
-      .mockResolvedValueOnce('Result:\n```json\n{"cards":[{"title":"Fallback card"}]}\n```');
-
-    await expect(
-      generateValidatedObject({
-        adapter,
-        schema: RESPONSE_SCHEMA,
-        schemaDescription: 'One test card.',
-        system: 'Generate a card.',
-        prompt: 'Create it.',
-      }),
-    ).resolves.toEqual({ cards: [{ title: 'Fallback card' }] });
-    expect(chatMock).toHaveBeenLastCalledWith(expect.objectContaining({ stream: false }));
-  });
-
-  it('surfaces provider failures from both attempts', async () => {
+  it('surfaces provider failures without retrying or changing generation modes', async () => {
     chatMock.mockRejectedValue(new Error('Provider rejected structured output.'));
 
     await expect(
@@ -89,5 +76,23 @@ describe('structured output generation', () => {
         prompt: 'Create it.',
       }),
     ).rejects.toThrow('Provider rejected structured output.');
+    expect(chatMock).toHaveBeenCalledOnce();
+  });
+
+  it('surfaces nested provider details without inspecting request metadata', async () => {
+    const providerError = Object.assign(new Error('Provider returned error'), {
+      rawValue: { error: { message: 'Schema grammar rejected.', code: 'INVALID_SCHEMA' } },
+    });
+    chatMock.mockRejectedValue(providerError);
+
+    await expect(
+      generateValidatedObject({
+        adapter,
+        schema: RESPONSE_SCHEMA,
+        schemaDescription: 'One test card.',
+        system: 'Generate a card.',
+        prompt: 'Create it.',
+      }),
+    ).rejects.toThrow('Schema grammar rejected. INVALID_SCHEMA');
   });
 });

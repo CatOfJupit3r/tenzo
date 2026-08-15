@@ -2,7 +2,11 @@ import { chat, maxIterations } from '@tanstack/ai';
 import type { ModelMessage, UIMessage } from '@tanstack/ai';
 
 import type { CharacterCard } from '../cards/card-schema';
-import { createCharacterModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
+import {
+  createCharacterModelOptions,
+  createCharacterTextAdapter,
+  createCharacterToolModelOptions,
+} from '../generation/tanstack-ai-text-generation';
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant-final-response';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
@@ -140,8 +144,8 @@ export function buildAssistantSystemPrompt({
       : null;
   const proposalInstruction =
     mode === 'tool-call'
-      ? 'Use proposal tools for requested card edits and return a concise final response with useful follow-up suggestions.'
-      : 'Express every requested card edit through the structured action schema and keep the conversation natural.';
+      ? 'For every requested card creation or edit, you must use the matching proposal tool. Never return proposed field values only as prose. Return a concise final response with useful follow-up suggestions.'
+      : 'Express every requested card creation or edit through the structured action schema. Never return proposed field values only as prose, and keep the conversation natural.';
 
   return [
     'You are the Character Assistant inside a local-first character card editor.',
@@ -216,10 +220,13 @@ export function streamCharacterAssistant({
     agentLoopStrategy: maxIterations(maxSteps),
     outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA,
     middleware: [createCharacterAssistantSafetyMiddleware()],
-    modelOptions: createCharacterModelOptions(generationSettings.endpoint, {
-      ...generationSettings,
-      shouldSendDisabledSamplers,
-    }),
+    modelOptions: (shouldUseNativeTools ? createCharacterToolModelOptions : createCharacterModelOptions)(
+      generationSettings.endpoint,
+      {
+        ...generationSettings,
+        shouldSendDisabledSamplers,
+      },
+    ),
     abortController,
     stream: true,
   });

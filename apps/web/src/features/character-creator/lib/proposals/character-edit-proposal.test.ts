@@ -9,6 +9,7 @@ import {
   createCharacterEditProposal,
   createCharacterEditPatches,
   reduceCharacterEditProposal,
+  supersedeOverlappingCharacterEditProposals,
   upsertCharacterEditProposal,
 } from './character-edit-proposal';
 
@@ -78,6 +79,20 @@ describe('character edit proposals', () => {
     expect(result.proposal.patches[0]?.status).toBe(CHARACTER_EDIT_PATCH_STATUSES.conflict);
   });
 
+  it('treats an already-applied value as an idempotent success', () => {
+    const baseCard = createEmptyCharacterCard();
+    const proposedCard = structuredClone(baseCard);
+    proposedCard.data.name = 'Mira';
+    const proposal = createCharacterEditProposal({ baseCard, proposedCard });
+    const firstResult = applyCharacterEditProposal(proposal, baseCard, ['name']);
+
+    const repeatedResult = applyCharacterEditProposal(proposal, firstResult.card, ['name']);
+
+    expect(repeatedResult.conflictFieldKeys).toEqual([]);
+    expect(repeatedResult.card.data.name).toBe('Mira');
+    expect(repeatedResult.proposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.applied);
+  });
+
   it('upserts streamed patches by field key', () => {
     const baseCard = createEmptyCharacterCard();
     const firstCard = structuredClone(baseCard);
@@ -121,5 +136,26 @@ describe('character edit proposals', () => {
     expect(proposals).toHaveLength(1);
     expect(proposals[0]?.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.applied);
     expect(proposals[0]?.patches[0]?.status).toBe(CHARACTER_EDIT_PATCH_STATUSES.applied);
+  });
+
+  it('supersedes unresolved changes to the same field with the latest proposal', () => {
+    const baseCard = createEmptyCharacterCard();
+    const firstCard = structuredClone(baseCard);
+    firstCard.data.name = 'First name';
+    firstCard.data.description = 'Keep this description';
+    const firstProposal = createCharacterEditProposal({ baseCard, proposedCard: firstCard });
+    const latestCard = structuredClone(baseCard);
+    latestCard.data.name = 'Latest name';
+    const latestProposal = createCharacterEditProposal({ baseCard, proposedCard: latestCard });
+
+    const [supersededProposal] = supersedeOverlappingCharacterEditProposals([firstProposal], latestProposal);
+
+    expect(supersededProposal?.patches.find((patch) => patch.fieldKey === 'name')?.status).toBe(
+      CHARACTER_EDIT_PATCH_STATUSES.rejected,
+    );
+    expect(supersededProposal?.patches.find((patch) => patch.fieldKey === 'description')?.status).toBe(
+      CHARACTER_EDIT_PATCH_STATUSES.proposed,
+    );
+    expect(supersededProposal?.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.review);
   });
 });

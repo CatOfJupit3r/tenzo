@@ -69,6 +69,14 @@ export const CHARACTER_EDIT_PATCH_SCHEMA = z.discriminatedUnion('kind', [
 ]);
 export type iCharacterEditPatch = z.infer<typeof CHARACTER_EDIT_PATCH_SCHEMA>;
 
+export function isCharacterEditPatchUnresolved(patch: iCharacterEditPatch) {
+  return (
+    patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed ||
+    patch.status === CHARACTER_EDIT_PATCH_STATUSES.applying ||
+    patch.status === CHARACTER_EDIT_PATCH_STATUSES.conflict
+  );
+}
+
 export const CHARACTER_EDIT_PROPOSAL_STATUS_SCHEMA = z.enum([
   'streaming',
   'review',
@@ -111,6 +119,30 @@ export function upsertCharacterEditProposal(
     currentProposal && currentProposal.updatedAt > nextProposal.updatedAt ? currentProposal : nextProposal;
 
   return [...proposals.filter((proposal) => !isSameCharacterEditProposalRun(proposal, nextProposal)), proposalToKeep];
+}
+
+export function supersedeOverlappingCharacterEditProposals(
+  proposals: readonly iCharacterEditProposal[],
+  nextProposal: iCharacterEditProposal,
+) {
+  const nextFieldKeys = new Set(
+    nextProposal.patches.filter(isCharacterEditPatchUnresolved).map((patch) => patch.fieldKey),
+  );
+  if (nextFieldKeys.size === 0) return [...proposals];
+
+  return proposals.map((proposal) => {
+    if (proposal.id === nextProposal.id) return proposal;
+    const supersededFieldKeys = proposal.patches
+      .filter((patch) => isCharacterEditPatchUnresolved(patch) && nextFieldKeys.has(patch.fieldKey))
+      .map((patch) => patch.fieldKey);
+    if (supersededFieldKeys.length === 0) return proposal;
+
+    return reduceCharacterEditProposal(proposal, {
+      type: 'patches-rejected',
+      fieldKeys: supersededFieldKeys,
+      occurredAt: nextProposal.createdAt,
+    });
+  });
 }
 
 export const CHARACTER_EDIT_PROPOSAL_EVENT_SCHEMA = z.discriminatedUnion('type', [
@@ -405,7 +437,9 @@ export function getCharacterEditProposalConflicts(
   return proposal.patches
     .filter(
       (patch) =>
-        selectedFieldKeys.has(patch.fieldKey) && !areValuesEqual(getPatchValue(currentCard, patch), patch.oldValue),
+        selectedFieldKeys.has(patch.fieldKey) &&
+        !areValuesEqual(getPatchValue(currentCard, patch), patch.oldValue) &&
+        !areValuesEqual(getPatchValue(currentCard, patch), patch.newValue),
     )
     .map((patch) => patch.fieldKey);
 }

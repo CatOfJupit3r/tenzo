@@ -1,13 +1,16 @@
-import { chatParamsFromRequestBody, toServerSentEventsResponse } from '@tanstack/ai';
+import { chatParamsFromRequestBody } from '@tanstack/ai';
 import { createFileRoute } from '@tanstack/react-router';
 import { ZodError } from 'zod';
 
 import { CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/assistant/character-assistant-generation-mode';
-import { fallbackFromUnsupportedToolUse } from '@~/features/character-creator/lib/assistant/character-assistant-provider-fallback';
 import { streamCharacterAssistant } from '@~/features/character-creator/lib/assistant/character-assistant-runtime.server';
 import { generateStructuredCharacterAssistantStream } from '@~/features/character-creator/lib/assistant/character-assistant-structured.server';
 import { generateCharacterDiscoveryDirections } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
+import {
+  suppressGenerationAbort,
+  toAbortSafeServerSentEventsResponse,
+} from '@~/features/character-creator/lib/generation/abort-safe-stream';
 import { createCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 import type { iCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 
@@ -89,13 +92,11 @@ export const Route = createFileRoute('/api/character-assistant')({
           const stream =
             payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']
               ? generateStructuredCharacterAssistantStream(commonOptions)
-              : fallbackFromUnsupportedToolUse(streamCharacterAssistant({ ...commonOptions, maxSteps: 8 }), () =>
-                  generateStructuredCharacterAssistantStream(commonOptions),
-                );
+              : streamCharacterAssistant({ ...commonOptions, maxSteps: 8 });
 
           const abortController = new AbortController();
           request.signal.addEventListener('abort', () => abortController.abort(request.signal.reason), { once: true });
-          return toServerSentEventsResponse(stream, { abortController });
+          return toAbortSafeServerSentEventsResponse(suppressGenerationAbort(stream, request.signal), abortController);
         } catch (error) {
           return new Response(error instanceof Error ? error.message : 'Character assistant failed.', {
             status: error instanceof ZodError ? 400 : 500,

@@ -27,7 +27,11 @@ import type {
 import { createCharacterAssistantMessagePersistence } from '../lib/assistant/message-persistence';
 import type { CharacterCard } from '../lib/cards/card-schema';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
-import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../lib/proposals/character-edit-proposal';
+import {
+  CHARACTER_EDIT_PROPOSAL_SCHEMA,
+  isCharacterEditPatchUnresolved,
+  supersedeOverlappingCharacterEditProposals,
+} from '../lib/proposals/character-edit-proposal';
 import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
 import type { ProviderKind } from '../lib/provider/provider-health';
 import { useProposalActions } from './use-proposal-actions';
@@ -136,7 +140,10 @@ export function useCharacterAssistantWorkspace({
       return;
     }
     void updateCharacterAssistantSession(session.id, (draft) => {
-      draft.proposals.push(...missingProposals);
+      missingProposals.forEach((proposal) => {
+        draft.proposals = supersedeOverlappingCharacterEditProposals(draft.proposals, proposal);
+        draft.proposals.push(proposal);
+      });
       if (latestConcept) draft.concept = latestConcept;
     });
   }, [chat.messages, session]);
@@ -150,7 +157,9 @@ export function useCharacterAssistantWorkspace({
   const activePatches = useMemo(
     () =>
       proposalActions.activeProposals.flatMap((proposal) =>
-        proposal.patches.map((patch) => ({ proposalId: proposal.id, proposalSummary: proposal.summary, patch })),
+        proposal.patches
+          .filter(isCharacterEditPatchUnresolved)
+          .map((patch) => ({ proposalId: proposal.id, proposalSummary: proposal.summary, patch })),
       ),
     [proposalActions.activeProposals],
   );

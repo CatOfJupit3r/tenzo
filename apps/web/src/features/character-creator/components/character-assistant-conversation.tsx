@@ -11,11 +11,13 @@ import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
   CHARACTER_CONCEPT_SCHEMA,
 } from '../lib/assistant/character-assistant-contracts';
+import { groupCharacterAssistantConversationMessages } from '../lib/assistant/conversation-message-groups';
 import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from '../lib/assistant/tool-part-renderers';
 import { computeRewriteDiffHunks } from '../lib/editor/rewrite-diff';
 import {
   CHARACTER_EDIT_PATCH_STATUSES,
   CHARACTER_EDIT_PROPOSAL_SCHEMA,
+  isCharacterEditPatchUnresolved,
 } from '../lib/proposals/character-edit-proposal';
 import type {
   CharacterEditFieldKey,
@@ -64,10 +66,14 @@ interface iProposalCardProps {
 
 function ProposalCard({ proposal, onApply, onReject, onJumpToField }: iProposalCardProps) {
   const [expandedFields, setExpandedFields] = useState<Set<CharacterEditFieldKey>>(new Set());
+  const unresolvedPatches = proposal.patches.filter(isCharacterEditPatchUnresolved);
+
+  if (unresolvedPatches.length === 0) return null;
+
   return (
     <section className="grid gap-2 rounded-xl border bg-muted/15 p-3" aria-label="Assistant proposal">
       <p className="text-sm font-medium">{proposal.summary ?? 'Proposed changes'}</p>
-      {proposal.patches.map((patch) => {
+      {unresolvedPatches.map((patch) => {
         const isExpanded = expandedFields.has(patch.fieldKey);
         return (
           <div key={patch.fieldKey} className="grid gap-2 rounded-lg border bg-background p-2">
@@ -156,23 +162,25 @@ export function CharacterAssistantConversation({
   onSendMessage,
 }: iCharacterAssistantConversationProps) {
   const proposalsById = new Map(proposals.map((proposal) => [proposal.id, proposal]));
+  const conversationMessages = useMemo(() => groupCharacterAssistantConversationMessages(messages), [messages]);
   return (
     <div className="grid gap-4">
-      {messages.length === 0 ? (
+      {conversationMessages.length === 0 ? (
         <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
           Describe the character, ask for a focused change, or choose a suggestion below.
         </div>
       ) : null}
-      {messages.map((message) => (
+      {conversationMessages.map((message) => (
         <div
           key={message.id}
+          aria-label={message.role === 'user' ? 'User message' : 'Assistant message'}
           className={cn(
             'grid max-w-[92%] gap-2 rounded-xl px-3 py-2 text-sm',
             message.role === 'user' ? 'ml-auto bg-primary text-primary-foreground' : 'border bg-card',
           )}
         >
-          {message.parts.map((part) => {
-            let partKey: string = part.type;
+          {message.parts.map((part, partIndex) => {
+            let partKey = `${part.type}-${partIndex}`;
             if (part.type === 'tool-call') partKey = part.id;
             if (part.type === 'text') partKey = `text-${part.content}`;
             if (part.type === 'text')
@@ -182,6 +190,10 @@ export function CharacterAssistantConversation({
                 </p>
               );
             if (part.type === 'structured-output' && part.status === 'complete') {
+              const hasStreamedText = message.parts.some(
+                (messagePart) => messagePart.type === 'text' && messagePart.content.trim().length > 0,
+              );
+              if (hasStreamedText) return null;
               const result = ASSISTANT_FINAL_RESPONSE_SCHEMA.safeParse(part.data);
               return result.success ? (
                 <p key={partKey} className="whitespace-pre-wrap">
@@ -194,7 +206,9 @@ export function CharacterAssistantConversation({
             if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.proposal) {
               const result = CHARACTER_EDIT_PROPOSAL_SCHEMA.safeParse((part.output as { proposal?: unknown }).proposal);
               if (!result.success) return null;
-              const proposal = proposalsById.get(result.data.id) ?? result.data;
+              const storedProposal = proposalsById.get(result.data.id);
+              if (!storedProposal && !isRunning) return null;
+              const proposal = storedProposal ?? result.data;
               return (
                 <ProposalCard
                   key={partKey}

@@ -185,14 +185,14 @@ export function CharacterAssistantPanel({
               void handleSubmit();
             }}
           >
-            <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Suggested next prompts">
+            <div className="flex flex-wrap gap-2" aria-label="Suggested next prompts">
               {suggestions.map((suggestion) => (
                 <Button
                   key={suggestion.id}
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="shrink-0 rounded-full"
+                  className="h-auto min-h-8 max-w-full shrink rounded-full whitespace-normal text-left"
                   disabled={workspace.isRunning}
                   onClick={() => {
                     if (suggestion.id === 'premise') setInputValue(suggestion.prompt);

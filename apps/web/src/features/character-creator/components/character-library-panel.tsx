@@ -130,15 +130,15 @@ const CharacterLibraryItem = memo(
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button type="button" size="icon" variant="ghost" aria-label={`Remove ${displayName}`} title="Remove">
+              <Button type="button" size="icon" variant="ghost" aria-label={`Delete ${displayName}`} title="Delete">
                 <LuTrash2 className="size-4" />
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Remove character?</AlertDialogTitle>
+                <AlertDialogTitle>Delete {displayName}?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This clears the saved character entry and its local portrait asset from this browser.
+                  This permanently deletes the character, portrait, and assistant conversation stored in this browser.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -148,7 +148,7 @@ const CharacterLibraryItem = memo(
                     await onRemove(character.id);
                   }}
                 >
-                  Remove
+                  Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

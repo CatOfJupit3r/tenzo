@@ -1,6 +1,6 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import { useMemo, useState } from 'react';
-import { LuChevronDown, LuExternalLink, LuLoaderCircle, LuTriangleAlert } from 'react-icons/lu';
+import { LuChevronDown, LuExternalLink, LuFileText, LuLoaderCircle, LuTriangleAlert } from 'react-icons/lu';
 import { z } from 'zod';
 
 import { Button } from '@~/components/ui/button/button';
@@ -13,6 +13,7 @@ import {
 } from '../lib/assistant/character-assistant-contracts';
 import { groupCharacterAssistantConversationMessages } from '../lib/assistant/conversation-message-groups';
 import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from '../lib/assistant/tool-part-renderers';
+import { readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
 import { computeRewriteDiffHunks } from '../lib/editor/rewrite-diff';
 import {
   CHARACTER_EDIT_PATCH_STATUSES,
@@ -24,6 +25,7 @@ import type {
   iCharacterEditPatch,
   iCharacterEditProposal,
 } from '../lib/proposals/character-edit-proposal';
+import { CharacterAssistantMessageText } from './assistant/character-assistant-message-text';
 import { DiscoveryCardGrid } from './assistant/discovery-card-grid';
 
 function formatFieldLabel(fieldKey: CharacterEditFieldKey) {
@@ -31,6 +33,16 @@ function formatFieldLabel(fieldKey: CharacterEditFieldKey) {
     .split('_')
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(' ');
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readMessagePartMetadata(part: object) {
+  return 'metadata' in part ? part.metadata : undefined;
 }
 
 function stringifyPatchValue(patch: iCharacterEditPatch, side: 'old' | 'new') {
@@ -182,13 +194,43 @@ export function CharacterAssistantConversation({
           {message.parts.map((part, partIndex) => {
             let partKey = `${part.type}-${partIndex}`;
             if (part.type === 'tool-call') partKey = part.id;
-            if (part.type === 'text') partKey = `text-${part.content}`;
-            if (part.type === 'text')
+            if (part.type === 'text') partKey = `text-${partIndex}`;
+            if (part.type === 'text') {
+              const attachment = readChatAttachmentMetadata(readMessagePartMetadata(part));
+              if (attachment)
+                return (
+                  <div
+                    key={partKey}
+                    className="flex items-center gap-2 rounded-md border border-current/20 px-2 py-1.5"
+                  >
+                    <LuFileText className="size-4 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{attachment.name}</span>
+                    <span className="shrink-0 text-xs opacity-70">{formatFileSize(attachment.size)}</span>
+                  </div>
+                );
+              return <CharacterAssistantMessageText key={partKey} content={part.content} />;
+            }
+            if (part.type === 'image') {
+              const attachment = readChatAttachmentMetadata(part.metadata);
+              const source =
+                part.source.type === 'data'
+                  ? `data:${part.source.mimeType};base64,${part.source.value}`
+                  : part.source.value;
               return (
-                <p key={partKey} className="whitespace-pre-wrap">
-                  {part.content}
-                </p>
+                <figure key={partKey} className="grid gap-1">
+                  <img
+                    src={source}
+                    alt={attachment?.name ?? 'Attached image'}
+                    className="max-h-64 w-auto max-w-full rounded-md border object-contain"
+                  />
+                  {attachment ? (
+                    <figcaption className="text-xs opacity-70">
+                      {attachment.name} · {formatFileSize(attachment.size)}
+                    </figcaption>
+                  ) : null}
+                </figure>
               );
+            }
             if (part.type === 'structured-output' && part.status === 'complete') {
               const hasStreamedText = message.parts.some(
                 (messagePart) => messagePart.type === 'text' && messagePart.content.trim().length > 0,
@@ -196,9 +238,7 @@ export function CharacterAssistantConversation({
               if (hasStreamedText) return null;
               const result = ASSISTANT_FINAL_RESPONSE_SCHEMA.safeParse(part.data);
               return result.success ? (
-                <p key={partKey} className="whitespace-pre-wrap">
-                  {result.data.assistantMessage}
-                </p>
+                <CharacterAssistantMessageText key={partKey} content={result.data.assistantMessage} />
               ) : null;
             }
             if (part.type !== 'tool-call' || !part.output) return null;

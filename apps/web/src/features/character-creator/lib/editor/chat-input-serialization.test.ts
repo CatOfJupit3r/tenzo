@@ -42,4 +42,22 @@ describe('chat input serialization', () => {
       }).templateIds,
     ).toEqual(['template-0', 'template-1', 'template-2', 'template-3']);
   });
+
+  it('serializes supported text styles as markdown for the assistant', () => {
+    expect(
+      serializeChatInput({
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
+              { type: 'text', text: ' italic', marks: [{ type: 'italic' }] },
+              { type: 'text', text: ' gone', marks: [{ type: 'strike' }] },
+            ],
+          },
+        ],
+      }).text,
+    ).toBe('**bold*** italic*~~ gone~~');
+  });
 });

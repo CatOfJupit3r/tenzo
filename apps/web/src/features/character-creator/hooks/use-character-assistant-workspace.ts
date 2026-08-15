@@ -26,6 +26,8 @@ import type {
 } from '../lib/assistant/character-assistant-contracts';
 import { createCharacterAssistantMessagePersistence } from '../lib/assistant/message-persistence';
 import type { CharacterCard } from '../lib/cards/card-schema';
+import { buildChatInputContentParts } from '../lib/editor/chat-input-attachments';
+import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import {
   CHARACTER_EDIT_PROPOSAL_SCHEMA,
@@ -171,10 +173,13 @@ export function useCharacterAssistantWorkspace({
     [characterId],
   );
   const sendMessage = useCallback(
-    async (input: string, options: { templates?: iChatTemplateRef[] } = {}) => {
+    async (input: string, options: { templates?: iChatTemplateRef[]; attachments?: iChatInputAttachment[] } = {}) => {
       forwardedProps.templates = options.templates ?? [];
       try {
-        await chat.sendMessage(input);
+        const attachments = options.attachments ?? [];
+        await chat.sendMessage(
+          attachments.length > 0 ? { content: buildChatInputContentParts(input, attachments) } : input,
+        );
         return true;
       } catch (error) {
         toastError(

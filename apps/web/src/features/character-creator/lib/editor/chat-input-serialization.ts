@@ -13,7 +13,13 @@ export function serializeChatInput(document: JSONContent): iSerializedChatInput 
 
   const visit = (node: JSONContent) => {
     if (node.type === 'text' && node.text) {
-      textParts.push(node.text);
+      const markedText = (node.marks ?? []).reduce((text, mark) => {
+        if (mark.type === 'bold') return `**${text}**`;
+        if (mark.type === 'italic') return `*${text}*`;
+        if (mark.type === 'strike') return `~~${text}~~`;
+        return text;
+      }, node.text);
+      textParts.push(markedText);
       return;
     }
 

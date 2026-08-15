@@ -132,4 +132,20 @@ describe('ChatInputEditor', () => {
       expect(onValueChange).toHaveBeenLastCalledWith('Use /voice-template', ['voice-template'], expect.any(Object)),
     );
   });
+
+  it('highlights character macros with the shared project token styles', async () => {
+    render(
+      <ChatInputEditor
+        value="Ask {{char}} about {{user}}"
+        templates={[]}
+        ariaLabel="Assistant message"
+        onValueChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const textbox = await screen.findByRole('textbox', { name: 'Assistant message' });
+    await waitFor(() => expect(textbox.querySelector('.macro-chip-char')?.textContent).toBe('{{char}}'));
+    expect(textbox.querySelector('.macro-chip-user')?.textContent).toBe('{{user}}');
+  });
 });

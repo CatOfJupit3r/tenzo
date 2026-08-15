@@ -14,6 +14,7 @@ import {
   mergeNextPromptSuggestions,
   readModelPromptSuggestions,
 } from '../lib/assistant/next-prompt-suggestions';
+import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
 import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
 import { CharacterAssistantConversation } from './character-assistant-conversation';
 import { ChatInputEditor } from './editor/chat-input-editor';
@@ -51,6 +52,7 @@ export function CharacterAssistantPanel({
   const [inputValue, setInputValue] = useState('');
   const [inputTemplateIds, setInputTemplateIds] = useState<string[]>([]);
   const [inputDocument, setInputDocument] = useState<JSONContent | null>(null);
+  const [inputAttachments, setInputAttachments] = useState<iChatInputAttachment[]>([]);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const settledOutcomeRef = useRef<HTMLDivElement>(null);
   const hydratedDraftIdRef = useRef<string | null>(null);
@@ -98,18 +100,19 @@ export function CharacterAssistantPanel({
     conversationEndRef.current?.scrollIntoView({ behavior: workspace.isRunning ? 'auto' : 'smooth', block: 'end' });
   }, [workspace.messages, workspace.activeProposals.length, workspace.isRunning]);
 
-  const send = async (message: string) => {
-    if (!message.trim() || workspace.isRunning) return false;
+  const send = async (message: string, attachments: iChatInputAttachment[] = []) => {
+    if ((!message.trim() && attachments.length === 0) || workspace.isRunning) return false;
     const templates = fieldTemplates
       .filter((template) => inputTemplateIds.includes(template.id))
       .map(({ id, name, mode, fieldKeys, content }) => ({ id, name, mode, fieldKeys, content }));
-    return workspace.sendMessage(message, { templates });
+    return workspace.sendMessage(message, { templates, attachments });
   };
   const handleSubmit = async () => {
-    if (await send(inputValue)) {
+    if (await send(inputValue, inputAttachments)) {
       setInputValue('');
       setInputTemplateIds([]);
       setInputDocument(null);
+      setInputAttachments([]);
     }
   };
 
@@ -210,6 +213,7 @@ export function CharacterAssistantPanel({
               value={inputValue}
               content={inputDocument}
               templates={fieldTemplates}
+              attachments={inputAttachments}
               isDisabled={workspace.isRunning}
               ariaLabel={`Message Character Assistant about ${focusLabel.toLocaleLowerCase()}`}
               placeholder={`Ask about ${focusLabel.toLocaleLowerCase()}...`}
@@ -218,6 +222,7 @@ export function CharacterAssistantPanel({
                 setInputTemplateIds(templateIds);
                 setInputDocument(content);
               }}
+              onAttachmentsChange={setInputAttachments}
               onSubmit={() => {
                 void handleSubmit();
               }}
@@ -232,6 +237,7 @@ export function CharacterAssistantPanel({
                   void workspace.clearConversation();
                   setInputValue('');
                   setInputDocument(null);
+                  setInputAttachments([]);
                 }}
               >
                 New conversation
@@ -255,7 +261,7 @@ export function CharacterAssistantPanel({
                       {workspace.errorMessage ? 'Retry' : 'Regenerate'}
                     </Button>
                   ) : null}
-                  <Button type="submit" size="sm" disabled={!inputValue.trim()}>
+                  <Button type="submit" size="sm" disabled={!inputValue.trim() && inputAttachments.length === 0}>
                     Send
                   </Button>
                 </div>

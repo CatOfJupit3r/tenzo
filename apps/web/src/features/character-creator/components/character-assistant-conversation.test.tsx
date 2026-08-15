@@ -10,6 +10,37 @@ import { createCharacterEditProposal } from '../lib/proposals/character-edit-pro
 import { CharacterAssistantConversation } from './character-assistant-conversation';
 
 describe('CharacterAssistantConversation proposals', () => {
+  it('renders markdown formatting and project macros in chat messages', async () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'assistant-message',
+        role: 'assistant',
+        createdAt: new Date('2026-08-14T00:00:00.000Z'),
+        parts: [{ type: 'text', content: '**{{char}}** greets *{{user}}* with ~~formal~~ warmth.' }],
+      },
+    ];
+
+    const { container } = render(
+      <CharacterAssistantConversation
+        messages={messages}
+        proposals={[]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    await screen.findByText('{{char}}');
+    expect(container.querySelector('strong .macro-chip-char')?.textContent).toBe('{{char}}');
+    expect(container.querySelector('em .macro-chip-user')?.textContent).toBe('{{user}}');
+    expect(container.querySelector('s')?.textContent).toBe('formal');
+  });
+
   it('renders text, list, and book diffs with per-patch actions', async () => {
     const user = userEvent.setup();
     const baseCard = createEmptyCharacterCard();

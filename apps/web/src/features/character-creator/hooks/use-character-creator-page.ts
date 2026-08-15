@@ -438,7 +438,7 @@ export function useCharacterCreatorPage() {
     try {
       const result = await probeConnection();
       const detailParts = [
-        result.currentModel ?? result.models[0] ?? null,
+        result.currentModel ?? result.models[0]?.value ?? null,
         result.contextSize ? `${result.contextSize} context` : null,
       ].filter((value): value is string => Boolean(value));
 

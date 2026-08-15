@@ -1,9 +1,31 @@
 import { ClientOnly } from '@tanstack/react-router';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { merge } from 'lodash-es';
-import { Children, forwardRef, isValidElement, useId, useMemo } from 'react';
-import type { ForwardRefExoticComponent, ReactElement, Ref, RefAttributes } from 'react';
+import {
+  Children,
+  createContext,
+  forwardRef,
+  isValidElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type {
+  Dispatch,
+  ForwardRefExoticComponent,
+  ReactElement,
+  Ref,
+  RefAttributes,
+  SetStateAction,
+  UIEvent,
+  WheelEvent,
+} from 'react';
 import { LuCheck, LuChevronDown, LuX } from 'react-icons/lu';
-import SelectComponent, { components, createFilter } from 'react-select';
+import { components, createFilter } from 'react-select';
 import type {
   ActionMeta,
   DropdownIndicatorProps,
@@ -17,7 +39,8 @@ import type {
   Props,
   SelectInstance,
 } from 'react-select';
-import { List } from 'react-window';
+import CreatableSelectComponent from 'react-select/creatable';
+import type { CreatableProps } from 'react-select/creatable';
 
 import { isOnClient } from '@~/utils/ssr-helpers';
 
@@ -97,74 +120,196 @@ export const Menu = ({ children, ...props }: MenuProps<iOptionType>) => (
   <components.Menu {...props}>{children}</components.Menu>
 );
 
+const isNewOptionValid = () => false;
+const INITIAL_OPTION_BATCH_SIZE = 50;
+const OPTION_BATCH_SIZE = 50;
 const COMPACT_OPTION_HEIGHT = 35;
 const OPTION_WITH_DESCRIPTION_HEIGHT = 50;
+const LOAD_MORE_THRESHOLD = COMPACT_OPTION_HEIGHT * 3;
+const VIRTUAL_OPTION_OVERSCAN = 20;
 
-const getOptionRowHeight = (option: unknown) => {
-  if (isValidElement<OptionProps<iOptionType>>(option) && option.props.data.description) {
-    return OPTION_WITH_DESCRIPTION_HEIGHT;
-  }
+interface iSelectVirtualizationState {
+  optionLimit: number;
+  setOptionLimit: Dispatch<SetStateAction<number>>;
+}
 
-  return COMPACT_OPTION_HEIGHT;
+const DEFAULT_SELECT_VIRTUALIZATION_STATE = {
+  optionLimit: INITIAL_OPTION_BATCH_SIZE,
+  setOptionLimit: () => undefined,
+} satisfies iSelectVirtualizationState;
+
+const SelectVirtualizationContext = createContext<iSelectVirtualizationState>(DEFAULT_SELECT_VIRTUALIZATION_STATE);
+
+const handleMenuWheel = (event: WheelEvent<HTMLDivElement>) => {
+  event.stopPropagation();
 };
 
+const getEstimatedOptionHeight = (option: unknown) =>
+  isValidElement<OptionProps<iOptionType>>(option) && option.props.data?.description
+    ? OPTION_WITH_DESCRIPTION_HEIGHT
+    : COMPACT_OPTION_HEIGHT;
+
 export const MenuList = (props: MenuListProps<iOptionType>) => {
-  const { children, className } = props;
-
+  const { children, className, focusedOption, innerProps, innerRef, maxHeight } = props;
   const childrenArray = Children.toArray(children);
+  const { optionLimit, setOptionLimit } = useContext(SelectVirtualizationContext);
+  const scrollElementRef = useRef<HTMLDivElement>(null);
+  const loadedOptionCount = Math.min(optionLimit, childrenArray.length);
+  const focusedOptionIndex = childrenArray.findIndex(
+    (child) => isValidElement<OptionProps<iOptionType>>(child) && child.props.data?.value === focusedOption?.value,
+  );
+  const virtualizer = useVirtualizer({
+    count: loadedOptionCount,
+    estimateSize: (index) => getEstimatedOptionHeight(childrenArray[index]),
+    getScrollElement: () => scrollElementRef.current,
+    overscan: VIRTUAL_OPTION_OVERSCAN,
+    useFlushSync: false,
+  });
 
-  if (!childrenArray || childrenArray.length - 1 === 0) return <components.MenuList {...props} />;
+  const setScrollElementRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      scrollElementRef.current = element;
+      if (typeof innerRef === 'function') {
+        innerRef(element);
+      } else if (innerRef) {
+        innerRef.current = element;
+      }
+    },
+    [innerRef],
+  );
+
+  useEffect(() => {
+    if (focusedOptionIndex < 0) {
+      return;
+    }
+
+    const requiredOptionCount = Math.min(
+      childrenArray.length,
+      Math.ceil((focusedOptionIndex + 1) / OPTION_BATCH_SIZE) * OPTION_BATCH_SIZE,
+    );
+    if (requiredOptionCount > optionLimit) {
+      setOptionLimit(requiredOptionCount);
+      return;
+    }
+
+    const scrollElement = scrollElementRef.current;
+    const focusedOptionOffset = virtualizer.getOffsetForIndex(focusedOptionIndex, 'auto');
+    if (!scrollElement || !focusedOptionOffset) {
+      return;
+    }
+
+    const [targetOffset] = focusedOptionOffset;
+    if (Math.abs(targetOffset - scrollElement.scrollTop) > 1) {
+      virtualizer.scrollToIndex(focusedOptionIndex, { align: 'auto' });
+    }
+  }, [childrenArray.length, focusedOptionIndex, optionLimit, setOptionLimit, virtualizer]);
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    innerProps.onScroll?.(event);
+    const { clientHeight, scrollHeight, scrollTop } = event.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight <= LOAD_MORE_THRESHOLD) {
+      setOptionLimit((currentCount) => Math.min(currentCount + OPTION_BATCH_SIZE, childrenArray.length));
+    }
+  };
+
+  const listHeight = Math.min(
+    maxHeight,
+    childrenArray
+      .slice(0, loadedOptionCount)
+      .reduce<number>((totalHeight, option) => totalHeight + getEstimatedOptionHeight(option), 0),
+  );
+
+  if (childrenArray.length <= 1) {
+    return <components.MenuList {...props} />;
+  }
 
   return (
-    <List
-      rowCount={childrenArray.length}
-      rowHeight={(index) => getOptionRowHeight(childrenArray[index])}
-      rowProps={{ children: childrenArray }}
-      // eslint-disable-next-line react/no-unstable-nested-components
-      rowComponent={({ index, style }) => <div style={style}>{childrenArray[index]}</div>}
+    <div
+      {...innerProps}
+      ref={setScrollElementRef}
       className={className}
-    />
+      style={{
+        ...innerProps.style,
+        height: listHeight,
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
+        position: 'relative',
+      }}
+      onScroll={handleScroll}
+      onWheel={handleMenuWheel}
+    >
+      <div style={{ position: 'relative', height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            data-index={virtualItem.index}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            {childrenArray[virtualItem.index]}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 
 const BaseSelect = <IsMulti extends boolean = false>(
-  props: Props<iOptionType, IsMulti> & { isMulti?: IsMulti; isDOMTarget?: boolean },
+  props: CreatableProps<iOptionType, IsMulti, GroupBase<iOptionType>> & {
+    isMulti?: IsMulti;
+    isDOMTarget?: boolean;
+    isCreatable?: boolean;
+  },
   ref: Ref<SelectInstance<iOptionType, IsMulti, GroupBase<iOptionType>>>,
 ) => {
   const {
     styles = DEFAULT_SELECT_STYLES,
     classNames = {},
     components: componentsFromProps = {},
+    captureMenuScroll: shouldCaptureMenuScroll = false,
     isDOMTarget = true,
+    isCreatable = false,
+    isValidNewOption,
     ...rest
   } = props;
   const instanceId = useId();
+  const [optionLimit, setOptionLimit] = useState(INITIAL_OPTION_BATCH_SIZE);
+  const virtualizationState = useMemo(() => ({ optionLimit, setOptionLimit }), [optionLimit]);
 
   return (
     <ClientOnly>
-      <SelectComponent<iOptionType, IsMulti, GroupBase<iOptionType>>
-        ref={ref}
-        instanceId={instanceId}
-        unstyled
-        filterOption={createFilter({
-          matchFrom: 'any',
-          stringify: (option) => option.label,
-        })}
-        menuPortalTarget={isDOMTarget && isOnClient ? document.body : undefined}
-        components={{
-          DropdownIndicator,
-          ClearIndicator,
-          MultiValueRemove,
-          Option,
-          SingleValue,
-          Menu,
-          MenuList,
-          ...componentsFromProps,
-        }}
-        styles={styles}
-        classNames={merge(DEFAULT_SELECT_CLASSNAMES, classNames)}
-        {...rest}
-      />
+      <SelectVirtualizationContext.Provider value={virtualizationState}>
+        <CreatableSelectComponent<iOptionType, IsMulti, GroupBase<iOptionType>>
+          ref={ref}
+          instanceId={instanceId}
+          unstyled
+          filterOption={createFilter({
+            matchFrom: 'any',
+            stringify: (option) => option.label,
+          })}
+          menuPortalTarget={isDOMTarget && isOnClient ? document.body : undefined}
+          components={{
+            DropdownIndicator,
+            ClearIndicator,
+            MultiValueRemove,
+            Option,
+            SingleValue,
+            Menu,
+            MenuList,
+            ...componentsFromProps,
+          }}
+          styles={styles}
+          classNames={merge(DEFAULT_SELECT_CLASSNAMES, classNames)}
+          captureMenuScroll={shouldCaptureMenuScroll}
+          isValidNewOption={isCreatable ? isValidNewOption : isNewOptionValid}
+          {...rest}
+        />
+      </SelectVirtualizationContext.Provider>
     </ClientOnly>
   );
 };
@@ -191,6 +336,7 @@ const flattenOptions = (options?: readonly (iOptionType | GroupBase<iOptionType>
 
 type SingleSelectBaseProps = Props<iOptionType, false, GroupBase<iOptionType>>;
 type MultiSelectBaseProps = Props<iOptionType, true, GroupBase<iOptionType>>;
+type CreatableSingleSelectBaseProps = CreatableProps<iOptionType, false, GroupBase<iOptionType>>;
 
 const ForwardedSelectSingle = ForwardedSelect as unknown as ForwardRefExoticComponent<
   SingleSelectBaseProps & RefAttributes<SelectInstance<iOptionType, false, GroupBase<iOptionType>>>
@@ -198,6 +344,11 @@ const ForwardedSelectSingle = ForwardedSelect as unknown as ForwardRefExoticComp
 
 const ForwardedSelectMulti = ForwardedSelect as unknown as ForwardRefExoticComponent<
   MultiSelectBaseProps & RefAttributes<SelectInstance<iOptionType, true, GroupBase<iOptionType>>>
+>;
+
+const ForwardedCreatableSelectSingle = ForwardedSelect as unknown as ForwardRefExoticComponent<
+  CreatableSingleSelectBaseProps &
+    RefAttributes<SelectInstance<iOptionType, false, GroupBase<iOptionType>>> & { isCreatable: true }
 >;
 
 export interface iSingleSelectProps extends Omit<
@@ -231,6 +382,56 @@ export const SingleSelect = forwardRef<SelectInstance<iOptionType, false, GroupB
       <ForwardedSelectSingle
         {...rest}
         ref={ref}
+        options={options}
+        value={computedValue}
+        defaultValue={computedDefaultValue}
+        onChange={(selected, actionMeta) => {
+          onOptionChange?.(selected, actionMeta);
+          const normalizedOption = selected ?? null;
+          onValueChange?.(normalizedOption?.value ?? null, normalizedOption, actionMeta);
+        }}
+      />
+    );
+  },
+);
+
+export interface iCreatableSingleSelectProps extends Omit<
+  CreatableSingleSelectBaseProps,
+  'value' | 'defaultValue' | 'onChange' | 'isMulti'
+> {
+  value?: string | null;
+  defaultValue?: string | null;
+  onValueChange?: (value: string | null, option: iOptionType | null, action: ActionMeta<iOptionType>) => void;
+  onOptionChange?: NonNullable<CreatableSingleSelectBaseProps['onChange']>;
+}
+
+export const CreatableSingleSelect = forwardRef<
+  SelectInstance<iOptionType, false, GroupBase<iOptionType>>,
+  iCreatableSingleSelectProps
+>(
+  // eslint-disable-next-line prefer-arrow-callback
+  function CreatableSingleSelect({ value, defaultValue, onValueChange, onOptionChange, options, ...rest }, ref) {
+    const flatOptions = useMemo(() => flattenOptions(options), [options]);
+
+    const computedValue = useMemo<iOptionType | null | undefined>(() => {
+      if (value === undefined) return undefined;
+      if (value === null || value === '') return null;
+      return flatOptions.find((option) => option.value === value) ?? { label: value, value };
+    }, [flatOptions, value]);
+
+    const computedDefaultValue = useMemo<iOptionType | null | undefined>(() => {
+      if (defaultValue === undefined) return undefined;
+      if (defaultValue === null || defaultValue === '') return null;
+      return (
+        flatOptions.find((option) => option.value === defaultValue) ?? { label: defaultValue, value: defaultValue }
+      );
+    }, [defaultValue, flatOptions]);
+
+    return (
+      <ForwardedCreatableSelectSingle
+        {...rest}
+        ref={ref}
+        isCreatable
         options={options}
         value={computedValue}
         defaultValue={computedDefaultValue}

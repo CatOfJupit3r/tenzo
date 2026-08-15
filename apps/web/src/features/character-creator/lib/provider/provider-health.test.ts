@@ -33,6 +33,10 @@ describe('provider health model metadata', () => {
     );
 
     expect(result.contextSize).toBe(131_072);
+    expect(result.models).toEqual([
+      { label: 'text-model', value: 'text-model' },
+      { label: 'vision-model', value: 'vision-model' },
+    ]);
     expect(result.modelContextSizes).toEqual({
       'text-model': 32_768,
       'vision-model': 131_072,
@@ -49,6 +53,33 @@ describe('provider health model metadata', () => {
         hasJointStructuredOutputAndToolCalling: true,
       },
     });
+  });
+
+  it('uses the preview name as the label without adding it as a duplicate model', async () => {
+    const result = await probeProviderMetadataWithProxyFetcher(
+      {
+        endpoint: 'https://openrouter.ai/api/v1',
+        apiKey: 'test-key',
+        requestMode: REQUEST_MODES.proxy,
+      },
+      async (url) =>
+        url.endsWith('/models')
+          ? {
+              isOk: true,
+              status: 200,
+              data: {
+                data: [{ id: 'mistralai/mistral-nemo', name: 'Mistral Nemo' }],
+              },
+            }
+          : { isOk: false, status: 404, data: null },
+    );
+
+    expect(result.models).toEqual([
+      {
+        label: 'Mistral Nemo (mistralai/mistral-nemo)',
+        value: 'mistralai/mistral-nemo',
+      },
+    ]);
   });
 
   it('does not combine capabilities published by different OpenRouter endpoints', async () => {

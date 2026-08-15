@@ -25,12 +25,17 @@ export interface iConnectionHealthRequest {
 export interface iConnectionHealthResult {
   providerName: string | null;
   providerKind: ProviderKind;
-  models: string[];
+  models: iProviderModelOption[];
   currentModel: string | null;
   contextSize: number | null;
   modelContextSizes: Record<string, number>;
   modelCapabilities: Record<string, iModelCapabilities>;
   modelProviders: iModelProviderOption[];
+}
+
+export interface iProviderModelOption {
+  label: string;
+  value: string;
 }
 
 interface iFetchJsonResult {
@@ -119,40 +124,41 @@ function readPositiveInteger(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
 }
 
-function extractModels(payload: unknown): string[] {
-  const discoveredModels = new Set<string>();
+function extractModels(payload: unknown): iProviderModelOption[] {
+  const discoveredModels = new Map<string, iProviderModelOption>();
 
-  const pushModel = (value: unknown) => {
-    const normalized = readString(value);
-    if (normalized) {
-      discoveredModels.add(normalized);
+  const pushModel = (entry: unknown) => {
+    if (entry && typeof entry === 'object') {
+      const canonicalName =
+        readString(Reflect.get(entry, 'id')) ??
+        readString(Reflect.get(entry, 'model_name')) ??
+        readString(Reflect.get(entry, 'name'));
+      if (!canonicalName) {
+        return;
+      }
+
+      const previewLabel = readString(Reflect.get(entry, 'name'));
+      discoveredModels.set(canonicalName, {
+        label: previewLabel && previewLabel !== canonicalName ? `${previewLabel} (${canonicalName})` : canonicalName,
+        value: canonicalName,
+      });
+      return;
+    }
+
+    const canonicalName = readString(entry);
+    if (canonicalName) {
+      discoveredModels.set(canonicalName, { label: canonicalName, value: canonicalName });
     }
   };
 
   if (Array.isArray(payload)) {
-    payload.forEach((entry) => {
-      if (entry && typeof entry === 'object') {
-        pushModel(Reflect.get(entry, 'id'));
-        pushModel(Reflect.get(entry, 'name'));
-        pushModel(Reflect.get(entry, 'model_name'));
-      } else {
-        pushModel(entry);
-      }
-    });
+    payload.forEach(pushModel);
   }
 
   if (payload && typeof payload === 'object') {
     const data = Reflect.get(payload, 'data');
     if (Array.isArray(data)) {
-      data.forEach((entry) => {
-        if (entry && typeof entry === 'object') {
-          pushModel(Reflect.get(entry, 'id'));
-          pushModel(Reflect.get(entry, 'name'));
-          pushModel(Reflect.get(entry, 'model_name'));
-        } else {
-          pushModel(entry);
-        }
-      });
+      data.forEach(pushModel);
     }
 
     const models = Reflect.get(payload, 'models');
@@ -161,7 +167,7 @@ function extractModels(payload: unknown): string[] {
     }
   }
 
-  return [...discoveredModels];
+  return [...discoveredModels.values()];
 }
 
 function extractModelContextSizes(payload: unknown) {
@@ -346,7 +352,10 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   }
   const contextSize = endpointContextSize ?? (selectedModel ? (modelContextSizes[selectedModel] ?? null) : null);
 
-  const detectedModels = currentModel && !models.includes(currentModel) ? [currentModel, ...models] : models;
+  const detectedModels =
+    currentModel && !models.some((model) => model.value === currentModel)
+      ? [{ label: currentModel, value: currentModel }, ...models]
+      : models;
   const providerName = serviceInfoResponse?.isOk ? extractProviderName(serviceInfoResponse.data) : null;
   const hasKoboldMetadata =
     koboldModelResponse?.isOk === true ||

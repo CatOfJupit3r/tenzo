@@ -29,7 +29,7 @@ import type {
   ModelCompatibilityStatus,
 } from '../lib/provider/model-capabilities';
 import { PROVIDER_KINDS } from '../lib/provider/provider-health';
-import type { ProviderKind } from '../lib/provider/provider-health';
+import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iConnectionHealthViewModel {
@@ -38,7 +38,7 @@ export interface iConnectionHealthViewModel {
   errorMessage: string | null;
   providerName: string | null;
   providerKind: ProviderKind | null;
-  availableModels: string[];
+  availableModels: iProviderModelOption[];
   detectedModel: string | null;
   detectedContextSize: number | null;
   modelContextSizes: Record<string, number>;

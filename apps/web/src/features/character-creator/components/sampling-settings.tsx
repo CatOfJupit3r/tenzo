@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
-import { SingleSelect } from '@~/components/ui/select/select';
+import { CreatableSingleSelect, SingleSelect } from '@~/components/ui/select/select';
 import type { iOptionType } from '@~/components/ui/select/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@~/components/ui/tooltip';
@@ -27,6 +27,7 @@ import {
   MODEL_COMPATIBILITY_STATUSES,
 } from '../lib/provider/model-capabilities';
 import type { iModelProviderOption } from '../lib/provider/model-capabilities';
+import type { iProviderModelOption } from '../lib/provider/provider-health';
 import { GenerationPresets } from './generation-presets';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
@@ -63,7 +64,7 @@ const MODEL_ROLE_CONFIG = [
 
 export interface iSamplingSettingsProps {
   generationSettings: iCharacterGenerationSettings;
-  availableModels: string[];
+  availableModels: iProviderModelOption[];
   detectedContextSize: number | null;
   detectedModel: string | null;
   modelContextSizes: Record<string, number>;
@@ -111,7 +112,6 @@ export function SamplingSettings({
   const hasSmallContext = generationSettings.contextSize < recommendedContextSize;
   const hasSmallResponse = generationSettings.maxTokens < RECOMMENDED_MINIMUM_MAX_TOKENS;
   const hasDetectedContext = Boolean(modelContextSizes[generationSettings.model] ?? detectedContextSize);
-  const modelListId = 'detected-generation-models';
   const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.openrouter;
   const availableModelProviders =
     generationSettings.model.trim() === detectedModel ? modelProviders : EMPTY_MODEL_PROVIDERS;
@@ -134,6 +134,7 @@ export function SamplingSettings({
     ],
     [availableModelProviders, generationSettings.assistantGenerationMode],
   );
+  const modelOptions = useMemo<iOptionType[]>(() => availableModels, [availableModels]);
 
   return (
     <div className="space-y-4">
@@ -157,14 +158,17 @@ export function SamplingSettings({
           <TabsContent key={config.role} value={config.role} className="rounded-lg border p-3">
             <div className="space-y-1.5">
               <Label htmlFor={config.inputId}>{config.label} model</Label>
-              <Input
-                id={config.inputId}
-                list={modelListId}
+              <CreatableSingleSelect
+                inputId={config.inputId}
+                isClearable
+                isSearchable
+                formatCreateLabel={(inputValue) => `Use custom model "${inputValue}"`}
+                options={modelOptions}
                 placeholder={config.placeholder}
                 value={generationSettings[config.modelKey]}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   onSettingsChange({
-                    [config.modelKey]: event.target.value,
+                    [config.modelKey]: value ?? '',
                     ...(config.modelKey === 'model' ? { openRouterProvider: '' } : {}),
                   })
                 }
@@ -194,13 +198,6 @@ export function SamplingSettings({
           </TabsContent>
         ))}
       </Tabs>
-      <datalist id={modelListId}>
-        {availableModels.map((model) => (
-          <option key={model} value={model}>
-            {model}
-          </option>
-        ))}
-      </datalist>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1.5">

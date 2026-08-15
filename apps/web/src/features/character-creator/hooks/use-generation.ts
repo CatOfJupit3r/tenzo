@@ -1,6 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useAtom } from 'jotai';
 import { startTransition, useCallback, useMemo, useRef, useState } from 'react';
+
+import { INTERVALS } from '@~/constants/dates';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
 import type { CharacterCard } from '../lib/cards/card-schema';
@@ -27,7 +30,7 @@ import { characterPromptPipeline } from '../lib/prompt/prompt-pipeline';
 import { SeededRandom } from '../lib/prompt/seeded-random';
 import type { iModelCapabilities, iModelProviderOption } from '../lib/provider/model-capabilities';
 import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider/provider-health';
-import type { ProviderKind } from '../lib/provider/provider-health';
+import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider/provider-health-proxy';
 import { useCharacterSession } from './use-character-session';
 
@@ -52,12 +55,24 @@ interface iConnectionHealthState {
   errorMessage: string | null;
   providerName: string | null;
   providerKind: ProviderKind | null;
-  availableModels: string[];
+  availableModels: iProviderModelOption[];
   detectedModel: string | null;
   detectedContextSize: number | null;
   modelContextSizes: Record<string, number>;
   modelCapabilities: Record<string, iModelCapabilities>;
   modelProviders: iModelProviderOption[];
+}
+
+const PROVIDER_HEALTH_QUERY_KEY = 'provider-health';
+
+function getCredentialCacheKey(apiKey: string) {
+  let hash = 0;
+
+  for (let index = 0; index < apiKey.length; index += 1) {
+    hash = (hash * 31 + apiKey.charCodeAt(index)) % 2_147_483_647;
+  }
+
+  return `${apiKey.length}:${hash.toString(36)}`;
 }
 
 function removeFieldInstruction(instructions: Record<string, string>, instructionKey: string) {
@@ -173,6 +188,7 @@ async function readTextResponseStream({
 }
 
 export function useGeneration() {
+  const queryClient = useQueryClient();
   const [storedGenerationSettings, setGenerationSettings] = useAtom(characterGenerationSettingsAtom);
   const { promptSettings, updatePromptSettings } = useCharacterSession();
   const connectionSettings = useMemo(
@@ -390,16 +406,29 @@ export function useGeneration() {
         model: connectionSettings.model,
         openRouterProvider: connectionSettings.openRouterProvider,
       };
-      const result =
-        connectionSettings.requestMode === REQUEST_MODES.browser
-          ? await probeProviderMetadata(requestData)
-          : await requestProviderHealth({ data: requestData });
+      const result = await queryClient.fetchQuery({
+        queryKey: [
+          PROVIDER_HEALTH_QUERY_KEY,
+          connectionSettings.requestMode,
+          connectionSettings.endpoint,
+          connectionSettings.model,
+          connectionSettings.openRouterProvider,
+          getCredentialCacheKey(apiKey),
+        ],
+        queryFn: async () =>
+          connectionSettings.requestMode === REQUEST_MODES.browser
+            ? probeProviderMetadata(requestData)
+            : requestProviderHealth({ data: requestData }),
+        staleTime: INTERVALS.FIVE_MINUTES,
+        gcTime: INTERVALS.THIRTY_MINUTES,
+      });
 
       const nextModel =
         result.currentModel ??
-        (connectionSettings.model.trim() && result.models.includes(connectionSettings.model.trim())
+        (connectionSettings.model.trim() &&
+        result.models.some((model) => model.value === connectionSettings.model.trim())
           ? connectionSettings.model.trim()
-          : (result.models[0] ?? null));
+          : (result.models[0]?.value ?? null));
 
       setConnectionHealth({
         isChecking: false,
@@ -437,6 +466,7 @@ export function useGeneration() {
     connectionSettings.model,
     connectionSettings.openRouterProvider,
     connectionSettings.requestMode,
+    queryClient,
     requestProviderHealth,
     setGenerationSettings,
   ]);

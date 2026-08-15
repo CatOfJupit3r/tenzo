@@ -122,6 +122,7 @@ interface iStructuredAssistantOptions {
     iCharacterAssistantStreamRequest,
     | 'endpoint'
     | 'model'
+    | 'openRouterProvider'
     | 'maxTokens'
     | 'temperature'
     | 'topP'

@@ -8,6 +8,7 @@ const providerHealthInputSchema = z.object({
   apiKey: z.string(),
   requestMode: z.enum(['proxy', 'browser']),
   model: z.string().optional(),
+  openRouterProvider: z.string().optional(),
 });
 
 export const requestProviderHealthProxy = createServerFn({ method: 'POST' })

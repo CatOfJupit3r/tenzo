@@ -28,6 +28,7 @@ interface iStreamCharacterAssistantOptions {
     iCharacterAssistantStreamRequest,
     | 'endpoint'
     | 'model'
+    | 'openRouterProvider'
     | 'maxTokens'
     | 'temperature'
     | 'topP'

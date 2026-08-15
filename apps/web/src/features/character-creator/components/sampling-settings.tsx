@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LuTriangleAlert } from 'react-icons/lu';
 import { z } from 'zod';
 
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
+import { SingleSelect } from '@~/components/ui/select/select';
+import type { iOptionType } from '@~/components/ui/select/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@~/components/ui/tooltip';
 
 import {
   FREQUENCY_PENALTY_RANGE,
+  GENERATION_PROVIDERS,
   MIN_P_RANGE,
   PRESENCE_PENALTY_RANGE,
   RECOMMENDED_MINIMUM_CONTEXT_SIZE,
@@ -18,12 +21,19 @@ import {
   TOP_P_RANGE,
 } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import {
+  getModelCompatibilityStatus,
+  MODEL_CAPABILITIES,
+  MODEL_COMPATIBILITY_STATUSES,
+} from '../lib/provider/model-capabilities';
+import type { iModelProviderOption } from '../lib/provider/model-capabilities';
 import { GenerationPresets } from './generation-presets';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 const MODEL_ROLE_SCHEMA = z.enum(['text', 'vision']);
 const MODEL_ROLES = MODEL_ROLE_SCHEMA.enum;
 type ModelRole = z.infer<typeof MODEL_ROLE_SCHEMA>;
+const EMPTY_MODEL_PROVIDERS: iModelProviderOption[] = [];
 
 const MODEL_ROLE_CONFIG = [
   {
@@ -55,7 +65,9 @@ export interface iSamplingSettingsProps {
   generationSettings: iCharacterGenerationSettings;
   availableModels: string[];
   detectedContextSize: number | null;
+  detectedModel: string | null;
   modelContextSizes: Record<string, number>;
+  modelProviders: iModelProviderOption[];
   onSettingsChange: iGenerationSettingsPatchHandler;
 }
 
@@ -72,11 +84,25 @@ function SettingWarning({ message }: { message: string }) {
   );
 }
 
+function getProviderStatusLabel(status: ReturnType<typeof getModelCompatibilityStatus>) {
+  if (status === MODEL_COMPATIBILITY_STATUSES.compatible) {
+    return 'Compatible';
+  }
+
+  if (status === MODEL_COMPATIBILITY_STATUSES.incompatible) {
+    return 'Missing support';
+  }
+
+  return 'Unknown';
+}
+
 export function SamplingSettings({
   generationSettings,
   availableModels,
   detectedContextSize,
+  detectedModel,
   modelContextSizes,
+  modelProviders,
   onSettingsChange,
 }: iSamplingSettingsProps) {
   const [activeModelRole, setActiveModelRole] = useState<ModelRole>(MODEL_ROLES.text);
@@ -86,6 +112,28 @@ export function SamplingSettings({
   const hasSmallResponse = generationSettings.maxTokens < RECOMMENDED_MINIMUM_MAX_TOKENS;
   const hasDetectedContext = Boolean(modelContextSizes[generationSettings.model] ?? detectedContextSize);
   const modelListId = 'detected-generation-models';
+  const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.openrouter;
+  const availableModelProviders =
+    generationSettings.model.trim() === detectedModel ? modelProviders : EMPTY_MODEL_PROVIDERS;
+  const providerOptions = useMemo<iOptionType[]>(
+    () => [
+      {
+        label: 'Automatic',
+        value: '',
+        description: 'Let OpenRouter choose a provider that supports the request.',
+      },
+      ...availableModelProviders.map((provider) => {
+        const status = getModelCompatibilityStatus(provider.capabilities, generationSettings.assistantGenerationMode);
+        return {
+          label: provider.name,
+          value: provider.slug,
+          description: `Structured: ${provider.capabilities[MODEL_CAPABILITIES['structured-output']] ? 'Yes' : 'No'} · Tools: ${provider.capabilities[MODEL_CAPABILITIES['tool-calling']] ? 'Yes' : 'No'}`,
+          meta: getProviderStatusLabel(status),
+        } satisfies iOptionType;
+      }),
+    ],
+    [availableModelProviders, generationSettings.assistantGenerationMode],
+  );
 
   return (
     <div className="space-y-4">
@@ -114,13 +162,34 @@ export function SamplingSettings({
                 list={modelListId}
                 placeholder={config.placeholder}
                 value={generationSettings[config.modelKey]}
-                onChange={(event) => onSettingsChange({ [config.modelKey]: event.target.value })}
+                onChange={(event) =>
+                  onSettingsChange({
+                    [config.modelKey]: event.target.value,
+                    ...(config.modelKey === 'model' ? { openRouterProvider: '' } : {}),
+                  })
+                }
               />
               <p className="text-sm text-muted-foreground">
                 {availableModels.length > 0
                   ? `${availableModels.length} model IDs detected. Type any custom model ID or choose a detected one.`
                   : `${config.helperText} Run the connection health check to load provider model IDs.`}
               </p>
+              {config.modelKey === 'model' && isUsingOpenRouter ? (
+                <div className="space-y-1.5 pt-2">
+                  <Label htmlFor="openrouter-provider">OpenRouter routing provider</Label>
+                  <SingleSelect
+                    inputId="openrouter-provider"
+                    options={providerOptions}
+                    value={generationSettings.openRouterProvider}
+                    onValueChange={(value) => onSettingsChange({ openRouterProvider: value ?? '' })}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {availableModelProviders.length > 0
+                      ? 'Capabilities come from this model’s live OpenRouter endpoints.'
+                      : 'Run the connection health check after selecting a model to load its providers.'}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </TabsContent>
         ))}

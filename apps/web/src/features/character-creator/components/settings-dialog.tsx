@@ -86,7 +86,9 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
               generationSettings={generationSettings}
               availableModels={connectionHealth.availableModels}
               detectedContextSize={connectionHealth.detectedContextSize}
+              detectedModel={connectionHealth.detectedModel}
               modelContextSizes={connectionHealth.modelContextSizes}
+              modelProviders={connectionHealth.modelProviders}
               onSettingsChange={updateGenerationSettings}
             />
           </TabsContent>

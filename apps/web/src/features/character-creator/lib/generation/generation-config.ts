@@ -45,6 +45,7 @@ export interface iCharacterGenerationConnectionSettings {
   provider: GenerationProvider;
   endpoint: string;
   model: string;
+  openRouterProvider: string;
   visionModel: string;
   apiKeyCiphertext: string;
   contextSize: number;
@@ -76,6 +77,7 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   provider: GENERATION_PROVIDERS.koboldcpp,
   ...GENERATION_PROVIDER_DEFAULTS[GENERATION_PROVIDERS.koboldcpp],
   visionModel: '',
+  openRouterProvider: '',
   apiKeyCiphertext: '',
   contextSize: DEFAULT_CONTEXT_SIZE,
   maxTokens: DEFAULT_MAX_TOKENS,
@@ -167,6 +169,10 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
       : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.provider,
     endpoint: readString(candidate.endpoint, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.endpoint),
     model: readString(candidate.model, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.model),
+    openRouterProvider: readString(
+      candidate.openRouterProvider,
+      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.openRouterProvider,
+    ),
     visionModel: readString(candidate.visionModel, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.visionModel),
     apiKeyCiphertext: readString(
       candidate.apiKeyCiphertext,

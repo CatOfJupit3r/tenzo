@@ -27,7 +27,7 @@ function buildDirectionCardId(category: string, index: number) {
 
 type DiscoveryGenerationSettings = Pick<
   iCharacterAssistantStreamRequest,
-  'maxTokens' | 'temperature' | 'topP' | 'frequencyPenalty' | 'presencePenalty' | 'topK' | 'minP'
+  'maxTokens' | 'temperature' | 'topP' | 'frequencyPenalty' | 'presencePenalty' | 'topK' | 'minP' | 'openRouterProvider'
 >;
 
 function isMateriallyDistinct(values: readonly { title: string; description: string }[]) {

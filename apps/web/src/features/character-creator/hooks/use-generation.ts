@@ -25,6 +25,7 @@ import type {
 } from '../lib/prompt/generation-contracts';
 import { characterPromptPipeline } from '../lib/prompt/prompt-pipeline';
 import { SeededRandom } from '../lib/prompt/seeded-random';
+import type { iModelCapabilities, iModelProviderOption } from '../lib/provider/model-capabilities';
 import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { ProviderKind } from '../lib/provider/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider/provider-health-proxy';
@@ -47,6 +48,7 @@ interface iGenerateFieldOptions {
 
 interface iConnectionHealthState {
   isChecking: boolean;
+  hasCompletedCheck: boolean;
   errorMessage: string | null;
   providerName: string | null;
   providerKind: ProviderKind | null;
@@ -54,6 +56,8 @@ interface iConnectionHealthState {
   detectedModel: string | null;
   detectedContextSize: number | null;
   modelContextSizes: Record<string, number>;
+  modelCapabilities: Record<string, iModelCapabilities>;
+  modelProviders: iModelProviderOption[];
 }
 
 function removeFieldInstruction(instructions: Record<string, string>, instructionKey: string) {
@@ -183,6 +187,7 @@ export function useGeneration() {
   const [runtimeStates, setRuntimeStates] = useState<Record<string, iFieldGenerationRuntimeState>>({});
   const [connectionHealth, setConnectionHealth] = useState<iConnectionHealthState>({
     isChecking: false,
+    hasCompletedCheck: false,
     errorMessage: null,
     providerName: null,
     providerKind: null,
@@ -190,6 +195,8 @@ export function useGeneration() {
     detectedModel: null,
     detectedContextSize: null,
     modelContextSizes: {},
+    modelCapabilities: {},
+    modelProviders: [],
   });
   const abortControllersRef = useRef<Record<string, AbortController>>({});
 
@@ -371,6 +378,7 @@ export function useGeneration() {
     setConnectionHealth((prev) => ({
       ...prev,
       isChecking: true,
+      hasCompletedCheck: false,
       errorMessage: null,
     }));
 
@@ -380,6 +388,7 @@ export function useGeneration() {
         apiKey,
         requestMode: connectionSettings.requestMode,
         model: connectionSettings.model,
+        openRouterProvider: connectionSettings.openRouterProvider,
       };
       const result =
         connectionSettings.requestMode === REQUEST_MODES.browser
@@ -394,6 +403,7 @@ export function useGeneration() {
 
       setConnectionHealth({
         isChecking: false,
+        hasCompletedCheck: true,
         errorMessage: null,
         providerName: result.providerName,
         providerKind: result.providerKind,
@@ -401,6 +411,8 @@ export function useGeneration() {
         detectedModel: nextModel,
         detectedContextSize: result.contextSize,
         modelContextSizes: result.modelContextSizes,
+        modelCapabilities: result.modelCapabilities,
+        modelProviders: result.modelProviders,
       });
 
       setGenerationSettings((prev) => ({
@@ -423,6 +435,7 @@ export function useGeneration() {
     apiKey,
     connectionSettings.endpoint,
     connectionSettings.model,
+    connectionSettings.openRouterProvider,
     connectionSettings.requestMode,
     requestProviderHealth,
     setGenerationSettings,
@@ -498,6 +511,7 @@ export function useGeneration() {
           endpoint: connectionSettings.endpoint,
           apiKey,
           model: connectionSettings.model,
+          openRouterProvider: connectionSettings.openRouterProvider,
           maxTokens: connectionSettings.maxTokens,
           temperature: connectionSettings.temperature,
           topP: connectionSettings.topP,

@@ -1,4 +1,4 @@
-import { LuActivity, LuLoaderCircle } from 'react-icons/lu';
+import { LuActivity, LuCircleCheck, LuCircleHelp, LuCircleX, LuLoaderCircle } from 'react-icons/lu';
 
 import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Button } from '@~/components/ui/button';
@@ -17,11 +17,24 @@ import {
   REQUEST_MODES,
 } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import {
+  getModelCompatibilityStatus,
+  MODEL_CAPABILITIES,
+  MODEL_COMPATIBILITY_STATUSES,
+} from '../lib/provider/model-capabilities';
+import type {
+  iModelCapabilities,
+  iModelProviderOption,
+  ModelCapability,
+  ModelCompatibilityStatus,
+} from '../lib/provider/model-capabilities';
+import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { ProviderKind } from '../lib/provider/provider-health';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iConnectionHealthViewModel {
   isChecking: boolean;
+  hasCompletedCheck: boolean;
   errorMessage: string | null;
   providerName: string | null;
   providerKind: ProviderKind | null;
@@ -29,6 +42,44 @@ export interface iConnectionHealthViewModel {
   detectedModel: string | null;
   detectedContextSize: number | null;
   modelContextSizes: Record<string, number>;
+  modelCapabilities: Record<string, iModelCapabilities>;
+  modelProviders: iModelProviderOption[];
+}
+
+const MODEL_CAPABILITY_LABELS = {
+  [MODEL_CAPABILITIES['structured-output']]: 'Structured responses',
+  [MODEL_CAPABILITIES['tool-calling']]: 'Tool calling',
+} satisfies Record<ModelCapability, string>;
+
+const DISPLAYED_MODEL_CAPABILITIES = [
+  MODEL_CAPABILITIES['structured-output'],
+  MODEL_CAPABILITIES['tool-calling'],
+] as const;
+
+const MODEL_COMPATIBILITY_TITLES = {
+  [MODEL_COMPATIBILITY_STATUSES.compatible]: 'Model meets project requirements',
+  [MODEL_COMPATIBILITY_STATUSES.incompatible]: 'Model is missing required capabilities',
+  [MODEL_COMPATIBILITY_STATUSES.unknown]: 'Model capabilities could not be verified',
+} satisfies Record<ModelCompatibilityStatus, string>;
+
+function getCapabilityIcon(isSupported: boolean | undefined) {
+  if (isSupported === true) {
+    return LuCircleCheck;
+  }
+
+  if (isSupported === false) {
+    return LuCircleX;
+  }
+
+  return LuCircleHelp;
+}
+
+function getCapabilitySupportLabel(isSupported: boolean | undefined) {
+  if (isSupported === undefined) {
+    return 'Unknown';
+  }
+
+  return isSupported ? 'Yes' : 'No';
 }
 
 const outputFormatOptions: iOptionType[] = [
@@ -94,6 +145,22 @@ export function ConnectionSettings({
 }: iConnectionSettingsProps) {
   const isUsingProxy = generationSettings.requestMode === REQUEST_MODES.proxy;
   const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.openrouter;
+  const selectedModel = generationSettings.model.trim() || connectionHealth.detectedModel;
+  const selectedProvider = connectionHealth.modelProviders.find(
+    (provider) => provider.slug === generationSettings.openRouterProvider,
+  );
+  const hasCapabilitiesForSelectedModel = selectedModel === connectionHealth.detectedModel;
+  let selectedModelCapabilities =
+    selectedModel && hasCapabilitiesForSelectedModel
+      ? (connectionHealth.modelCapabilities[selectedModel] ?? null)
+      : null;
+  if (generationSettings.openRouterProvider) {
+    selectedModelCapabilities = selectedProvider?.capabilities ?? null;
+  }
+  const compatibilityStatus = getModelCompatibilityStatus(
+    selectedModelCapabilities,
+    generationSettings.assistantGenerationMode,
+  );
 
   return (
     <div className="space-y-4">
@@ -227,7 +294,7 @@ export function ConnectionSettings({
               <span
                 className={cn(
                   'font-medium',
-                  connectionHealth.providerKind === 'koboldcpp' ? 'text-foreground' : undefined,
+                  connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp ? 'text-foreground' : undefined,
                 )}
               >
                 {connectionHealth.providerName ?? 'Unknown provider'}
@@ -236,6 +303,48 @@ export function ConnectionSettings({
             {connectionHealth.detectedModel ? <p>Selected model: {connectionHealth.detectedModel}</p> : null}
             {connectionHealth.detectedContextSize ? (
               <p>Detected context size: {connectionHealth.detectedContextSize}</p>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {connectionHealth.hasCompletedCheck ? (
+        <Alert variant={compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.incompatible ? 'destructive' : 'default'}>
+          <AlertTitle>{MODEL_COMPATIBILITY_TITLES[compatibilityStatus]}</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p className="break-all">{selectedModel ?? 'No model selected'}</p>
+            {generationSettings.openRouterProvider ? (
+              <p>Routing provider: {selectedProvider?.name ?? generationSettings.openRouterProvider}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {DISPLAYED_MODEL_CAPABILITIES.map((capability) => {
+                const isSupported = selectedModelCapabilities?.[capability];
+                const Icon = getCapabilityIcon(isSupported);
+
+                return (
+                  <span className="inline-flex items-center gap-1.5" key={capability}>
+                    <Icon
+                      className={cn(
+                        'size-4',
+                        isSupported === true && 'text-emerald-600 dark:text-emerald-400',
+                        isSupported === undefined && 'text-muted-foreground',
+                      )}
+                    />
+                    {MODEL_CAPABILITY_LABELS[capability]}: {getCapabilitySupportLabel(isSupported)}
+                  </span>
+                );
+              })}
+            </div>
+            {generationSettings.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'] ? (
+              <p>
+                One route supports both:{' '}
+                {selectedModelCapabilities
+                  ? getCapabilitySupportLabel(selectedModelCapabilities.hasJointStructuredOutputAndToolCalling)
+                  : 'Unknown'}
+              </p>
+            ) : null}
+            {compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.unknown ? (
+              <p>The provider did not publish capability metadata for this model.</p>
             ) : null}
           </AlertDescription>
         </Alert>

@@ -117,6 +117,7 @@ export function useCharacterAssistantWorkspace({
     endpoint: generationSettings.endpoint,
     apiKey,
     model: generationSettings.model,
+    openRouterProvider: generationSettings.openRouterProvider,
     maxTokens: generationSettings.maxTokens,
     temperature: generationSettings.temperature,
     topP: generationSettings.topP,

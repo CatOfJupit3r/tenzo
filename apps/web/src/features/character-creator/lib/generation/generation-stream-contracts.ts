@@ -20,6 +20,7 @@ export const CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA = z.object({
   endpoint: z.string().trim().min(1),
   apiKey: z.string().trim().min(1),
   model: z.string().trim().min(1),
+  openRouterProvider: z.string().trim().optional(),
   maxTokens: z.number().int().positive(),
   messages: z.array(GENERATION_STREAM_MESSAGE_SCHEMA).min(1),
   temperature: z.number().min(TEMPERATURE_RANGE.min).max(TEMPERATURE_RANGE.max),

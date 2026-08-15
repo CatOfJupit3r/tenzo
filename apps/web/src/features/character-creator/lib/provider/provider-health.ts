@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { REQUEST_MODES } from '../generation/generation-config';
 import type { RequestMode } from '../generation/generation-config';
+import { mergeModelCapabilities, readModelCapabilities } from './model-capabilities';
+import type { iModelCapabilities, iModelProviderOption } from './model-capabilities';
 import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
 
 export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openrouter', 'openai-compatible', 'unknown']);
@@ -17,6 +19,7 @@ export interface iConnectionHealthRequest {
   apiKey: string;
   requestMode: RequestMode;
   model?: string;
+  openRouterProvider?: string;
 }
 
 export interface iConnectionHealthResult {
@@ -26,6 +29,8 @@ export interface iConnectionHealthResult {
   currentModel: string | null;
   contextSize: number | null;
   modelContextSizes: Record<string, number>;
+  modelCapabilities: Record<string, iModelCapabilities>;
+  modelProviders: iModelProviderOption[];
 }
 
 interface iFetchJsonResult {
@@ -44,6 +49,7 @@ interface iEndpointCandidates {
   koboldPublicContextUrl: string;
   propsUrl: string;
   serviceInfoUrl: string;
+  modelEndpointsUrl: string | null;
 }
 
 const PROVIDER_KIND_LABELS = {
@@ -53,9 +59,16 @@ const PROVIDER_KIND_LABELS = {
   [PROVIDER_KINDS.unknown]: 'Unknown provider',
 } satisfies Record<ProviderKind, string>;
 
-function buildEndpointCandidates(endpoint: string): iEndpointCandidates {
+function buildEndpointCandidates(endpoint: string, model?: string): iEndpointCandidates {
   const openAiBaseUrl = normalizeOpenAiCompatibleBaseUrl(endpoint);
   const baseUrl = openAiBaseUrl.slice(0, -'/v1'.length);
+  const isOpenRouter = openAiBaseUrl.toLowerCase().includes('openrouter.ai/api');
+  const modelPath = model
+    ?.trim()
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
 
   return {
     baseUrl: openAiBaseUrl,
@@ -65,6 +78,7 @@ function buildEndpointCandidates(endpoint: string): iEndpointCandidates {
     koboldPublicContextUrl: `${baseUrl}/api/v1/config/max_context_length`,
     propsUrl: `${baseUrl}/props`,
     serviceInfoUrl: `${baseUrl}/.well-known/serviceinfo`,
+    modelEndpointsUrl: isOpenRouter && modelPath ? `${openAiBaseUrl}/models/${modelPath}/endpoints` : null,
   };
 }
 
@@ -180,6 +194,74 @@ function extractModelContextSizes(payload: unknown) {
   return modelContextSizes;
 }
 
+function extractModelCapabilities(payload: unknown) {
+  const modelCapabilities: Record<string, iModelCapabilities> = {};
+  let candidates: unknown[] = [];
+
+  if (Array.isArray(payload)) {
+    candidates = payload;
+  } else if (payload && typeof payload === 'object') {
+    const data = Reflect.get(payload, 'data');
+    candidates = Array.isArray(data) ? data : [];
+  }
+
+  candidates.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+
+    const model = readString(Reflect.get(entry, 'id')) ?? readString(Reflect.get(entry, 'name'));
+    const capabilities = readModelCapabilities(Reflect.get(entry, 'supported_parameters'));
+    if (model && capabilities) {
+      modelCapabilities[model] = capabilities;
+    }
+  });
+
+  return modelCapabilities;
+}
+
+function extractModelProviders(payload: unknown): iModelProviderOption[] {
+  if (!payload || typeof payload !== 'object') {
+    return [];
+  }
+
+  const data = Reflect.get(payload, 'data');
+  if (!data || typeof data !== 'object') {
+    return [];
+  }
+
+  const endpoints = Reflect.get(data, 'endpoints');
+  if (!Array.isArray(endpoints)) {
+    return [];
+  }
+
+  const providers = new Map<string, { name: string; capabilities: iModelCapabilities[] }>();
+  endpoints.forEach((endpoint) => {
+    if (!endpoint || typeof endpoint !== 'object') {
+      return;
+    }
+
+    const tag = readString(Reflect.get(endpoint, 'tag'));
+    const slug = tag?.split('/')[0] ?? null;
+    const name = readString(Reflect.get(endpoint, 'provider_name'));
+    const capabilities = readModelCapabilities(Reflect.get(endpoint, 'supported_parameters'));
+    if (!slug || !name || !capabilities) {
+      return;
+    }
+
+    const existing = providers.get(slug);
+    providers.set(slug, {
+      name,
+      capabilities: [...(existing?.capabilities ?? []), capabilities],
+    });
+  });
+
+  return [...providers.entries()].flatMap(([slug, provider]) => {
+    const capabilities = mergeModelCapabilities(provider.capabilities);
+    return capabilities ? [{ slug, name: provider.name, capabilities }] : [];
+  });
+}
+
 function extractCurrentModel(payload: unknown) {
   if (payload && typeof payload === 'object') {
     const result = Reflect.get(payload, 'result');
@@ -221,7 +303,7 @@ function extractProviderName(payload: unknown) {
 }
 
 async function probeProviderMetadataWithFetcher(request: iConnectionHealthRequest, jsonFetcher: JsonFetcher) {
-  const candidates = buildEndpointCandidates(request.endpoint);
+  const candidates = buildEndpointCandidates(request.endpoint, request.model);
   const headers = buildHealthHeaders(request.apiKey);
   const requestInit = {
     method: 'GET',
@@ -235,6 +317,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     koboldPublicContextResponse,
     propsResponse,
     serviceInfoResponse,
+    modelEndpointsResponse,
   ] = await Promise.all([
     jsonFetcher(candidates.modelsUrl, requestInit).catch(() => null),
     jsonFetcher(candidates.koboldModelUrl, requestInit).catch(() => null),
@@ -242,16 +325,25 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     jsonFetcher(candidates.koboldPublicContextUrl, requestInit).catch(() => null),
     jsonFetcher(candidates.propsUrl, requestInit).catch(() => null),
     jsonFetcher(candidates.serviceInfoUrl, requestInit).catch(() => null),
+    candidates.modelEndpointsUrl
+      ? jsonFetcher(candidates.modelEndpointsUrl, requestInit).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const models = modelsResponse?.isOk ? extractModels(modelsResponse.data) : [];
   const modelContextSizes = modelsResponse?.isOk ? extractModelContextSizes(modelsResponse.data) : {};
+  const modelCapabilities = modelsResponse?.isOk ? extractModelCapabilities(modelsResponse.data) : {};
+  const modelProviders = modelEndpointsResponse?.isOk ? extractModelProviders(modelEndpointsResponse.data) : [];
   const currentModel = koboldModelResponse?.isOk ? extractCurrentModel(koboldModelResponse.data) : null;
   const endpointContextSize =
     (koboldContextResponse?.isOk ? extractContextSize(koboldContextResponse.data) : null) ??
     (koboldPublicContextResponse?.isOk ? extractContextSize(koboldPublicContextResponse.data) : null) ??
     (propsResponse?.isOk ? extractContextSize(propsResponse.data) : null);
   const selectedModel = readString(request.model) ?? currentModel;
+  const selectedModelCapabilities = mergeModelCapabilities(modelProviders.map((provider) => provider.capabilities));
+  if (selectedModel && selectedModelCapabilities) {
+    modelCapabilities[selectedModel] = selectedModelCapabilities;
+  }
   const contextSize = endpointContextSize ?? (selectedModel ? (modelContextSizes[selectedModel] ?? null) : null);
 
   const detectedModels = currentModel && !models.includes(currentModel) ? [currentModel, ...models] : models;
@@ -303,6 +395,8 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     currentModel,
     contextSize,
     modelContextSizes,
+    modelCapabilities,
+    modelProviders,
   } satisfies iConnectionHealthResult;
 }
 

@@ -106,6 +106,23 @@ describe('TanStack AI text generation', () => {
     });
   });
 
+  it('restricts OpenRouter requests to the selected routing provider', () => {
+    expect(
+      createCharacterModelOptions('https://openrouter.ai/api', {
+        maxTokens: 400,
+        temperature: 0.8,
+        topP: 0.9,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        topK: 0,
+        minP: 0,
+        openRouterProvider: 'parasail',
+      }),
+    ).toMatchObject({
+      provider: { dataCollection: 'deny', zdr: true, only: ['parasail'] },
+    });
+  });
+
   it('passes compatible-provider samplers using native wire names', () => {
     expect(
       createCharacterModelOptions('http://localhost:5001', {

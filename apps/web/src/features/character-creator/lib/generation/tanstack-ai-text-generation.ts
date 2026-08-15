@@ -26,6 +26,7 @@ interface iCharacterModelOptions {
   topK: number;
   minP: number;
   shouldSendDisabledSamplers?: boolean;
+  openRouterProvider?: string;
 }
 
 const OPENROUTER_PROVIDER_PRIVACY_OPTIONS = {
@@ -111,6 +112,7 @@ export function createCharacterModelOptions(
     topK,
     minP,
     shouldSendDisabledSamplers = false,
+    openRouterProvider,
   }: iCharacterModelOptions,
 ) {
   const isOpenRouter = normalizeOpenAiCompatibleBaseUrl(endpoint).toLowerCase().includes('openrouter.ai/api');
@@ -122,7 +124,10 @@ export function createCharacterModelOptions(
       topP,
       frequencyPenalty,
       presencePenalty,
-      provider: OPENROUTER_PROVIDER_PRIVACY_OPTIONS,
+      provider: {
+        ...OPENROUTER_PROVIDER_PRIVACY_OPTIONS,
+        ...(openRouterProvider?.trim() ? { only: [openRouterProvider.trim()] } : {}),
+      },
     };
   }
 

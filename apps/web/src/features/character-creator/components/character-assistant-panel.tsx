@@ -16,6 +16,7 @@ import {
 } from '../lib/assistant/next-prompt-suggestions';
 import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
 import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
+import { CharacterAssistantConversationMenu } from './assistant/character-assistant-conversation-menu';
 import { CharacterAssistantConversation } from './character-assistant-conversation';
 import { ChatInputEditor } from './editor/chat-input-editor';
 import { ResizablePanelHandle } from './resizable-panel-handle';
@@ -118,16 +119,48 @@ export function CharacterAssistantPanel({
 
   const panelContent = (
     <>
-      <header className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="min-w-0">
-          <p className="font-medium">{assistantTitle}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {data.name.trim() || 'Untitled character'} / {focusLabel}
-          </p>
+      <header className="grid gap-1 border-b px-3 py-2.5">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <p className="font-medium">{assistantTitle}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {data.name.trim() || 'Untitled character'} / {focusLabel}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            aria-label="Close Character Assistant"
+            onClick={closeAssistant}
+          >
+            <LuX className="size-4" />
+          </Button>
         </div>
-        <Button type="button" size="sm" variant="ghost" aria-label="Close Character Assistant" onClick={closeAssistant}>
-          <LuX className="size-4" />
-        </Button>
+        <CharacterAssistantConversationMenu
+          activeSessionId={workspace.sessionId}
+          sessions={workspace.sessions}
+          isDisabled={workspace.isRunning}
+          onSelect={workspace.selectConversation}
+          onCreate={async () => {
+            try {
+              await workspace.createConversation();
+              setInputValue('');
+              setInputTemplateIds([]);
+              setInputDocument(null);
+              setInputAttachments([]);
+            } catch (error) {
+              toastError('Conversation was not created', getErrorMessage(error));
+            }
+          }}
+          onDelete={async (sessionId) => {
+            try {
+              await workspace.deleteConversation(sessionId);
+            } catch (error) {
+              toastError('Conversation was not deleted', getErrorMessage(error));
+            }
+          }}
+        />
       </header>
       <div
         className="scroll-fade-y min-h-0 overflow-y-auto overscroll-contain p-4 [scrollbar-gutter:stable]"
@@ -228,20 +261,9 @@ export function CharacterAssistantPanel({
               }}
             />
             <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={workspace.messages.length === 0}
-                onClick={() => {
-                  void workspace.clearConversation();
-                  setInputValue('');
-                  setInputDocument(null);
-                  setInputAttachments([]);
-                }}
-              >
-                New conversation
-              </Button>
+              <span className="text-xs text-muted-foreground">
+                {workspace.sessions.length} {workspace.sessions.length === 1 ? 'conversation' : 'conversations'}
+              </span>
               {workspace.isRunning ? (
                 <Button type="button" size="sm" variant="outline" onClick={workspace.cancelRun}>
                   Stop

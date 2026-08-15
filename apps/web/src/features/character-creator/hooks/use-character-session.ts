@@ -6,7 +6,7 @@ import { generateUuid } from '@~/utils/uuid';
 
 import { activeCharacterIdAtom } from '../atoms/character-session.atom';
 import { removeCharacterAssistantComposerDraft } from '../collections/character-assistant-composer-drafts.collection';
-import { removeCharacterAssistantSession } from '../collections/character-assistant-sessions.collection';
+import { removeCharacterAssistantSessions } from '../collections/character-assistant-sessions.collection';
 import { characterLibraryCollection } from '../collections/character-library.collection';
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
@@ -449,7 +449,7 @@ export function useCharacterSession() {
       await Promise.all([
         characterToRemove?.portrait ? deleteCharacterAssetBlob(characterToRemove.portrait.assetId) : Promise.resolve(),
         removeCharacterAssistantComposerDraft(id),
-        removeCharacterAssistantSession(id),
+        removeCharacterAssistantSessions(id),
         removeCharacterRecord(id),
       ]);
     },
@@ -466,7 +466,7 @@ export function useCharacterSession() {
             : Promise.resolve(),
         ]),
         removeCharacterAssistantComposerDraft(id),
-        removeCharacterAssistantSession(id),
+        removeCharacterAssistantSessions(id),
         removeCharacterRecord(id),
       ]);
     },

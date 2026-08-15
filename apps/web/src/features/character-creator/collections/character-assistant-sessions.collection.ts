@@ -22,23 +22,45 @@ export const characterAssistantSessionsCollection = new PersistentCollection({
   schema: CHARACTER_ASSISTANT_SESSION_SCHEMA,
 });
 
-export async function ensureCharacterAssistantSession(characterId: string) {
+export async function ensureCharacterAssistantSession(sessionId: string, characterId: string) {
   await characterAssistantSessionsCollection.preload();
-  const existingSession = characterAssistantSessionsCollection.get(characterId);
+  const existingSession = characterAssistantSessionsCollection.get(sessionId);
   if (existingSession) {
+    if (existingSession.characterId !== characterId) {
+      throw new Error(`Assistant conversation "${sessionId}" does not belong to this character.`);
+    }
     return CHARACTER_ASSISTANT_SESSION_SCHEMA.parse(existingSession);
   }
 
+  const session = createCharacterAssistantSession(characterId);
+  session.id = sessionId;
+  const transaction = characterAssistantSessionsCollection.insert(session);
+  await transaction.isPersisted.promise;
+  return CHARACTER_ASSISTANT_SESSION_SCHEMA.parse(characterAssistantSessionsCollection.get(session.id) ?? session);
+}
+
+export async function createCharacterAssistantSessionRecord(characterId: string) {
+  await characterAssistantSessionsCollection.preload();
   const session = createCharacterAssistantSession(characterId);
   const transaction = characterAssistantSessionsCollection.insert(session);
   await transaction.isPersisted.promise;
   return CHARACTER_ASSISTANT_SESSION_SCHEMA.parse(characterAssistantSessionsCollection.get(session.id) ?? session);
 }
 
-export async function removeCharacterAssistantSession(characterId: string) {
+export async function removeCharacterAssistantSession(sessionId: string) {
   await characterAssistantSessionsCollection.preload();
-  const transaction = characterAssistantSessionsCollection.delete(characterId);
+  const transaction = characterAssistantSessionsCollection.delete(sessionId);
   await transaction.isPersisted.promise;
+}
+
+export async function removeCharacterAssistantSessions(characterId: string) {
+  await characterAssistantSessionsCollection.preload();
+  const sessions = [...characterAssistantSessionsCollection.values()].filter(
+    (session) => session.characterId === characterId,
+  );
+  await Promise.all(
+    sessions.map(async (session) => characterAssistantSessionsCollection.delete(session.id).isPersisted.promise),
+  );
 }
 
 export async function updateCharacterAssistantSession(

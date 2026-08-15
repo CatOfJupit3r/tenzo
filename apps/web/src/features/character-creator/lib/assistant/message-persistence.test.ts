@@ -29,7 +29,7 @@ describe('character assistant message persistence', () => {
   });
 
   it('round-trips UI messages through the session collection adapter', async () => {
-    const adapter = createCharacterAssistantMessagePersistence('character-1');
+    const adapter = createCharacterAssistantMessagePersistence('session-1', 'character-1');
     await expect(adapter.getItem('character-1')).resolves.toEqual({
       messages: [{ id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'Hello' }] }],
     });
@@ -37,6 +37,7 @@ describe('character assistant message persistence', () => {
       { id: 'assistant-1', role: 'assistant' as const, parts: [{ type: 'text' as const, content: 'Hi' }] },
     ];
     await adapter.setItem('character-1', { messages });
+    expect(mocks.ensure).toHaveBeenCalledWith('session-1', 'character-1');
     expect(mocks.update).toHaveBeenCalledOnce();
     const recipe = mocks.update.mock.calls[0]?.[1];
     const draft = { messages: [] as typeof messages };

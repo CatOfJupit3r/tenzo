@@ -1,6 +1,8 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import { z } from 'zod';
 
+import { generateUuid } from '@~/utils/uuid';
+
 import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../proposals/character-edit-proposal';
 
 const UI_MESSAGE_SCHEMA = z.custom<UIMessage>(
@@ -61,7 +63,7 @@ export function sanitizeCharacterAssistantSession(value: unknown): iCharacterAss
     : [];
 
   return CHARACTER_ASSISTANT_SESSION_SCHEMA.parse({
-    id: characterId,
+    id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id : characterId,
     characterId,
     messages,
     proposals,
@@ -75,7 +77,7 @@ export function sanitizeCharacterAssistantSession(value: unknown): iCharacterAss
 export function createCharacterAssistantSession(characterId: string): iCharacterAssistantSession {
   const now = new Date().toISOString();
   return {
-    id: characterId,
+    id: generateUuid(),
     characterId,
     messages: [],
     proposals: [],

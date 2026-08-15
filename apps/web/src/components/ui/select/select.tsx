@@ -1,6 +1,6 @@
 import { ClientOnly } from '@tanstack/react-router';
 import { merge } from 'lodash-es';
-import { Children, forwardRef, useId, useMemo } from 'react';
+import { Children, forwardRef, isValidElement, useId, useMemo } from 'react';
 import type { ForwardRefExoticComponent, ReactElement, Ref, RefAttributes } from 'react';
 import { LuCheck, LuChevronDown, LuX } from 'react-icons/lu';
 import SelectComponent, { components, createFilter } from 'react-select';
@@ -97,6 +97,17 @@ export const Menu = ({ children, ...props }: MenuProps<iOptionType>) => (
   <components.Menu {...props}>{children}</components.Menu>
 );
 
+const COMPACT_OPTION_HEIGHT = 35;
+const OPTION_WITH_DESCRIPTION_HEIGHT = 50;
+
+const getOptionRowHeight = (option: unknown) => {
+  if (isValidElement<OptionProps<iOptionType>>(option) && option.props.data.description) {
+    return OPTION_WITH_DESCRIPTION_HEIGHT;
+  }
+
+  return COMPACT_OPTION_HEIGHT;
+};
+
 export const MenuList = (props: MenuListProps<iOptionType>) => {
   const { children, className } = props;
 
@@ -107,7 +118,7 @@ export const MenuList = (props: MenuListProps<iOptionType>) => {
   return (
     <List
       rowCount={childrenArray.length}
-      rowHeight={35}
+      rowHeight={(index) => getOptionRowHeight(childrenArray[index])}
       rowProps={{ children: childrenArray }}
       // eslint-disable-next-line react/no-unstable-nested-components
       rowComponent={({ index, style }) => <div style={style}>{childrenArray[index]}</div>}

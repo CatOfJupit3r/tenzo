@@ -23,6 +23,12 @@ No account or hosted database is required. Your character library, portraits, te
 | :package: | **Portable import and export** | Read V1/V2 JSON and PNG cards, preserve unknown extension data, and export hybrid V1+V2 JSON or PNG cards with embedded metadata. |
 | :floppy_disk: | **Bulk export and backup** | Package selected characters as ZIP or tar.gz, or back up the full workspace without including API credentials. |
 
+## See Tenzo in action
+
+![Mira Quill open in Tenzo with her portrait, character fields, reusable templates, and AI assistant](docs/screenshots/tenzo-mira-workspace.png)
+
+![Tenzo's full-workspace export dialog](docs/screenshots/tenzo-export-backup.png)
+
 ## How it fits together
 
 ```mermaid

@@ -21,6 +21,7 @@ import {
   updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
+import { MAX_CHAT_TEMPLATE_REF_COUNT } from '../lib/assistant/character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
@@ -33,6 +34,7 @@ import type { CharacterCard } from '../lib/cards/card-schema';
 import { buildChatInputContentParts, readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
 import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import type { iPromptExampleCharacter } from '../lib/prompt/generation-contracts';
 import {
   CHARACTER_EDIT_PROPOSAL_SCHEMA,
   isCharacterEditPatchUnresolved,
@@ -54,6 +56,9 @@ interface iUseCharacterAssistantWorkspaceOptions {
   providerKind: ProviderKind | null;
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
+  exampleCharacters: iPromptExampleCharacter[];
+  maxExampleContextCharacters: number;
+  focusTemplates: iChatTemplateRef[];
 }
 
 export interface iCharacterAssistantPatchView {
@@ -101,6 +106,9 @@ export function useCharacterAssistantWorkspace({
   providerKind,
   focus,
   contextAttachments,
+  exampleCharacters,
+  maxExampleContextCharacters,
+  focusTemplates,
 }: iUseCharacterAssistantWorkspaceOptions) {
   const sessions = usePersistentCollection(characterAssistantSessionsCollection);
   const drafts = usePersistentCollection(characterAssistantComposerDraftsCollection);
@@ -136,7 +144,9 @@ export function useCharacterAssistantWorkspace({
     globalCharacterInstruction: generationSettings.globalCharacterInstruction,
     generalCharacterIdea,
     contextAttachments,
-    templates: [],
+    exampleCharacters,
+    maxExampleContextCharacters,
+    templates: focusTemplates,
   });
   const chat = useChat({
     threadId: sessionId,
@@ -225,7 +235,11 @@ export function useCharacterAssistantWorkspace({
   );
   const sendMessage = useCallback(
     async (input: string, options: { templates?: iChatTemplateRef[]; attachments?: iChatInputAttachment[] } = {}) => {
-      forwardedProps.templates = options.templates ?? [];
+      const mentionTemplates = options.templates ?? [];
+      forwardedProps.templates = [
+        ...mentionTemplates,
+        ...focusTemplates.filter((template) => !mentionTemplates.some((mention) => mention.id === template.id)),
+      ].slice(0, MAX_CHAT_TEMPLATE_REF_COUNT);
       try {
         const attachments = options.attachments ?? [];
         await chat.sendMessage(
@@ -241,7 +255,7 @@ export function useCharacterAssistantWorkspace({
         return false;
       }
     },
-    [chat, forwardedProps],
+    [chat, focusTemplates, forwardedProps],
   );
   const replaceConversationMessages = useCallback(
     async (nextMessages: typeof chat.messages) => {

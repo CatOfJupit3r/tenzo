@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 import { CHARACTER_CARD_SCHEMA } from '../cards/card-schema';
+import { MAX_EXAMPLE_CHARACTER_COUNT } from '../cards/example-characters';
 import { STORED_FIELD_TEMPLATE_SCHEMA } from '../cards/field-templates';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '../generation/generation-stream-contracts';
+import { PROMPT_EXAMPLE_CHARACTER_SCHEMA } from '../prompt/generation-contracts';
 import { CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
 import { PROVIDER_KIND_SCHEMA, PROVIDER_KINDS } from '../provider/provider-health';
 import {
@@ -62,6 +64,8 @@ export const CHARACTER_CONCEPT_SCHEMA = z.object({
   nameCandidates: z.array(z.string()).max(5),
   suggestedTags: z.array(z.string()).max(10),
 });
+
+export const MAX_CHAT_TEMPLATE_REF_COUNT = 4;
 
 export const CHAT_TEMPLATE_REF_SCHEMA = STORED_FIELD_TEMPLATE_SCHEMA.pick({
   id: true,
@@ -144,7 +148,9 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   generalCharacterIdea: z.string().optional(),
   contextAttachments: z.array(CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA).max(8).optional().default([]),
   discoveryContext: CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA.optional(),
-  templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(4).optional().default([]),
+  templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(MAX_CHAT_TEMPLATE_REF_COUNT).optional().default([]),
+  exampleCharacters: z.array(PROMPT_EXAMPLE_CHARACTER_SCHEMA).max(MAX_EXAMPLE_CHARACTER_COUNT).optional().default([]),
+  maxExampleContextCharacters: z.number().int().positive().optional(),
   assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.optional().default(
     CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
   ),

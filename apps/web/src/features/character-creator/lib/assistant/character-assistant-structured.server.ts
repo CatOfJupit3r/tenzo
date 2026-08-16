@@ -10,6 +10,7 @@ import {
   createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
 } from '../generation/tanstack-ai-text-generation';
+import type { iPromptExampleCharacter } from '../prompt/generation-contracts';
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant-final-response';
 import {
   CHARACTER_ASSISTANT_TOOL_NAMES,
@@ -136,6 +137,8 @@ interface iStructuredAssistantOptions {
   generalCharacterIdea?: string;
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
+  exampleCharacters?: iPromptExampleCharacter[];
+  maxExampleContextCharacters?: number;
   store: iCharacterAssistantProposalStore;
   messages: Array<ModelMessage | UIMessage>;
   abortSignal?: AbortSignal;
@@ -191,6 +194,8 @@ export async function* generateStructuredCharacterAssistantStream(
       generalCharacterIdea: options.generalCharacterIdea,
       discoveryContext: options.discoveryContext,
       templates: options.templates,
+      exampleCharacters: options.exampleCharacters,
+      maxExampleContextCharacters: options.maxExampleContextCharacters,
       mode: 'structured-output',
     }),
     'Work in bounded rounds. Prefer completing the request in one round: group multiple field changes into one propose_character_fields action and include all independent actions together. Use another round only when an executed action result is required. Return conversational prose plus zero or more typed actions. When the user requests card creation or edits, at least one matching action is required; never put proposed values only in prose. Encode only the action arguments as one complete JSON object string in inputJson; do not repeat the action name or wrap the arguments. A prose-only round with isDone false is valid and must be followed by another round. Set isDone true only when the request is meaningfully addressed.',

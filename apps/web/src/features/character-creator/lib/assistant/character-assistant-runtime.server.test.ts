@@ -2,7 +2,7 @@ import { EventType } from '@tanstack/ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
-import { streamCharacterAssistant } from './character-assistant-runtime.server';
+import { buildAssistantSystemPrompt, streamCharacterAssistant } from './character-assistant-runtime.server';
 
 const { chatMock } = vi.hoisted(() => ({ chatMock: vi.fn() }));
 
@@ -56,5 +56,64 @@ describe('native character assistant tools', () => {
       }),
     );
     expect(chatMock.mock.calls[0]?.[0]).not.toHaveProperty('outputSchema');
+  });
+});
+
+describe('buildAssistantSystemPrompt', () => {
+  it('includes reference characters, depth expectations, and focused field guidance', () => {
+    const prompt = buildAssistantSystemPrompt({
+      card: createEmptyCharacterCard(),
+      focus: { kind: 'field', fieldKey: 'description' },
+      contextAttachments: [],
+      exampleCharacters: [{ name: 'Rin', description: 'A wandering swordswoman haunted by her past.' }],
+      mode: 'tool-call',
+    });
+
+    expect(prompt).toContain('Reference characters');
+    expect(prompt).toContain('Rin');
+    expect(prompt).toContain('same depth and richness as dedicated field generation');
+    expect(prompt).toContain('Field format guidance');
+    expect(prompt).toContain('description:');
+  });
+
+  it('limits field guidance to the focused fields', () => {
+    const prompt = buildAssistantSystemPrompt({
+      card: createEmptyCharacterCard(),
+      focus: { kind: 'field', fieldKey: 'first_mes' },
+      contextAttachments: [],
+      mode: 'tool-call',
+    });
+
+    expect(prompt).toContain('first_mes:');
+    expect(prompt).not.toContain('mes_example:');
+  });
+
+  it('includes guidance for every known field on card focus and omits the example section without references', () => {
+    const prompt = buildAssistantSystemPrompt({
+      card: createEmptyCharacterCard(),
+      focus: { kind: 'card' },
+      contextAttachments: [],
+      mode: 'structured-output',
+    });
+
+    expect(prompt).toContain('description:');
+    expect(prompt).toContain('first_mes:');
+    expect(prompt).toContain('mes_example:');
+    expect(prompt).not.toContain('Reference characters');
+  });
+
+  it('truncates reference context to the provided character budget', () => {
+    const prompt = buildAssistantSystemPrompt({
+      card: createEmptyCharacterCard(),
+      focus: { kind: 'card' },
+      contextAttachments: [],
+      exampleCharacters: [{ name: 'Rin', description: 'A'.repeat(10_000) }],
+      maxExampleContextCharacters: 2_500,
+      mode: 'tool-call',
+    });
+
+    const exampleSectionStart = prompt.indexOf('Reference characters');
+    expect(exampleSectionStart).toBeGreaterThanOrEqual(0);
+    expect(prompt.slice(exampleSectionStart).length).toBeLessThan(10_000);
   });
 });

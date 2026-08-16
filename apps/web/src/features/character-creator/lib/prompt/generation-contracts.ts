@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import type { CustomField } from '../cards/card-schema';
+import { CUSTOM_FIELD_SCHEMA } from '../cards/card-schema';
 import type { TemplateMode } from '../cards/field-templates';
 
 export const GENERATION_MODE_SCHEMA = z.enum(['generate', 'continue', 'rewrite']);
@@ -30,16 +30,17 @@ export interface iFieldGenerationTarget {
   kind: GenerationTargetKind;
 }
 
-export interface iPromptExampleCharacter {
-  name?: string;
-  description?: string;
-  personality?: string;
-  scenario?: string;
-  first_mes?: string;
-  mes_example?: string;
-  alternate_greetings?: string[];
-  custom_fields?: CustomField[];
-}
+export const PROMPT_EXAMPLE_CHARACTER_SCHEMA = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  personality: z.string().optional(),
+  scenario: z.string().optional(),
+  first_mes: z.string().optional(),
+  mes_example: z.string().optional(),
+  alternate_greetings: z.array(z.string()).optional(),
+  custom_fields: z.array(CUSTOM_FIELD_SCHEMA).optional(),
+});
+export type iPromptExampleCharacter = z.infer<typeof PROMPT_EXAMPLE_CHARACTER_SCHEMA>;
 
 export interface iPromptFieldTemplate {
   name: string;

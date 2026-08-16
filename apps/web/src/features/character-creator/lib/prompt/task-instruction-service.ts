@@ -18,7 +18,7 @@ const OUT_OF_CHARACTER_FIELD_GUIDANCE = `Write this as out-of-character referenc
 
 const GENERAL_CHARACTER_IDEA_FORMAT_GUIDANCE = `Write a concise, high-level character concept that can guide generation of every card field. Focus on the character's core identity, tone, roleplay premise, and defining traits. Do not write dialogue, JSON, or field labels.`;
 
-const FIELD_FORMAT_GUIDANCE: Partial<Record<CharacterTextFieldKey, string>> = {
+export const FIELD_FORMAT_GUIDANCE: Partial<Record<CharacterTextFieldKey, string>> = {
   first_mes: GREETING_FORMAT_GUIDANCE,
   mes_example: MES_EXAMPLE_FORMAT_GUIDANCE,
   description: OUT_OF_CHARACTER_FIELD_GUIDANCE,

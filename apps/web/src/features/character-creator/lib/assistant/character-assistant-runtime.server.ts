@@ -7,6 +7,9 @@ import {
   createCharacterTextAdapter,
   createCharacterToolModelOptions,
 } from '../generation/tanstack-ai-text-generation';
+import { ExampleContextService, MAX_EXAMPLE_CONTEXT_CHARACTERS } from '../prompt/example-context-service';
+import type { iPromptExampleCharacter } from '../prompt/generation-contracts';
+import { FIELD_FORMAT_GUIDANCE } from '../prompt/task-instruction-service';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
@@ -41,6 +44,8 @@ interface iStreamCharacterAssistantOptions {
   generalCharacterIdea?: string;
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
+  exampleCharacters?: iPromptExampleCharacter[];
+  maxExampleContextCharacters?: number;
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
   shouldUseNativeTools?: boolean;
   store: Parameters<typeof createCharacterAssistantTools>[0]['store'];
@@ -58,9 +63,13 @@ interface iBuildCharacterAssistantInstructionsOptions extends Pick<
   | 'generalCharacterIdea'
   | 'discoveryContext'
   | 'templates'
+  | 'exampleCharacters'
+  | 'maxExampleContextCharacters'
 > {
   mode: 'tool-call' | 'structured-output';
 }
+
+const exampleContextService = new ExampleContextService();
 
 function formatContextAttachment(attachment: iCharacterAssistantContextAttachment) {
   const confidence = attachment.confidence === null ? 'unknown' : `${Math.round(attachment.confidence * 100)}%`;
@@ -109,6 +118,53 @@ function buildDiscoverySection(discoveryContext: iCharacterAssistantDiscoveryCon
   ].join('\n');
 }
 
+function buildExampleSection(
+  exampleCharacters: iPromptExampleCharacter[],
+  maxExampleContextCharacters: number | undefined,
+) {
+  if (exampleCharacters.length === 0) {
+    return null;
+  }
+
+  const summary = exampleContextService.buildSummary({
+    exampleCharacters,
+    maxCharacters: maxExampleContextCharacters ?? MAX_EXAMPLE_CONTEXT_CHARACTERS,
+  });
+
+  return summary.section || null;
+}
+
+function getFocusedGuidanceFieldKeys(focus: CharacterAssistantFocus): readonly string[] | null {
+  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field) {
+    return [focus.fieldKey];
+  }
+
+  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.fields) {
+    return focus.fieldKeys;
+  }
+
+  return null;
+}
+
+function buildFieldGuidanceSection(focus: CharacterAssistantFocus) {
+  const focusedFieldKeys = getFocusedGuidanceFieldKeys(focus);
+  const guidanceBlocks = Object.entries(FIELD_FORMAT_GUIDANCE)
+    .filter(
+      (entry): entry is [string, string] =>
+        Boolean(entry[1]) && (focusedFieldKeys === null || focusedFieldKeys.includes(entry[0])),
+    )
+    .map(([fieldKey, guidance]) => `${fieldKey}:\n${guidance}`);
+
+  if (guidanceBlocks.length === 0) {
+    return null;
+  }
+
+  return [
+    'Field format guidance. Every proposed value for these fields must follow its guidance:',
+    ...guidanceBlocks,
+  ].join('\n\n');
+}
+
 export function buildAssistantSystemPrompt({
   card,
   focus,
@@ -117,6 +173,8 @@ export function buildAssistantSystemPrompt({
   generalCharacterIdea = '',
   discoveryContext,
   templates = [],
+  exampleCharacters = [],
+  maxExampleContextCharacters,
   mode,
 }: iBuildCharacterAssistantInstructionsOptions) {
   const characterName = card.data.name.trim() || 'Untitled character';
@@ -136,6 +194,8 @@ export function buildAssistantSystemPrompt({
         ].join('\n\n')
       : null;
   const discoverySection = discoveryContext ? buildDiscoverySection(discoveryContext) : null;
+  const exampleSection = buildExampleSection(exampleCharacters, maxExampleContextCharacters);
+  const fieldGuidanceSection = buildFieldGuidanceSection(focus);
   const templateSection =
     templates.length > 0
       ? [
@@ -159,6 +219,8 @@ export function buildAssistantSystemPrompt({
     'Do not invent card fields, silently discard character-book data, or rewrite unrelated content.',
     'If the user asks only for advice or analysis, answer without making a proposal.',
     'After proposing edits, briefly summarize their intent and mention genuine uncertainties that need review.',
+    'Proposed field values must be complete, ready-to-save card content with the same depth and richness as dedicated field generation — never placeholders or one-to-two-sentence summaries for prose fields.',
+    'Keep the conversational reply brief and put the depth into the proposed field values.',
     focusInstruction,
     `Current character name: ${characterName}.`,
     globalCharacterInstruction.trim() ? `Global character instruction: ${globalCharacterInstruction.trim()}` : null,
@@ -166,6 +228,8 @@ export function buildAssistantSystemPrompt({
     attachmentSection,
     discoverySection,
     templateSection,
+    exampleSection,
+    fieldGuidanceSection,
     mode === 'structured-output' ? `Current character card:\n${JSON.stringify(card)}` : null,
   ]
     .filter((section): section is string => Boolean(section))
@@ -183,6 +247,8 @@ export function streamCharacterAssistant({
   generalCharacterIdea = '',
   discoveryContext,
   templates = [],
+  exampleCharacters = [],
+  maxExampleContextCharacters,
   allowedToolNames,
   shouldUseNativeTools = true,
   store,
@@ -212,6 +278,8 @@ export function streamCharacterAssistant({
         generalCharacterIdea,
         discoveryContext,
         templates,
+        exampleCharacters,
+        maxExampleContextCharacters,
         mode: shouldUseNativeTools ? 'tool-call' : 'structured-output',
       }),
     ],

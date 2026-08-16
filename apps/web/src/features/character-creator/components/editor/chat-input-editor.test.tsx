@@ -133,6 +133,63 @@ describe('ChatInputEditor', () => {
     );
   });
 
+  it('reports the serialized template metadata when a mention is clicked', async () => {
+    const user = userEvent.setup();
+    const onTemplateClick = vi.fn();
+    render(
+      <ChatInputEditor
+        value="Use /voice-template"
+        content={{
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'mention', attrs: { id: 'voice-template', label: 'voice-template' } }],
+            },
+          ],
+        }}
+        templates={[]}
+        ariaLabel="Assistant message"
+        onValueChange={vi.fn()}
+        onTemplateClick={onTemplateClick}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const textbox = await screen.findByRole('textbox', { name: 'Assistant message' });
+    const mention = textbox.querySelector('[data-type="mention"]');
+    expect(mention).not.toBeNull();
+    const elementFromPointDescriptor = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
+    const rangeClientRectsDescriptor = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects');
+    const rangeBoundingRectDescriptor = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect');
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => mention,
+    });
+    Object.defineProperty(Range.prototype, 'getClientRects', {
+      configurable: true,
+      value: () => [] as unknown as DOMRectList,
+    });
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => new DOMRect(),
+    });
+
+    try {
+      await user.click(mention as HTMLElement);
+      expect(onTemplateClick).toHaveBeenCalledWith({ id: 'voice-template', label: 'voice-template' });
+    } finally {
+      if (elementFromPointDescriptor) Object.defineProperty(document, 'elementFromPoint', elementFromPointDescriptor);
+      else Reflect.deleteProperty(document, 'elementFromPoint');
+      if (rangeClientRectsDescriptor)
+        Object.defineProperty(Range.prototype, 'getClientRects', rangeClientRectsDescriptor);
+      else Reflect.deleteProperty(Range.prototype, 'getClientRects');
+      if (rangeBoundingRectDescriptor)
+        Object.defineProperty(Range.prototype, 'getBoundingClientRect', rangeBoundingRectDescriptor);
+      else Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect');
+    }
+  });
+
   it('highlights character macros with the shared project token styles', async () => {
     render(
       <ChatInputEditor

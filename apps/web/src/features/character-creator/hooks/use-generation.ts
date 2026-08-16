@@ -254,6 +254,16 @@ export function useGeneration() {
     [updatePromptSettings],
   );
 
+  const updateShouldUseDefaultFieldTemplates = useCallback(
+    (value: boolean) => {
+      updatePromptSettings((prev) => ({
+        ...prev,
+        shouldUseDefaultFieldTemplates: value,
+      }));
+    },
+    [updatePromptSettings],
+  );
+
   const removeCustomFieldInstruction = useCallback(
     (customFieldId: string) => {
       const instructionKey = `custom:${customFieldId}`;
@@ -598,6 +608,7 @@ export function useGeneration() {
     updateFieldTemplateId,
     shouldUseGeneralCharacterIdea,
     updateFieldShouldUseGeneralCharacterIdea,
+    updateShouldUseDefaultFieldTemplates,
     removeCustomFieldInstruction,
     removeAlternateGreetingInstruction,
     reorderAlternateGreetingInstructions,

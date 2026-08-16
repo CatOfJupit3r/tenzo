@@ -36,6 +36,8 @@ export interface iCharacterFieldProps {
   rewriteBackupValue?: string | null;
   templateOptions?: iFieldTemplateViewModel[];
   templateId?: string | null;
+  isDefaultTemplateSelected?: boolean;
+  isExplicitTemplateNone?: boolean;
   isStrictTemplateSelected?: boolean;
   templateFieldKey?: TemplateFieldKey | null;
   onTemplateIdChange?: (templateId: string | null) => void;
@@ -73,6 +75,8 @@ export function CharacterField({
   rewriteBackupValue = null,
   templateOptions = [],
   templateId = null,
+  isDefaultTemplateSelected = false,
+  isExplicitTemplateNone = false,
   isStrictTemplateSelected = false,
   templateFieldKey = null,
   onTemplateIdChange,
@@ -191,6 +195,8 @@ export function CharacterField({
             isGenerating={isGenerating}
             templateOptions={templateOptions}
             templateId={templateId}
+            isDefaultTemplateSelected={isDefaultTemplateSelected}
+            isExplicitTemplateNone={isExplicitTemplateNone}
             isStrictTemplateSelected={isStrictTemplateSelected}
             fieldValue={value}
             templateFieldKey={templateFieldKey}

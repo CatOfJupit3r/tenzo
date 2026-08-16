@@ -31,7 +31,11 @@ import {
 } from '../lib/cards/example-characters';
 import type { iExportSettings } from '../lib/cards/export-settings';
 import { resolveEffectiveFieldTemplateId } from '../lib/cards/field-template-resolution';
-import { getTemplateFieldKeyForTargetKey, TEMPLATE_MODES } from '../lib/cards/field-templates';
+import {
+  FIELD_TEMPLATE_SELECTION_NONE,
+  getTemplateFieldKeyForTargetKey,
+  TEMPLATE_MODES,
+} from '../lib/cards/field-templates';
 import { readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/cards/image-store';
 import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation/generation-config';
 import { invalidatePortraitAsset } from '../lib/portrait/portrait-asset-cache';
@@ -74,6 +78,8 @@ export interface iFieldGenerationState {
   shouldUseGeneralCharacterIdea: boolean;
   instructionValue: string;
   templateId: string | null;
+  isDefaultTemplateSelected: boolean;
+  isExplicitTemplateNone: boolean;
   isStrictTemplateSelected: boolean;
   errorMessage: string | null | undefined;
   isGenerating: boolean;
@@ -158,6 +164,7 @@ export function useCharacterCreatorPage() {
     updateFieldTemplateId,
     shouldUseGeneralCharacterIdea,
     updateFieldShouldUseGeneralCharacterIdea,
+    updateShouldUseDefaultFieldTemplates,
     removeCustomFieldInstruction,
     removeAlternateGreetingInstruction,
     reorderAlternateGreetingInstructions,
@@ -238,11 +245,14 @@ export function useCharacterCreatorPage() {
       const runtime = getFieldRuntime(fieldKey);
       // Dangling ids (deleted templates) resolve to no selection.
       const selectedTemplate = resolveFieldTemplate(fieldKey);
+      const explicitTemplateId = generationSettings.fieldTemplateIds[fieldKey];
 
       return {
         shouldUseGeneralCharacterIdea: shouldUseGeneralCharacterIdea(fieldKey),
         instructionValue: getFieldInstruction(fieldKey),
         templateId: selectedTemplate?.id ?? null,
+        isDefaultTemplateSelected: explicitTemplateId === undefined && selectedTemplate !== null,
+        isExplicitTemplateNone: explicitTemplateId === FIELD_TEMPLATE_SELECTION_NONE,
         isStrictTemplateSelected: selectedTemplate?.mode === TEMPLATE_MODES.strict,
         errorMessage: runtime.errorMessage,
         isGenerating: runtime.isGenerating,
@@ -254,6 +264,7 @@ export function useCharacterCreatorPage() {
     [
       getFieldInstruction,
       getFieldRuntime,
+      generationSettings.fieldTemplateIds,
       pendingRewriteReviewKeys,
       resolveFieldTemplate,
       rewriteBackups,
@@ -1038,6 +1049,7 @@ export function useCharacterCreatorPage() {
     resolveStandardFieldRewriteReview,
     acceptStandardFieldRewrite,
     updateStandardFieldShouldUseGeneralCharacterIdea,
+    updateShouldUseDefaultFieldTemplates,
     updateStandardFieldInstruction,
     updateStandardFieldTemplateId,
 

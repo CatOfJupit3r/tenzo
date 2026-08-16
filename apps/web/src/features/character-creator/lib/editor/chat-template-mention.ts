@@ -1,7 +1,9 @@
+import { mergeAttributes } from '@tiptap/core';
 import Mention from '@tiptap/extension-mention';
 import { ReactRenderer } from '@tiptap/react';
 import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { createElement } from 'react';
+import { LuFileText } from 'react-icons/lu';
 
 import type { iFieldTemplateViewModel } from '../cards/field-templates';
 
@@ -10,6 +12,11 @@ type iChatTemplateSuggestionProps = SuggestionProps<iFieldTemplateViewModel, iFi
 export interface iBuildChatTemplateMentionOptions {
   templates: iFieldTemplateViewModel[];
   preferredFieldKeys?: readonly string[];
+}
+
+export interface iChatTemplateMentionReference {
+  id: string;
+  label: string;
 }
 
 function sortTemplates(templates: iFieldTemplateViewModel[], preferredFieldKeys: readonly string[]) {
@@ -117,7 +124,12 @@ function ChatTemplateSuggestionList({
             command(template);
           },
         },
-        `${template.name} (${template.mode})`,
+        createElement(
+          'span',
+          { className: 'flex items-center gap-1.5' },
+          createElement(LuFileText, { className: 'size-3.5 shrink-0' }),
+          `${template.name} (${template.mode})`,
+        ),
       ),
     ),
   );
@@ -131,7 +143,9 @@ export function buildChatTemplateMentionExtension({
 
   return Mention.configure({
     HTMLAttributes: {
-      class: 'chat-template-mention',
+      class:
+        'chat-template-mention inline-flex cursor-pointer rounded-sm bg-chart-4/20 px-1 font-mono text-[0.9em] text-chart-5',
+      'data-mention-kind': 'template',
     },
     suggestion: {
       char: '/',
@@ -152,5 +166,14 @@ export function buildChatTemplateMentionExtension({
       },
       render: () => createSuggestionRenderer(),
     },
+    renderText: ({ node }) => `/${node.attrs.label ?? ''}`,
+    renderHTML: ({ options, node }) => [
+      'span',
+      mergeAttributes(options.HTMLAttributes, {
+        'data-type': 'mention',
+        title: `Template: ${node.attrs.label ?? 'Untitled template'}`,
+      }),
+      `▣ /${node.attrs.label ?? ''}`,
+    ],
   });
 }

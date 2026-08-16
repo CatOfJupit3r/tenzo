@@ -60,6 +60,8 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
         rewriteBackupValue={generationState.rewriteBackupValue}
         templateOptions={getTemplateOptionsForTargetKey(`field:${config.key}`)}
         templateId={generationState.templateId}
+        isDefaultTemplateSelected={generationState.isDefaultTemplateSelected}
+        isExplicitTemplateNone={generationState.isExplicitTemplateNone}
         isStrictTemplateSelected={generationState.isStrictTemplateSelected}
         templateFieldKey={templateFieldKey}
         onTemplateIdChange={(templateId) => updateStandardFieldTemplateId(config.key, templateId)}

@@ -94,6 +94,8 @@ export function AlternateGreetings({
                       isGenerating={isGenerating}
                       templateOptions={templateOptions}
                       templateId={generationState?.templateId ?? null}
+                      isDefaultTemplateSelected={generationState?.isDefaultTemplateSelected ?? false}
+                      isExplicitTemplateNone={generationState?.isExplicitTemplateNone ?? false}
                       isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
                       fieldValue={greeting}
                       templateFieldKey={TEMPLATE_FIELD_KEYS.alternate_greeting}

@@ -26,6 +26,7 @@ function CharacterCreatorWorkspace() {
   const [isCharacterLibraryPanelOpen, setIsCharacterLibraryPanelOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsDialogTab>(SETTINGS_DIALOG_TABS.connection);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null | undefined>(undefined);
   const [activeCharacterTab, setActiveCharacterTab] = useQueryState(
     'tab',
     parseAsStringEnum<CharacterCreatorTab>(Object.values(CHARACTER_CREATOR_TABS)).withDefault(
@@ -67,7 +68,14 @@ function CharacterCreatorWorkspace() {
   }, []);
 
   const openSettingsDialog = useCallback((tab: SettingsDialogTab) => {
+    setSelectedTemplateId(undefined);
     setActiveSettingsTab(tab);
+    setIsSettingsDialogOpen(true);
+  }, []);
+
+  const openTemplateSettings = useCallback((templateId: string | null) => {
+    setSelectedTemplateId(templateId);
+    setActiveSettingsTab(SETTINGS_DIALOG_TABS.templates);
     setIsSettingsDialogOpen(true);
   }, []);
 
@@ -143,6 +151,7 @@ function CharacterCreatorWorkspace() {
               onRestoreAssistantToggleFocus={restoreAssistantToggleFocus}
               isOverlay={false}
               onOpenConnectionSettings={openConnectionSettings}
+              onOpenTemplateSettings={openTemplateSettings}
             />
           ) : null}
         </div>
@@ -154,6 +163,7 @@ function CharacterCreatorWorkspace() {
             onRestoreAssistantToggleFocus={restoreAssistantToggleFocus}
             isOverlay
             onOpenConnectionSettings={openConnectionSettings}
+            onOpenTemplateSettings={openTemplateSettings}
           />
         ) : null}
       </div>
@@ -163,6 +173,7 @@ function CharacterCreatorWorkspace() {
         activeTab={activeSettingsTab}
         onOpenChange={setIsSettingsDialogOpen}
         onTabChange={setActiveSettingsTab}
+        selectedTemplateId={selectedTemplateId}
       />
     </>
   );

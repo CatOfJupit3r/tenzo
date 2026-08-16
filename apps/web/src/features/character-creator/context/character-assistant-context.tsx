@@ -13,7 +13,10 @@ import type {
 } from '../lib/assistant/character-assistant-contracts';
 import { CHARACTER_TEXT_FIELD_KEYS } from '../lib/cards/card-schema';
 import { toPromptExampleCharacter } from '../lib/cards/example-characters';
+import { resolveEffectiveFieldTemplateId } from '../lib/cards/field-template-resolution';
+import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
+import { CHARACTER_EDIT_FIELD_KEYS } from '../lib/proposals/character-edit-proposal';
 import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import { CharacterAssistantContext } from './character-assistant-context.constants';
 import { useCharacterCreatorContext } from './character-creator-context/character-creator-context.hooks';
@@ -32,6 +35,13 @@ function getTemplateBindableFieldKeys(focus: CharacterAssistantFocus): readonly 
   }
 
   return CHARACTER_TEXT_FIELD_KEYS;
+}
+
+function getAssistantTemplateTargetKey(fieldKey: string) {
+  const templateFieldKey =
+    fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings ? TEMPLATE_FIELD_KEYS.alternate_greeting : fieldKey;
+
+  return `field:${templateFieldKey}`;
 }
 
 export function CharacterAssistantProvider({ children }: PropsWithChildren) {
@@ -99,7 +109,11 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     const templates: iChatTemplateRef[] = [];
 
     focusedFieldKeys.forEach((fieldKey) => {
-      const templateId = generationSettings.fieldTemplateIds[`field:${fieldKey}`];
+      const templateId = resolveEffectiveFieldTemplateId({
+        fieldTemplateIds: generationSettings.fieldTemplateIds,
+        shouldUseDefaultFieldTemplates: generationSettings.shouldUseDefaultFieldTemplates,
+        targetKey: getAssistantTemplateTargetKey(fieldKey),
+      });
       if (!templateId) return;
       const template = fieldTemplates.find((candidate) => candidate.id === templateId);
       if (!template || templates.some((existing) => existing.id === template.id)) return;
@@ -113,7 +127,12 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     });
 
     return templates.slice(0, MAX_CHAT_TEMPLATE_REF_COUNT);
-  }, [assistantFocus, fieldTemplates, generationSettings.fieldTemplateIds]);
+  }, [
+    assistantFocus,
+    fieldTemplates,
+    generationSettings.fieldTemplateIds,
+    generationSettings.shouldUseDefaultFieldTemplates,
+  ]);
   const workspace = useCharacterAssistantWorkspace({
     characterId: activeCharacterId,
     card,

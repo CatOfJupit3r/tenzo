@@ -30,6 +30,7 @@ import {
   toPromptExampleCharacter,
 } from '../lib/cards/example-characters';
 import type { iExportSettings } from '../lib/cards/export-settings';
+import { resolveEffectiveFieldTemplateId } from '../lib/cards/field-template-resolution';
 import { getTemplateFieldKeyForTargetKey, TEMPLATE_MODES } from '../lib/cards/field-templates';
 import { readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/cards/image-store';
 import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation/generation-config';
@@ -154,7 +155,6 @@ export function useCharacterCreatorPage() {
     updateGeneralCharacterIdea,
     getFieldInstruction,
     updateFieldInstruction,
-    getFieldTemplateId,
     updateFieldTemplateId,
     shouldUseGeneralCharacterIdea,
     updateFieldShouldUseGeneralCharacterIdea,
@@ -222,8 +222,15 @@ export function useCharacterCreatorPage() {
   const openExportDialog = useCallback(() => setIsExportDialogOpen(true), []);
 
   const resolveFieldTemplate = useCallback(
-    (fieldKey: string) => getFieldTemplateById(getFieldTemplateId(fieldKey)),
-    [getFieldTemplateById, getFieldTemplateId],
+    (fieldKey: string) =>
+      getFieldTemplateById(
+        resolveEffectiveFieldTemplateId({
+          fieldTemplateIds: generationSettings.fieldTemplateIds,
+          shouldUseDefaultFieldTemplates: generationSettings.shouldUseDefaultFieldTemplates,
+          targetKey: fieldKey,
+        }),
+      ),
+    [generationSettings.fieldTemplateIds, generationSettings.shouldUseDefaultFieldTemplates, getFieldTemplateById],
   );
 
   const getGenerationState = useCallback(

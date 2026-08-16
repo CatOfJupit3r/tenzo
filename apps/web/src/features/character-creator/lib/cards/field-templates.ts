@@ -6,6 +6,10 @@ export const TEMPLATE_MODE_SCHEMA = z.enum(['prompt', 'strict']);
 export const TEMPLATE_MODES = TEMPLATE_MODE_SCHEMA.enum;
 export type TemplateMode = z.infer<typeof TEMPLATE_MODE_SCHEMA>;
 
+export const FIELD_TEMPLATE_SELECTION_SCHEMA = z.enum(['none']);
+export const FIELD_TEMPLATE_SELECTIONS = FIELD_TEMPLATE_SELECTION_SCHEMA.enum;
+export const FIELD_TEMPLATE_SELECTION_NONE = FIELD_TEMPLATE_SELECTIONS.none;
+
 export const TEMPLATE_MODE_LABELS = {
   [TEMPLATE_MODES.prompt]: 'Prompt guidance',
   [TEMPLATE_MODES.strict]: 'Strict skeleton',

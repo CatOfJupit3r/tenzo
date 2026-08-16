@@ -164,6 +164,7 @@ describe('card export detail levels', () => {
     fieldInstructions: { 'field:description': 'Keep it short.' },
     fieldShouldUseGeneralCharacterIdea: { 'field:description': true },
     fieldTemplateIds: {},
+    shouldUseDefaultFieldTemplates: true,
   };
   const cropRect = { x: 10, y: 20, width: 200, height: 300 };
 

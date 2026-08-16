@@ -43,16 +43,16 @@ archive_when:
 
 ### Phase 1 — Complete the built-in template catalog
 
-- [ ] Add `built-in:keyed-scenario` (prompt mode, `scenario`): setting/situation keyed list — location, time, circumstances, stakes, constraint on what has *not* happened yet.
-- [ ] Add `built-in:start-block-dialogue` (strict or prompt mode, `mes_example`): `<START>`-delimited exchange skeleton with `{{char}}:`/`{{user}}:` turns, aligned with `MES_EXAMPLE_FORMAT_GUIDANCE`.
-- [ ] Export `DEFAULT_FIELD_TEMPLATE_IDS` from `constants/default-field-templates.ts`: target-key map (`field:description` → `built-in:structured-description`, `field:personality` → `built-in:trait-list-personality`, `field:first_mes` / `alternate-greeting` targets → `built-in:scene-opening-greeting`, plus the two new ones), `satisfies Record<string, string>`.
+- [x] Add `built-in:keyed-scenario` (prompt mode, `scenario`): setting/situation keyed list — location, time, circumstances, stakes, constraint on what has *not* happened yet.
+- [x] Add `built-in:start-block-dialogue` (strict or prompt mode, `mes_example`): `<START>`-delimited exchange skeleton with `{{char}}:`/`{{user}}:` turns, aligned with `MES_EXAMPLE_FORMAT_GUIDANCE`.
+- [x] Export `DEFAULT_FIELD_TEMPLATE_IDS` from `constants/default-field-templates.ts`: target-key map (`field:description` → `built-in:structured-description`, `field:personality` → `built-in:trait-list-personality`, `field:first_mes` / `alternate-greeting` targets → `built-in:scene-opening-greeting`, plus the two new ones), `satisfies Record<string, string>`.
 
 ### Phase 2 — Single effective-template resolver
 
-- [ ] New `lib/cards/field-template-resolution.ts`: `resolveEffectiveFieldTemplateId({ fieldTemplateIds, shouldUseDefaultFieldTemplates, targetKey })` — explicit selection wins, sentinel `none` yields `null`, otherwise fall back to `DEFAULT_FIELD_TEMPLATE_IDS` when defaults are enabled.
-- [ ] Add `shouldUseDefaultFieldTemplates` to `CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA` (+ default in `DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS`).
-- [ ] Route `use-character-creator-page.resolveFieldTemplate` through the resolver (field generation path).
-- [ ] Route `character-assistant-context.focusTemplates` through the resolver (assistant path) so both paths always agree; keep the `MAX_CHAT_TEMPLATE_REF_COUNT` cap and mention-templates-win merge order.
+- [x] New `lib/cards/field-template-resolution.ts`: `resolveEffectiveFieldTemplateId({ fieldTemplateIds, shouldUseDefaultFieldTemplates, targetKey })` — explicit selection wins, sentinel `none` yields `null`, otherwise fall back to `DEFAULT_FIELD_TEMPLATE_IDS` when defaults are enabled.
+- [x] Add `shouldUseDefaultFieldTemplates` to `CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA` (+ default in `DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS`).
+- [x] Route `use-character-creator-page.resolveFieldTemplate` through the resolver (field generation path).
+- [x] Route `character-assistant-context.focusTemplates` through the resolver (assistant path) so both paths always agree; keep the `MAX_CHAT_TEMPLATE_REF_COUNT` cap and mention-templates-win merge order.
 
 ### Phase 3 — Strict-template enforcement for assistant proposals
 

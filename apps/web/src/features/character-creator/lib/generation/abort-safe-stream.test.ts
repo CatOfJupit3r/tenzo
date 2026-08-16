@@ -1,5 +1,5 @@
 import { EventType } from '@tanstack/ai';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { suppressGenerationAbort, toAbortSafeServerSentEventsResponse } from './abort-safe-stream';
 
@@ -51,5 +51,57 @@ describe('abort-safe generation streams', () => {
 
     await expect(reader?.cancel()).resolves.toBeUndefined();
     expect(abortController.signal.aborted).toBe(true);
+  });
+
+  it('surfaces nested provider metadata in the SSE error event', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const abortController = new AbortController();
+    async function* stream() {
+      yield { type: EventType.RUN_STARTED, threadId: 'thread', runId: 'run' } as const;
+      throw Object.assign(new Error('Provider rejected the request.'), {
+        rawEvent: {
+          error: {
+            code: 400,
+            metadata: { error_type: 'invalid_prompt', provider_code: 'tool_call_parse_failed' },
+          },
+        },
+      });
+    }
+
+    const response = toAbortSafeServerSentEventsResponse(stream(), abortController, {
+      operation: 'Tool request',
+      model: 'test/model',
+    });
+
+    const body = await response.text();
+    expect(body).toContain('Tool request failed for model \\"test/model\\"');
+    expect(body).toContain('error_type: invalid_prompt');
+    expect(body).toContain('provider_code: tool_call_parse_failed');
+    consoleError.mockRestore();
+  });
+
+  it('enriches provider RUN_ERROR chunks that do not throw', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const abortController = new AbortController();
+    async function* stream() {
+      yield {
+        type: EventType.RUN_ERROR,
+        message: 'Provider returned error',
+        code: '500',
+        rawEvent: { message: 'Provider returned error', code: 500 },
+        error: { message: 'Provider returned error', code: '500' },
+      } as const;
+    }
+
+    const response = toAbortSafeServerSentEventsResponse(stream(), abortController, {
+      operation: 'Tool request',
+      model: 'test/model',
+    });
+
+    const body = await response.text();
+    expect(body).toContain('Tool request failed for model \\"test/model\\"');
+    expect(body).toContain('code: 500');
+    expect(body).toContain('retry or choose another routing provider');
+    consoleError.mockRestore();
   });
 });

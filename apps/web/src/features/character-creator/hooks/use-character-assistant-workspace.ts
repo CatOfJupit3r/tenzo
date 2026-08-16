@@ -26,8 +26,8 @@ import type {
   iCharacterAssistantContextAttachment,
   iChatTemplateRef,
 } from '../lib/assistant/character-assistant-contracts';
+import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/assistant/character-assistant-generation-mode';
 import type { iCharacterAssistantSession } from '../lib/assistant/character-assistant-session';
-import { createCharacterAssistantMessagePersistence } from '../lib/assistant/message-persistence';
 import { readNewRecordedCharacterConcept } from '../lib/assistant/recorded-character-concept';
 import type { CharacterCard } from '../lib/cards/card-schema';
 import { buildChatInputContentParts, readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
@@ -82,6 +82,13 @@ function hasToolCall(messages: readonly iCharacterAssistantSession['messages'][n
   return messages.some((message) => message.parts.some((part) => part.type === 'tool-call' && part.id === toolCallId));
 }
 
+function areMessagesEqual(
+  first: readonly iCharacterAssistantSession['messages'][number][],
+  second: readonly iCharacterAssistantSession['messages'][number][],
+) {
+  return JSON.stringify(first) === JSON.stringify(second);
+}
+
 export function useCharacterAssistantWorkspace({
   characterId,
   card,
@@ -106,10 +113,6 @@ export function useCharacterAssistantWorkspace({
     characterSessions.find((candidate) => candidate.id === selectedSessionId) ?? characterSessions[0] ?? null;
   const sessionId = session?.id ?? characterId;
   const storedComposerDraft = drafts.find((draft) => draft.characterId === characterId) ?? null;
-  const persistence = useMemo(
-    () => createCharacterAssistantMessagePersistence(sessionId, characterId),
-    [characterId, sessionId],
-  );
   const forwardedProps = useMemo<Record<string, unknown>>(() => ({ characterId }), [characterId]);
   Object.assign(forwardedProps, {
     characterId,
@@ -130,18 +133,26 @@ export function useCharacterAssistantWorkspace({
     providerKind: providerKind ?? undefined,
     card,
     focus,
+    globalCharacterInstruction: generationSettings.globalCharacterInstruction,
     generalCharacterIdea,
     contextAttachments,
     templates: [],
   });
   const chat = useChat({
     threadId: sessionId,
+    initialMessages: session?.messages ?? [],
     connection: fetchServerSentEvents('/api/character-assistant'),
     forwardedProps,
-    persistence,
-    outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA,
+    ...(generationSettings.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']
+      ? { outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA }
+      : {}),
     devtools: { name: 'Character Assistant' },
   });
+
+  useEffect(() => {
+    if (!chat.error) return;
+    console.error('[Character Assistant] Stream failed:', chat.error);
+  }, [chat.error]);
 
   useEffect(() => {
     if (!characterId || session) return;
@@ -160,6 +171,7 @@ export function useCharacterAssistantWorkspace({
 
   useEffect(() => {
     if (!session) return;
+    const hasMessageChanges = !areMessagesEqual(session.messages, chat.messages);
     const proposals = chat.messages.flatMap((message) =>
       message.parts.flatMap((part) => {
         if (part.type !== 'tool-call' || !part.output || typeof part.output !== 'object') return [];
@@ -171,11 +183,14 @@ export function useCharacterAssistantWorkspace({
       (proposal) => !session.proposals.some((storedProposal) => storedProposal.id === proposal.id),
     );
     const newConcept = readNewRecordedCharacterConcept(chat.messages, session.lastRecordedConceptToolCallId);
-    if (missingProposals.length === 0 && !newConcept) {
+    if (!hasMessageChanges && missingProposals.length === 0 && !newConcept) {
       return;
     }
     if (newConcept) updateGeneralCharacterIdea(newConcept.concept.premise);
     void updateCharacterAssistantSession(session.id, (draft) => {
+      if (hasMessageChanges) {
+        draft.messages = structuredClone(chat.messages);
+      }
       missingProposals.forEach((proposal) => {
         draft.proposals = supersedeOverlappingCharacterEditProposals(draft.proposals, proposal);
         draft.proposals.push(proposal);
@@ -187,7 +202,7 @@ export function useCharacterAssistantWorkspace({
   }, [chat.messages, session, updateGeneralCharacterIdea]);
 
   const proposalActions = useProposalActions({
-    characterId,
+    sessionId,
     card,
     proposals: session?.proposals ?? [],
     replaceCard,
@@ -218,6 +233,7 @@ export function useCharacterAssistantWorkspace({
         );
         return true;
       } catch (error) {
+        console.error('[Character Assistant] Message request failed:', error instanceof Error ? error.message : error);
         toastError(
           'Character Assistant failed',
           error instanceof Error ? error.message : 'Character assistant failed.',
@@ -277,8 +293,15 @@ export function useCharacterAssistantWorkspace({
   );
   const clearConversation = useCallback(async () => {
     chat.clear();
-    await clearCharacterAssistantComposerDraft(characterId);
-  }, [characterId, chat]);
+    await Promise.all([
+      clearCharacterAssistantComposerDraft(characterId),
+      updateCharacterAssistantSession(sessionId, (draft) => {
+        draft.messages = [];
+        draft.proposals = [];
+        draft.lastRecordedConceptToolCallId = null;
+      }),
+    ]);
+  }, [characterId, chat, sessionId]);
   const createConversation = useCallback(async () => {
     if (chat.isLoading) chat.stop();
     const createdSession = await createCharacterAssistantSessionRecord(characterId);
@@ -326,6 +349,7 @@ export function useCharacterAssistantWorkspace({
         await chat.reload();
         return true;
       } catch (error) {
+        console.error('[Character Assistant] Response retry failed:', error instanceof Error ? error.message : error);
         toastError(
           'Character Assistant failed',
           error instanceof Error ? error.message : 'Character assistant failed.',

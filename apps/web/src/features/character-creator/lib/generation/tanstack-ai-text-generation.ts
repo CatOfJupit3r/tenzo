@@ -6,6 +6,7 @@ import { createOpenRouterText } from '@tanstack/ai-openrouter';
 import { normalizeOpenAiCompatibleBaseUrl } from '../provider/openai-compatible-endpoint';
 import { suppressGenerationAbort } from './abort-safe-stream';
 import type { iCharacterGenerationStreamRequest } from './generation-stream-contracts';
+import { createOpenRouterErrorPreservingHttpClient } from './openrouter-stream-error';
 
 export interface iStreamCharacterTextOptions extends iCharacterGenerationStreamRequest {
   signal?: AbortSignal;
@@ -90,7 +91,11 @@ export function createCharacterTextAdapter({ endpoint, apiKey, model }: iCharact
   const normalizedEndpoint = normalizeOpenAiCompatibleBaseUrl(endpoint);
 
   if (normalizedEndpoint.toLowerCase().includes('openrouter.ai/api')) {
-    return createOpenRouterText(model.trim() as Parameters<typeof createOpenRouterText>[0], apiKey.trim());
+    return createOpenRouterText(model.trim() as Parameters<typeof createOpenRouterText>[0], apiKey.trim(), {
+      httpClient: createOpenRouterErrorPreservingHttpClient() as NonNullable<
+        Parameters<typeof createOpenRouterText>[2]
+      >['httpClient'],
+    });
   }
 
   return openaiCompatibleText(model.trim(), {

@@ -8,9 +8,19 @@ import { streamCharacterAssistant } from '@~/features/character-creator/lib/assi
 import { generateStructuredCharacterAssistantStream } from '@~/features/character-creator/lib/assistant/character-assistant-structured.server';
 import { generateCharacterDiscoveryDirections } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
 import {
+  createNativeToolRouteKey,
+  fallbackFromUnsupportedNativeTools,
+  isNativeToolRouteUnsupported,
+  markNativeToolRouteUnsupported,
+} from '@~/features/character-creator/lib/assistant/native-tool-fallback';
+import {
   suppressGenerationAbort,
   toAbortSafeServerSentEventsResponse,
 } from '@~/features/character-creator/lib/generation/abort-safe-stream';
+import {
+  describeGenerationError,
+  logGenerationError,
+} from '@~/features/character-creator/lib/generation/generation-error';
 import { createCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 import type { iCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 
@@ -76,6 +86,7 @@ export const Route = createFileRoute('/api/character-assistant')({
             apiKey: payload.apiKey,
             generationSettings: payload,
             shouldSendDisabledSamplers: payload.shouldSendDisabledSamplers,
+            globalCharacterInstruction: payload.globalCharacterInstruction,
             generalCharacterIdea: payload.generalCharacterIdea,
             discoveryContext: payload.discoveryContext,
             templates: payload.templates,
@@ -83,16 +94,32 @@ export const Route = createFileRoute('/api/character-assistant')({
             messages: chatParams.messages,
             abortSignal: request.signal,
           };
-          const stream =
-            payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']
-              ? generateStructuredCharacterAssistantStream(commonOptions)
-              : streamCharacterAssistant({ ...commonOptions, maxSteps: 8 });
+          const nativeToolRouteKey = createNativeToolRouteKey(
+            payload.endpoint,
+            payload.model,
+            payload.openRouterProvider,
+          );
+          const shouldUseStructuredActions =
+            payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'] ||
+            isNativeToolRouteUnsupported(nativeToolRouteKey);
+          const stream = shouldUseStructuredActions
+            ? generateStructuredCharacterAssistantStream(commonOptions)
+            : fallbackFromUnsupportedNativeTools(streamCharacterAssistant({ ...commonOptions, maxSteps: 8 }), () => {
+                markNativeToolRouteUnsupported(nativeToolRouteKey);
+                return generateStructuredCharacterAssistantStream(commonOptions);
+              });
 
           const abortController = new AbortController();
           request.signal.addEventListener('abort', () => abortController.abort(request.signal.reason), { once: true });
-          return toAbortSafeServerSentEventsResponse(suppressGenerationAbort(stream, request.signal), abortController);
+          return toAbortSafeServerSentEventsResponse(suppressGenerationAbort(stream, request.signal), abortController, {
+            operation: `Character Assistant ${payload.assistantGenerationMode} request`,
+            model: payload.model,
+          });
         } catch (error) {
-          return new Response(error instanceof Error ? error.message : 'Character assistant failed.', {
+          if (!(error instanceof ZodError)) {
+            logGenerationError('Character Assistant request setup', error);
+          }
+          return new Response(describeGenerationError(error, 'Character assistant failed.'), {
             status: error instanceof ZodError ? 400 : 500,
             headers: { 'Cache-Control': 'no-store' },
           });

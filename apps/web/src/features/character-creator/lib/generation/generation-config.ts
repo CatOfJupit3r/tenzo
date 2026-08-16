@@ -42,6 +42,7 @@ export const TOP_K_RANGE = { min: 0, max: 200 } as const;
 export const MIN_P_RANGE = { min: 0, max: 1 } as const;
 
 export interface iCharacterGenerationConnectionSettings {
+  globalCharacterInstruction: string;
   provider: GenerationProvider;
   endpoint: string;
   model: string;
@@ -74,6 +75,7 @@ export interface iCharacterGenerationSettings
   extends iCharacterGenerationConnectionSettings, iCharacterGenerationPromptSettings {}
 
 export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerationConnectionSettings = {
+  globalCharacterInstruction: '',
   provider: GENERATION_PROVIDERS.koboldcpp,
   ...GENERATION_PROVIDER_DEFAULTS[GENERATION_PROVIDERS.koboldcpp],
   visionModel: '',
@@ -164,6 +166,10 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
   const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
   return {
+    globalCharacterInstruction: readString(
+      candidate.globalCharacterInstruction,
+      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.globalCharacterInstruction,
+    ),
     provider: GENERATION_PROVIDER_SCHEMA.safeParse(candidate.provider).success
       ? (candidate.provider as GenerationProvider)
       : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.provider,

@@ -66,6 +66,30 @@ describe('structured character assistant loop', () => {
     generateValidatedObjectMock.mockReset();
   });
 
+  it('includes the global character instruction in the assistant system prompt', async () => {
+    generateValidatedObjectMock.mockResolvedValue({
+      assistantMessage: 'Understood.',
+      actions: [],
+      isDone: true,
+      followUpSuggestions: [],
+    });
+
+    await collect(
+      generateStructuredCharacterAssistantStream({
+        ...createOptions(),
+        globalCharacterInstruction: 'Favor tsundere dynamics while keeping each character distinct.',
+      }),
+    );
+
+    expect(generateValidatedObjectMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        system: expect.stringContaining(
+          'Global character instruction: Favor tsundere dynamics while keeping each character distinct.',
+        ),
+      }),
+    );
+  });
+
   it('continues after a prose-only incomplete round', async () => {
     generateValidatedObjectMock
       .mockResolvedValueOnce({

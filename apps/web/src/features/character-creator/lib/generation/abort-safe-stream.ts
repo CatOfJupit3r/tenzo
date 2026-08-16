@@ -1,6 +1,13 @@
 import { EventType } from '@tanstack/ai';
 import type { StreamChunk } from '@tanstack/ai';
 
+import { describeGenerationError, getGenerationErrorHint, logGenerationError } from './generation-error';
+
+interface iAbortSafeResponseOptions {
+  operation: string;
+  model?: string;
+}
+
 export function isGenerationAbort(error: unknown, signal?: AbortSignal) {
   return (
     signal?.aborted === true ||
@@ -29,14 +36,32 @@ export async function* suppressGenerationAbort<T>(stream: AsyncIterable<T>, sign
   }
 }
 
-function createRunErrorChunk(error: unknown): StreamChunk {
-  const message = error instanceof Error ? error.message : 'Character assistant failed.';
+function buildRunErrorMessage(error: unknown, options: iAbortSafeResponseOptions) {
+  const modelLabel = options.model?.trim() ? ` for model "${options.model.trim()}"` : '';
+  const hint = getGenerationErrorHint(error);
+  return `${options.operation} failed${modelLabel}: ${describeGenerationError(error)}${hint ? ` ${hint}` : ''}`;
+}
+
+function createRunErrorChunk(error: unknown, options: iAbortSafeResponseOptions): StreamChunk {
+  const message = buildRunErrorMessage(error, options);
   return { type: EventType.RUN_ERROR, message, error: { message } };
+}
+
+function enrichRunErrorChunk(chunk: StreamChunk, options: iAbortSafeResponseOptions): StreamChunk {
+  if (chunk.type !== EventType.RUN_ERROR) return chunk;
+  const message = buildRunErrorMessage(chunk, options);
+  logGenerationError(`${options.operation}${options.model ? ` · ${options.model}` : ''}`, chunk);
+  return {
+    ...chunk,
+    message,
+    error: { ...chunk.error, message },
+  };
 }
 
 export function toAbortSafeServerSentEventsResponse(
   stream: AsyncIterable<StreamChunk>,
   abortController: AbortController,
+  options: iAbortSafeResponseOptions = { operation: 'Character assistant' },
 ) {
   const encoder = new TextEncoder();
   const iterator = stream[Symbol.asyncIterator]();
@@ -49,11 +74,14 @@ export function toAbortSafeServerSentEventsResponse(
           while (!isCancelled) {
             const result = await iterator.next();
             if (result.done || isCancelled) break;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(result.value)}\n\n`));
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(enrichRunErrorChunk(result.value, options))}\n\n`),
+            );
           }
         } catch (error) {
           if (!isCancelled && !isGenerationAbort(error, abortController.signal)) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(createRunErrorChunk(error))}\n\n`));
+            logGenerationError(`${options.operation}${options.model ? ` · ${options.model}` : ''}`, error);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(createRunErrorChunk(error, options))}\n\n`));
           }
         } finally {
           if (!isCancelled) controller.close();

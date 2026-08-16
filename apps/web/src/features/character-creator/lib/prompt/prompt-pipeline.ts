@@ -33,6 +33,7 @@ export interface iPromptPipelineInput {
   /** Drives every random choice in the pipeline; the same seed reproduces the same prompt. */
   seed: number;
   mode?: GenerationMode;
+  globalCharacterInstruction?: string;
   generalCharacterIdea?: string;
   shouldUseGeneralCharacterIdea?: boolean;
   userInstructions?: string;
@@ -110,6 +111,7 @@ export class CharacterPromptPipeline {
     outputFormat,
     seed,
     mode = GENERATION_MODES.generate,
+    globalCharacterInstruction = '',
     generalCharacterIdea = '',
     shouldUseGeneralCharacterIdea = true,
     userInstructions = '',
@@ -134,6 +136,7 @@ export class CharacterPromptPipeline {
       outputFormat,
       mode,
       seed,
+      globalCharacterInstruction,
       generalCharacterIdea,
       shouldUseGeneralCharacterIdea,
       userInstructions,

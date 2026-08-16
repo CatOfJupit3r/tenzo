@@ -7,7 +7,6 @@ import {
   createCharacterTextAdapter,
   createCharacterToolModelOptions,
 } from '../generation/tanstack-ai-text-generation';
-import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from './assistant-final-response';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
@@ -38,6 +37,7 @@ interface iStreamCharacterAssistantOptions {
     | 'minP'
   >;
   shouldSendDisabledSamplers?: boolean;
+  globalCharacterInstruction?: string;
   generalCharacterIdea?: string;
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
@@ -51,7 +51,13 @@ interface iStreamCharacterAssistantOptions {
 
 interface iBuildCharacterAssistantInstructionsOptions extends Pick<
   iStreamCharacterAssistantOptions,
-  'card' | 'focus' | 'contextAttachments' | 'generalCharacterIdea' | 'discoveryContext' | 'templates'
+  | 'card'
+  | 'focus'
+  | 'contextAttachments'
+  | 'globalCharacterInstruction'
+  | 'generalCharacterIdea'
+  | 'discoveryContext'
+  | 'templates'
 > {
   mode: 'tool-call' | 'structured-output';
 }
@@ -107,6 +113,7 @@ export function buildAssistantSystemPrompt({
   card,
   focus,
   contextAttachments,
+  globalCharacterInstruction = '',
   generalCharacterIdea = '',
   discoveryContext,
   templates = [],
@@ -154,6 +161,7 @@ export function buildAssistantSystemPrompt({
     'After proposing edits, briefly summarize their intent and mention genuine uncertainties that need review.',
     focusInstruction,
     `Current character name: ${characterName}.`,
+    globalCharacterInstruction.trim() ? `Global character instruction: ${globalCharacterInstruction.trim()}` : null,
     generalCharacterIdea.trim() ? `General character idea: ${generalCharacterIdea.trim()}` : null,
     attachmentSection,
     discoverySection,
@@ -171,6 +179,7 @@ export function streamCharacterAssistant({
   apiKey,
   generationSettings,
   shouldSendDisabledSamplers = false,
+  globalCharacterInstruction = '',
   generalCharacterIdea = '',
   discoveryContext,
   templates = [],
@@ -199,6 +208,7 @@ export function streamCharacterAssistant({
         card,
         focus,
         contextAttachments,
+        globalCharacterInstruction,
         generalCharacterIdea,
         discoveryContext,
         templates,
@@ -210,7 +220,6 @@ export function streamCharacterAssistant({
       : {}),
     messages,
     agentLoopStrategy: maxIterations(maxSteps),
-    outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA,
     middleware: [createCharacterAssistantSafetyMiddleware()],
     modelOptions: (shouldUseNativeTools ? createCharacterToolModelOptions : createCharacterModelOptions)(
       generationSettings.endpoint,

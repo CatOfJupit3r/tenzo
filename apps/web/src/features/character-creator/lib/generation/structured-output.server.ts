@@ -2,6 +2,8 @@ import { chat, defineChatMiddleware } from '@tanstack/ai';
 import type { AnyTextAdapter, ModelMessage, TokenUsage, UIMessage } from '@tanstack/ai';
 import type { z } from 'zod';
 
+import { describeGenerationError } from './generation-error';
+
 interface iGenerateValidatedObjectOptions<T> {
   adapter: AnyTextAdapter;
   schema: z.ZodType<T>;
@@ -40,43 +42,6 @@ function createNonStreamingStructuredOutputAdapter(adapter: AnyTextAdapter): Any
       return (...args: unknown[]) => Reflect.apply(method, target, args);
     },
   });
-}
-
-function collectGenerationErrorDetails(error: unknown, details: string[], visited: Set<unknown>) {
-  if (error === null || error === undefined || visited.has(error)) {
-    return;
-  }
-  visited.add(error);
-
-  if (typeof error === 'string') {
-    details.push(error);
-    return;
-  }
-  if (typeof error !== 'object') {
-    return;
-  }
-
-  collectGenerationErrorDetails(Reflect.get(error, 'rawValue'), details, visited);
-  collectGenerationErrorDetails(Reflect.get(error, 'error'), details, visited);
-  for (const key of ['message', 'code', 'responseBody'] as const) {
-    const value = Reflect.get(error, key);
-    if (typeof value === 'string' && value.trim()) {
-      details.push(value);
-    }
-  }
-  collectGenerationErrorDetails(Reflect.get(error, 'cause'), details, visited);
-  const nestedErrors = Reflect.get(error, 'errors');
-  if (Array.isArray(nestedErrors)) {
-    nestedErrors.forEach((nestedError) => collectGenerationErrorDetails(nestedError, details, visited));
-  }
-  collectGenerationErrorDetails(Reflect.get(error, 'rawEvent'), details, visited);
-}
-
-function describeGenerationError(error: unknown) {
-  const details: string[] = [];
-  collectGenerationErrorDetails(error, details, new Set());
-  const compactMessage = [...new Set(details)].join(' ').replace(/\s+/g, ' ').trim() || 'Unknown provider error.';
-  return compactMessage.length > 300 ? `${compactMessage.slice(0, 297)}...` : compactMessage;
 }
 
 export async function generateValidatedObject<T>({

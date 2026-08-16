@@ -527,6 +527,7 @@ export function useGeneration() {
           outputFormat: connectionSettings.outputFormat,
           seed: SeededRandom.generateSeed(),
           mode,
+          globalCharacterInstruction: connectionSettings.globalCharacterInstruction,
           generalCharacterIdea: promptSettings.generalCharacterIdea,
           shouldUseGeneralCharacterIdea:
             target.kind !== GENERATION_TARGET_KINDS['general-character-idea'] &&

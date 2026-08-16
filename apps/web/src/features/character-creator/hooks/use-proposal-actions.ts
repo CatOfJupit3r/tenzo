@@ -26,12 +26,12 @@ const ACTIVE_PROPOSAL_STATUSES = new Set<CharacterEditProposalStatus>([
 ]);
 
 export function useProposalActions({
-  characterId,
+  sessionId,
   card,
   proposals,
   replaceCard,
 }: {
-  characterId: string;
+  sessionId: string;
   card: CharacterCard;
   proposals: readonly iCharacterEditProposal[];
   replaceCard: (nextCard: CharacterCard) => Promise<unknown>;
@@ -42,11 +42,11 @@ export function useProposalActions({
   );
   const persistProposal = useCallback(
     async (proposal: iCharacterEditProposal) => {
-      await updateCharacterAssistantSession(characterId, (draft) => {
+      await updateCharacterAssistantSession(sessionId, (draft) => {
         draft.proposals = upsertCharacterEditProposal(draft.proposals, proposal);
       });
     },
-    [characterId],
+    [sessionId],
   );
   const applyProposalFields = useCallback(
     async (proposalId: string, fieldKeys?: CharacterEditFieldKey[], resolvedTextValue?: string) => {

@@ -7,6 +7,7 @@ import { Label } from '@~/components/ui/label';
 import { CreatableSingleSelect, SingleSelect } from '@~/components/ui/select/select';
 import type { iOptionType } from '@~/components/ui/select/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
+import { Textarea } from '@~/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@~/components/ui/tooltip';
 
 import {
@@ -139,6 +140,19 @@ export function SamplingSettings({
   return (
     <div className="space-y-4">
       <GenerationPresets generationSettings={generationSettings} onSettingsChange={onSettingsChange} />
+
+      <div className="space-y-1.5 rounded-lg border p-3">
+        <Label htmlFor="global-character-instruction">Global character instruction</Label>
+        <Textarea
+          id="global-character-instruction"
+          value={generationSettings.globalCharacterInstruction}
+          placeholder="Example: Favor tsundere character dynamics while keeping each character distinct."
+          onChange={(event) => onSettingsChange({ globalCharacterInstruction: event.target.value })}
+        />
+        <p className="text-sm text-muted-foreground">
+          Applied to field generation and the Character Assistant for every character. Stored locally.
+        </p>
+      </div>
 
       <Tabs
         value={activeModelRole}

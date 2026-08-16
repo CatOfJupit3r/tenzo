@@ -140,6 +140,7 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   card: CHARACTER_CARD_SCHEMA,
   focus: CHARACTER_ASSISTANT_FOCUS_SCHEMA,
   messages: z.array(z.unknown()).min(1),
+  globalCharacterInstruction: z.string().optional(),
   generalCharacterIdea: z.string().optional(),
   contextAttachments: z.array(CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA).max(8).optional().default([]),
   discoveryContext: CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA.optional(),

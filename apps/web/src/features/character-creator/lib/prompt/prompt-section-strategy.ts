@@ -15,6 +15,7 @@ export interface iPromptPipelineContext {
   outputFormat: OutputFormat;
   mode: GenerationMode;
   seed: number;
+  globalCharacterInstruction: string;
   generalCharacterIdea: string;
   shouldUseGeneralCharacterIdea: boolean;
   userInstructions: string;

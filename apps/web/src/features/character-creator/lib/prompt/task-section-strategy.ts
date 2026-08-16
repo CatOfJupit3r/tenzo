@@ -25,6 +25,9 @@ export class TaskSectionStrategy implements iPromptSectionStrategy {
       exampleContextSummary.isTruncated
         ? `Reference example content was truncated to stay within the ${context.maxExampleContextCharacters}-character context budget. Use only the included reference details.`
         : '',
+      context.globalCharacterInstruction.trim()
+        ? `Global character instruction: ${context.globalCharacterInstruction.trim()}`
+        : '',
       context.shouldUseGeneralCharacterIdea && context.generalCharacterIdea.trim()
         ? `General character idea: ${context.generalCharacterIdea.trim()}`
         : '',

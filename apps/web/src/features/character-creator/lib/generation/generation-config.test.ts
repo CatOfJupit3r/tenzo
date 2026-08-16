@@ -30,6 +30,15 @@ describe('CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA', () => {
 });
 
 describe('sanitizeCharacterGenerationConnectionSettings', () => {
+  it('defaults stored settings that predate the global character instruction', () => {
+    const result = sanitizeCharacterGenerationConnectionSettings({
+      ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
+      globalCharacterInstruction: undefined,
+    });
+
+    expect(result.globalCharacterInstruction).toBe('');
+  });
+
   it('defaults stored settings that predate provider selection to KoboldCpp', () => {
     const result = sanitizeCharacterGenerationConnectionSettings({
       ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,

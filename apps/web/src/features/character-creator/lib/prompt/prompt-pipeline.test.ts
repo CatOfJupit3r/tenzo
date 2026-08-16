@@ -26,7 +26,7 @@ const MANY_EXAMPLES: iPromptExampleCharacter[] = ['Astra', 'Brimble', 'Corvus', 
 }));
 
 describe('prompt-pipeline', () => {
-  it('includes current card context, the general character idea, and field instructions', () => {
+  it('includes current card context, global and per-character instructions, and field instructions', () => {
     const card = createEmptyCharacterCard();
     card.data.name = 'Fire Keeper';
     card.data.description = 'A quiet guardian of the kiln.';
@@ -44,6 +44,7 @@ describe('prompt-pipeline', () => {
       },
       outputFormat: OUTPUT_FORMATS.xml,
       seed: 1,
+      globalCharacterInstruction: 'Favor tsundere dynamics while keeping each character distinct.',
       generalCharacterIdea: 'A quietly devout firekeeper with ceremonial language.',
       userInstructions: 'Open with a tactile sensory detail.',
     });
@@ -51,6 +52,9 @@ describe('prompt-pipeline', () => {
     expect(messages[0]?.role).toBe('system');
     expect(messages[1]?.content).toContain('Name: Fire Keeper');
     expect(messages[1]?.content).toContain('Custom Field Weapon: Lantern spear');
+    expect(messages[1]?.content).toContain(
+      'Global character instruction: Favor tsundere dynamics while keeping each character distinct.',
+    );
     expect(messages[1]?.content).toContain(
       'General character idea: A quietly devout firekeeper with ceremonial language.',
     );

@@ -93,6 +93,6 @@ describe('structured output generation', () => {
         system: 'Generate a card.',
         prompt: 'Create it.',
       }),
-    ).rejects.toThrow('Schema grammar rejected. INVALID_SCHEMA');
+    ).rejects.toThrow(/Schema grammar rejected\..*INVALID_SCHEMA/);
   });
 });

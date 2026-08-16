@@ -132,6 +132,7 @@ interface iStructuredAssistantOptions {
     | 'minP'
   >;
   shouldSendDisabledSamplers?: boolean;
+  globalCharacterInstruction?: string;
   generalCharacterIdea?: string;
   discoveryContext?: iCharacterAssistantDiscoveryContext;
   templates?: iChatTemplateRef[];
@@ -186,6 +187,7 @@ export async function* generateStructuredCharacterAssistantStream(
       card: options.card,
       focus: options.focus,
       contextAttachments: options.contextAttachments,
+      globalCharacterInstruction: options.globalCharacterInstruction,
       generalCharacterIdea: options.generalCharacterIdea,
       discoveryContext: options.discoveryContext,
       templates: options.templates,

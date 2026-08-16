@@ -17,17 +17,22 @@ import {
   suppressGenerationAbort,
   toAbortSafeServerSentEventsResponse,
 } from '@~/features/character-creator/lib/generation/abort-safe-stream';
+import type { CharacterAssistantFieldEditing } from '@~/features/character-creator/lib/generation/generation-config';
 import {
   describeGenerationError,
   logGenerationError,
 } from '@~/features/character-creator/lib/generation/generation-error';
-import { createCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
+import {
+  createCharacterEditProposal,
+  preserveAssistantProtectedFields,
+} from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 import type { iCharacterEditProposal } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 
 function createRunStore(
   characterId: string,
   initialCard: (typeof CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA)['shape']['card']['_output'],
   suggestDirections: (premise?: string) => ReturnType<typeof generateCharacterDiscoveryDirections>,
+  fieldShouldAllowAssistantEditing: Readonly<CharacterAssistantFieldEditing>,
 ) {
   let projectedCard = structuredClone(initialCard);
   const proposals: iCharacterEditProposal[] = [];
@@ -43,14 +48,19 @@ function createRunStore(
       summary: string;
       proposedCard: typeof initialCard;
     }) {
+      const permittedCard = preserveAssistantProtectedFields(
+        projectedCard,
+        proposedCard,
+        fieldShouldAllowAssistantEditing,
+      );
       const proposal = createCharacterEditProposal({
         characterId,
         baseCard: projectedCard,
-        proposedCard,
+        proposedCard: permittedCard,
         toolCallId,
         summary,
       });
-      projectedCard = structuredClone(proposedCard);
+      projectedCard = structuredClone(permittedCard);
       proposals.push(proposal);
       return proposal;
     },
@@ -69,15 +79,19 @@ export const Route = createFileRoute('/api/character-assistant')({
             ...chatParams.forwardedProps,
             messages: chatParams.messages,
           });
-          const store = createRunStore(payload.characterId, payload.card, async (premise) =>
-            generateCharacterDiscoveryDirections({
-              premise,
-              endpoint: payload.endpoint,
-              apiKey: payload.apiKey,
-              model: payload.model,
-              generationSettings: payload,
-              abortSignal: request.signal,
-            }),
+          const store = createRunStore(
+            payload.characterId,
+            payload.card,
+            async (premise) =>
+              generateCharacterDiscoveryDirections({
+                premise,
+                endpoint: payload.endpoint,
+                apiKey: payload.apiKey,
+                model: payload.model,
+                generationSettings: payload,
+                abortSignal: request.signal,
+              }),
+            payload.fieldShouldAllowAssistantEditing,
           );
           const commonOptions = {
             card: payload.card,

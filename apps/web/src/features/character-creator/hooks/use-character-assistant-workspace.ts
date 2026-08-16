@@ -147,6 +147,7 @@ export function useCharacterAssistantWorkspace({
     exampleCharacters,
     maxExampleContextCharacters,
     templates: focusTemplates,
+    fieldShouldAllowAssistantEditing: generationSettings.fieldShouldAllowAssistantEditing,
   });
   const chat = useChat({
     threadId: sessionId,

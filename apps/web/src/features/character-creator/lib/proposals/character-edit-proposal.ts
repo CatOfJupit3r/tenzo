@@ -330,6 +330,38 @@ export function createCharacterEditPatches(
   return patches;
 }
 
+export function preserveAssistantProtectedFields(
+  currentCard: CharacterCard,
+  proposedCard: CharacterCard,
+  fieldShouldAllowAssistantEditing: Readonly<Record<CharacterEditFieldKey, boolean>>,
+) {
+  const nextCard = structuredClone(proposedCard);
+
+  CHARACTER_TEXT_FIELD_KEYS.forEach((fieldKey) => {
+    if (!fieldShouldAllowAssistantEditing[fieldKey]) {
+      nextCard.data[fieldKey] = currentCard.data[fieldKey];
+    }
+  });
+
+  Object.values(CHARACTER_EDIT_LIST_FIELD_KEYS).forEach((fieldKey) => {
+    if (!fieldShouldAllowAssistantEditing[fieldKey]) {
+      nextCard.data[fieldKey] = structuredClone(currentCard.data[fieldKey]);
+    }
+  });
+
+  if (!fieldShouldAllowAssistantEditing[CHARACTER_EDIT_FIELD_KEYS.custom_fields]) {
+    nextCard.data.extensions.custom_fields = structuredClone(currentCard.data.extensions.custom_fields);
+  }
+
+  if (!fieldShouldAllowAssistantEditing[CHARACTER_EDIT_FIELD_KEYS.character_book]) {
+    nextCard.data.character_book = currentCard.data.character_book
+      ? structuredClone(currentCard.data.character_book)
+      : undefined;
+  }
+
+  return nextCard;
+}
+
 export function createCharacterEditProposal({
   characterId,
   baseCard,

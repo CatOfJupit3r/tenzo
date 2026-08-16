@@ -5,6 +5,8 @@ import {
   CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA,
 } from '../assistant/character-assistant-generation-mode';
 import type { CharacterAssistantGenerationMode } from '../assistant/character-assistant-generation-mode';
+import { CHARACTER_EDIT_FIELD_KEYS, CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
+import type { CharacterEditFieldKey } from '../proposals/character-edit-proposal';
 
 export const OUTPUT_FORMAT_SCHEMA = z.enum(['xml', 'json', 'none']);
 export const OUTPUT_FORMATS = OUTPUT_FORMAT_SCHEMA.enum;
@@ -17,6 +19,27 @@ export type RequestMode = z.infer<typeof REQUEST_MODE_SCHEMA>;
 export const GENERATION_PROVIDER_SCHEMA = z.enum(['koboldcpp', 'openrouter']);
 export const GENERATION_PROVIDERS = GENERATION_PROVIDER_SCHEMA.enum;
 export type GenerationProvider = z.infer<typeof GENERATION_PROVIDER_SCHEMA>;
+
+export const CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA = z.record(CHARACTER_EDIT_FIELD_KEY_SCHEMA, z.boolean());
+export type CharacterAssistantFieldEditing = z.infer<typeof CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA>;
+
+export const DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING = {
+  [CHARACTER_EDIT_FIELD_KEYS.name]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.description]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.personality]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.scenario]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.first_mes]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.mes_example]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.creator_notes]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.system_prompt]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.post_history_instructions]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.creator]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.character_version]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.tags]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.alternate_greetings]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.custom_fields]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.character_book]: false,
+} satisfies Record<CharacterEditFieldKey, boolean>;
 
 export const GENERATION_PROVIDER_DEFAULTS = {
   [GENERATION_PROVIDERS.koboldcpp]: {
@@ -60,6 +83,7 @@ export interface iCharacterGenerationConnectionSettings {
   presencePenalty: number;
   topK: number;
   minP: number;
+  fieldShouldAllowAssistantEditing: CharacterAssistantFieldEditing;
 }
 
 export const CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA = z.object({
@@ -93,6 +117,7 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   presencePenalty: 0,
   topK: 0,
   minP: 0,
+  fieldShouldAllowAssistantEditing: DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
 };
 
 export const DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS: iCharacterGenerationPromptSettings = {
@@ -168,6 +193,15 @@ function readFieldShouldUseGeneralCharacterIdea(value: unknown) {
   );
 }
 
+function readAssistantFieldEditing(value: unknown): CharacterAssistantFieldEditing {
+  const parsedPreferences = z.partialRecord(CHARACTER_EDIT_FIELD_KEY_SCHEMA, z.boolean()).safeParse(value);
+
+  return {
+    ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+    ...(parsedPreferences.success ? parsedPreferences.data : {}),
+  };
+}
+
 export function sanitizeCharacterGenerationConnectionSettings(value: unknown): iCharacterGenerationConnectionSettings {
   const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
@@ -223,6 +257,7 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
     ),
     topK: readIntegerInRange(candidate.topK, TOP_K_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topK),
     minP: readFloatInRange(candidate.minP, MIN_P_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.minP),
+    fieldShouldAllowAssistantEditing: readAssistantFieldEditing(candidate.fieldShouldAllowAssistantEditing),
   };
 }
 

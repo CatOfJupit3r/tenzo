@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs'
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { useTemplateEnhancement } from '../hooks/use-template-enhancement';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/cards/example-characters';
+import { AssistantEditingSettings } from './assistant-editing-settings';
 import { ConnectionSettings } from './connection-settings';
 import { ExampleCharacters } from './example-characters';
 import { FieldTemplatesPanel } from './field-templates-panel';
@@ -83,6 +84,7 @@ export function SettingsDialog({
           <TabsList className="w-full">
             <TabsTrigger value={SETTINGS_DIALOG_TABS.connection}>Connection</TabsTrigger>
             <TabsTrigger value={SETTINGS_DIALOG_TABS.sampling}>Sampling</TabsTrigger>
+            <TabsTrigger value={SETTINGS_DIALOG_TABS.assistant}>Assistant</TabsTrigger>
             <TabsTrigger value={SETTINGS_DIALOG_TABS.templates}>Templates</TabsTrigger>
             <TabsTrigger value={SETTINGS_DIALOG_TABS.examples}>
               Reference Examples {exampleCharacters.length}/{MAX_EXAMPLE_CHARACTER_COUNT}
@@ -109,6 +111,21 @@ export function SettingsDialog({
               modelContextSizes={connectionHealth.modelContextSizes}
               modelProviders={connectionHealth.modelProviders}
               onSettingsChange={updateGenerationSettings}
+            />
+          </TabsContent>
+
+          <TabsContent value={SETTINGS_DIALOG_TABS.assistant} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
+            <AssistantEditingSettings
+              fieldShouldAllowAssistantEditing={generationSettings.fieldShouldAllowAssistantEditing}
+              onChange={(fieldKey, shouldAllowEditing) => {
+                updateGenerationSettings({
+                  fieldShouldAllowAssistantEditing: {
+                    ...generationSettings.fieldShouldAllowAssistantEditing,
+                    [fieldKey]: shouldAllowEditing,
+                  },
+                });
+                return undefined;
+              }}
             />
           </TabsContent>
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
 import {
   CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
+  DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
   DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   GENERATION_PROVIDERS,
@@ -43,6 +44,21 @@ describe('sanitizeCharacterGenerationPromptSettings', () => {
 });
 
 describe('sanitizeCharacterGenerationConnectionSettings', () => {
+  it('enables assistant editing only for core authored fields and alternate greetings by default', () => {
+    const result = sanitizeCharacterGenerationConnectionSettings({});
+
+    expect(result.fieldShouldAllowAssistantEditing).toEqual(DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING);
+    expect(Object.entries(result.fieldShouldAllowAssistantEditing).filter(([, isEnabled]) => isEnabled)).toEqual([
+      ['name', true],
+      ['description', true],
+      ['personality', true],
+      ['scenario', true],
+      ['first_mes', true],
+      ['mes_example', true],
+      ['alternate_greetings', true],
+    ]);
+  });
+
   it('defaults stored settings that predate the global character instruction', () => {
     const result = sanitizeCharacterGenerationConnectionSettings({
       ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,

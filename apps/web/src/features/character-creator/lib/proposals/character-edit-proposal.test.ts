@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
 import {
   applyCharacterEditProposal,
   CHARACTER_EDIT_PATCH_STATUSES,
@@ -8,12 +9,37 @@ import {
   createCharacterCardRevision,
   createCharacterEditProposal,
   createCharacterEditPatches,
+  preserveAssistantProtectedFields,
   reduceCharacterEditProposal,
   supersedeOverlappingCharacterEditProposals,
   upsertCharacterEditProposal,
 } from './character-edit-proposal';
 
 describe('character edit proposals', () => {
+  it('preserves fields disabled for assistant editing', () => {
+    const currentCard = createEmptyCharacterCard();
+    currentCard.data.system_prompt = 'Keep this prompt.';
+    currentCard.data.post_history_instructions = 'Keep these instructions.';
+    currentCard.data.extensions.custom_fields = [{ id: 'voice', label: 'Voice', value: 'Warm' }];
+    const proposedCard = structuredClone(currentCard);
+    proposedCard.data.name = 'Mira';
+    proposedCard.data.system_prompt = 'Overwrite prompt.';
+    proposedCard.data.post_history_instructions = 'Overwrite instructions.';
+    proposedCard.data.extensions.custom_fields = [];
+
+    const permittedCard = preserveAssistantProtectedFields(currentCard, proposedCard, {
+      ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+      system_prompt: false,
+      post_history_instructions: false,
+      custom_fields: false,
+    });
+
+    expect(permittedCard.data.name).toBe('Mira');
+    expect(permittedCard.data.system_prompt).toBe('Keep this prompt.');
+    expect(permittedCard.data.post_history_instructions).toBe('Keep these instructions.');
+    expect(permittedCard.data.extensions.custom_fields).toEqual(currentCard.data.extensions.custom_fields);
+  });
+
   it('creates typed patches for every field-addressable card section', () => {
     const baseCard = createEmptyCharacterCard();
     const proposedCard = structuredClone(baseCard);

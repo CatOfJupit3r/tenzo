@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { CHARACTER_CARD_SCHEMA } from '../cards/card-schema';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../cards/example-characters';
 import { STORED_FIELD_TEMPLATE_SCHEMA } from '../cards/field-templates';
+import {
+  CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA,
+  DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+} from '../generation/generation-config';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '../generation/generation-stream-contracts';
 import { PROMPT_EXAMPLE_CHARACTER_SCHEMA } from '../prompt/generation-contracts';
 import { CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
@@ -155,6 +159,9 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
     CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
   ),
   providerKind: PROVIDER_KIND_SCHEMA.optional().default(PROVIDER_KINDS.unknown),
+  fieldShouldAllowAssistantEditing: CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA.optional().default(
+    DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+  ),
 });
 
 export type CharacterAssistantFocus = z.infer<typeof CHARACTER_ASSISTANT_FOCUS_SCHEMA>;

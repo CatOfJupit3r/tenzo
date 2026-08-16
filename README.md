@@ -68,6 +68,18 @@ flowchart TB
 > [!IMPORTANT]
 > Browser storage is tied to the current browser profile and origin. Export a full workspace backup before clearing site data or moving to another device.
 
+## Under the hood
+
+Tenzo keeps the interesting machinery close to the browser instead of hiding it behind a conventional application backend.
+
+- **Binary assets stay binary.** Portraits are stored as `Blob` objects in IndexedDB rather than inflated base64 strings. A bounded, shared LRU cache retains object URLs for recently viewed portraits, deduplicates concurrent loads, and revokes URLs on eviction. That makes character switching feel immediate without leaking browser memory.
+- **PNG cards are edited without recompressing artwork.** Tenzo reads the PNG chunk stream, removes stale `chara` or `ccv3` metadata, inserts a UTF-8/base64 `chara` `tEXt` chunk immediately before `IEND`, and reassembles the original chunks. The image data itself is never decoded and re-encoded.
+- **Local data has application-level migrations.** Dexie provides stable IndexedDB stores while Tenzo tracks record migrations separately. A destructive migration must declare a warning, lock the editor, and require the user to download a recovery backup before it can run.
+- **The UI writes optimistically.** Persistent collections update React immediately and roll back the local view if IndexedDB rejects the mutation, combining local-app responsiveness with durable storage semantics.
+- **Assistant changes are transactions, not pasted prose.** The model produces typed patches for fields, tags, greetings, custom fields, and character books. Tenzo can detect overlapping edits and stale revisions, then lets the user apply or reject proposals explicitly.
+- **Generation is streamed and cancellation-aware.** Stateless TanStack routes bridge OpenAI-compatible providers through server-sent events. Browser cancellation propagates upstream, while provider failures are normalized into actionable stream errors.
+- **Backups are real archives.** Full-workspace ZIP and tar.gz files contain a versioned manifest, character records, examples, settings, and original portrait blobs. API credentials are deliberately blanked before packaging.
+
 ## Card workflow
 
 1. Create a character or import an existing `.json` or `.png` card.

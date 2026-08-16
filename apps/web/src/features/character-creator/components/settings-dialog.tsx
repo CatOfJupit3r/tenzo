@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
+import { useTemplateEnhancement } from '../hooks/use-template-enhancement';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/cards/example-characters';
 import { ConnectionSettings } from './connection-settings';
 import { ExampleCharacters } from './example-characters';
@@ -39,6 +40,15 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
     removeExampleCharacter,
     updateExampleCharacterIncludedFields,
   } = useCharacterCreatorContext();
+  const {
+    isEnhancing: isEnhancingTemplate,
+    enhanceTemplate,
+    cancelEnhancement: cancelTemplateEnhancement,
+  } = useTemplateEnhancement({
+    generationSettings,
+    apiKey,
+    providerKind: connectionHealth.providerKind,
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -96,10 +106,14 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
           <TabsContent value={SETTINGS_DIALOG_TABS.templates} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <FieldTemplatesPanel
               fieldTemplates={fieldTemplates}
+              exampleCharacters={exampleCharacters}
+              isEnhancingTemplate={isEnhancingTemplate}
               onAddTemplate={addFieldTemplate}
               onUpdateTemplate={updateFieldTemplate}
               onRemoveTemplate={removeFieldTemplate}
               onDuplicateTemplate={duplicateFieldTemplate}
+              onEnhanceTemplate={enhanceTemplate}
+              onCancelTemplateEnhancement={cancelTemplateEnhancement}
             />
           </TabsContent>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LuCopy, LuLock, LuPlus, LuTrash2 } from 'react-icons/lu';
+import { LuCopy, LuLock, LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
 
 import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Badge } from '@~/components/ui/badge';
@@ -11,6 +11,8 @@ import type { iOptionType } from '@~/components/ui/select';
 import { cn } from '@~/lib/utils';
 
 import type { FieldTemplatePatch } from '../hooks/use-field-templates';
+import type { iEnhanceTemplateOptions } from '../hooks/use-template-enhancement';
+import type { iStoredExampleCharacter } from '../lib/cards/example-characters';
 import {
   parseTemplateSlots,
   TEMPLATE_FIELD_KEY_LABELS,
@@ -26,6 +28,7 @@ import type {
   iCreateStoredFieldTemplateInput,
 } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
+import { EnhanceFieldTemplateDialog } from './enhance-field-template-dialog';
 
 const templateModeOptions: iOptionType[] = [
   {
@@ -47,20 +50,29 @@ const templateFieldKeyOptions: iOptionType[] = TEMPLATE_FIELD_KEY_SCHEMA.options
 
 export interface iFieldTemplatesPanelProps {
   fieldTemplates: iFieldTemplateViewModel[];
+  exampleCharacters: iStoredExampleCharacter[];
+  isEnhancingTemplate: boolean;
   onAddTemplate: (input: iCreateStoredFieldTemplateInput) => string;
   onUpdateTemplate: (id: string, patch: FieldTemplatePatch) => void;
   onRemoveTemplate: (id: string) => void;
   onDuplicateTemplate: (id: string) => string | null;
+  onEnhanceTemplate: (options: iEnhanceTemplateOptions) => Promise<string>;
+  onCancelTemplateEnhancement: () => void;
 }
 
 export function FieldTemplatesPanel({
   fieldTemplates,
+  exampleCharacters,
+  isEnhancingTemplate,
   onAddTemplate,
   onUpdateTemplate,
   onRemoveTemplate,
   onDuplicateTemplate,
+  onEnhanceTemplate,
+  onCancelTemplateEnhancement,
 }: iFieldTemplatesPanelProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(fieldTemplates[0]?.id ?? null);
+  const [isEnhanceDialogOpen, setIsEnhanceDialogOpen] = useState(false);
   const selectedTemplate = fieldTemplates.find((template) => template.id === selectedTemplateId) ?? null;
   const validationIssues = selectedTemplate ? validateFieldTemplate(selectedTemplate) : [];
   const templateSlots = selectedTemplate ? parseTemplateSlots(selectedTemplate.content) : [];
@@ -147,6 +159,15 @@ export function FieldTemplatesPanel({
               ) : null}
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={selectedTemplate.isBuiltIn || isEnhancingTemplate}
+                onClick={() => setIsEnhanceDialogOpen(true)}
+              >
+                <LuSparkles className="size-4" />
+                Enhance with AI
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -268,6 +289,18 @@ export function FieldTemplatesPanel({
               </AlertDescription>
             </Alert>
           ) : null}
+
+          <EnhanceFieldTemplateDialog
+            isOpen={isEnhanceDialogOpen}
+            isEnhancing={isEnhancingTemplate}
+            targetTemplate={selectedTemplate}
+            fieldTemplates={fieldTemplates}
+            exampleCharacters={exampleCharacters}
+            onOpenChange={setIsEnhanceDialogOpen}
+            onCancel={onCancelTemplateEnhancement}
+            onEnhance={onEnhanceTemplate}
+            onApply={(content) => onUpdateTemplate(selectedTemplate.id, { content })}
+          />
         </div>
       ) : (
         <div className="flex min-h-48 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">

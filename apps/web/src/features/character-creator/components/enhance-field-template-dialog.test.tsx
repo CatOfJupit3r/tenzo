@@ -1,0 +1,192 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
+import type { iStoredExampleCharacter } from '../lib/cards/example-characters';
+import { TEMPLATE_MODES } from '../lib/cards/field-templates';
+import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
+import { EnhanceFieldTemplateDialog } from './enhance-field-template-dialog';
+
+vi.mock('@~/components/toastifications', () => ({
+  toastSuccess: vi.fn(),
+}));
+
+vi.mock('@~/components/ui/select', () => ({
+  MultiSelect: () => <div />,
+}));
+
+vi.mock('./editor/markdown-field-editor', () => ({
+  MarkdownFieldEditor: ({
+    value,
+    isReadOnly,
+    ariaLabelledBy,
+    onValueChange,
+  }: {
+    value: string;
+    isReadOnly?: boolean;
+    ariaLabelledBy?: string;
+    onValueChange: (value: string) => unknown;
+  }) => (
+    <textarea
+      aria-labelledby={ariaLabelledBy}
+      value={value}
+      readOnly={isReadOnly}
+      onChange={(event) => onValueChange(event.target.value)}
+    />
+  ),
+}));
+
+function createTemplate(): iFieldTemplateViewModel {
+  return {
+    id: 'target-template',
+    name: 'Description template',
+    description: '',
+    mode: TEMPLATE_MODES.prompt,
+    fieldKeys: ['description'],
+    content: 'Original template content',
+    createdAt: '2026-08-16T00:00:00.000Z',
+    updatedAt: '2026-08-16T00:00:00.000Z',
+    isBuiltIn: false,
+  };
+}
+
+function createExampleCharacter(): iStoredExampleCharacter {
+  return {
+    id: 'example-character',
+    fileName: 'reference.json',
+    sourceKind: 'json',
+    includedFieldKeys: ['name', 'description', 'personality'],
+    card: {
+      spec: 'chara_card_v2',
+      spec_version: '2.0',
+      data: {
+        name: 'Reference Name',
+        description: 'Reference description',
+        personality: 'Reference personality',
+        scenario: '',
+        first_mes: '',
+        mes_example: '',
+        creator_notes: '',
+        system_prompt: '',
+        post_history_instructions: '',
+        alternate_greetings: [],
+        tags: [],
+        creator: '',
+        character_version: '',
+        extensions: { custom_fields: [] },
+      },
+    },
+  };
+}
+
+describe('EnhanceFieldTemplateDialog', () => {
+  it('keeps the original unchanged until the edited AI draft is applied', async () => {
+    const user = userEvent.setup();
+    const onEnhance = vi
+      .fn()
+      .mockResolvedValueOnce('Generated template content')
+      .mockResolvedValueOnce('Regenerated template content');
+    const onApply = vi.fn();
+    const onOpenChange = vi.fn();
+
+    render(
+      <EnhanceFieldTemplateDialog
+        isOpen
+        isEnhancing={false}
+        targetTemplate={createTemplate()}
+        fieldTemplates={[createTemplate()]}
+        exampleCharacters={[]}
+        onOpenChange={onOpenChange}
+        onCancel={vi.fn()}
+        onEnhance={onEnhance}
+        onApply={onApply}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Generate draft' }));
+
+    const currentTemplate = await screen.findByRole('textbox', { name: 'Current template' });
+    const aiDraft = screen.getByRole('textbox', { name: 'AI draft' });
+    expect((currentTemplate as HTMLTextAreaElement).value).toBe('Original template content');
+    expect((aiDraft as HTMLTextAreaElement).value).toBe('Generated template content');
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Regenerate' }));
+    const regeneratedDraft = await screen.findByRole<HTMLTextAreaElement>('textbox', { name: 'AI draft' });
+    expect(regeneratedDraft.value).toBe('Regenerated template content');
+    expect(onEnhance).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        targetTemplate: expect.objectContaining({ content: 'Generated template content' }),
+      }),
+    );
+    expect(onApply).not.toHaveBeenCalled();
+
+    await user.clear(aiDraft);
+    await user.type(aiDraft, 'Edited AI draft');
+    await user.click(screen.getByRole('button', { name: 'Apply changes' }));
+
+    expect(onApply).toHaveBeenCalledWith('Edited AI draft');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('sends only selected parts of a reference character', async () => {
+    const user = userEvent.setup();
+    const onEnhance = vi.fn().mockResolvedValue('Generated template content');
+
+    render(
+      <EnhanceFieldTemplateDialog
+        isOpen
+        isEnhancing={false}
+        targetTemplate={createTemplate()}
+        fieldTemplates={[createTemplate()]}
+        exampleCharacters={[createExampleCharacter()]}
+        onOpenChange={vi.fn()}
+        onCancel={vi.fn()}
+        onEnhance={onEnhance}
+        onApply={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Description' }));
+    await user.click(screen.getByRole('button', { name: 'Generate draft' }));
+
+    expect(onEnhance).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exampleCharacters: [
+          expect.objectContaining({
+            name: undefined,
+            description: 'Reference description',
+            personality: undefined,
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('discards the AI draft without applying it', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    const onOpenChange = vi.fn();
+
+    render(
+      <EnhanceFieldTemplateDialog
+        isOpen
+        isEnhancing={false}
+        targetTemplate={createTemplate()}
+        fieldTemplates={[createTemplate()]}
+        exampleCharacters={[]}
+        onOpenChange={onOpenChange}
+        onCancel={vi.fn()}
+        onEnhance={vi.fn().mockResolvedValue('Generated template content')}
+        onApply={onApply}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Generate draft' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard' }));
+
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});

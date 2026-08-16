@@ -346,6 +346,7 @@ export function useCharacterAssistantWorkspace({
   return {
     sessionId,
     sessions: characterSessions,
+    focusTemplates,
     composerDraft,
     composerDraftSessionId: storedComposerDraft?.characterId ?? null,
     messages: chat.messages,

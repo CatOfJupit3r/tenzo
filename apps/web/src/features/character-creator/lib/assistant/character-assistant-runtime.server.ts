@@ -284,7 +284,7 @@ export function streamCharacterAssistant({
       }),
     ],
     ...(shouldUseNativeTools
-      ? { tools: Object.values(createCharacterAssistantTools({ focus, store, allowedToolNames })) }
+      ? { tools: Object.values(createCharacterAssistantTools({ focus, store, templates, allowedToolNames })) }
       : {}),
     messages,
     agentLoopStrategy: maxIterations(maxSteps),

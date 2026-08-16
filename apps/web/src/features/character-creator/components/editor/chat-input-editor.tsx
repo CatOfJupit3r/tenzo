@@ -19,6 +19,7 @@ import {
 import type { iChatInputAttachment } from '../../lib/editor/chat-input-attachments';
 import { CHAT_INPUT_EDITOR_SERIALIZER } from '../../lib/editor/chat-input-serialization';
 import { buildChatTemplateMentionExtension } from '../../lib/editor/chat-template-mention';
+import type { iChatTemplateMentionReference } from '../../lib/editor/chat-template-mention';
 import { buildEditorAccessibilityAttributes } from '../../lib/editor/editor-contracts';
 import { createEditorHook } from '../../lib/editor/synced-editor-hook';
 
@@ -33,6 +34,7 @@ interface iChatInputEditorProps {
   attachments?: iChatInputAttachment[];
   onAttachmentsChange?: (attachments: iChatInputAttachment[]) => void;
   onValueChange: (value: string, templateIds: string[], content: JSONContent) => void;
+  onTemplateClick?: (reference: iChatTemplateMentionReference) => void;
   onSubmit: () => void;
 }
 
@@ -56,6 +58,7 @@ interface iChatInputEditorHookOptions {
   placeholder?: string;
   ariaLabel?: string;
   onSubmit: () => void;
+  onTemplateClick?: (reference: iChatTemplateMentionReference) => void;
   onUpdate: (content: JSONContent) => void;
 }
 
@@ -81,7 +84,7 @@ const useCreatedChatInputEditor = createEditorHook<iChatInputEditorHookOptions>(
     preferredFieldKeys,
     placeholder,
   ],
-  buildEditorOptions: ({ content, isDisabled, ariaLabel, onSubmit, onUpdate }) => ({
+  buildEditorOptions: ({ content, isDisabled, ariaLabel, onSubmit, onTemplateClick, onUpdate }) => ({
     content,
     editable: !isDisabled,
     editorProps: {
@@ -96,6 +99,17 @@ const useCreatedChatInputEditor = createEditorHook<iChatInputEditorHookOptions>(
           return true;
         }
         return false;
+      },
+      handleClick: (view, position) => {
+        if (!onTemplateClick) return false;
+        const resolvedPosition = view.state.doc.resolve(position);
+        const mentionNode = resolvedPosition.nodeAfter ?? resolvedPosition.nodeBefore;
+        if (mentionNode?.type.name !== 'mention') return false;
+        const id = typeof mentionNode.attrs.id === 'string' ? mentionNode.attrs.id : '';
+        const label = typeof mentionNode.attrs.label === 'string' ? mentionNode.attrs.label : '';
+        if (!id || !label) return false;
+        onTemplateClick({ id, label });
+        return true;
       },
     },
     onUpdate: ({ editor }) => onUpdate(editor.getJSON()),
@@ -113,6 +127,7 @@ export function ChatInputEditor({
   attachments = [],
   onAttachmentsChange,
   onValueChange,
+  onTemplateClick,
   onSubmit,
 }: iChatInputEditorProps) {
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -132,6 +147,7 @@ export function ChatInputEditor({
     isDisabled,
     placeholder,
     ariaLabel,
+    onTemplateClick,
     onSubmit,
     onUpdate: (document) => {
       const serialized = CHAT_INPUT_EDITOR_SERIALIZER.serialize(document);

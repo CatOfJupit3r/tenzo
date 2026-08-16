@@ -183,7 +183,11 @@ export async function* generateStructuredCharacterAssistantStream(
   const threadId = generateUuid();
   const runId = generateUuid();
   const messageId = generateUuid();
-  const handlers = createCharacterAssistantActionHandlers({ focus: options.focus, store: options.store });
+  const handlers = createCharacterAssistantActionHandlers({
+    focus: options.focus,
+    store: options.store,
+    templates: options.templates,
+  });
   const messages: Array<ModelMessage | UIMessage> = compactStructuredHistory(options.messages);
   const system = [
     buildAssistantSystemPrompt({

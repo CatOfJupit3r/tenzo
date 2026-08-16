@@ -23,6 +23,10 @@ vi.mock('../hooks/use-character-library-list', () => ({
   }),
 }));
 
+vi.mock('../context/character-creator-context/character-creator-context.hooks', () => ({
+  useCharacterCreatorContext: () => ({ activeCharacterId: 'character-1' }),
+}));
+
 vi.mock('../context/character-creator-context/character-creator-actions-context.hooks', () => ({
   useCharacterCreatorActions: () => ({
     handleCreateCharacter: vi.fn(),

@@ -1,10 +1,11 @@
 import type { JSONContent } from '@tiptap/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LuRefreshCw, LuSparkles, LuX } from 'react-icons/lu';
+import { LuFileText, LuRefreshCw, LuSparkles, LuX } from 'react-icons/lu';
 
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { Button } from '@~/components/ui/button/button';
-import { Dialog, DialogContent, DialogTitle } from '@~/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@~/components/ui/dialog';
+import { cn } from '@~/lib/utils';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
@@ -15,6 +16,7 @@ import {
   readModelPromptSuggestions,
 } from '../lib/assistant/next-prompt-suggestions';
 import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
+import type { iChatTemplateMentionReference } from '../lib/editor/chat-template-mention';
 import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
 import { CharacterAssistantConversationMenu } from './assistant/character-assistant-conversation-menu';
 import { CharacterAssistantConversation } from './character-assistant-conversation';
@@ -36,6 +38,7 @@ function getErrorMessage(error: unknown) {
 export interface iCharacterAssistantPanelProps {
   isOverlay: boolean;
   onOpenConnectionSettings: () => void;
+  onOpenTemplateSettings: (templateId: string) => void;
   onRestoreAssistantToggleFocus: () => void;
   onWidthChange: (width: number) => void;
   width: number;
@@ -44,6 +47,7 @@ export interface iCharacterAssistantPanelProps {
 export function CharacterAssistantPanel({
   isOverlay,
   onOpenConnectionSettings,
+  onOpenTemplateSettings,
   onRestoreAssistantToggleFocus,
   onWidthChange,
   width,
@@ -54,6 +58,7 @@ export function CharacterAssistantPanel({
   const [inputTemplateIds, setInputTemplateIds] = useState<string[]>([]);
   const [inputDocument, setInputDocument] = useState<JSONContent | null>(null);
   const [inputAttachments, setInputAttachments] = useState<iChatInputAttachment[]>([]);
+  const [missingTemplateReference, setMissingTemplateReference] = useState<iChatTemplateMentionReference | null>(null);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const settledOutcomeRef = useRef<HTMLDivElement>(null);
   const hydratedDraftIdRef = useRef<string | null>(null);
@@ -117,6 +122,15 @@ export function CharacterAssistantPanel({
     }
   };
 
+  const handleTemplateClick = (reference: iChatTemplateMentionReference) => {
+    if (fieldTemplates.some((template) => template.id === reference.id)) {
+      onOpenTemplateSettings(reference.id);
+      return;
+    }
+
+    setMissingTemplateReference(reference);
+  };
+
   const panelContent = (
     <>
       <header className="grid gap-1 border-b px-3 py-2.5">
@@ -161,6 +175,25 @@ export function CharacterAssistantPanel({
             }
           }}
         />
+        {workspace.focusTemplates.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1" aria-label="Auto-attached templates">
+            <span className="text-[11px] font-medium text-muted-foreground">Attached templates</span>
+            {workspace.focusTemplates.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                className={cn(
+                  'inline-flex max-w-full items-center gap-1 rounded-full border bg-muted/40 px-2 py-1 text-[11px] hover:bg-muted',
+                )}
+                title={`Open template ${template.name}`}
+                onClick={() => onOpenTemplateSettings(template.id)}
+              >
+                <LuFileText className="size-3 shrink-0" />
+                <span className="truncate">{template.name}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </header>
       <div
         className="scroll-fade-y min-h-0 overflow-y-auto overscroll-contain p-4 [scrollbar-gutter:stable]"
@@ -271,6 +304,7 @@ export function CharacterAssistantPanel({
                 setInputTemplateIds(templateIds);
                 setInputDocument(content);
               }}
+              onTemplateClick={handleTemplateClick}
               onAttachmentsChange={setInputAttachments}
               onSubmit={() => {
                 void handleSubmit();
@@ -308,6 +342,27 @@ export function CharacterAssistantPanel({
           </form>
         )}
       </footer>
+      <Dialog
+        open={missingTemplateReference !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setMissingTemplateReference(null);
+        }}
+      >
+        <DialogContent>
+          <DialogTitle>Template unavailable</DialogTitle>
+          <DialogDescription>
+            The template mention /{missingTemplateReference?.label ?? 'unknown'} is no longer available. Its saved
+            metadata is kept here so the message remains understandable.
+          </DialogDescription>
+          {missingTemplateReference ? (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">Template mention</p>
+              <p className="mt-1 font-mono text-xs">/{missingTemplateReference.label}</p>
+              <p className="mt-2 text-xs text-muted-foreground">ID: {missingTemplateReference.id}</p>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 

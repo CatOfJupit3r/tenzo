@@ -2,6 +2,8 @@ import { EventType } from '@tanstack/ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import { BUILT_IN_FIELD_TEMPLATES } from '../../constants/default-field-templates';
+import { resolveEffectiveFieldTemplateId } from '../cards/field-template-resolution';
 import { buildAssistantSystemPrompt, streamCharacterAssistant } from './character-assistant-runtime.server';
 
 const { chatMock } = vi.hoisted(() => ({ chatMock: vi.fn() }));
@@ -86,6 +88,28 @@ describe('buildAssistantSystemPrompt', () => {
 
     expect(prompt).toContain('first_mes:');
     expect(prompt).not.toContain('mes_example:');
+  });
+
+  it('includes the effective built-in template when no explicit selection exists', () => {
+    const templateId = resolveEffectiveFieldTemplateId({
+      fieldTemplateIds: {},
+      shouldUseDefaultFieldTemplates: true,
+      targetKey: 'field:description',
+    });
+    const template = BUILT_IN_FIELD_TEMPLATES.find((candidate) => candidate.id === templateId);
+
+    const prompt = buildAssistantSystemPrompt({
+      card: createEmptyCharacterCard(),
+      focus: { kind: 'field', fieldKey: 'description' },
+      contextAttachments: [],
+      templates: template ? [template] : [],
+      mode: 'tool-call',
+    });
+
+    expect(template).toBeDefined();
+    expect(prompt).toContain('Template: Structured Description');
+    expect(prompt).toContain('Reproduce this skeleton exactly');
+    expect(prompt).toContain('**Identity:** {{gen:identity:one line summing up who the character is}}');
   });
 
   it('includes guidance for every known field on card focus and omits the example section without references', () => {

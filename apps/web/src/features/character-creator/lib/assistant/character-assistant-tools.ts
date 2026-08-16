@@ -10,7 +10,10 @@ import {
   CUSTOM_FIELD_SCHEMA,
 } from '../cards/card-schema';
 import type { CharacterCard, CustomField } from '../cards/card-schema';
-import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../proposals/character-edit-proposal';
+import { doesValueMatchStrictFieldTemplate } from '../cards/field-template-enforcement';
+import { getTemplateFieldKeyForTargetKey, TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
+import type { TemplateFieldKey } from '../cards/field-templates';
+import { CHARACTER_EDIT_FIELD_KEYS, CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../proposals/character-edit-proposal';
 import type { iCharacterEditProposal } from '../proposals/character-edit-proposal';
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
@@ -23,6 +26,7 @@ import type {
   CharacterAssistantToolName,
   iCharacterAssistantDiscoveryDirectionCard,
   iCharacterConcept,
+  iChatTemplateRef,
 } from './character-assistant-contracts';
 
 export interface iCharacterAssistantProposalStore {
@@ -74,6 +78,57 @@ function assertFocusAllowsField(focus: CharacterAssistantFocus, fieldKey: string
     throw new Error(`This run does not allow proposing changes to ${fieldKey}.`);
 }
 
+function getTemplateFieldKeyForProposalField(fieldKey: string): TemplateFieldKey | null {
+  if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings) {
+    return TEMPLATE_FIELD_KEYS.alternate_greeting;
+  }
+
+  return getTemplateFieldKeyForTargetKey(`field:${fieldKey}`);
+}
+
+function assertStrictTemplateCompliance({
+  fieldKeys,
+  proposedCard,
+  templates,
+}: {
+  fieldKeys: readonly string[];
+  proposedCard: CharacterCard;
+  templates: readonly iChatTemplateRef[];
+}) {
+  fieldKeys.forEach((fieldKey) => {
+    const templateFieldKey = getTemplateFieldKeyForProposalField(fieldKey);
+    if (!templateFieldKey) {
+      return;
+    }
+
+    const strictTemplate = templates.find(
+      (template) => template.mode === TEMPLATE_MODES.strict && template.fieldKeys.includes(templateFieldKey),
+    );
+    if (!strictTemplate) {
+      return;
+    }
+
+    const proposedValues =
+      fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings
+        ? proposedCard.data.alternate_greetings
+        : [proposedCard.data[templateFieldKey as keyof typeof proposedCard.data]];
+    const isCompliant = proposedValues.every(
+      (proposedValue): proposedValue is string =>
+        typeof proposedValue === 'string' && doesValueMatchStrictFieldTemplate(strictTemplate.content, proposedValue),
+    );
+
+    if (isCompliant) {
+      return;
+    }
+
+    throw new Error(
+      `The proposed ${fieldKey} value does not match strict template "${strictTemplate.name}". ` +
+        `Preserve this skeleton exactly:\n${strictTemplate.content}\n` +
+        'Fill only {{gen:label}} slots; do not alter the literal text outside those slots.',
+    );
+  });
+}
+
 export function createProposalFromChanges({
   store,
   focus,
@@ -81,6 +136,7 @@ export function createProposalFromChanges({
   summary,
   updateCard,
   fieldKeys,
+  templates = [],
 }: {
   store: iCharacterAssistantProposalStore;
   focus: CharacterAssistantFocus;
@@ -88,10 +144,12 @@ export function createProposalFromChanges({
   summary: string;
   updateCard: (card: CharacterCard) => unknown;
   fieldKeys: readonly string[];
+  templates?: readonly iChatTemplateRef[];
 }) {
   fieldKeys.forEach((fieldKey) => assertFocusAllowsField(focus, fieldKey));
   const proposedCard = structuredClone(store.getCard());
   updateCard(proposedCard);
+  assertStrictTemplateCompliance({ fieldKeys, proposedCard, templates });
   return { proposal: store.appendProposedCard({ toolCallId: toolCallId ?? generateUuid(), summary, proposedCard }) };
 }
 
@@ -102,9 +160,11 @@ export function recordConcept(concept: iCharacterConcept) {
 export function createCharacterAssistantActionHandlers({
   focus,
   store,
+  templates = [],
 }: {
   focus: CharacterAssistantFocus;
   store: iCharacterAssistantProposalStore;
+  templates?: readonly iChatTemplateRef[];
 }) {
   return {
     readCharacter: () => ({ card: store.getCard() }),
@@ -116,6 +176,7 @@ export function createCharacterAssistantActionHandlers({
         toolCallId,
         summary: input.summary,
         fieldKeys: input.changes.map((change) => change.fieldKey),
+        templates,
         updateCard: (card) =>
           input.changes.forEach((change) => {
             card.data[change.fieldKey] = change.value;
@@ -128,6 +189,7 @@ export function createCharacterAssistantActionHandlers({
         toolCallId,
         summary: input.summary,
         fieldKeys: ['tags'],
+        templates,
         updateCard: (card) => {
           card.data.tags = input.tags;
         },
@@ -139,6 +201,7 @@ export function createCharacterAssistantActionHandlers({
         toolCallId,
         summary: input.summary,
         fieldKeys: ['alternate_greetings'],
+        templates,
         updateCard: (card) => {
           card.data.alternate_greetings = input.greetings;
         },
@@ -150,6 +213,7 @@ export function createCharacterAssistantActionHandlers({
         toolCallId,
         summary: input.summary,
         fieldKeys: ['custom_fields'],
+        templates,
         updateCard: (card) => {
           card.data.extensions.custom_fields = input.fields.map(normalizeCustomField);
         },
@@ -161,6 +225,7 @@ export function createCharacterAssistantActionHandlers({
         toolCallId,
         summary: input.summary,
         fieldKeys: ['character_book'],
+        templates,
         updateCard: (card) => {
           card.data.character_book = input.characterBook ?? undefined;
         },
@@ -175,13 +240,15 @@ export function createCharacterAssistantActionHandlers({
 export function createCharacterAssistantTools({
   focus,
   store,
+  templates = [],
   allowedToolNames,
 }: {
   focus: CharacterAssistantFocus;
   store: iCharacterAssistantProposalStore;
+  templates?: readonly iChatTemplateRef[];
   allowedToolNames?: readonly CharacterAssistantToolName[];
 }) {
-  const handlers = createCharacterAssistantActionHandlers({ focus, store });
+  const handlers = createCharacterAssistantActionHandlers({ focus, store, templates });
   const allTools = {
     [CHARACTER_ASSISTANT_TOOL_NAMES.read_character]: toolDefinition({
       name: CHARACTER_ASSISTANT_TOOL_NAMES.read_character,

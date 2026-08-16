@@ -3,6 +3,7 @@ import type { ModelMessage, StreamChunk, UIMessage } from '@tanstack/ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS, CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import {
   generateStructuredCharacterAssistantStream,
@@ -221,5 +222,44 @@ describe('structured character assistant loop', () => {
     const chunks = await collect(generateStructuredCharacterAssistantStream(options));
 
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_RESULT)).toBe(true);
+  });
+
+  it('returns a retryable tool error when a structured strict proposal drifts', async () => {
+    const options = createOptions();
+    const strictTemplate = {
+      id: 'strict-description',
+      name: 'Strict description',
+      mode: TEMPLATE_MODES.strict,
+      fieldKeys: [TEMPLATE_FIELD_KEYS.description],
+      content: 'Description: {{gen:body}}',
+    };
+    generateValidatedObjectMock.mockResolvedValueOnce({
+      assistantMessage: 'I drafted the description.',
+      actions: [
+        {
+          action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+          inputJson: JSON.stringify({
+            changes: [{ fieldKey: 'description', value: 'A description without the required prefix.' }],
+            summary: 'Draft description',
+          }),
+        },
+      ],
+      isDone: true,
+      followUpSuggestions: [],
+    });
+
+    const chunks = await collect(
+      generateStructuredCharacterAssistantStream({
+        ...options,
+        templates: [strictTemplate],
+      }),
+    );
+    const toolError = chunks.find((chunk) => chunk.type === EventType.TOOL_CALL_END && chunk.state === 'output-error');
+
+    expect(toolError).toEqual(
+      expect.objectContaining({
+        result: expect.stringContaining('Fill only {{gen:label}} slots'),
+      }),
+    );
   });
 });

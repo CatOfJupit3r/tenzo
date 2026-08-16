@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
+import { Switch } from '@~/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
 
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
@@ -19,15 +20,23 @@ export interface iSettingsDialogProps {
   activeTab: SettingsDialogTab;
   onOpenChange: (isOpen: boolean) => void;
   onTabChange: (tab: SettingsDialogTab) => void;
+  selectedTemplateId?: string | null;
 }
 
-export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }: iSettingsDialogProps) {
+export function SettingsDialog({
+  isOpen,
+  activeTab,
+  onOpenChange,
+  onTabChange,
+  selectedTemplateId,
+}: iSettingsDialogProps) {
   const {
     generationSettings,
     apiKey,
     connectionHealth,
     updateApiKey,
     updateGenerationSettings,
+    updateShouldUseDefaultFieldTemplates,
     handleHealthCheck,
     fieldTemplates,
     addFieldTemplate,
@@ -104,6 +113,19 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
           </TabsContent>
 
           <TabsContent value={SETTINGS_DIALOG_TABS.templates} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
+            <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Use default field templates</p>
+                <p className="text-xs text-muted-foreground">
+                  Apply built-in structure when a field has no explicit template selection.
+                </p>
+              </div>
+              <Switch
+                checked={generationSettings.shouldUseDefaultFieldTemplates}
+                aria-label="Use default field templates"
+                onCheckedChange={updateShouldUseDefaultFieldTemplates}
+              />
+            </div>
             <FieldTemplatesPanel
               fieldTemplates={fieldTemplates}
               exampleCharacters={exampleCharacters}
@@ -114,6 +136,7 @@ export function SettingsDialog({ isOpen, activeTab, onOpenChange, onTabChange }:
               onDuplicateTemplate={duplicateFieldTemplate}
               onEnhanceTemplate={enhanceTemplate}
               onCancelTemplateEnhancement={cancelTemplateEnhancement}
+              selectedTemplateId={selectedTemplateId}
             />
           </TabsContent>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LuCopy, LuLock, LuPlus, LuSparkles, LuTrash2 } from 'react-icons/lu';
 
 import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
@@ -58,6 +58,7 @@ export interface iFieldTemplatesPanelProps {
   onDuplicateTemplate: (id: string) => string | null;
   onEnhanceTemplate: (options: iEnhanceTemplateOptions) => Promise<string>;
   onCancelTemplateEnhancement: () => void;
+  selectedTemplateId?: string | null;
 }
 
 export function FieldTemplatesPanel({
@@ -70,6 +71,7 @@ export function FieldTemplatesPanel({
   onDuplicateTemplate,
   onEnhanceTemplate,
   onCancelTemplateEnhancement,
+  selectedTemplateId: templateIdToSelect,
 }: iFieldTemplatesPanelProps) {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(fieldTemplates[0]?.id ?? null);
   const [isEnhanceDialogOpen, setIsEnhanceDialogOpen] = useState(false);
@@ -79,6 +81,14 @@ export function FieldTemplatesPanel({
   const hasOriginalMacroCapableField = Boolean(
     selectedTemplate?.fieldKeys.some((fieldKey) => TEMPLATE_FIELD_KEYS_ALLOWING_ORIGINAL_MACRO.includes(fieldKey)),
   );
+
+  useEffect(() => {
+    if (templateIdToSelect === undefined) {
+      return;
+    }
+
+    setSelectedTemplateId(templateIdToSelect);
+  }, [templateIdToSelect]);
 
   const handleCreateTemplate = () => {
     const newTemplateId = onAddTemplate({

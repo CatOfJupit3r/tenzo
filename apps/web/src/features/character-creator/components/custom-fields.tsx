@@ -98,6 +98,8 @@ export function CustomFields({
                     isGenerating={isGenerating}
                     templateOptions={templateOptions}
                     templateId={generationState?.templateId ?? null}
+                    isDefaultTemplateSelected={generationState?.isDefaultTemplateSelected ?? false}
+                    isExplicitTemplateNone={generationState?.isExplicitTemplateNone ?? false}
                     isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
                     fieldValue={field.value}
                     templateFieldKey={TEMPLATE_FIELD_KEYS.custom_field}

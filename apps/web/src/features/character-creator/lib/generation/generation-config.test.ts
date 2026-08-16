@@ -7,6 +7,7 @@ import {
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   GENERATION_PROVIDERS,
   sanitizeCharacterGenerationConnectionSettings,
+  sanitizeCharacterGenerationPromptSettings,
 } from './generation-config';
 
 describe('CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA', () => {
@@ -24,8 +25,20 @@ describe('CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA', () => {
         fieldInstructions: {},
         fieldShouldUseGeneralCharacterIdea: {},
         fieldTemplateIds: DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldTemplateIds,
+        shouldUseDefaultFieldTemplates: true,
       },
     });
+  });
+});
+
+describe('sanitizeCharacterGenerationPromptSettings', () => {
+  it('defaults stored settings that predate default field templates to enabled', () => {
+    const result = sanitizeCharacterGenerationPromptSettings({
+      ...DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
+      shouldUseDefaultFieldTemplates: undefined,
+    });
+
+    expect(result.shouldUseDefaultFieldTemplates).toBe(true);
   });
 });
 

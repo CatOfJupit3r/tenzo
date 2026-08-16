@@ -14,4 +14,7 @@ Planning artifacts following the roadmap standard in [`standard.md`](../../stand
 
 ## Archive
 
-_None yet._
+| Roadmap | Type | Priority | Status |
+| ------- | ---- | -------- | ------ |
+| [Character Assistant Experience Overhaul](archive/assistant-experience-overhaul.roadmap.md) | feature-epic | P1 | Completed |
+| [Default Field Templates & Assistant Template Enforcement](archive/default-field-templates.roadmap.md) | feature | P2 | Completed and aligned |

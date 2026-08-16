@@ -56,7 +56,13 @@ describe('TanStack AI text generation', () => {
       model: 'anthropic/claude-sonnet-4',
     });
 
-    expect(createOpenRouterTextMock).toHaveBeenCalledWith('anthropic/claude-sonnet-4', 'sk-or-v1-test');
+    expect(createOpenRouterTextMock).toHaveBeenCalledWith(
+      'anthropic/claude-sonnet-4',
+      'sk-or-v1-test',
+      expect.objectContaining({
+        httpClient: expect.objectContaining({ request: expect.any(Function) }),
+      }),
+    );
     expect(
       createCharacterModelOptions('https://openrouter.ai/api', {
         maxTokens: 400,

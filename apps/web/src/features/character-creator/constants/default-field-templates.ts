@@ -54,4 +54,42 @@ Keep the whole greeting under three paragraphs.`,
     updatedAt: BUILT_IN_TIMESTAMP,
     isBuiltIn: true,
   },
+  {
+    id: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}keyed-scenario`,
+    name: 'Keyed Scenario',
+    description: 'A setting-and-situation outline organized around the details that shape the roleplay premise.',
+    mode: TEMPLATE_MODES.prompt,
+    fieldKeys: [TEMPLATE_FIELD_KEYS.scenario],
+    content: `Setting: location and immediate surroundings.
+Time: when this takes place and any relevant time pressure.
+Circumstances: the situation that has brought {{char}} and {{user}} together.
+Stakes: what matters to the characters in this situation.
+Constraint: describe what has not happened yet; do not narrate the outcome or future events.`,
+    createdAt: BUILT_IN_TIMESTAMP,
+    updatedAt: BUILT_IN_TIMESTAMP,
+    isBuiltIn: true,
+  },
+  {
+    id: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}start-block-dialogue`,
+    name: 'Start-Block Dialogue',
+    description: 'A SillyTavern example-dialogue exchange with explicit START and speaker turns.',
+    mode: TEMPLATE_MODES.strict,
+    fieldKeys: [TEMPLATE_FIELD_KEYS.mes_example],
+    content: `<START>
+{{char}}: {{gen:char_turn:an in-character opening turn with action or dialogue}}
+{{user}}: {{gen:user_turn:a natural user response for the exchange}}
+{{char}}: {{gen:char_followup:an in-character response that demonstrates the character's voice}}`,
+    createdAt: BUILT_IN_TIMESTAMP,
+    updatedAt: BUILT_IN_TIMESTAMP,
+    isBuiltIn: true,
+  },
 ];
+
+export const DEFAULT_FIELD_TEMPLATE_IDS = {
+  [`field:${TEMPLATE_FIELD_KEYS.description}`]: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}structured-description`,
+  [`field:${TEMPLATE_FIELD_KEYS.personality}`]: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}trait-list-personality`,
+  [`field:${TEMPLATE_FIELD_KEYS.scenario}`]: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}keyed-scenario`,
+  [`field:${TEMPLATE_FIELD_KEYS.first_mes}`]: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}scene-opening-greeting`,
+  [`field:${TEMPLATE_FIELD_KEYS.mes_example}`]: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}start-block-dialogue`,
+  [`field:${TEMPLATE_FIELD_KEYS.alternate_greeting}`]: `${BUILT_IN_FIELD_TEMPLATE_ID_PREFIX}scene-opening-greeting`,
+} satisfies Record<string, string>;

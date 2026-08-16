@@ -18,7 +18,7 @@ import type { iOptionType } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
 import { cn } from '@~/lib/utils';
 
-import { TEMPLATE_MODE_LABELS } from '../lib/cards/field-templates';
+import { FIELD_TEMPLATE_SELECTION_NONE, TEMPLATE_MODE_LABELS } from '../lib/cards/field-templates';
 import type {
   iCreateStoredFieldTemplateInput,
   iFieldTemplateViewModel,
@@ -27,7 +27,7 @@ import type {
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { SaveTemplateDialog } from './save-template-dialog';
 
-const NO_TEMPLATE_OPTION_VALUE = '';
+const NO_TEMPLATE_OPTION_VALUE = FIELD_TEMPLATE_SELECTION_NONE;
 
 export interface iFieldGenerationControlsProps {
   fieldId: string;
@@ -41,6 +41,8 @@ export interface iFieldGenerationControlsProps {
   isGenerating: boolean;
   templateOptions?: iFieldTemplateViewModel[];
   templateId?: string | null;
+  isDefaultTemplateSelected?: boolean;
+  isExplicitTemplateNone?: boolean;
   isStrictTemplateSelected?: boolean;
   fieldValue?: string;
   templateFieldKey?: TemplateFieldKey | null;
@@ -67,6 +69,8 @@ export function FieldGenerationControls({
   isGenerating,
   templateOptions = [],
   templateId = null,
+  isDefaultTemplateSelected = false,
+  isExplicitTemplateNone = false,
   isStrictTemplateSelected = false,
   fieldValue = '',
   templateFieldKey = null,
@@ -88,13 +92,22 @@ export function FieldGenerationControls({
   const canSaveTemplate = Boolean(onSaveTemplate) && fieldValue.trim().length > 0;
 
   const templateSelectOptions: iOptionType[] = [
-    { label: 'None', value: NO_TEMPLATE_OPTION_VALUE, description: 'Generate without a field template.' },
-    ...templateOptions.map((template) => ({
-      label: template.name.trim() !== '' ? template.name : 'Untitled template',
-      value: template.id,
-      description: template.description.trim() !== '' ? template.description : TEMPLATE_MODE_LABELS[template.mode],
-      meta: TEMPLATE_MODE_LABELS[template.mode],
-    })),
+    {
+      label: 'None',
+      value: NO_TEMPLATE_OPTION_VALUE,
+      description: 'Explicitly disable the template for this field.',
+    },
+    ...templateOptions.map((template) => {
+      const templateName = template.name.trim() !== '' ? template.name : 'Untitled template';
+      const isInheritedDefault = isDefaultTemplateSelected && template.id === templateId;
+
+      return {
+        label: isInheritedDefault ? `Default — ${templateName}` : templateName,
+        value: template.id,
+        description: template.description.trim() !== '' ? template.description : TEMPLATE_MODE_LABELS[template.mode],
+        meta: TEMPLATE_MODE_LABELS[template.mode],
+      };
+    }),
   ];
 
   return (
@@ -136,11 +149,14 @@ export function FieldGenerationControls({
               <SingleSelect
                 inputId={templateSelectId}
                 options={templateSelectOptions}
-                value={templateId ?? NO_TEMPLATE_OPTION_VALUE}
-                onValueChange={(value) =>
-                  onTemplateIdChange?.(value === null || value === NO_TEMPLATE_OPTION_VALUE ? null : value)
-                }
+                value={isExplicitTemplateNone ? NO_TEMPLATE_OPTION_VALUE : (templateId ?? NO_TEMPLATE_OPTION_VALUE)}
+                onValueChange={(value) => onTemplateIdChange?.(value ?? NO_TEMPLATE_OPTION_VALUE)}
               />
+              {isDefaultTemplateSelected && templateId ? (
+                <p className="text-xs text-muted-foreground">
+                  Inherited default. Choose a template or None to override it.
+                </p>
+              ) : null}
               {isStrictTemplateSelected ? (
                 <p className="text-xs text-muted-foreground">
                   Strict template: the AI only fills the slots, so Continue is unavailable.

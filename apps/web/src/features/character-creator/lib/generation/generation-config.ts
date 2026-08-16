@@ -67,6 +67,7 @@ export const CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA = z.object({
   fieldInstructions: z.record(z.string(), z.string()),
   fieldShouldUseGeneralCharacterIdea: z.record(z.string(), z.boolean()),
   fieldTemplateIds: z.record(z.string(), z.string()).default({}),
+  shouldUseDefaultFieldTemplates: z.boolean().default(true),
 });
 
 export type iCharacterGenerationPromptSettings = z.infer<typeof CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA>;
@@ -99,6 +100,7 @@ export const DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS: iCharacterGenerationP
   fieldInstructions: {},
   fieldShouldUseGeneralCharacterIdea: {},
   fieldTemplateIds: {},
+  shouldUseDefaultFieldTemplates: true,
 };
 
 export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings = {
@@ -108,6 +110,10 @@ export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings
 
 function readString(value: unknown, fallbackValue: string) {
   return typeof value === 'string' ? value : fallbackValue;
+}
+
+function readBoolean(value: unknown, fallbackValue: boolean) {
+  return typeof value === 'boolean' ? value : fallbackValue;
 }
 
 function readPositiveInteger(value: unknown, fallbackValue: number) {
@@ -233,6 +239,10 @@ export function sanitizeCharacterGenerationPromptSettings(value: unknown): iChar
       candidate.fieldShouldUseGeneralCharacterIdea,
     ),
     fieldTemplateIds: readFieldTemplateIds(candidate.fieldTemplateIds),
+    shouldUseDefaultFieldTemplates: readBoolean(
+      candidate.shouldUseDefaultFieldTemplates,
+      DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.shouldUseDefaultFieldTemplates,
+    ),
   };
 }
 

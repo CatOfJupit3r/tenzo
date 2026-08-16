@@ -1,7 +1,7 @@
 ---
 title: "Default Field Templates & Assistant Template Enforcement"
 slug: "default-field-templates"
-status: "Active backlog"
+status: "Completed and aligned"
 roadmap_type: "feature"
 priority: "P2"
 created: "2026-08-16"
@@ -23,8 +23,8 @@ archive_when:
 
 # Default Field Templates & Assistant Template Enforcement
 
-> Status: Active backlog
-> Current summary: The assistant/field-generation parity work made the assistant consume reference characters, field format guidance, and templates bound via `fieldTemplateIds` (auto-attached for focused fields, all bound `field:*` templates on card focus, merged with `/`-mentioned chat templates from the tiptap composer). This roadmap closes the remaining template gaps: fields with no configured template get nothing, built-in templates only cover 3 of 5 core prose fields, and strict-mode skeletons are only *suggested* to the assistant while field generation *enforces* them via `renderStrictTemplate`.
+> Status: Completed and aligned
+> Current summary: Complete. Core prose fields inherit built-in templates, field generation and the assistant share effective-template resolution, strict assistant proposals are enforced, and users can understand and override template behavior in the UI.
 
 ## 1. Problem
 
@@ -56,23 +56,29 @@ archive_when:
 
 ### Phase 3 — Strict-template enforcement for assistant proposals
 
-- [ ] Server-side, in `propose_character_fields` handling (both tool-call and structured-action paths share `createProposalFromChanges` / action handlers): when a change's `fieldKey` is bound to an attached strict template, validate the proposed value reproduces the skeleton (reuse `TEMPLATE_SLOT_PATTERN`; compare non-slot segments, ignoring slot spans).
-- [ ] On violation, throw the existing tool-error shape with the skeleton and the instruction to fill only `{{gen:label}}` slots — the bounded loop already surfaces tool errors back to the model for retry.
-- [ ] Pass attached templates into the handler context (`character-assistant-tools.ts` currently has no template awareness); thread from `commonOptions` in `routes/api/character-assistant.ts`.
+- [x] Server-side, in `propose_character_fields` handling (both tool-call and structured-action paths share `createProposalFromChanges` / action handlers): when a change's `fieldKey` is bound to an attached strict template, validate the proposed value reproduces the skeleton (reuse `TEMPLATE_SLOT_PATTERN`; compare non-slot segments, ignoring slot spans).
+- [x] On violation, throw the existing tool-error shape with the skeleton and the instruction to fill only `{{gen:label}}` slots — the bounded loop already surfaces tool errors back to the model for retry.
+- [x] Pass attached templates into the handler context (`character-assistant-tools.ts` currently has no template awareness); thread from `commonOptions` in `routes/api/character-assistant.ts`.
 
 ### Phase 4 — UI affordances
 
-- [ ] Template pickers: show inherited default as "Default — <name>" with a distinct state from an explicit selection; explicit "None" option writes the sentinel.
-- [ ] Settings dialog: toggle for `shouldUseDefaultFieldTemplates` next to the field-template section.
-- [ ] Assistant panel: chip/indicator listing auto-attached templates for the current focus so users understand why output follows a skeleton;
-- [ ] AI Assistant panel: add icons displaying what `/`-mention is (template or something else); format the `/` mentions to look similar to `{{user}}` or `{{char}}` tokens, so users can distinguish them from free-text content. Make sure that clicking on the template in such state opens up the template if it still exists (it may have been deleted; else display a placeholder with minimal information available).
+- [x] Template pickers: show inherited default as "Default — <name>" with a distinct state from an explicit selection; explicit "None" option writes the sentinel.
+- [x] Settings dialog: toggle for `shouldUseDefaultFieldTemplates` next to the field-template section.
+- [x] Assistant panel: chip/indicator listing auto-attached templates for the current focus so users understand why output follows a skeleton;
+- [x] AI Assistant panel: add icons displaying what `/`-mention is (template or something else); format the `/` mentions to look similar to `{{user}}` or `{{char}}` tokens, so users can distinguish them from free-text content. Make sure that clicking on the template in such state opens up the template if it still exists (it may have been deleted; else display a placeholder with minimal information available).
 
 ### Phase 5 — Tests & validation
 
-- [ ] Resolver unit tests: explicit > sentinel > default > none; defaults disabled.
-- [ ] Runtime prompt test: default template appears in the assistant system prompt when no explicit selection exists.
-- [ ] Enforcement tests: conforming strict value accepted; skeleton drift rejected with retryable error; prompt-mode templates never rejected.
-- [ ] `pnpm run lint`, `pnpm run check-types`, `pnpm run test` clean; mark roadmap items complete.
+- [x] Resolver unit tests: explicit > sentinel > default > none; defaults disabled.
+- [x] Runtime prompt test: default template appears in the assistant system prompt when no explicit selection exists.
+- [x] Enforcement tests: conforming strict value accepted; skeleton drift rejected with retryable error; prompt-mode templates never rejected.
+- [x] `pnpm run lint`, `pnpm run check-types`, `pnpm run test` clean; mark roadmap items complete.
+
+### Verification evidence
+
+- 2026-08-16: `pnpm run test` passed 61 files and 244 tests.
+- 2026-08-16: `pnpm run lint` passed.
+- 2026-08-16: `pnpm run check-types` passed.
 
 ## 4. Non-Goals
 

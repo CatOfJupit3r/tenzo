@@ -11,8 +11,10 @@ Planning artifacts following the roadmap standard in [`standard.md`](../../stand
 | Roadmap | Type | Priority | Status |
 | ------- | ---- | -------- | ------ |
 | [Character Card Creator Web App](active/character-card-creator.roadmap.md) | feature-epic | P1 | Active backlog |
-| [Default Field Templates & Assistant Template Enforcement](active/default-field-templates.roadmap.md) | feature | P2 | Active backlog |
 
 ## Archive
 
-_None yet._
+| Roadmap | Type | Priority | Status |
+| ------- | ---- | -------- | ------ |
+| [Character Assistant Experience Overhaul](archive/assistant-experience-overhaul.roadmap.md) | feature-epic | P1 | Completed |
+| [Default Field Templates & Assistant Template Enforcement](archive/default-field-templates.roadmap.md) | feature | P2 | Completed and aligned |

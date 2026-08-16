@@ -7,12 +7,13 @@ export const MAX_TEMPLATE_ENHANCEMENT_REFERENCE_COUNT = 4;
 
 export interface iBuildTemplateEnhancementMessagesOptions {
   targetTemplate: iFieldTemplateViewModel;
+  shouldIncludeCurrentTemplate: boolean;
   referenceTemplates: iFieldTemplateViewModel[];
   exampleCharacters: iPromptExampleCharacter[];
   guidance: string;
 }
 
-function formatTemplate(template: iFieldTemplateViewModel) {
+function formatTemplate(template: iFieldTemplateViewModel, shouldIncludeContent = true) {
   const fieldLabels = template.fieldKeys.map((fieldKey) => TEMPLATE_FIELD_KEY_LABELS[fieldKey]);
 
   return [
@@ -20,8 +21,8 @@ function formatTemplate(template: iFieldTemplateViewModel) {
     `Mode: ${TEMPLATE_MODE_LABELS[template.mode]}`,
     `Fields: ${fieldLabels.join(', ') || 'Unbound'}`,
     template.description.trim() ? `Notes: ${template.description.trim()}` : '',
-    'Content:',
-    template.content,
+    shouldIncludeContent ? 'Content:' : '',
+    shouldIncludeContent ? template.content : '',
   ]
     .filter(Boolean)
     .join('\n');
@@ -29,6 +30,7 @@ function formatTemplate(template: iFieldTemplateViewModel) {
 
 export function buildTemplateEnhancementMessages({
   targetTemplate,
+  shouldIncludeCurrentTemplate,
   referenceTemplates,
   exampleCharacters,
   guidance,
@@ -63,7 +65,7 @@ export function buildTemplateEnhancementMessages({
       role: 'user',
       content: [
         'Template to enhance:',
-        formatTemplate(targetTemplate),
+        formatTemplate(targetTemplate, shouldIncludeCurrentTemplate),
         referenceTemplateSection ? `Other reusable templates:\n${referenceTemplateSection}` : '',
         exampleSection,
         guidance.trim()

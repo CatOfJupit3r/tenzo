@@ -58,6 +58,7 @@ export function EnhanceFieldTemplateDialog({
   onApply,
 }: iEnhanceFieldTemplateDialogProps) {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  const [shouldIncludeCurrentTemplate, setShouldIncludeCurrentTemplate] = useState(true);
   const [selectedExampleFieldKeys, setSelectedExampleFieldKeys] = useState<
     Record<string, ExampleCharacterContextFieldKey[]>
   >({});
@@ -75,6 +76,7 @@ export function EnhanceFieldTemplateDialog({
   useEffect(() => {
     if (isOpen) {
       setSelectedTemplateIds([]);
+      setShouldIncludeCurrentTemplate(true);
       setSelectedExampleFieldKeys({});
       setGuidance('');
       setErrorMessage(null);
@@ -96,6 +98,7 @@ export function EnhanceFieldTemplateDialog({
     try {
       const enhancedContent = await onEnhance({
         targetTemplate: candidateContent === null ? targetTemplate : { ...targetTemplate, content: candidateContent },
+        shouldIncludeCurrentTemplate,
         referenceTemplates: selectedTemplateIds.flatMap((templateId) => {
           const template = fieldTemplates.find((candidate) => candidate.id === templateId);
           return template ? [template] : [];
@@ -205,9 +208,12 @@ export function EnhanceFieldTemplateDialog({
                       return (
                         <div key={exampleCharacter.id} className="space-y-3 rounded-md border bg-muted/20 p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="truncate text-sm font-medium">{displayName}</span>
-                              <Badge variant="outline">{exampleCharacter.sourceKind.toUpperCase()}</Badge>
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate text-sm font-medium">{displayName}</span>
+                                <Badge variant="outline">{exampleCharacter.sourceKind.toUpperCase()}</Badge>
+                              </div>
+                              <p className="truncate text-sm text-muted-foreground">{exampleCharacter.fileName}</p>
                             </div>
                             <Label
                               htmlFor={`enhance-example-${exampleCharacter.id}-all`}
@@ -276,6 +282,22 @@ export function EnhanceFieldTemplateDialog({
                 )}
                 <p className="text-sm text-muted-foreground">
                   Choose only the character parts that should influence this template draft.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="enhance-template-current-content" className="flex items-center gap-2">
+                  <Checkbox
+                    id="enhance-template-current-content"
+                    checked={shouldIncludeCurrentTemplate}
+                    disabled={isEnhancing}
+                    onCheckedChange={(checked) => setShouldIncludeCurrentTemplate(checked === true)}
+                  />
+                  Include current template content
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Turn this off to create the draft from guidance and selected references without sending the current
+                  content.
                 </p>
               </div>
 

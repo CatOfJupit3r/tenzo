@@ -23,6 +23,7 @@ describe('buildTemplateEnhancementMessages', () => {
   it('separates the target, selected templates, examples, and user guidance', () => {
     const messages = buildTemplateEnhancementMessages({
       targetTemplate: createTemplate(),
+      shouldIncludeCurrentTemplate: true,
       referenceTemplates: [
         createTemplate({ id: 'voice-template', name: 'Voice reference', content: 'Use sensory contrasts.' }),
       ],
@@ -46,6 +47,7 @@ describe('buildTemplateEnhancementMessages', () => {
         mode: TEMPLATE_MODES.strict,
         content: '## Appearance\n{{gen:appearance:two vivid paragraphs}}',
       }),
+      shouldIncludeCurrentTemplate: true,
       referenceTemplates: [],
       exampleCharacters: [],
       guidance: '',
@@ -54,6 +56,20 @@ describe('buildTemplateEnhancementMessages', () => {
     expect(messages[0]?.content).toContain('{{gen:label}}');
     expect(messages[0]?.content).toContain('Do not replace slots with generated character content.');
     expect(messages[1]?.content).toContain('{{gen:appearance:two vivid paragraphs}}');
+  });
+
+  it('omits the current template content when it is not included', () => {
+    const messages = buildTemplateEnhancementMessages({
+      targetTemplate: createTemplate(),
+      shouldIncludeCurrentTemplate: false,
+      referenceTemplates: [],
+      exampleCharacters: [],
+      guidance: 'Create a fresh structure.',
+    });
+
+    expect(messages[1]?.content).toContain('Name: Character description');
+    expect(messages[1]?.content).not.toContain('Write a vivid description.');
+    expect(messages[1]?.content).not.toContain('Content:');
   });
 });
 

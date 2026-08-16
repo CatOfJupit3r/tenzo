@@ -21,6 +21,7 @@ interface iUseTemplateEnhancementOptions {
 
 export interface iEnhanceTemplateOptions {
   targetTemplate: iFieldTemplateViewModel;
+  shouldIncludeCurrentTemplate: boolean;
   referenceTemplates: iFieldTemplateViewModel[];
   exampleCharacters: iPromptExampleCharacter[];
   guidance: string;

@@ -164,6 +164,30 @@ describe('EnhanceFieldTemplateDialog', () => {
     );
   });
 
+  it('can omit the current template content and shows the reference filename', async () => {
+    const user = userEvent.setup();
+    const onEnhance = vi.fn().mockResolvedValue('Generated template content');
+
+    render(
+      <EnhanceFieldTemplateDialog
+        isOpen
+        isEnhancing={false}
+        targetTemplate={createTemplate()}
+        fieldTemplates={[createTemplate()]}
+        exampleCharacters={[createExampleCharacter()]}
+        onOpenChange={vi.fn()}
+        onCancel={vi.fn()}
+        onEnhance={onEnhance}
+        onApply={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('checkbox', { name: 'Include current template content' }));
+    await user.click(screen.getByRole('button', { name: 'Generate draft' }));
+
+    expect(onEnhance).toHaveBeenCalledWith(expect.objectContaining({ shouldIncludeCurrentTemplate: false }));
+  });
+
   it('discards the AI draft without applying it', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();

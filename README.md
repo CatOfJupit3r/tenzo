@@ -1,25 +1,89 @@
-# Character Card Creator
+# Tenzo
 
-A standalone, client-only web app for authoring [SillyTavern-compatible V2 character cards](inspo/spec_v2.md) — no SillyTavern install required.
+> A local-first studio for designing, refining, and packaging AI character cards.
 
-## What it does
+[![MIT License](https://img.shields.io/badge/license-MIT-f97316.svg)](LICENSE)
+[![Node.js 24](https://img.shields.io/badge/Node.js-24-3c873a.svg)](.nvmrc)
+[![pnpm 10+](https://img.shields.io/badge/pnpm-10%2B-f69220.svg)](package.json)
 
-- Edit all V2 card fields (description, personality, scenario, first message, example dialogue, alternate greetings, custom fields).
-- Generate or continue any field with an AI model, using your own OpenAI-compatible API key/endpoint (streamed responses).
-- Feed in example character cards as reference material for generation.
-- Import existing cards from PNG (embedded `chara` tEXt chunk) or JSON, and re-export the same way.
-- Upload a portrait and export a spec-compliant PNG with the JSON embedded, or export JSON alone.
-- Everything lives in the browser — application data and images are stored in IndexedDB, with a small amount of localStorage for settings. No server or accounts.
+Tenzo turns character creation into a focused writing workflow. Build a character by hand, develop one with an AI assistant, tune each field with reusable instructions, and export a portable card for SillyTavern and other V2-compatible tools.
 
-See [docs/roadmaps/active/character-card-creator.roadmap.md](docs/roadmaps/active/character-card-creator.roadmap.md) for the full spec, phase status, and design decisions.
+No account or hosted database is required. Your character library, portraits, templates, and conversations live in your browser.
 
-## Tech stack
+## Highlights
 
-React 19, TanStack Start/Router/Query/Form, Tailwind CSS 4, Jotai, Zod, Vitest — all in `apps/web`. TanStack Start server functions are used only as a CORS proxy for AI generation calls; nothing is persisted server-side.
+| | Feature | What it gives you |
+| --- | --- | --- |
+| :sparkles: | **Character Assistant** | Explore concepts, fill gaps, and revise one field or a whole card through conversation. AI edits arrive as reviewable proposals, so you stay in control. |
+| :memo: | **Purpose-built editor** | Author core identity, dialogue, alternate greetings, character books, prompt overrides, metadata, tags, and custom fields in one workspace. |
+| :magic_wand: | **Field-level generation** | Generate, continue, or rewrite individual fields with streaming output, sampling controls, and token estimates. |
+| :bookmark_tabs: | **Reusable templates** | Save field instructions, scope them to specific fields, and use example characters as style and structure references. |
+| :framed_picture: | **Portrait studio** | Upload PNG, JPEG, WebP, or GIF artwork and adjust its focal point for a SillyTavern-ready 2:3 portrait. |
+| :card_file_box: | **Local character library** | Keep multiple works in progress with automatic browser persistence and switch between them instantly. |
+| :package: | **Portable import and export** | Read V1/V2 JSON and PNG cards, preserve unknown extension data, and export hybrid V1+V2 JSON or PNG cards with embedded metadata. |
+| :floppy_disk: | **Bulk export and backup** | Package selected characters as ZIP or tar.gz, or back up the full workspace without including API credentials. |
 
-## Getting started
+## How it fits together
 
-Prerequisites: Node.js 24 (see `.nvmrc`), pnpm ≥ 10.
+```mermaid
+flowchart LR
+    Idea[Idea or existing card] --> Studio[Tenzo workspace]
+    Examples[Example characters] --> Studio
+    Portrait[Portrait artwork] --> Studio
+
+    Studio <--> Library[(Browser storage)]
+    Studio --> Assistant[AI assistant]
+    Assistant --> Review{Review proposed edits}
+    Review -->|Apply| Studio
+    Review -->|Reject| Studio
+
+    Studio --> JSON[Hybrid V1 + V2 JSON]
+    Studio --> PNG[PNG with embedded card data]
+    Studio --> Archive[ZIP / tar.gz archive]
+```
+
+The assistant can focus on a single field or reason about the complete character. It streams suggestions into a separate review step; conflicting edits are detected before changes are applied to the card.
+
+## Local-first by design
+
+```mermaid
+flowchart TB
+    Browser[Your browser]
+    Storage[(IndexedDB + local settings)]
+    Route[Stateless Tenzo AI route]
+    Provider[Your configured AI provider]
+
+    Browser <--> Storage
+    Browser -->|Generation request + API credential| Route
+    Route -->|OpenAI-compatible request| Provider
+    Provider -->|Streamed response| Route
+    Route --> Browser
+```
+
+- Character data, images, assistant sessions, and templates are persisted locally.
+- Card parsing, portrait processing, PNG metadata embedding, archives, and backups run in the browser.
+- AI credentials are supplied per request and are never included in workspace backups or persisted by the server route.
+- Tenzo works with OpenAI-compatible endpoints, including model discovery and capability checks where the provider supports them.
+
+> [!IMPORTANT]
+> Browser storage is tied to the current browser profile and origin. Export a full workspace backup before clearing site data or moving to another device.
+
+## Card workflow
+
+1. Create a character or import an existing `.json` or `.png` card.
+2. Write directly, generate individual fields, or collaborate with the Character Assistant.
+3. Add example cards and reusable templates when you want consistent style or structure.
+4. Upload and frame a portrait, then review token estimates and card metadata.
+5. Export the current card, a selected collection, or a complete workspace backup.
+
+Tenzo preserves unknown `extensions` values during import and export, including character-book and entry-level extension data. Macros such as `{{char}}` and `{{user}}` remain intact.
+
+## Run locally
+
+### Requirements
+
+- [Node.js 24](https://nodejs.org/)
+- [pnpm 10 or newer](https://pnpm.io/)
 
 ```bash
 git clone https://github.com/CatOfJupit3r/tenzo.git
@@ -28,13 +92,23 @@ pnpm install
 pnpm run dev
 ```
 
-Open `http://localhost:3030`.
+Open [http://localhost:3030](http://localhost:3030), then configure an OpenAI-compatible endpoint, model, and API key in **Settings -> Connection** to enable AI features. The editor and local card tools do not require an AI connection.
 
-## Commands
+## Development
 
-- `pnpm run dev` – start the web app
-- `pnpm run build` – build the web app
-- `pnpm run test` – run the test suite
-- `pnpm run check-types` – TypeScript checks
-- `pnpm run lint` – ESLint
-- `pnpm run prettify` – formatting check
+Tenzo is a TypeScript monorepo centered on a React 19 application in `apps/web`, built with TanStack Start and Router, TanStack AI, Tailwind CSS 4, TipTap, Dexie, Jotai, Zod, Vitest, and Playwright.
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm run dev` | Start the development app |
+| `pnpm run build` | Create a production build |
+| `pnpm run test` | Run the test suite |
+| `pnpm run check-types` | Check TypeScript types |
+| `pnpm run lint` | Run ESLint |
+| `pnpm run prettify` | Check formatting |
+
+The character-card implementation lives in `apps/web/src/features/character-creator`. Product scope and implementation status are tracked in the [character card creator roadmap](docs/roadmaps/active/character-card-creator.roadmap.md).
+
+## License
+
+Tenzo is available under the [MIT License](LICENSE).

@@ -93,6 +93,25 @@ describe('structured character assistant loop', () => {
     );
   });
 
+  it('defaults omitted structured round control fields', async () => {
+    generateValidatedObjectMock.mockResolvedValue({
+      assistantMessage: 'Understood.',
+      actions: [],
+      isDone: true,
+      followUpSuggestions: [],
+    });
+
+    await collect(generateStructuredCharacterAssistantStream(createOptions()));
+
+    const schema = generateValidatedObjectMock.mock.calls[0]?.[0].schema;
+    expect(schema.parse({ assistantMessage: 'I am still working.' })).toEqual({
+      assistantMessage: 'I am still working.',
+      actions: [],
+      isDone: false,
+      followUpSuggestions: [],
+    });
+  });
+
   it('continues after a prose-only incomplete round', async () => {
     generateValidatedObjectMock
       .mockResolvedValueOnce({
@@ -224,6 +243,65 @@ describe('structured character assistant loop', () => {
     const chunks = await collect(generateStructuredCharacterAssistantStream(options));
 
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_RESULT)).toBe(true);
+  });
+
+  it('repairs malformed JSON action arguments before validation', async () => {
+    const options = createOptions();
+    const proposedCard = structuredClone(options.card);
+    proposedCard.data.description = 'A librarian who safeguards forgotten memories.';
+    options.store.appendProposedCard.mockReturnValue(
+      createCharacterEditProposal({ baseCard: options.card, proposedCard }) as never,
+    );
+    generateValidatedObjectMock.mockResolvedValueOnce({
+      assistantMessage: 'I drafted the description.',
+      actions: [
+        {
+          action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+          inputJson: "{changes:[{fieldKey:'description',value:'A librarian who safeguards forgotten memories.'}]}",
+        },
+      ],
+      isDone: true,
+      followUpSuggestions: [],
+    });
+
+    const chunks = await collect(generateStructuredCharacterAssistantStream(options));
+
+    expect(options.store.appendProposedCard).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: 'Character update' }),
+    );
+    expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_RESULT)).toBe(true);
+  });
+
+  it('completes without retrying when a proposal already matches the current card', async () => {
+    const options = createOptions();
+    options.store.appendProposedCard.mockReturnValue(
+      createCharacterEditProposal({ baseCard: options.card, proposedCard: structuredClone(options.card) }) as never,
+    );
+    generateValidatedObjectMock.mockResolvedValueOnce({
+      assistantMessage: 'The description already matches.',
+      actions: [
+        {
+          action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+          inputJson: JSON.stringify({
+            changes: [{ fieldKey: 'description', value: options.card.data.description }],
+          }),
+        },
+      ],
+      isDone: true,
+      followUpSuggestions: [],
+    });
+
+    const chunks = await collect(generateStructuredCharacterAssistantStream(options));
+    const toolResult = chunks.find((chunk) => chunk.type === EventType.TOOL_CALL_END);
+
+    expect(generateValidatedObjectMock).toHaveBeenCalledOnce();
+    expect(toolResult).toEqual(
+      expect.objectContaining({
+        state: 'output-available',
+        output: expect.objectContaining({ isNoOp: true, proposal: null }),
+      }),
+    );
+    expect(chunks.at(-1)?.type).toBe(EventType.RUN_FINISHED);
   });
 
   it('returns a retryable tool error when a structured strict proposal drifts', async () => {

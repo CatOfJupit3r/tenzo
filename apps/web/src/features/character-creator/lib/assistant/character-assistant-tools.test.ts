@@ -9,6 +9,8 @@ import {
   createCharacterAssistantTools,
   createProposalFromChanges,
   createProposeCharacterFieldsInputSchema,
+  PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA,
+  PROPOSE_CUSTOM_FIELDS_INPUT_SCHEMA,
 } from './character-assistant-tools';
 import type { iCharacterAssistantProposalStore } from './character-assistant-tools';
 
@@ -34,6 +36,28 @@ function createTemplate(mode: 'prompt' | 'strict', fieldKey: 'description' | 'al
 }
 
 describe('character assistant template enforcement', () => {
+  it('defaults auxiliary proposal fields instead of rejecting usable tool calls', () => {
+    expect(
+      createProposeCharacterFieldsInputSchema()?.parse({
+        changes: [{ fieldKey: 'description', value: 'A watchful archivist.' }],
+      }),
+    ).toEqual({
+      changes: [{ fieldKey: 'description', value: 'A watchful archivist.' }],
+      summary: 'Character update',
+    });
+    expect(PROPOSE_CUSTOM_FIELDS_INPUT_SCHEMA.parse({ fields: [{}] })).toEqual({
+      fields: [{ label: 'Custom field', value: '' }],
+      summary: 'Character update',
+    });
+    expect(PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA.parse({ characterBook: { entries: [{}] } })).toEqual({
+      characterBook: {
+        entries: [{ keys: [], content: '', extensions: {}, enabled: true, insertion_order: 0 }],
+        extensions: {},
+      },
+      summary: 'Character update',
+    });
+  });
+
   it('removes disabled fields and dedicated tools from native tool schemas', () => {
     const fieldShouldAllowAssistantEditing = {
       ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
@@ -63,11 +87,11 @@ describe('character assistant template enforcement', () => {
     expect(tools).toHaveProperty('propose_character_fields');
   });
 
-  it('rejects a proposal with no editable changes', () => {
+  it('returns a successful no-op when proposed values already match the card', () => {
     const store = createStore();
     store.appendProposedCard.mockReturnValue({ patches: [] } as never);
 
-    expect(() =>
+    expect(
       createProposalFromChanges({
         store,
         focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
@@ -75,7 +99,11 @@ describe('character assistant template enforcement', () => {
         fieldKeys: ['name'],
         updateCard: () => undefined,
       }),
-    ).toThrow('did not contain any editable changes');
+    ).toEqual({
+      proposal: null,
+      isNoOp: true,
+      message: 'No changes were needed because the requested fields already match the current card.',
+    });
   });
 
   it('accepts a proposal that preserves a strict template skeleton', () => {

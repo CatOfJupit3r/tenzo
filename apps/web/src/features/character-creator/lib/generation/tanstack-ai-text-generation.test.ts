@@ -8,6 +8,7 @@ import {
   createCharacterTextAdapter,
   createCharacterToolModelOptions,
   streamCharacterText,
+  withRepairedToolCallArguments,
 } from './tanstack-ai-text-generation';
 
 const { chatMock, createOpenRouterTextMock, openaiCompatibleTextMock } = vi.hoisted(() => ({
@@ -34,6 +35,31 @@ afterEach(() => {
 });
 
 describe('TanStack AI text generation', () => {
+  it('repairs streamed native tool-call arguments before the runtime parses them', async () => {
+    const adapter = withRepairedToolCallArguments({
+      chatStream: () =>
+        (async function* streamChunks() {
+          yield { type: EventType.TOOL_CALL_START, toolCallId: 'call-1', toolName: 'propose_character_fields' };
+          yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-1', delta: "{changes:[{fieldKey:'descr" };
+          yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-1', delta: "iption',value:'Ready'}]}" };
+          yield { type: EventType.TOOL_CALL_END, toolCallId: 'call-1', toolName: 'propose_character_fields' };
+        })(),
+    } as never);
+
+    const chunks = [];
+    for await (const chunk of adapter.chatStream({} as never)) chunks.push(chunk);
+
+    expect(chunks).toEqual([
+      expect.objectContaining({ type: EventType.TOOL_CALL_START }),
+      {
+        type: EventType.TOOL_CALL_ARGS,
+        toolCallId: 'call-1',
+        delta: '{"changes":[{"fieldKey":"description","value":"Ready"}]}',
+      },
+      expect.objectContaining({ type: EventType.TOOL_CALL_END }),
+    ]);
+  });
+
   it('creates a typed OpenAI-compatible adapter with a normalized endpoint', () => {
     createCharacterTextAdapter({
       endpoint: 'http://localhost:5001',

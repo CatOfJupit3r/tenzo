@@ -27,6 +27,7 @@ import { cn } from '@~/lib/utils';
 
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA } from '../lib/assistant/character-assistant-contracts';
+import { PROPOSAL_TOOL_RESULT_SCHEMA } from '../lib/assistant/character-assistant-tool-results';
 import { groupCharacterAssistantConversationMessages } from '../lib/assistant/conversation-message-groups';
 import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from '../lib/assistant/tool-part-renderers';
 import { readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
@@ -367,8 +368,22 @@ export function CharacterAssistantConversation({
                 if (part.type !== 'tool-call' || !part.output) return null;
                 const rendererKind = getAssistantToolRendererKind(part.name);
                 if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.proposal) {
+                  const toolResult = PROPOSAL_TOOL_RESULT_SCHEMA.safeParse(part.output);
+                  if (toolResult.success && toolResult.data.isNoOp) {
+                    const hasEarlierNoOp = message.parts.slice(0, partIndex).some((messagePart) => {
+                      if (messagePart.type !== 'tool-call') return false;
+                      const earlierResult = PROPOSAL_TOOL_RESULT_SCHEMA.safeParse(messagePart.output);
+                      return earlierResult.success && earlierResult.data.isNoOp;
+                    });
+                    if (hasEarlierNoOp) return null;
+                    return (
+                      <p key={partKey} role="status" className="text-xs text-muted-foreground">
+                        {toolResult.data.message}
+                      </p>
+                    );
+                  }
                   const result = CHARACTER_EDIT_PROPOSAL_SCHEMA.safeParse(
-                    (part.output as { proposal?: unknown }).proposal,
+                    toolResult.success ? toolResult.data.proposal : (part.output as { proposal?: unknown }).proposal,
                   );
                   if (!result.success) return null;
                   const storedProposal = proposalsById.get(result.data.id);

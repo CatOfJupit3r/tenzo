@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { generateUuid } from '@~/utils/uuid';
 
 import type { CharacterCard } from '../cards/card-schema';
-import { CHARACTER_TEXT_FIELD_KEYS } from '../cards/card-schema';
 import type { CharacterAssistantFieldEditing } from '../generation/generation-config';
+import { parseRepairedJson } from '../generation/json-repair';
 import { generateValidatedObject } from '../generation/structured-output.server';
 import {
   createCharacterStructuredModelOptions,
@@ -29,10 +29,12 @@ import {
   MAX_ASSISTANT_PARALLEL_TOOL_CALLS_PER_TURN,
   MAX_ASSISTANT_TOOL_CALLS_PER_RUN,
 } from './character-assistant-safety';
+import { CHARACTER_ASSISTANT_TOOL_OUTCOMES, logCharacterAssistantTool } from './character-assistant-tool-observability';
 import {
   createCharacterAssistantActionHandlers,
   createProposeCharacterFieldsInputSchema,
   getAllowedCharacterAssistantToolNames,
+  getAllowedCharacterAssistantTextFieldKeys,
   PROPOSE_ALTERNATE_GREETINGS_INPUT_SCHEMA,
   PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA,
   PROPOSE_CUSTOM_FIELDS_INPUT_SCHEMA,
@@ -42,21 +44,59 @@ import {
 import type { iCharacterAssistantProposalStore } from './character-assistant-tools';
 
 export const MAX_STRUCTURED_ROUNDS = 4;
+const MAX_STRUCTURED_SCHEMA_ATTEMPTS = 2;
 const MAX_STRUCTURED_HISTORY_MESSAGES = 12;
 const MAX_STRUCTURED_HISTORY_MESSAGE_CHARACTERS = 4_000;
 
 interface iStructuredAction {
   action: CharacterAssistantToolName;
-  inputJson: string;
+  input?: unknown;
+  inputJson?: string;
 }
 
-function createStructuredRoundSchema(actionNames: [CharacterAssistantToolName, ...CharacterAssistantToolName[]]) {
+function createStructuredActionSchema(
+  actionNames: [CharacterAssistantToolName, ...CharacterAssistantToolName[]],
+  characterFieldsInputSchema: ReturnType<typeof createProposeCharacterFieldsInputSchema>,
+) {
+  const inputSchemas = {
+    [CHARACTER_ASSISTANT_TOOL_NAMES.record_concept]: CHARACTER_CONCEPT_SCHEMA,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields]: characterFieldsInputSchema,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags]: PROPOSE_TAGS_INPUT_SCHEMA,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings]: PROPOSE_ALTERNATE_GREETINGS_INPUT_SCHEMA,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields]: PROPOSE_CUSTOM_FIELDS_INPUT_SCHEMA,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book]: PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.suggest_character_directions]: SUGGEST_DIRECTIONS_INPUT_SCHEMA,
+  } satisfies Record<
+    Exclude<CharacterAssistantToolName, typeof CHARACTER_ASSISTANT_TOOL_NAMES.read_character>,
+    z.ZodType | null
+  >;
+  const actionSchemas = actionNames.flatMap((actionName) => {
+    const inputSchema = inputSchemas[actionName as keyof typeof inputSchemas];
+    return inputSchema ? [z.object({ action: z.literal(actionName), input: inputSchema })] : [];
+  });
+  const [firstActionSchema, secondActionSchema, ...remainingActionSchemas] = actionSchemas;
+  if (!firstActionSchema || !secondActionSchema) {
+    throw new Error('Structured assistant requires at least two available actions.');
+  }
+  return z.discriminatedUnion('action', [firstActionSchema, secondActionSchema, ...remainingActionSchemas]);
+}
+
+function isRetryableStructuredSchemaError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return /structured-output-(?:validation-failed|parse-failed|missing-result)/i.test(error.message);
+}
+
+function createStructuredRoundSchema(
+  actionNames: [CharacterAssistantToolName, ...CharacterAssistantToolName[]],
+  characterFieldsInputSchema: ReturnType<typeof createProposeCharacterFieldsInputSchema>,
+) {
   return z.object({
-    assistantMessage: z.string(),
+    assistantMessage: z.string().default(''),
     actions: z
-      .array(z.object({ action: z.enum(actionNames), inputJson: z.string() }))
-      .max(MAX_ASSISTANT_PARALLEL_TOOL_CALLS_PER_TURN),
-    isDone: z.boolean(),
+      .array(createStructuredActionSchema(actionNames, characterFieldsInputSchema))
+      .max(MAX_ASSISTANT_PARALLEL_TOOL_CALLS_PER_TURN)
+      .default([]),
+    isDone: z.boolean().default(false),
     followUpSuggestions: z.array(z.string().trim().min(1)).max(3).default([]),
   });
 }
@@ -64,12 +104,11 @@ function createStructuredRoundSchema(actionNames: [CharacterAssistantToolName, .
 function buildStructuredActionCatalog(
   actionNames: ReadonlySet<CharacterAssistantToolName>,
   fieldShouldAllowAssistantEditing?: Readonly<CharacterAssistantFieldEditing>,
+  focus?: CharacterAssistantFocus,
 ) {
-  const enabledTextFieldKeys = CHARACTER_TEXT_FIELD_KEYS.filter(
-    (fieldKey) => fieldShouldAllowAssistantEditing?.[fieldKey] !== false,
-  );
+  const enabledTextFieldKeys = getAllowedCharacterAssistantTextFieldKeys(fieldShouldAllowAssistantEditing, focus);
   return [
-    'Action catalog for inputJson:',
+    'Action catalog for input:',
     actionNames.has(CHARACTER_ASSISTANT_TOOL_NAMES.suggest_character_directions)
       ? '- suggest_character_directions: {"premise":"optional inspiration"}. Use this when the user asks to discover or explore character directions.'
       : '',
@@ -97,7 +136,7 @@ function buildStructuredActionCatalog(
 }
 
 function parseActionInputJson(action: iStructuredAction) {
-  const parsed: unknown = JSON.parse(action.inputJson);
+  const parsed = action.input ?? parseRepairedJson(action.inputJson ?? '{}');
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parsed;
   }
@@ -217,12 +256,19 @@ export async function* generateStructuredCharacterAssistantStream(
     store: options.store,
     templates: options.templates,
   });
-  const actionNames = getAllowedCharacterAssistantToolNames(options.fieldShouldAllowAssistantEditing).filter(
-    (toolName) => toolName !== CHARACTER_ASSISTANT_TOOL_NAMES.read_character,
-  ) as [CharacterAssistantToolName, ...CharacterAssistantToolName[]];
+  const actionNames = getAllowedCharacterAssistantToolNames(
+    options.fieldShouldAllowAssistantEditing,
+    options.focus,
+  ).filter((toolName) => toolName !== CHARACTER_ASSISTANT_TOOL_NAMES.read_character) as [
+    CharacterAssistantToolName,
+    ...CharacterAssistantToolName[],
+  ];
   const actionNameSet = new Set(actionNames);
-  const structuredRoundSchema = createStructuredRoundSchema(actionNames);
-  const characterFieldsInputSchema = createProposeCharacterFieldsInputSchema(options.fieldShouldAllowAssistantEditing);
+  const characterFieldsInputSchema = createProposeCharacterFieldsInputSchema(
+    options.fieldShouldAllowAssistantEditing,
+    options.focus,
+  );
+  const structuredRoundSchema = createStructuredRoundSchema(actionNames, characterFieldsInputSchema);
   const messages: Array<ModelMessage | UIMessage> = compactStructuredHistory(options.messages);
   const system = [
     buildAssistantSystemPrompt({
@@ -237,8 +283,8 @@ export async function* generateStructuredCharacterAssistantStream(
       maxExampleContextCharacters: options.maxExampleContextCharacters,
       mode: 'structured-output',
     }),
-    'Work in bounded rounds. Prefer completing the request in one round: group multiple field changes into one propose_character_fields action and include all independent actions together. Use another round only when an executed action result is required. Return conversational prose plus zero or more typed actions. When the user requests card creation or edits, at least one matching action is required; never put proposed values only in prose. Encode only the action arguments as one complete JSON object string in inputJson; do not repeat the action name or wrap the arguments. A prose-only round with isDone false is valid and must be followed by another round. Set isDone true only when the request is meaningfully addressed.',
-    buildStructuredActionCatalog(actionNameSet, options.fieldShouldAllowAssistantEditing),
+    'Work in bounded rounds. Prefer completing the request in one round: group multiple field changes into one propose_character_fields action and include all independent actions together. Use another round only when an executed action result is required. Return conversational prose plus zero or more typed actions. When the user requests card creation or edits, at least one matching action is required; never put proposed values only in prose. Put action arguments directly in the typed input object. A prose-only round with isDone false is valid and must be followed by another round. Set isDone true only when the request is meaningfully addressed.',
+    buildStructuredActionCatalog(actionNameSet, options.fieldShouldAllowAssistantEditing, options.focus),
   ].join('\n\n');
   let toolCallCount = 0;
   let finalMessage = '';
@@ -253,24 +299,49 @@ export async function* generateStructuredCharacterAssistantStream(
   yield { type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' };
   for (let roundIndex = 0; roundIndex < MAX_STRUCTURED_ROUNDS; roundIndex += 1) {
     if (options.abortSignal?.aborted) throw options.abortSignal.reason ?? new DOMException('Aborted', 'AbortError');
-    const round = await generateValidatedObject({
-      adapter: createCharacterTextAdapter({
-        endpoint: options.generationSettings.endpoint,
-        apiKey: options.apiKey,
-        model: options.generationSettings.model,
-      }),
-      schema: structuredRoundSchema,
-      schemaDescription:
-        'One conversational assistant round with action names, JSON-encoded action inputs, completion state, and up to three follow-up suggestions.',
-      system,
-      messages,
-      modelOptions: createCharacterStructuredModelOptions(options.generationSettings.endpoint, {
-        ...options.generationSettings,
-        shouldSendDisabledSamplers: options.shouldSendDisabledSamplers ?? false,
-      }),
-      abortSignal: options.abortSignal,
-      onUsage: trackUsage,
-    });
+    let round: z.infer<typeof structuredRoundSchema> | undefined;
+    for (let schemaAttempt = 1; schemaAttempt <= MAX_STRUCTURED_SCHEMA_ATTEMPTS; schemaAttempt += 1) {
+      try {
+        round = await generateValidatedObject({
+          adapter: createCharacterTextAdapter({
+            endpoint: options.generationSettings.endpoint,
+            apiKey: options.apiKey,
+            model: options.generationSettings.model,
+          }),
+          schema: structuredRoundSchema,
+          schemaDescription:
+            'One conversational assistant round with typed action inputs, completion state, and up to three follow-up suggestions.',
+          system,
+          messages:
+            schemaAttempt === 1
+              ? messages
+              : [
+                  ...messages,
+                  {
+                    role: 'user',
+                    content:
+                      'Return a valid structured round. Every action must use its typed input object and only fields permitted by the schema.',
+                  },
+                ],
+          modelOptions: createCharacterStructuredModelOptions(options.generationSettings.endpoint, {
+            ...options.generationSettings,
+            shouldSendDisabledSamplers: options.shouldSendDisabledSamplers ?? false,
+          }),
+          abortSignal: options.abortSignal,
+          onUsage: trackUsage,
+        });
+        break;
+      } catch (error) {
+        if (schemaAttempt === MAX_STRUCTURED_SCHEMA_ATTEMPTS || !isRetryableStructuredSchemaError(error)) throw error;
+        console.warn('[Character Assistant] Retrying invalid structured round', {
+          model: options.generationSettings.model,
+          round: roundIndex + 1,
+          nextAttempt: schemaAttempt + 1,
+        });
+      }
+    }
+    // The bounded loop either assigns a validated round or throws its final error.
+    if (!round) throw new Error('Structured assistant round did not produce a result.');
     if (round.assistantMessage.trim()) finalMessage = round.assistantMessage.trim();
     followUpSuggestions = round.followUpSuggestions;
     if (toolCallCount + round.actions.length > MAX_ASSISTANT_TOOL_CALLS_PER_RUN)
@@ -278,6 +349,8 @@ export async function* generateStructuredCharacterAssistantStream(
     const actionSummaries: string[] = [];
     for (const action of round.actions) {
       const toolCallId = generateUuid();
+      const toolStartedAt = Date.now();
+      let diagnosticInput: unknown;
       toolCallCount += 1;
       yield {
         type: EventType.TOOL_CALL_START,
@@ -288,9 +361,21 @@ export async function* generateStructuredCharacterAssistantStream(
       };
       try {
         const execution = createActionExecution(handlers, action, characterFieldsInputSchema);
+        diagnosticInput = execution.input;
         yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(execution.input) };
         const output = await execution.execute(toolCallId);
         failedActionMessages.delete(action.action);
+        const isNoOp = output !== null && typeof output === 'object' && Reflect.get(output, 'isNoOp') === true;
+        logCharacterAssistantTool({
+          mode: 'structured-output',
+          model: options.generationSettings.model,
+          outcome: isNoOp ? CHARACTER_ASSISTANT_TOOL_OUTCOMES['no-op'] : CHARACTER_ASSISTANT_TOOL_OUTCOMES.completed,
+          runId,
+          toolCallId,
+          toolName: action.action,
+          durationMs: Date.now() - toolStartedAt,
+          input: execution.input,
+        });
         const result = JSON.stringify(output);
         yield {
           type: EventType.TOOL_CALL_END,
@@ -310,8 +395,26 @@ export async function* generateStructuredCharacterAssistantStream(
           role: 'tool',
           state: 'output-available',
         };
-        actionSummaries.push(`${action.action}: completed`);
+        actionSummaries.push(`${action.action}: ${isNoOp ? 'no changes needed' : 'completed'}`);
       } catch (error) {
+        if (diagnosticInput === undefined) {
+          try {
+            diagnosticInput = parseActionInputJson(action);
+          } catch {
+            diagnosticInput = undefined;
+          }
+        }
+        logCharacterAssistantTool({
+          mode: 'structured-output',
+          model: options.generationSettings.model,
+          outcome: CHARACTER_ASSISTANT_TOOL_OUTCOMES.failed,
+          runId,
+          toolCallId,
+          toolName: action.action,
+          durationMs: Date.now() - toolStartedAt,
+          input: diagnosticInput,
+          error,
+        });
         const result = error instanceof Error ? error.message : 'Action failed.';
         failedActionMessages.set(action.action, result);
         yield {
@@ -320,6 +423,7 @@ export async function* generateStructuredCharacterAssistantStream(
           toolCallName: action.action,
           toolName: action.action,
           result,
+          output: { error: result },
           state: 'output-error',
         };
         actionSummaries.push(`${action.action}: ${result}`);

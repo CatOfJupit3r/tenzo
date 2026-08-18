@@ -302,7 +302,7 @@ export function streamCharacterAssistant({
       : {}),
     messages,
     agentLoopStrategy: maxIterations(maxSteps),
-    middleware: [createCharacterAssistantSafetyMiddleware()],
+    middleware: [createCharacterAssistantSafetyMiddleware({ model: generationSettings.model })],
     modelOptions: (shouldUseNativeTools ? createCharacterToolModelOptions : createCharacterModelOptions)(
       generationSettings.endpoint,
       {

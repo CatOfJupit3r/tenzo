@@ -2,6 +2,8 @@ import { defineChatMiddleware, EventType } from '@tanstack/ai';
 import type { TokenUsage } from '@tanstack/ai';
 
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
+import { CHARACTER_ASSISTANT_TOOL_OUTCOMES, logCharacterAssistantTool } from './character-assistant-tool-observability';
+import type { CharacterAssistantToolOutcome } from './character-assistant-tool-observability';
 
 export const MAX_ASSISTANT_TOOL_CALLS_PER_RUN = 12;
 export const MAX_ASSISTANT_PARALLEL_TOOL_CALLS_PER_TURN = 4;
@@ -31,19 +33,21 @@ export function aggregateTokenUsage(current: TokenUsage | undefined, next: Token
   };
 }
 
-export function createCharacterAssistantSafetyMiddleware() {
+export function createCharacterAssistantSafetyMiddleware({ model }: { model?: string } = {}) {
   let parallelToolCallCount = 0;
   let totalToolCallCount = 0;
   let proposalToolCallCount = 0;
   let successfulProposalToolCallCount = 0;
   let usage: TokenUsage | undefined;
+  const toolInputs = new Map<string, unknown>();
 
   return defineChatMiddleware({
     name: 'character-assistant-safety',
     onIteration() {
       parallelToolCallCount = 0;
     },
-    onBeforeToolCall() {
+    onBeforeToolCall(_context, info) {
+      toolInputs.set(info.toolCallId, info.args);
       parallelToolCallCount += 1;
       totalToolCallCount += 1;
       if (totalToolCallCount > MAX_ASSISTANT_TOOL_CALLS_PER_RUN) {
@@ -58,6 +62,23 @@ export function createCharacterAssistantSafetyMiddleware() {
       return null;
     },
     onAfterToolCall(_context, info) {
+      const isNoOp =
+        info.result !== null && typeof info.result === 'object' && Reflect.get(info.result, 'isNoOp') === true;
+      let outcome: CharacterAssistantToolOutcome = CHARACTER_ASSISTANT_TOOL_OUTCOMES.failed;
+      if (info.ok) {
+        outcome = isNoOp ? CHARACTER_ASSISTANT_TOOL_OUTCOMES['no-op'] : CHARACTER_ASSISTANT_TOOL_OUTCOMES.completed;
+      }
+      logCharacterAssistantTool({
+        mode: 'tool-call',
+        model,
+        outcome,
+        toolCallId: info.toolCallId,
+        toolName: info.toolName,
+        durationMs: info.duration,
+        input: toolInputs.get(info.toolCallId),
+        error: info.error,
+      });
+      toolInputs.delete(info.toolCallId);
       if (!PROPOSAL_TOOL_NAMES.has(info.toolName)) return;
       proposalToolCallCount += 1;
       if (info.ok) successfulProposalToolCallCount += 1;

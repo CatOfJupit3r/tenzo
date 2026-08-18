@@ -10,6 +10,47 @@ import { createCharacterEditProposal } from '../lib/proposals/character-edit-pro
 import { CharacterAssistantConversation } from './character-assistant-conversation';
 
 describe('CharacterAssistantConversation', () => {
+  it('shows idempotent proposal calls as a successful no-op', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'assistant-message',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-call',
+            id: 'no-op-tool-call',
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            arguments: '{}',
+            state: 'complete',
+            output: {
+              proposal: null,
+              isNoOp: true,
+              message: 'No changes were needed because the requested fields already match the current card.',
+            },
+          },
+        ],
+      },
+    ];
+
+    render(
+      <CharacterAssistantConversation
+        messages={messages}
+        proposals={[]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('status').textContent).toContain('already match the current card');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('shows failed assistant tool calls', () => {
     const messages: UIMessage[] = [
       {

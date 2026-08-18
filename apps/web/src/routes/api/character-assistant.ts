@@ -129,7 +129,7 @@ export const Route = createFileRoute('/api/character-assistant')({
           const abortController = new AbortController();
           request.signal.addEventListener('abort', () => abortController.abort(request.signal.reason), { once: true });
           return toAbortSafeServerSentEventsResponse(suppressGenerationAbort(stream, request.signal), abortController, {
-            operation: `Character Assistant ${payload.assistantGenerationMode} request`,
+            operation: 'Character Assistant request',
             model: payload.model,
           });
         } catch (error) {

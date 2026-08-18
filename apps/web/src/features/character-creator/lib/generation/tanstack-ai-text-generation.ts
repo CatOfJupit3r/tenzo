@@ -1,11 +1,12 @@
 import { chat, EventType } from '@tanstack/ai';
-import type { ModelMessage } from '@tanstack/ai';
+import type { AnyTextAdapter, ModelMessage, StreamChunk } from '@tanstack/ai';
 import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { createOpenRouterText } from '@tanstack/ai-openrouter';
 
 import { normalizeOpenAiCompatibleBaseUrl } from '../provider/openai-compatible-endpoint';
 import { suppressGenerationAbort } from './abort-safe-stream';
 import type { iCharacterGenerationStreamRequest } from './generation-stream-contracts';
+import { repairJson } from './json-repair';
 import { createOpenRouterErrorPreservingHttpClient } from './openrouter-stream-error';
 
 export interface iStreamCharacterTextOptions extends iCharacterGenerationStreamRequest {
@@ -87,23 +88,74 @@ function toTextReadableStream(iterable: AsyncIterable<string>) {
   });
 }
 
+async function* repairToolCallArguments(stream: AsyncIterable<StreamChunk>): AsyncGenerator<StreamChunk> {
+  const argumentBuffers = new Map<string, string>();
+
+  function* flushArguments(toolCallId: string) {
+    const rawArguments = argumentBuffers.get(toolCallId);
+    if (rawArguments === undefined) return;
+    argumentBuffers.delete(toolCallId);
+
+    let repairedArguments = rawArguments;
+    try {
+      repairedArguments = repairJson(rawArguments.trim() || '{}');
+    } catch {
+      // Preserve the provider payload so the runtime can report the original parse error.
+    }
+    yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: repairedArguments } as StreamChunk;
+  }
+
+  for await (const chunk of stream) {
+    if (chunk.type === EventType.TOOL_CALL_ARGS) {
+      argumentBuffers.set(chunk.toolCallId, `${argumentBuffers.get(chunk.toolCallId) ?? ''}${chunk.delta}`);
+      continue;
+    }
+    if (chunk.type === EventType.TOOL_CALL_END) {
+      if (chunk.input === undefined) yield* flushArguments(chunk.toolCallId);
+      else argumentBuffers.delete(chunk.toolCallId);
+    } else if (chunk.type === EventType.RUN_FINISHED) {
+      for (const toolCallId of [...argumentBuffers.keys()]) yield* flushArguments(toolCallId);
+    }
+    yield chunk;
+  }
+}
+
+export function withRepairedToolCallArguments(adapter: AnyTextAdapter): AnyTextAdapter {
+  return new Proxy(adapter, {
+    get(target, property) {
+      if (property === 'chatStream') {
+        return (options: Parameters<AnyTextAdapter['chatStream']>[0]) =>
+          repairToolCallArguments(target.chatStream(options));
+      }
+      const value = Reflect.get(target, property, target) as unknown;
+      if (typeof value !== 'function') return value;
+      const method = value as (...args: unknown[]) => unknown;
+      return (...args: unknown[]) => Reflect.apply(method, target, args);
+    },
+  });
+}
+
 export function createCharacterTextAdapter({ endpoint, apiKey, model }: iCharacterTextAdapterOptions) {
   const normalizedEndpoint = normalizeOpenAiCompatibleBaseUrl(endpoint);
 
   if (normalizedEndpoint.toLowerCase().includes('openrouter.ai/api')) {
-    return createOpenRouterText(model.trim() as Parameters<typeof createOpenRouterText>[0], apiKey.trim(), {
-      httpClient: createOpenRouterErrorPreservingHttpClient() as NonNullable<
-        Parameters<typeof createOpenRouterText>[2]
-      >['httpClient'],
-    });
+    return withRepairedToolCallArguments(
+      createOpenRouterText(model.trim() as Parameters<typeof createOpenRouterText>[0], apiKey.trim(), {
+        httpClient: createOpenRouterErrorPreservingHttpClient() as NonNullable<
+          Parameters<typeof createOpenRouterText>[2]
+        >['httpClient'],
+      }),
+    );
   }
 
-  return openaiCompatibleText(model.trim(), {
-    name: 'character-creator',
-    baseURL: normalizedEndpoint,
-    apiKey: apiKey.trim(),
-    dangerouslyAllowBrowser: true,
-  });
+  return withRepairedToolCallArguments(
+    openaiCompatibleText(model.trim(), {
+      name: 'character-creator',
+      baseURL: normalizedEndpoint,
+      apiKey: apiKey.trim(),
+      dangerouslyAllowBrowser: true,
+    }),
+  );
 }
 
 export function createCharacterModelOptions(

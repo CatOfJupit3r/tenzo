@@ -61,12 +61,12 @@ export const CHARACTER_ASSISTANT_TOOL_NAME_SCHEMA = z.enum([
 export const CHARACTER_ASSISTANT_TOOL_NAMES = CHARACTER_ASSISTANT_TOOL_NAME_SCHEMA.enum;
 
 export const CHARACTER_CONCEPT_SCHEMA = z.object({
-  premise: z.string().trim().min(1).max(600),
-  archetype: z.string(),
-  keyTraits: z.array(z.string()).max(8),
-  flaws: z.array(z.string()).max(6),
-  nameCandidates: z.array(z.string()).max(5),
-  suggestedTags: z.array(z.string()).max(10),
+  premise: z.string().trim().default(''),
+  archetype: z.string().default(''),
+  keyTraits: z.array(z.string()).default([]),
+  flaws: z.array(z.string()).default([]),
+  nameCandidates: z.array(z.string()).default([]),
+  suggestedTags: z.array(z.string()).default([]),
 });
 
 export const MAX_CHAT_TEMPLATE_REF_COUNT = 4;

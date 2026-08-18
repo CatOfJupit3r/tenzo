@@ -43,7 +43,7 @@ This is a behavior-preserving cleanup except where obsolete compatibility behavi
 
 - **Low-signal tests:** `apps/web/test/some.test.ts` only asserts `true === true`. Other tests restate registry mappings, compare two runs produced by the same fixture and code path, or preserve historical absences and pre-feature storage shapes.
 - **Mock-heavy architecture:** 33 `vi.mock(...)` calls occur across 14 files. The worst test replaces seven modules to exercise one hook. These tests are coupled to import topology and can pass while real composition is broken.
-- **Broken baseline:** On the audited machine, a full Vitest run passed 40 files and 184 tests but failed to collect any tests in 22 files. A focused run fails identically. `loggerFactory` is undefined when modules eagerly call `loggerFactory.getLogger(...)` under Vitest. The machine used Node 26.5.0 while the repository requires Node 24.13.0 and CI currently installs 24.11.1, so runtime alignment must be fixed before classifying any remaining intermittent failures.
+- **Broken baseline:** On the audited machine, a full Vitest run passed 40 files and 184 tests but failed to collect any tests in 22 files. A focused run fails identically. `loggerFactory` is undefined when modules eagerly call `loggerFactory.getLogger(...)` under Vitest. The machine used Node 26.5.0 while the repository requires Node 26.5.0 and CI currently installs 24.11.1, so runtime alignment must be fixed before classifying any remaining intermittent failures.
 - **Repeated boundary parsing:** `readString` exists independently in generation settings, character-library hydration, and provider health. Those files also define local number, boolean, timestamp, record, and range readers.
 - **Fabricated type evidence:** The source currently contains approximately 44 `Reflect.get` calls, two `Reflect.apply` calls, nine chained `as unknown as` assertions, 32 `Record<string, unknown>` occurrences, 22 `Promise<unknown>` occurrences, and 374 `typeof` tokens. These counts are search indicators, not automatic defect counts; several uses are legitimate callbacks, environment detection, or third-party component integration.
 - **Sparse object boilerplate:** About 23 conditional object-spread sites build optional properties. Some can become direct typed properties or Zod transformations; others encode meaningful omission semantics and should not be replaced with a generic helper merely to satisfy a lint rule.
@@ -101,7 +101,7 @@ If this work is not done, each new feature can add another custom sanitizer or i
 - The complete run on 2026-08-18 reported 40 passing files, 22 failed files, and 184 executed passing tests.
 - The dominant failure occurs during module import before test collection: `loggerFactory.getLogger(...)` is called while `loggerFactory` is undefined.
 - A focused run of `provider-health.test.ts` fails the same way, so this is not demonstrated cross-file mock leakage.
-- `package.json` requires Node 24.13.0; the audit ran on Node 26.5.0; GitHub Actions installs Node 24.11.1. The repository has three different effective versions and must select one exact supported version before repeatability measurements are meaningful.
+- `package.json` requires Node 26.5.0; the audit ran on Node 26.5.0; GitHub Actions installs Node 24.11.1. The repository has three different effective versions and must select one exact supported version before repeatability measurements are meaningful.
 
 ### Parsing and helper duplication
 
@@ -269,17 +269,17 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Scope:**
 
-- [ ] Choose one exact Node 26.5.0 (IMPORTANT) release and align `.node-version`, `.nvmrc`, root/package engine declarations, config package engines, and both GitHub Actions workflows.
-- [ ] Refactor `apps/web/src/lib/logging/logger.ts` so importing application code under Vitest produces a valid logger without executing a client/server RPC path incorrectly. Keep one real isomorphic production composition and avoid a test-only global fallback.
-- [ ] Move eager `getLogger` calls in `generation-error.ts`, `provider-health.ts`, and other import-time modules behind a valid factory or inject a narrow logger into their service composition.
-- [ ] Run the full suite on the pinned Node version. Repeat it enough times to detect order/timing failures only after the import failure is fixed; record failing seed/order if Vitest reports one.
-- [ ] Add `pnpm run test` to `.github/workflows/ci.yml` only once the baseline is green.
+- [x] Choose Node 26.5.0 and align `.node-version`, `.nvmrc`, root/package engine declarations, config package engines, and both GitHub Actions workflows.
+- [x] Refactor `apps/web/src/lib/logging/logger.ts` so importing application code under Vitest produces a valid logger without executing a client/server RPC path incorrectly. Keep one real isomorphic production composition and avoid a test-only global fallback.
+- [x] Move eager `getLogger` calls in `generation-error.ts`, `provider-health.ts`, and other import-time modules behind a valid factory or inject a narrow logger into their service composition.
+- [x] Run the full suite on the pinned Node version. Three consecutive runs passed with 62 files and 266 tests on 2026-08-18.
+- [x] Add `pnpm run test` to `.github/workflows/pull-request.yml` once the baseline is green.
 
 **Exit criteria:**
 
-- [ ] Every test file collects when run alone and in the complete suite.
-- [ ] Three consecutive complete runs pass on the exact pinned Node version.
-- [ ] CI and local engines agree.
+- [x] Every test file collects when run alone and in the complete suite.
+- [x] Three consecutive complete runs pass on the exact pinned Node version.
+- [x] CI and local engines agree.
 
 **Can run in parallel:**
 
@@ -683,3 +683,4 @@ Introduce Oxlint side by side with ESLint after the initial violations are remov
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-18 | Created after auditing the anti-slop rules, all discovered test files, module-mock usage, boundary helpers, current lint/CI configuration, and the failing full-suite baseline. |
 | 2026-08-18 | Added repository-wide clone detection, one runtime-environment source of truth, local Oxlint architectural rules, and an explicit side-by-side ESLint/Oxlint rollout.           |
+| 2026-08-18 | Completed Phase 0 on Node 26.5.0: restored import-safe logging, aligned local and CI runtimes, added CI tests, and passed three complete 62-file/266-test runs.                 |

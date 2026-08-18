@@ -83,8 +83,8 @@ const createLoggerFactory = createIsomorphicFn()
     }),
   )
   .client((): iLoggerFactory => {
-    const clientLogger = createTsLogger(LOG_RUNTIMES.client);
-    return { getLogger: (component) => createApplicationLogger(clientLogger, LOG_RUNTIMES.client, component) };
+    const CLIENT_LOGGER = createTsLogger(LOG_RUNTIMES.client);
+    return { getLogger: (component) => createApplicationLogger(CLIENT_LOGGER, LOG_RUNTIMES.client, component) };
   });
 
 export const loggerFactory = createLoggerFactory();

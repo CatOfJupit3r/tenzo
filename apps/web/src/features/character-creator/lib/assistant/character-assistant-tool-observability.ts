@@ -9,7 +9,7 @@ import type { CharacterAssistantToolName } from './character-assistant-contracts
 export const CHARACTER_ASSISTANT_TOOL_OUTCOME_SCHEMA = z.enum(['completed', 'no-op', 'failed']);
 export const CHARACTER_ASSISTANT_TOOL_OUTCOMES = CHARACTER_ASSISTANT_TOOL_OUTCOME_SCHEMA.enum;
 export type CharacterAssistantToolOutcome = z.infer<typeof CHARACTER_ASSISTANT_TOOL_OUTCOME_SCHEMA>;
-const characterAssistantToolLogger = loggerFactory.getLogger('character-assistant.tool');
+const CHARACTER_ASSISTANT_TOOL_LOGGER = loggerFactory.getLogger('character-assistant.tool');
 
 interface iCharacterAssistantToolLog {
   model?: string;
@@ -105,8 +105,8 @@ export function logCharacterAssistantTool({
   };
 
   if (outcome === CHARACTER_ASSISTANT_TOOL_OUTCOMES.failed) {
-    characterAssistantToolLogger.error('Tool execution', error, details);
+    CHARACTER_ASSISTANT_TOOL_LOGGER.error('Tool execution', error, details);
   } else {
-    characterAssistantToolLogger.info('Tool execution', details);
+    CHARACTER_ASSISTANT_TOOL_LOGGER.info('Tool execution', details);
   }
 }

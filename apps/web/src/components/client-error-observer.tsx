@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import { loggerFactory } from '@~/lib/logging/logger';
 
-const clientErrorLogger = loggerFactory.getLogger('browser');
+const CLIENT_ERROR_LOGGER = loggerFactory.getLogger('browser');
 
 export function ClientErrorObserver() {
   useEffect(() => {
@@ -14,11 +14,11 @@ export function ClientErrorObserver() {
       };
       const error = event.error ?? new Error(event.message || 'Unhandled browser error');
 
-      clientErrorLogger.error('Unhandled browser error', error, context);
+      CLIENT_ERROR_LOGGER.error('Unhandled browser error', error, context);
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      clientErrorLogger.error('Unhandled browser promise rejection', event.reason);
+      CLIENT_ERROR_LOGGER.error('Unhandled browser promise rejection', event.reason);
     };
 
     window.addEventListener('error', handleError);

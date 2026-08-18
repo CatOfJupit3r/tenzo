@@ -9,8 +9,8 @@ import { INTERVALS } from './constants/dates';
 import { loggerFactory } from './lib/logging/logger';
 import { routeTree } from './routeTree.gen';
 
-const routerLogger = loggerFactory.getLogger('router');
-const queryLogger = loggerFactory.getLogger('react-query');
+const ROUTER_LOGGER = loggerFactory.getLogger('router');
+const QUERY_LOGGER = loggerFactory.getLogger('react-query');
 
 function getOperationIdentifier(key: readonly unknown[] | undefined) {
   const candidate = key?.[0];
@@ -38,13 +38,13 @@ export const getRouter = () => {
     queryCache: new QueryCache({
       onError: (error, query) => {
         const operation = getOperationIdentifier(query.queryKey);
-        queryLogger.error('Query failed', error, operation ? { operation } : undefined);
+        QUERY_LOGGER.error('Query failed', error, operation ? { operation } : undefined);
       },
     }),
     mutationCache: new MutationCache({
       onError: (error, _variables, _onMutateResult, mutation) => {
         const operation = getOperationIdentifier(mutation.options.mutationKey);
-        queryLogger.error('Mutation failed', error, operation ? { operation } : undefined);
+        QUERY_LOGGER.error('Mutation failed', error, operation ? { operation } : undefined);
       },
     }),
   });
@@ -60,7 +60,7 @@ export const getRouter = () => {
     defaultErrorComponent: ErrorBoundary,
     defaultOnCatch: (error, errorInfo) => {
       const componentStack = errorInfo.componentStack?.trim();
-      routerLogger.error(
+      ROUTER_LOGGER.error(
         'Router caught an error',
         error,
         componentStack ? { componentStack: componentStack.slice(0, 2_000) } : undefined,

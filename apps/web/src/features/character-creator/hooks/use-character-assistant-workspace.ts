@@ -62,7 +62,7 @@ interface iUseCharacterAssistantWorkspaceOptions {
   focusTemplates: iChatTemplateRef[];
 }
 
-const characterAssistantWorkspaceLogger = loggerFactory.getLogger('character-assistant.workspace');
+const CHARACTER_ASSISTANT_WORKSPACE_LOGGER = loggerFactory.getLogger('character-assistant.workspace');
 
 export interface iCharacterAssistantPatchView {
   proposalId: string;
@@ -113,7 +113,7 @@ export function useCharacterAssistantWorkspace({
   maxExampleContextCharacters,
   focusTemplates,
 }: iUseCharacterAssistantWorkspaceOptions) {
-  const workspaceLogger = useMemo(() => characterAssistantWorkspaceLogger.child({ characterId }), [characterId]);
+  const WORKSPACE_LOGGER = useMemo(() => CHARACTER_ASSISTANT_WORKSPACE_LOGGER.child({ characterId }), [characterId]);
   const sessions = usePersistentCollection(characterAssistantSessionsCollection);
   const drafts = usePersistentCollection(characterAssistantComposerDraftsCollection);
   const characterSessions = useMemo(
@@ -166,8 +166,8 @@ export function useCharacterAssistantWorkspace({
 
   useEffect(() => {
     if (!chat.error) return;
-    workspaceLogger.error('Assistant stream failed', chat.error, { operation: 'stream', sessionId });
-  }, [chat.error, sessionId, workspaceLogger]);
+    WORKSPACE_LOGGER.error('Assistant stream failed', chat.error, { operation: 'stream', sessionId });
+  }, [chat.error, sessionId, WORKSPACE_LOGGER]);
 
   useEffect(() => {
     if (!characterId || session) return;
@@ -252,7 +252,7 @@ export function useCharacterAssistantWorkspace({
         );
         return true;
       } catch (error) {
-        workspaceLogger.error('Assistant message request failed', error, {
+        WORKSPACE_LOGGER.error('Assistant message request failed', error, {
           operation: 'send-message',
           sessionId,
         });
@@ -263,7 +263,7 @@ export function useCharacterAssistantWorkspace({
         return false;
       }
     },
-    [chat, focusTemplates, forwardedProps, sessionId, workspaceLogger],
+    [chat, focusTemplates, forwardedProps, sessionId, WORKSPACE_LOGGER],
   );
   const replaceConversationMessages = useCallback(
     async (nextMessages: typeof chat.messages) => {
@@ -372,7 +372,7 @@ export function useCharacterAssistantWorkspace({
         await chat.reload();
         return true;
       } catch (error) {
-        workspaceLogger.error('Assistant response retry failed', error, {
+        WORKSPACE_LOGGER.error('Assistant response retry failed', error, {
           operation: 'response-retry',
           sessionId,
         });

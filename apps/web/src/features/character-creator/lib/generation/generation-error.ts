@@ -14,7 +14,7 @@ const ERROR_DETAIL_KEYS = [
 
 const ERROR_CHILD_KEYS = ['rawValue', 'error', 'metadata', 'cause', 'rawEvent', 'response'] as const;
 const MAX_ERROR_MESSAGE_LENGTH = 1_200;
-const generationLogger = loggerFactory.getLogger('character-creator.generation');
+const GENERATION_LOGGER = loggerFactory.getLogger('character-creator.generation');
 
 function redactSensitiveValues(value: string) {
   return value
@@ -83,7 +83,7 @@ export function getGenerationErrorHint(error: unknown) {
 }
 
 export function logGenerationError(context: string, error: unknown) {
-  generationLogger.error('Generation failed', error, {
+  GENERATION_LOGGER.error('Generation failed', error, {
     operation: context,
   });
 }

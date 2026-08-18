@@ -157,18 +157,10 @@ async function* repairToolCallArguments(stream: AsyncIterable<StreamChunk>): Asy
 }
 
 export function withRepairedToolCallArguments(adapter: AnyTextAdapter): AnyTextAdapter {
-  return new Proxy(adapter, {
-    get(target, property) {
-      if (property === 'chatStream') {
-        return (options: Parameters<AnyTextAdapter['chatStream']>[0]) =>
-          repairToolCallArguments(target.chatStream(options));
-      }
-      const value = Reflect.get(target, property, target) as unknown;
-      if (typeof value !== 'function') return value;
-      const method = value as (...args: unknown[]) => unknown;
-      return (...args: unknown[]) => Reflect.apply(method, target, args);
-    },
-  });
+  return {
+    ...adapter,
+    chatStream: (options) => repairToolCallArguments(adapter.chatStream(options)),
+  };
 }
 
 export function createCharacterModelOptions(

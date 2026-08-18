@@ -14,16 +14,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type {
-  Dispatch,
-  ForwardRefExoticComponent,
-  ReactElement,
-  Ref,
-  RefAttributes,
-  SetStateAction,
-  UIEvent,
-  WheelEvent,
-} from 'react';
+import type { Dispatch, ReactElement, Ref, RefAttributes, SetStateAction, UIEvent, WheelEvent } from 'react';
 import { LuCheck, LuChevronDown, LuX } from 'react-icons/lu';
 import { components, createFilter } from 'react-select';
 import type {
@@ -338,18 +329,20 @@ type SingleSelectBaseProps = Props<iOptionType, false, GroupBase<iOptionType>>;
 type MultiSelectBaseProps = Props<iOptionType, true, GroupBase<iOptionType>>;
 type CreatableSingleSelectBaseProps = CreatableProps<iOptionType, false, GroupBase<iOptionType>>;
 
-const ForwardedSelectSingle = ForwardedSelect as unknown as ForwardRefExoticComponent<
-  SingleSelectBaseProps & RefAttributes<SelectInstance<iOptionType, false, GroupBase<iOptionType>>>
->;
+const ForwardedSelectSingle = forwardRef<
+  SelectInstance<iOptionType, false, GroupBase<iOptionType>>,
+  SingleSelectBaseProps
+>((props, ref) => BaseSelect({ ...props, isMulti: false }, ref));
 
-const ForwardedSelectMulti = ForwardedSelect as unknown as ForwardRefExoticComponent<
-  MultiSelectBaseProps & RefAttributes<SelectInstance<iOptionType, true, GroupBase<iOptionType>>>
->;
+const ForwardedSelectMulti = forwardRef<
+  SelectInstance<iOptionType, true, GroupBase<iOptionType>>,
+  MultiSelectBaseProps
+>((props, ref) => BaseSelect({ ...props, isMulti: true }, ref));
 
-const ForwardedCreatableSelectSingle = ForwardedSelect as unknown as ForwardRefExoticComponent<
-  CreatableSingleSelectBaseProps &
-    RefAttributes<SelectInstance<iOptionType, false, GroupBase<iOptionType>>> & { isCreatable: true }
->;
+const ForwardedCreatableSelectSingle = forwardRef<
+  SelectInstance<iOptionType, false, GroupBase<iOptionType>>,
+  CreatableSingleSelectBaseProps
+>((props, ref) => BaseSelect({ ...props, isMulti: false, isCreatable: true }, ref));
 
 export interface iSingleSelectProps extends Omit<
   SingleSelectBaseProps,
@@ -431,7 +424,6 @@ export const CreatableSingleSelect = forwardRef<
       <ForwardedCreatableSelectSingle
         {...rest}
         ref={ref}
-        isCreatable
         options={options}
         value={computedValue}
         defaultValue={computedDefaultValue}

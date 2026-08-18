@@ -44,19 +44,15 @@ function buildMessages(prompt?: string, messages?: Array<ModelMessage | UIMessag
 }
 
 function createNonStreamingStructuredOutputAdapter(adapter: AnyTextAdapter): AnyTextAdapter {
-  return new Proxy(adapter, {
-    get(target, property) {
-      if (property === 'structuredOutputStream') {
-        return undefined;
-      }
-      const value = Reflect.get(target, property, target) as unknown;
-      if (typeof value !== 'function') {
-        return value;
-      }
-      const method = value as (...args: unknown[]) => unknown;
-      return (...args: unknown[]) => Reflect.apply(method, target, args);
-    },
-  });
+  return {
+    ...adapter,
+    chatStream: (options) => adapter.chatStream(options),
+    structuredOutput: async (options) => adapter.structuredOutput(options),
+    structuredOutputStream: undefined,
+    ...(adapter.supportsCombinedToolsAndSchema
+      ? { supportsCombinedToolsAndSchema: adapter.supportsCombinedToolsAndSchema.bind(adapter) }
+      : {}),
+  };
 }
 
 export function createValidatedObjectGenerator(

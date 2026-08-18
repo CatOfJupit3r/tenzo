@@ -46,6 +46,12 @@ interface iFetchJsonResult {
   data: unknown;
 }
 
+interface iParsedFetchJsonResult<T> {
+  isOk: boolean;
+  status: number;
+  data: T | null;
+}
+
 type JsonFetcher = (url: string, init?: RequestInit) => Promise<iFetchJsonResult>;
 
 interface iEndpointCandidates {
@@ -119,38 +125,141 @@ async function fetchJson(url: string, init?: RequestInit): Promise<iFetchJsonRes
   };
 }
 
-function readString(value: unknown) {
-  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+const OPTIONAL_TRIMMED_STRING_SCHEMA = z
+  .string()
+  .transform((value) => value.trim() || undefined)
+  .optional()
+  .catch(() => undefined);
+const POSITIVE_INTEGER_SCHEMA = z
+  .number()
+  .finite()
+  .positive()
+  .transform((value) => Math.floor(value));
+const OPTIONAL_POSITIVE_INTEGER_SCHEMA = z
+  .number()
+  .finite()
+  .positive()
+  .transform((value) => Math.floor(value))
+  .optional()
+  .catch(() => undefined);
+const SUPPORTED_PARAMETERS_SCHEMA = z
+  .array(z.string())
+  .optional()
+  .catch(() => undefined);
+
+const PROVIDER_MODEL_ENTRY_SCHEMA = z.union([
+  z.string().trim().min(1),
+  z
+    .object({
+      id: OPTIONAL_TRIMMED_STRING_SCHEMA,
+      model_name: OPTIONAL_TRIMMED_STRING_SCHEMA,
+      name: OPTIONAL_TRIMMED_STRING_SCHEMA,
+      context_length: OPTIONAL_POSITIVE_INTEGER_SCHEMA,
+      context_window: OPTIONAL_POSITIVE_INTEGER_SCHEMA,
+      max_context_length: OPTIONAL_POSITIVE_INTEGER_SCHEMA,
+      supported_parameters: SUPPORTED_PARAMETERS_SCHEMA,
+    })
+    .passthrough(),
+]);
+type iProviderModelEntry = z.infer<typeof PROVIDER_MODEL_ENTRY_SCHEMA>;
+
+const OPENAI_MODELS_RESPONSE_SCHEMA = z.union([
+  z.array(PROVIDER_MODEL_ENTRY_SCHEMA),
+  z
+    .object({
+      data: z.array(PROVIDER_MODEL_ENTRY_SCHEMA).optional(),
+      models: z.array(PROVIDER_MODEL_ENTRY_SCHEMA).optional(),
+    })
+    .passthrough(),
+]);
+type iOpenAiModelsResponse = z.infer<typeof OPENAI_MODELS_RESPONSE_SCHEMA>;
+
+const OPENROUTER_ENDPOINT_SCHEMA = z
+  .object({
+    tag: OPTIONAL_TRIMMED_STRING_SCHEMA,
+    provider_name: OPTIONAL_TRIMMED_STRING_SCHEMA,
+    supported_parameters: SUPPORTED_PARAMETERS_SCHEMA,
+  })
+  .passthrough();
+const OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA = z
+  .object({
+    data: z
+      .object({
+        endpoints: z.array(OPENROUTER_ENDPOINT_SCHEMA).catch([]),
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+type iOpenRouterEndpointsResponse = z.infer<typeof OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA>;
+
+const KOBOLD_MODEL_RESPONSE_SCHEMA = z.union([
+  z.string().transform((value) => value.trim()),
+  z
+    .object({
+      result: z.union([
+        OPTIONAL_TRIMMED_STRING_SCHEMA,
+        z.object({ result: OPTIONAL_TRIMMED_STRING_SCHEMA }).passthrough(),
+      ]),
+      model: OPTIONAL_TRIMMED_STRING_SCHEMA,
+    })
+    .passthrough(),
+]);
+type iKoboldModelResponse = z.infer<typeof KOBOLD_MODEL_RESPONSE_SCHEMA>;
+
+const CONTEXT_RESPONSE_SCHEMA = z.union([
+  POSITIVE_INTEGER_SCHEMA,
+  z
+    .object({
+      default_generation_settings: z.object({ n_ctx: OPTIONAL_POSITIVE_INTEGER_SCHEMA }).passthrough().optional(),
+      value: OPTIONAL_POSITIVE_INTEGER_SCHEMA,
+    })
+    .passthrough(),
+]);
+type iContextResponse = z.infer<typeof CONTEXT_RESPONSE_SCHEMA>;
+
+const SERVICE_INFO_RESPONSE_SCHEMA = z.union([
+  z.string().transform((value) => value.trim()),
+  z
+    .object({
+      software: z.object({ name: OPTIONAL_TRIMMED_STRING_SCHEMA }).passthrough().optional(),
+      result: OPTIONAL_TRIMMED_STRING_SCHEMA,
+    })
+    .passthrough(),
+]);
+type iServiceInfoResponse = z.infer<typeof SERVICE_INFO_RESPONSE_SCHEMA>;
+
+function parseProbeResult<T>(
+  response: iFetchJsonResult | null,
+  schema: z.ZodType<T>,
+): iParsedFetchJsonResult<T> | null {
+  if (!response) {
+    return null;
+  }
+
+  const parsed = schema.safeParse(response.data);
+  return {
+    ...response,
+    data: parsed.success ? parsed.data : null,
+  };
 }
 
-function readPositiveInteger(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
-}
-
-function extractModels(payload: unknown): iProviderModelOption[] {
+function extractModels(payload: iOpenAiModelsResponse): iProviderModelOption[] {
   const discoveredModels = new Map<string, iProviderModelOption>();
 
-  const pushModel = (entry: unknown) => {
-    if (entry && typeof entry === 'object') {
-      const canonicalName =
-        readString(Reflect.get(entry, 'id')) ??
-        readString(Reflect.get(entry, 'model_name')) ??
-        readString(Reflect.get(entry, 'name'));
-      if (!canonicalName) {
-        return;
-      }
+  const pushModel = (entry: iProviderModelEntry) => {
+    if (typeof entry === 'string') {
+      discoveredModels.set(entry, { label: entry, value: entry });
+      return;
+    }
 
-      const previewLabel = readString(Reflect.get(entry, 'name'));
+    const canonicalName = entry.id ?? entry.model_name ?? entry.name;
+    if (canonicalName) {
+      const previewLabel = entry.name;
       discoveredModels.set(canonicalName, {
         label: previewLabel && previewLabel !== canonicalName ? `${previewLabel} (${canonicalName})` : canonicalName,
         value: canonicalName,
       });
-      return;
-    }
-
-    const canonicalName = readString(entry);
-    if (canonicalName) {
-      discoveredModels.set(canonicalName, { label: canonicalName, value: canonicalName });
     }
   };
 
@@ -158,42 +267,25 @@ function extractModels(payload: unknown): iProviderModelOption[] {
     payload.forEach(pushModel);
   }
 
-  if (payload && typeof payload === 'object') {
-    const data = Reflect.get(payload, 'data');
-    if (Array.isArray(data)) {
-      data.forEach(pushModel);
-    }
-
-    const models = Reflect.get(payload, 'models');
-    if (Array.isArray(models)) {
-      models.forEach(pushModel);
-    }
+  if (!Array.isArray(payload)) {
+    payload.data?.forEach(pushModel);
+    payload.models?.forEach(pushModel);
   }
 
   return [...discoveredModels.values()];
 }
 
-function extractModelContextSizes(payload: unknown) {
+function extractModelContextSizes(payload: iOpenAiModelsResponse) {
   const modelContextSizes: Record<string, number> = {};
-  let candidates: unknown[] = [];
+  const candidates = Array.isArray(payload) ? payload : (payload.data ?? []);
 
-  if (Array.isArray(payload)) {
-    candidates = payload;
-  } else if (payload && typeof payload === 'object') {
-    const data = Reflect.get(payload, 'data');
-    candidates = Array.isArray(data) ? data : [];
-  }
-
-  candidates.forEach((entry: unknown) => {
-    if (!entry || typeof entry !== 'object') {
+  candidates.forEach((entry) => {
+    if (typeof entry === 'string') {
       return;
     }
 
-    const model = readString(Reflect.get(entry, 'id')) ?? readString(Reflect.get(entry, 'name'));
-    const contextSize =
-      readPositiveInteger(Reflect.get(entry, 'context_length')) ??
-      readPositiveInteger(Reflect.get(entry, 'context_window')) ??
-      readPositiveInteger(Reflect.get(entry, 'max_context_length'));
+    const model = entry.id ?? entry.name;
+    const contextSize = entry.context_length ?? entry.context_window ?? entry.max_context_length;
 
     if (model && contextSize) {
       modelContextSizes[model] = contextSize;
@@ -203,24 +295,17 @@ function extractModelContextSizes(payload: unknown) {
   return modelContextSizes;
 }
 
-function extractModelCapabilities(payload: unknown) {
+function extractModelCapabilities(payload: iOpenAiModelsResponse) {
   const modelCapabilities: Record<string, iModelCapabilities> = {};
-  let candidates: unknown[] = [];
-
-  if (Array.isArray(payload)) {
-    candidates = payload;
-  } else if (payload && typeof payload === 'object') {
-    const data = Reflect.get(payload, 'data');
-    candidates = Array.isArray(data) ? data : [];
-  }
+  const candidates = Array.isArray(payload) ? payload : (payload.data ?? []);
 
   candidates.forEach((entry) => {
-    if (!entry || typeof entry !== 'object') {
+    if (typeof entry === 'string') {
       return;
     }
 
-    const model = readString(Reflect.get(entry, 'id')) ?? readString(Reflect.get(entry, 'name'));
-    const capabilities = readModelCapabilities(Reflect.get(entry, 'supported_parameters'));
+    const model = entry.id ?? entry.name;
+    const capabilities = readModelCapabilities(entry.supported_parameters);
     if (model && capabilities) {
       modelCapabilities[model] = capabilities;
     }
@@ -229,31 +314,15 @@ function extractModelCapabilities(payload: unknown) {
   return modelCapabilities;
 }
 
-function extractModelProviders(payload: unknown): iModelProviderOption[] {
-  if (!payload || typeof payload !== 'object') {
-    return [];
-  }
-
-  const data = Reflect.get(payload, 'data');
-  if (!data || typeof data !== 'object') {
-    return [];
-  }
-
-  const endpoints = Reflect.get(data, 'endpoints');
-  if (!Array.isArray(endpoints)) {
-    return [];
-  }
+function extractModelProviders(payload: iOpenRouterEndpointsResponse): iModelProviderOption[] {
+  const endpoints = payload.data?.endpoints ?? [];
 
   const providers = new Map<string, { name: string; capabilities: iModelCapabilities[] }>();
   endpoints.forEach((endpoint) => {
-    if (!endpoint || typeof endpoint !== 'object') {
-      return;
-    }
-
-    const tag = readString(Reflect.get(endpoint, 'tag'));
+    const { tag } = endpoint;
     const slug = tag?.split('/')[0] ?? null;
-    const name = readString(Reflect.get(endpoint, 'provider_name'));
-    const capabilities = readModelCapabilities(Reflect.get(endpoint, 'supported_parameters'));
+    const name = endpoint.provider_name;
+    const capabilities = readModelCapabilities(endpoint.supported_parameters);
     if (!slug || !name || !capabilities) {
       return;
     }
@@ -271,44 +340,29 @@ function extractModelProviders(payload: unknown): iModelProviderOption[] {
   });
 }
 
-function extractCurrentModel(payload: unknown) {
-  if (payload && typeof payload === 'object') {
-    const result = Reflect.get(payload, 'result');
-    const nestedResult = result && typeof result === 'object' ? Reflect.get(result, 'result') : undefined;
-
-    return readString(nestedResult) ?? readString(result) ?? readString(Reflect.get(payload, 'model'));
+function extractCurrentModel(payload: iKoboldModelResponse) {
+  if (typeof payload === 'string') {
+    return payload || null;
   }
 
-  return readString(payload);
+  const nestedResult = typeof payload.result === 'object' ? payload.result.result : undefined;
+  return nestedResult ?? (typeof payload.result === 'string' ? payload.result : undefined) ?? payload.model ?? null;
 }
 
-function extractContextSize(payload: unknown) {
-  if (payload && typeof payload === 'object') {
-    const defaultGenerationSettings = Reflect.get(payload, 'default_generation_settings');
-    if (defaultGenerationSettings && typeof defaultGenerationSettings === 'object') {
-      const nCtx = readPositiveInteger(Reflect.get(defaultGenerationSettings, 'n_ctx'));
-      if (nCtx) {
-        return nCtx;
-      }
-    }
-
-    return readPositiveInteger(Reflect.get(payload, 'value'));
+function extractContextSize(payload: iContextResponse) {
+  if (typeof payload === 'number') {
+    return payload;
   }
 
-  return readPositiveInteger(payload);
+  return payload.default_generation_settings?.n_ctx ?? payload.value ?? null;
 }
 
-function extractProviderName(payload: unknown) {
-  if (!payload || typeof payload !== 'object') {
-    return null;
+function extractProviderName(payload: iServiceInfoResponse) {
+  if (typeof payload === 'string') {
+    return payload || null;
   }
 
-  const software = Reflect.get(payload, 'software');
-  if (software && typeof software === 'object') {
-    return readString(Reflect.get(software, 'name'));
-  }
-
-  return readString(Reflect.get(payload, 'result'));
+  return payload.software?.name ?? payload.result ?? null;
 }
 
 async function probeProviderMetadataWithFetcher(request: iConnectionHealthRequest, jsonFetcher: JsonFetcher) {
@@ -320,13 +374,13 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   } satisfies RequestInit;
 
   const [
-    modelsResponse,
-    koboldModelResponse,
-    koboldContextResponse,
-    koboldPublicContextResponse,
-    propsResponse,
-    serviceInfoResponse,
-    modelEndpointsResponse,
+    rawModelsResponse,
+    rawKoboldModelResponse,
+    rawKoboldContextResponse,
+    rawKoboldPublicContextResponse,
+    rawPropsResponse,
+    rawServiceInfoResponse,
+    rawModelEndpointsResponse,
   ] = await Promise.all([
     jsonFetcher(candidates.modelsUrl, requestInit).catch(() => null),
     jsonFetcher(candidates.koboldModelUrl, requestInit).catch(() => null),
@@ -338,6 +392,14 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
       ? jsonFetcher(candidates.modelEndpointsUrl, requestInit).catch(() => null)
       : Promise.resolve(null),
   ]);
+  const modelsResponse = parseProbeResult(rawModelsResponse, OPENAI_MODELS_RESPONSE_SCHEMA);
+  const koboldModelResponse = parseProbeResult(rawKoboldModelResponse, KOBOLD_MODEL_RESPONSE_SCHEMA);
+  const koboldContextResponse = parseProbeResult(rawKoboldContextResponse, CONTEXT_RESPONSE_SCHEMA);
+  const koboldPublicContextResponse = parseProbeResult(rawKoboldPublicContextResponse, CONTEXT_RESPONSE_SCHEMA);
+  const propsResponse = parseProbeResult(rawPropsResponse, CONTEXT_RESPONSE_SCHEMA);
+  const serviceInfoResponse = parseProbeResult(rawServiceInfoResponse, SERVICE_INFO_RESPONSE_SCHEMA);
+  const modelEndpointsResponse = parseProbeResult(rawModelEndpointsResponse, OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA);
+  const requestedModel = OPTIONAL_TRIMMED_STRING_SCHEMA.parse(request.model);
 
   const probeResults = [
     { category: 'models', isAttempted: true, result: modelsResponse },
@@ -355,23 +417,33 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   PROVIDER_HEALTH_LOGGER.debug('Provider metadata probe completed', {
     operation: 'probe-provider-metadata',
     requestMode: request.requestMode,
-    model: readString(request.model) ?? undefined,
+    model: requestedModel,
     attemptedProbeCount: attemptedProbeResults.length,
     successfulProbeCount: successfulProbeCategories.length,
     successfulProbeCategories,
     failedProbeCount: attemptedProbeResults.length - successfulProbeCategories.length,
   });
 
-  const models = modelsResponse?.isOk ? extractModels(modelsResponse.data) : [];
-  const modelContextSizes = modelsResponse?.isOk ? extractModelContextSizes(modelsResponse.data) : {};
-  const modelCapabilities = modelsResponse?.isOk ? extractModelCapabilities(modelsResponse.data) : {};
-  const modelProviders = modelEndpointsResponse?.isOk ? extractModelProviders(modelEndpointsResponse.data) : [];
-  const currentModel = koboldModelResponse?.isOk ? extractCurrentModel(koboldModelResponse.data) : null;
+  const models = modelsResponse?.isOk && modelsResponse.data ? extractModels(modelsResponse.data) : [];
+  const modelContextSizes =
+    modelsResponse?.isOk && modelsResponse.data ? extractModelContextSizes(modelsResponse.data) : {};
+  const modelCapabilities =
+    modelsResponse?.isOk && modelsResponse.data ? extractModelCapabilities(modelsResponse.data) : {};
+  const modelProviders =
+    modelEndpointsResponse?.isOk && modelEndpointsResponse.data
+      ? extractModelProviders(modelEndpointsResponse.data)
+      : [];
+  const currentModel =
+    koboldModelResponse?.isOk && koboldModelResponse.data ? extractCurrentModel(koboldModelResponse.data) : null;
   const endpointContextSize =
-    (koboldContextResponse?.isOk ? extractContextSize(koboldContextResponse.data) : null) ??
-    (koboldPublicContextResponse?.isOk ? extractContextSize(koboldPublicContextResponse.data) : null) ??
-    (propsResponse?.isOk ? extractContextSize(propsResponse.data) : null);
-  const selectedModel = readString(request.model) ?? currentModel;
+    (koboldContextResponse?.isOk && koboldContextResponse.data
+      ? extractContextSize(koboldContextResponse.data)
+      : null) ??
+    (koboldPublicContextResponse?.isOk && koboldPublicContextResponse.data
+      ? extractContextSize(koboldPublicContextResponse.data)
+      : null) ??
+    (propsResponse?.isOk && propsResponse.data ? extractContextSize(propsResponse.data) : null);
+  const selectedModel = requestedModel ?? currentModel;
   const selectedModelCapabilities = mergeModelCapabilities(modelProviders.map((provider) => provider.capabilities));
   if (selectedModel && selectedModelCapabilities) {
     modelCapabilities[selectedModel] = selectedModelCapabilities;
@@ -382,7 +454,8 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     currentModel && !models.some((model) => model.value === currentModel)
       ? [{ label: currentModel, value: currentModel }, ...models]
       : models;
-  const providerName = serviceInfoResponse?.isOk ? extractProviderName(serviceInfoResponse.data) : null;
+  const providerName =
+    serviceInfoResponse?.isOk && serviceInfoResponse.data ? extractProviderName(serviceInfoResponse.data) : null;
   const hasKoboldMetadata =
     koboldModelResponse?.isOk === true ||
     koboldContextResponse?.isOk === true ||

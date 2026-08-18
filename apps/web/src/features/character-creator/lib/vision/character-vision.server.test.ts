@@ -5,7 +5,6 @@ import {
   createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
 } from '../generation/tanstack-ai-text-generation';
-import { CHARACTER_IMAGE_ANALYSIS_SCHEMA } from './character-vision-contracts';
 import type { iCharacterImageAnalysis } from './character-vision-contracts';
 import { createCharacterVisionService } from './character-vision.server';
 
@@ -41,7 +40,7 @@ function createVisionHarness(value: unknown) {
   const calls: iGenerateValidatedObjectOptions<unknown>[] = [];
   const generateValidatedObject: iGenerateValidatedObject = async <T>(options: iGenerateValidatedObjectOptions<T>) => {
     calls.push(options as iGenerateValidatedObjectOptions<unknown>);
-    return value as T;
+    return options.schema.parse(value);
   };
   const adapter = createCharacterTextAdapter({
     endpoint: request.endpoint,
@@ -65,7 +64,6 @@ describe('character vision analysis', () => {
 
     await expect(harness.service.analyzeCharacterImage(request, harness.adapter)).resolves.toEqual(analysis);
     expect(harness.calls).toHaveLength(1);
-    expect(harness.calls[0]?.schema).toBe(CHARACTER_IMAGE_ANALYSIS_SCHEMA);
   });
 
   it('clamps oversized arrays returned by structured generation', async () => {

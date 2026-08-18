@@ -16,6 +16,7 @@ import { useComposedRefs } from '@~/hooks/use-compose-refs';
 import { useIsomorphicLayoutEffect } from '@~/hooks/use-isomorphic-layout-effect';
 import { useLazyRef } from '@~/hooks/use-lazy-ref';
 import { cn } from '@~/lib/utils';
+import { isOnClient } from '@~/utils/ssr-helpers';
 
 const ROOT_NAME = 'Cropper';
 const ROOT_IMPL_NAME = 'CropperImpl';
@@ -62,7 +63,29 @@ interface iDivProps extends ComponentProps<'div'> {
 }
 
 const MAX_CACHE_SIZE = 200;
-const DPR = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+const DPR = isOnClient ? window.devicePixelRatio || 1 : 1;
+
+function createReactMediaEvent<T extends EventTarget>(type: string, target: T) {
+  const nativeEvent = new Event(type);
+  const syntheticEvent = {
+    nativeEvent,
+    currentTarget: target,
+    target,
+    bubbles: nativeEvent.bubbles,
+    cancelable: nativeEvent.cancelable,
+    defaultPrevented: nativeEvent.defaultPrevented,
+    eventPhase: nativeEvent.eventPhase,
+    isTrusted: nativeEvent.isTrusted,
+    preventDefault: () => nativeEvent.preventDefault(),
+    isDefaultPrevented: () => nativeEvent.defaultPrevented,
+    stopPropagation: () => nativeEvent.stopPropagation(),
+    isPropagationStopped: () => false,
+    persist: () => undefined,
+    timeStamp: nativeEvent.timeStamp,
+    type: nativeEvent.type,
+  } satisfies SyntheticEvent<T>;
+  return syntheticEvent;
+}
 
 const rotationSizeCache = new Map<string, iSize>();
 const cropSizeCache = new Map<string, iSize>();
@@ -1364,7 +1387,7 @@ export function CropperImage(props: iCropperImageProps) {
 
     computeSizes();
 
-    onLoad?.(new Event('load') as unknown as SyntheticEvent<HTMLImageElement>);
+    onLoad?.(createReactMediaEvent<HTMLImageElement>('load', image));
   }, [computeSizes, onLoad]);
 
   useEffect(() => {
@@ -1492,7 +1515,7 @@ export function CropperVideo(props: iCropperVideoProps) {
 
     computeSizes();
 
-    onLoadedMetadata?.(new Event('loadedmetadata') as unknown as SyntheticEvent<HTMLVideoElement>);
+    onLoadedMetadata?.(createReactMediaEvent<HTMLVideoElement>('loadedmetadata', video));
   }, [computeSizes, onLoadedMetadata]);
 
   useEffect(() => {

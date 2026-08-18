@@ -4,10 +4,13 @@ import { ReactRenderer } from '@tiptap/react';
 import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { createElement } from 'react';
 import { LuFileText } from 'react-icons/lu';
+import { z } from 'zod';
 
+import { STORED_FIELD_TEMPLATE_SCHEMA } from '../cards/field-templates';
 import type { iFieldTemplateViewModel } from '../cards/field-templates';
 
 type iChatTemplateSuggestionProps = SuggestionProps<iFieldTemplateViewModel, iFieldTemplateViewModel>;
+const CHAT_TEMPLATE_VIEW_MODEL_SCHEMA = STORED_FIELD_TEMPLATE_SCHEMA.extend({ isBuiltIn: z.boolean() });
 
 export interface iBuildChatTemplateMentionOptions {
   templates: iFieldTemplateViewModel[];
@@ -154,7 +157,7 @@ export function buildChatTemplateMentionExtension({
           .filter((template) => template.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
           .slice(0, 8),
       command: ({ editor, range, props }) => {
-        const template = props as unknown as iFieldTemplateViewModel;
+        const template = CHAT_TEMPLATE_VIEW_MODEL_SCHEMA.parse(props);
         editor
           .chain()
           .focus()

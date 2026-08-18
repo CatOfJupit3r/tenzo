@@ -50,6 +50,7 @@ const MAX_STRUCTURED_SCHEMA_ATTEMPTS = 2;
 const MAX_STRUCTURED_HISTORY_MESSAGES = 12;
 const MAX_STRUCTURED_HISTORY_MESSAGE_CHARACTERS = 4_000;
 const STRUCTURED_ASSISTANT_LOGGER = loggerFactory.getLogger('character-assistant.structured');
+const ACTION_INPUT_JSON_SCHEMA = z.record(z.string(), z.unknown());
 
 interface iStructuredAction {
   action: CharacterAssistantToolName;
@@ -139,7 +140,7 @@ function buildStructuredActionCatalog(
 }
 
 function parseActionInputJson(action: iStructuredAction) {
-  const parsed = action.input ?? parseRepairedJson(action.inputJson ?? '{}');
+  const parsed = action.input ?? parseRepairedJson(action.inputJson ?? '{}', ACTION_INPUT_JSON_SCHEMA);
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parsed;
   }
@@ -379,7 +380,7 @@ async function* generateStructuredCharacterAssistantStreamWithDependencies(
         yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(execution.input) };
         const output = await execution.execute(toolCallId);
         failedActionMessages.delete(action.action);
-        const isNoOp = output !== null && typeof output === 'object' && Reflect.get(output, 'isNoOp') === true;
+        const isNoOp = output !== null && typeof output === 'object' && 'isNoOp' in output && output.isNoOp;
         logCharacterAssistantTool({
           mode: 'structured-output',
           model: options.generationSettings.model,

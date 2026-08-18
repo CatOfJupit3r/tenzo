@@ -1,4 +1,5 @@
 import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
+import { z } from 'zod';
 
 import { generateValidatedObject } from '../generation/structured-output.server';
 import type { iGenerateValidatedObject } from '../generation/structured-output.server';
@@ -12,30 +13,13 @@ import type { iCharacterImageAnalysis, iCharacterVisionRequest } from './charact
 const VISION_SYSTEM_PROMPT =
   'You describe character reference images for a character card editor. Describe only what is visible; put uncertainty in warnings and lower confidence. Do not invent story details.';
 
-function clampAnalysisArrays(value: unknown): unknown {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return value;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  const { appearance } = candidate;
-  return {
-    ...candidate,
-    suggestedTags: Array.isArray(candidate.suggestedTags)
-      ? candidate.suggestedTags.slice(0, 10)
-      : candidate.suggestedTags,
-    warnings: Array.isArray(candidate.warnings) ? candidate.warnings.slice(0, 10) : candidate.warnings,
-    appearance:
-      appearance && typeof appearance === 'object' && !Array.isArray(appearance)
-        ? {
-            ...(appearance as Record<string, unknown>),
-            notableFeatures: Array.isArray((appearance as Record<string, unknown>).notableFeatures)
-              ? ((appearance as Record<string, unknown>).notableFeatures as unknown[]).slice(0, 10)
-              : (appearance as Record<string, unknown>).notableFeatures,
-          }
-        : appearance,
-  };
-}
+const CLAMPED_CHARACTER_IMAGE_ANALYSIS_SCHEMA = CHARACTER_IMAGE_ANALYSIS_SCHEMA.extend({
+  appearance: CHARACTER_IMAGE_ANALYSIS_SCHEMA.shape.appearance.extend({
+    notableFeatures: z.array(z.string()).transform((values) => values.slice(0, 10)),
+  }),
+  suggestedTags: z.array(z.string()).transform((values) => values.slice(0, 10)),
+  warnings: z.array(z.string()).transform((values) => values.slice(0, 10)),
+});
 
 function buildVisionMessages(imageDataUrl: string, userHint?: string): ModelMessage[] {
   return [
@@ -85,7 +69,7 @@ export function createCharacterVisionService(
         adapter,
         system: VISION_SYSTEM_PROMPT,
         messages,
-        schema: CHARACTER_IMAGE_ANALYSIS_SCHEMA,
+        schema: CLAMPED_CHARACTER_IMAGE_ANALYSIS_SCHEMA,
         schemaDescription: 'Visible character appearance details with uncertainty and suggested tags.',
         modelOptions: dependencies.createStructuredModelOptions(parsedRequest.endpoint, {
           maxTokens: parsedRequest.maxTokens,
@@ -95,7 +79,7 @@ export function createCharacterVisionService(
         }),
       });
 
-      return CHARACTER_IMAGE_ANALYSIS_SCHEMA.parse(clampAnalysisArrays(analysis));
+      return analysis;
     },
   };
 }

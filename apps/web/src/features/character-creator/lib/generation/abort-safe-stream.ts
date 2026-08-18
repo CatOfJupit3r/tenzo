@@ -1,5 +1,6 @@
 import { EventType } from '@tanstack/ai';
 import type { StreamChunk } from '@tanstack/ai';
+import { z } from 'zod';
 
 import { describeGenerationError, getGenerationErrorHint, logGenerationError } from './generation-error';
 
@@ -7,6 +8,11 @@ interface iAbortSafeResponseOptions {
   operation: string;
   model?: string;
 }
+
+const ABORT_RUN_ERROR_CHUNK_SCHEMA = z.object({
+  type: z.literal(EventType.RUN_ERROR),
+  code: z.literal('aborted'),
+});
 
 export function isGenerationAbort(error: unknown, signal?: AbortSignal) {
   return (
@@ -18,13 +24,7 @@ export function isGenerationAbort(error: unknown, signal?: AbortSignal) {
 export async function* suppressGenerationAbort<T>(stream: AsyncIterable<T>, signal?: AbortSignal): AsyncGenerator<T> {
   try {
     for await (const chunk of stream) {
-      if (
-        signal?.aborted &&
-        typeof chunk === 'object' &&
-        chunk !== null &&
-        Reflect.get(chunk, 'type') === EventType.RUN_ERROR &&
-        Reflect.get(chunk, 'code') === 'aborted'
-      ) {
+      if (signal?.aborted && ABORT_RUN_ERROR_CHUNK_SCHEMA.safeParse(chunk).success) {
         return;
       }
       yield chunk;

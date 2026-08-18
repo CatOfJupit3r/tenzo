@@ -1,31 +1,45 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { generateCharacterDiscoveryDirections } from './discovery-directions.server';
+import type { iGenerateValidatedObject, iGenerateValidatedObjectOptions } from '../generation/structured-output.server';
+import {
+  createCharacterStructuredModelOptions,
+  createCharacterTextAdapter,
+} from '../generation/tanstack-ai-text-generation';
+import { createCharacterDiscoveryDirectionsService } from './discovery-directions.server';
+import type { iCharacterDiscoveryDirectionsDependencies } from './discovery-directions.server';
 
-const { generateValidatedObjectMock } = vi.hoisted(() => ({
-  generateValidatedObjectMock: vi.fn(),
-}));
+const generatedCards = {
+  cards: [
+    { title: 'First direction', description: 'A materially distinct direction with enough useful detail.' },
+    { title: 'Second direction', description: 'Another materially distinct direction with enough useful detail.' },
+    { title: 'Third direction', description: 'A final materially distinct direction with enough useful detail.' },
+  ],
+};
 
-vi.mock('../generation/structured-output.server', () => ({
-  generateValidatedObject: generateValidatedObjectMock,
-}));
-
-vi.mock('../generation/tanstack-ai-text-generation', () => ({
-  createCharacterTextAdapter: vi.fn(() => ({})),
-  createCharacterStructuredModelOptions: vi.fn(() => ({})),
-}));
+function createService() {
+  const calls: iGenerateValidatedObjectOptions<unknown>[] = [];
+  const adapter = createCharacterTextAdapter({
+    endpoint: 'http://localhost:11434',
+    apiKey: 'key',
+    model: 'model',
+  });
+  const generateValidatedObject: iGenerateValidatedObject = async <T>(options: iGenerateValidatedObjectOptions<T>) => {
+    calls.push(options as iGenerateValidatedObjectOptions<unknown>);
+    return generatedCards as T;
+  };
+  const dependencies: iCharacterDiscoveryDirectionsDependencies = {
+    generateValidatedObject,
+    createTextAdapter: () => adapter,
+    createStructuredModelOptions: createCharacterStructuredModelOptions,
+  };
+  return { calls, service: createCharacterDiscoveryDirectionsService(dependencies) };
+}
 
 describe('character discovery directions', () => {
   it('generates every category without requiring a premise', async () => {
-    generateValidatedObjectMock.mockResolvedValue({
-      cards: [
-        { title: 'First direction', description: 'A materially distinct direction with enough useful detail.' },
-        { title: 'Second direction', description: 'Another materially distinct direction with enough useful detail.' },
-        { title: 'Third direction', description: 'A final materially distinct direction with enough useful detail.' },
-      ],
-    });
+    const { calls, service } = createService();
 
-    const result = await generateCharacterDiscoveryDirections({
+    const result = await service.generateCharacterDiscoveryDirections({
       endpoint: 'http://localhost:11434',
       apiKey: 'key',
       model: 'model',
@@ -41,9 +55,7 @@ describe('character discovery directions', () => {
     });
 
     expect(result.cards).toHaveLength(12);
-    expect(generateValidatedObjectMock).toHaveBeenCalledTimes(4);
-    expect(
-      generateValidatedObjectMock.mock.calls.every(([options]) => options.prompt.includes('Invent varied premises')),
-    ).toBe(true);
+    expect(calls).toHaveLength(4);
+    expect(calls.every((options) => options.prompt?.includes('Invent varied premises'))).toBe(true);
   });
 });

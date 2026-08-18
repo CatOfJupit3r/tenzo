@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { generateValidatedObject } from '../generation/structured-output.server';
+import type { iGenerateValidatedObject } from '../generation/structured-output.server';
 import {
   createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
@@ -25,7 +26,7 @@ function buildDirectionCardId(category: string, index: number) {
   return `discovery-${category}-${index}-${crypto.randomUUID()}`;
 }
 
-type DiscoveryGenerationSettings = Pick<
+type iDiscoveryGenerationSettings = Pick<
   iCharacterAssistantStreamRequest,
   'maxTokens' | 'temperature' | 'topP' | 'frequencyPenalty' | 'presencePenalty' | 'topK' | 'minP' | 'openRouterProvider'
 >;
@@ -45,78 +46,120 @@ function isMateriallyDistinct(values: readonly { title: string; description: str
   return true;
 }
 
-export async function generateCharacterDiscoveryCategory({
-  premise,
-  category,
-  endpoint,
-  apiKey,
-  model,
-  generationSettings,
-  abortSignal,
-}: {
+export interface iCharacterDiscoveryCategoryRequest {
   premise?: string;
   category: z.infer<typeof CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA>;
   endpoint: string;
   apiKey: string;
   model: string;
-  generationSettings: DiscoveryGenerationSettings;
+  generationSettings: iDiscoveryGenerationSettings;
   abortSignal?: AbortSignal;
-}) {
-  const premiseInstruction = premise?.trim()
-    ? `Use this premise as inspiration: ${premise.trim()}`
-    : 'Invent varied premises suitable for roleplay; do not assume the user already has a concept.';
-  const generated = await generateValidatedObject({
-    adapter: createCharacterTextAdapter({ endpoint, apiKey, model }),
-    schema: GENERATED_RESPONSE_SCHEMA,
-    schemaDescription: 'Exactly three distinct character discovery direction cards.',
-    system: 'Generate high-signal, materially distinct creative directions for character design.',
-    prompt: `Create exactly three directions for category ${category}. ${premiseInstruction}`,
-    modelOptions: createCharacterStructuredModelOptions(endpoint, generationSettings),
-    abortSignal,
-  });
-  if (!isMateriallyDistinct(generated.cards)) {
-    throw new Error('The model returned non-distinct direction cards.');
-  }
-  return generated.cards.map((card, index) => ({
-    id: buildDirectionCardId(category, index),
-    category,
-    title: card.title,
-    description: card.description,
-    sourceCardId: null,
-    isUserAuthored: false,
-  })) satisfies iCharacterAssistantDiscoveryDirectionCard[];
 }
 
-export async function generateCharacterDiscoveryDirections({
-  premise,
-  endpoint,
-  apiKey,
-  model,
-  generationSettings,
-  abortSignal,
-}: {
+export interface iCharacterDiscoveryDirectionsRequest {
   premise?: string;
   endpoint: string;
   apiKey: string;
   model: string;
-  generationSettings: DiscoveryGenerationSettings;
+  generationSettings: iDiscoveryGenerationSettings;
   abortSignal?: AbortSignal;
-}) {
-  const categories = Object.values(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES);
-  const cards = (
-    await Promise.all(
-      categories.map(async (category) =>
-        generateCharacterDiscoveryCategory({
-          premise,
-          category,
-          endpoint,
-          apiKey,
-          model,
-          generationSettings,
-          abortSignal,
-        }),
-      ),
-    )
-  ).flat();
-  return { cards: z.array(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA).length(12).parse(cards) };
+}
+
+export interface iCharacterDiscoveryDirectionsDependencies {
+  generateValidatedObject: iGenerateValidatedObject;
+  createTextAdapter: typeof createCharacterTextAdapter;
+  createStructuredModelOptions: typeof createCharacterStructuredModelOptions;
+}
+
+export interface iCharacterDiscoveryDirectionsService {
+  generateCharacterDiscoveryCategory: (
+    options: iCharacterDiscoveryCategoryRequest,
+  ) => Promise<iCharacterAssistantDiscoveryDirectionCard[]>;
+  generateCharacterDiscoveryDirections: (
+    options: iCharacterDiscoveryDirectionsRequest,
+  ) => Promise<{ cards: iCharacterAssistantDiscoveryDirectionCard[] }>;
+}
+
+export function createCharacterDiscoveryDirectionsService(
+  dependencies: iCharacterDiscoveryDirectionsDependencies = {
+    generateValidatedObject,
+    createTextAdapter: createCharacterTextAdapter,
+    createStructuredModelOptions: createCharacterStructuredModelOptions,
+  },
+): iCharacterDiscoveryDirectionsService {
+  async function generateCategory({
+    premise,
+    category,
+    endpoint,
+    apiKey,
+    model,
+    generationSettings,
+    abortSignal,
+  }: iCharacterDiscoveryCategoryRequest) {
+    const premiseInstruction = premise?.trim()
+      ? `Use this premise as inspiration: ${premise.trim()}`
+      : 'Invent varied premises suitable for roleplay; do not assume the user already has a concept.';
+    const generated = await dependencies.generateValidatedObject({
+      adapter: dependencies.createTextAdapter({ endpoint, apiKey, model }),
+      schema: GENERATED_RESPONSE_SCHEMA,
+      schemaDescription: 'Exactly three distinct character discovery direction cards.',
+      system: 'Generate high-signal, materially distinct creative directions for character design.',
+      prompt: `Create exactly three directions for category ${category}. ${premiseInstruction}`,
+      modelOptions: dependencies.createStructuredModelOptions(endpoint, generationSettings),
+      abortSignal,
+    });
+    if (!isMateriallyDistinct(generated.cards)) {
+      throw new Error('The model returned non-distinct direction cards.');
+    }
+    return generated.cards.map((card, index) => ({
+      id: buildDirectionCardId(category, index),
+      category,
+      title: card.title,
+      description: card.description,
+      sourceCardId: null,
+      isUserAuthored: false,
+    })) satisfies iCharacterAssistantDiscoveryDirectionCard[];
+  }
+
+  async function generateDirections({
+    premise,
+    endpoint,
+    apiKey,
+    model,
+    generationSettings,
+    abortSignal,
+  }: iCharacterDiscoveryDirectionsRequest) {
+    const categories = Object.values(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES);
+    const cards = (
+      await Promise.all(
+        categories.map(async (category) =>
+          generateCategory({
+            premise,
+            category,
+            endpoint,
+            apiKey,
+            model,
+            generationSettings,
+            abortSignal,
+          }),
+        ),
+      )
+    ).flat();
+    return { cards: z.array(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA).length(12).parse(cards) };
+  }
+
+  return {
+    generateCharacterDiscoveryCategory: generateCategory,
+    generateCharacterDiscoveryDirections: generateDirections,
+  };
+}
+
+const DEFAULT_CHARACTER_DISCOVERY_DIRECTIONS_SERVICE = createCharacterDiscoveryDirectionsService();
+
+export async function generateCharacterDiscoveryCategory(options: iCharacterDiscoveryCategoryRequest) {
+  return DEFAULT_CHARACTER_DISCOVERY_DIRECTIONS_SERVICE.generateCharacterDiscoveryCategory(options);
+}
+
+export async function generateCharacterDiscoveryDirections(options: iCharacterDiscoveryDirectionsRequest) {
+  return DEFAULT_CHARACTER_DISCOVERY_DIRECTIONS_SERVICE.generateCharacterDiscoveryDirections(options);
 }

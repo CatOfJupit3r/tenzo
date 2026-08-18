@@ -1,96 +1,93 @@
 import { EventType } from '@tanstack/ai';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StreamChunk } from '@tanstack/ai';
+import { describe, expect, it } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { BUILT_IN_FIELD_TEMPLATES } from '../../constants/default-field-templates';
 import { resolveEffectiveFieldTemplateId } from '../cards/field-template-resolution';
 import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
+import type { iCharacterChatOptions } from '../generation/tanstack-ai-text-generation';
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
-import { buildAssistantSystemPrompt, streamCharacterAssistant } from './character-assistant-runtime.server';
+import { buildAssistantSystemPrompt, createCharacterAssistantRuntime } from './character-assistant-runtime.server';
+import type {
+  iCharacterAssistantRuntimeService,
+  iStreamCharacterAssistantOptions,
+} from './character-assistant-runtime.server';
 
-const { chatMock } = vi.hoisted(() => ({ chatMock: vi.fn() }));
-
-vi.mock('@tanstack/ai', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@tanstack/ai')),
-  chat: chatMock,
-}));
-
-beforeEach(() => {
-  chatMock.mockReset();
-  chatMock.mockReturnValue({
-    async *[Symbol.asyncIterator]() {
-      yield { type: EventType.RUN_STARTED, runId: 'test-run' };
+function createRuntimeHarness() {
+  const calls: iCharacterChatOptions[] = [];
+  const runtime: iCharacterAssistantRuntimeService = createCharacterAssistantRuntime({
+    chat: (options) => {
+      calls.push(options);
+      return (async function* streamChunks(): AsyncGenerator<StreamChunk> {
+        yield { type: EventType.RUN_STARTED, threadId: 'test-thread', runId: 'test-run' };
+      })();
     },
   });
-});
+  return { calls, runtime };
+}
+
+function createOptions() {
+  const card = createEmptyCharacterCard();
+  const store: iStreamCharacterAssistantOptions['store'] = {
+    getCard: () => card,
+    appendProposedCard: () => {
+      throw new Error('No proposal was expected in this fixture.');
+    },
+  };
+  return {
+    card,
+    focus: { kind: 'card' } as const,
+    contextAttachments: [],
+    apiKey: 'test-key',
+    generationSettings: {
+      endpoint: 'https://openrouter.ai/api/v1',
+      model: 'test/model',
+      openRouterProvider: 'nextbit',
+      maxTokens: 2_000,
+      temperature: 1,
+      topP: 1,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+      topK: 0,
+      minP: 0,
+    },
+    store,
+    messages: [{ role: 'user' as const, content: 'Propose a name.' }],
+    maxSteps: 8,
+  };
+}
 
 describe('native character assistant tools', () => {
   it('runs the tool loop without a separate structured-output finalization request', () => {
-    const card = createEmptyCharacterCard();
+    const harness = createRuntimeHarness();
 
-    streamCharacterAssistant({
-      card,
-      focus: { kind: 'card' },
-      contextAttachments: [],
-      apiKey: 'test-key',
-      generationSettings: {
-        endpoint: 'https://openrouter.ai/api/v1',
-        model: 'test/model',
-        openRouterProvider: 'nextbit',
-        maxTokens: 2_000,
-        temperature: 1,
-        topP: 1,
-        frequencyPenalty: 0,
-        presencePenalty: 0,
-        topK: 0,
-        minP: 0,
-      },
-      store: {
-        getCard: () => card,
-        appendProposedCard: vi.fn(),
-      },
-      messages: [{ role: 'user', content: 'Propose a name.' }],
-      maxSteps: 8,
-    });
+    harness.runtime.streamCharacterAssistant(createOptions());
 
-    expect(chatMock).toHaveBeenCalledWith(
+    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls[0]).toEqual(
       expect.objectContaining({
         tools: expect.any(Array),
         stream: true,
       }),
     );
-    expect(chatMock.mock.calls[0]?.[0]).not.toHaveProperty('outputSchema');
+    expect(harness.calls[0]).not.toHaveProperty('outputSchema');
   });
 
   it('does not expose native tools for disabled dedicated fields', () => {
-    const card = createEmptyCharacterCard();
+    const harness = createRuntimeHarness();
+    const options = createOptions();
 
-    streamCharacterAssistant({
-      card,
-      focus: { kind: 'card' },
-      contextAttachments: [],
-      apiKey: 'test-key',
-      generationSettings: {
-        endpoint: 'https://openrouter.ai/api/v1',
-        model: 'test/model',
-        maxTokens: 2_000,
-        temperature: 1,
-        topP: 1,
-        frequencyPenalty: 0,
-        presencePenalty: 0,
-        topK: 0,
-        minP: 0,
-      },
+    harness.runtime.streamCharacterAssistant({
+      ...options,
       fieldShouldAllowAssistantEditing: {
         ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
         alternate_greetings: false,
       },
-      store: { getCard: () => card, appendProposedCard: vi.fn() },
       messages: [{ role: 'user', content: 'Propose greetings.' }],
-      maxSteps: 8,
     });
 
-    const toolNames = chatMock.mock.calls[0]?.[0].tools.map((tool: { name: string }) => tool.name);
+    const toolNames = harness.calls[0]?.tools?.map((tool) => tool.name);
     expect(toolNames).not.toContain(CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings);
     expect(toolNames).toContain(CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields);
   });

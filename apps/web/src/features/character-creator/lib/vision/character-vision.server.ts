@@ -1,6 +1,7 @@
 import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
 
 import { generateValidatedObject } from '../generation/structured-output.server';
+import type { iGenerateValidatedObject } from '../generation/structured-output.server';
 import {
   createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
@@ -48,33 +49,59 @@ function buildVisionMessages(imageDataUrl: string, userHint?: string): ModelMess
   ];
 }
 
-export async function analyzeCharacterImage(
-  request: iCharacterVisionRequest,
-  adapterOverride?: AnyTextAdapter,
-): Promise<iCharacterImageAnalysis> {
-  const parsedRequest = CHARACTER_VISION_REQUEST_SCHEMA.parse(request);
-  const adapter =
-    adapterOverride ??
-    createCharacterTextAdapter({
-      endpoint: parsedRequest.endpoint,
-      apiKey: parsedRequest.apiKey,
-      model: parsedRequest.model,
-    });
-  const messages = buildVisionMessages(parsedRequest.imageDataUrl, parsedRequest.userHint);
+export interface iCharacterVisionDependencies {
+  generateValidatedObject: iGenerateValidatedObject;
+  createTextAdapter: typeof createCharacterTextAdapter;
+  createStructuredModelOptions: typeof createCharacterStructuredModelOptions;
+}
 
-  const analysis = await generateValidatedObject({
-    adapter,
-    system: VISION_SYSTEM_PROMPT,
-    messages,
-    schema: CHARACTER_IMAGE_ANALYSIS_SCHEMA,
-    schemaDescription: 'Visible character appearance details with uncertainty and suggested tags.',
-    modelOptions: createCharacterStructuredModelOptions(parsedRequest.endpoint, {
-      maxTokens: parsedRequest.maxTokens,
-      temperature: parsedRequest.temperature,
-      topK: 0,
-      minP: 0,
-    }),
-  });
+export interface iCharacterVisionService {
+  analyzeCharacterImage: (
+    request: iCharacterVisionRequest,
+    adapterOverride?: AnyTextAdapter,
+  ) => Promise<iCharacterImageAnalysis>;
+}
 
-  return CHARACTER_IMAGE_ANALYSIS_SCHEMA.parse(clampAnalysisArrays(analysis));
+export function createCharacterVisionService(
+  dependencies: iCharacterVisionDependencies = {
+    generateValidatedObject,
+    createTextAdapter: createCharacterTextAdapter,
+    createStructuredModelOptions: createCharacterStructuredModelOptions,
+  },
+): iCharacterVisionService {
+  return {
+    analyzeCharacterImage: async (request, adapterOverride) => {
+      const parsedRequest = CHARACTER_VISION_REQUEST_SCHEMA.parse(request);
+      const adapter =
+        adapterOverride ??
+        dependencies.createTextAdapter({
+          endpoint: parsedRequest.endpoint,
+          apiKey: parsedRequest.apiKey,
+          model: parsedRequest.model,
+        });
+      const messages = buildVisionMessages(parsedRequest.imageDataUrl, parsedRequest.userHint);
+
+      const analysis = await dependencies.generateValidatedObject({
+        adapter,
+        system: VISION_SYSTEM_PROMPT,
+        messages,
+        schema: CHARACTER_IMAGE_ANALYSIS_SCHEMA,
+        schemaDescription: 'Visible character appearance details with uncertainty and suggested tags.',
+        modelOptions: dependencies.createStructuredModelOptions(parsedRequest.endpoint, {
+          maxTokens: parsedRequest.maxTokens,
+          temperature: parsedRequest.temperature,
+          topK: 0,
+          minP: 0,
+        }),
+      });
+
+      return CHARACTER_IMAGE_ANALYSIS_SCHEMA.parse(clampAnalysisArrays(analysis));
+    },
+  };
+}
+
+const DEFAULT_CHARACTER_VISION_SERVICE = createCharacterVisionService();
+
+export async function analyzeCharacterImage(request: iCharacterVisionRequest, adapterOverride?: AnyTextAdapter) {
+  return DEFAULT_CHARACTER_VISION_SERVICE.analyzeCharacterImage(request, adapterOverride);
 }

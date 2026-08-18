@@ -1,15 +1,13 @@
-import type { AnyTextAdapter } from '@tanstack/ai';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { analyzeCharacterImage } from './character-vision.server';
-
-const { generateValidatedObjectMock } = vi.hoisted(() => ({
-  generateValidatedObjectMock: vi.fn(),
-}));
-
-vi.mock('../generation/structured-output.server', () => ({
-  generateValidatedObject: generateValidatedObjectMock,
-}));
+import type { iGenerateValidatedObject, iGenerateValidatedObjectOptions } from '../generation/structured-output.server';
+import {
+  createCharacterStructuredModelOptions,
+  createCharacterTextAdapter,
+} from '../generation/tanstack-ai-text-generation';
+import { CHARACTER_IMAGE_ANALYSIS_SCHEMA } from './character-vision-contracts';
+import type { iCharacterImageAnalysis } from './character-vision-contracts';
+import { createCharacterVisionService } from './character-vision.server';
 
 const request = {
   endpoint: 'http://localhost:1234',
@@ -20,7 +18,7 @@ const request = {
   imageDataUrl: 'data:image/png;base64,aGVsbG8=',
 };
 
-const analysis = {
+const analysis: iCharacterImageAnalysis = {
   subject: 'A person in a cloak.',
   appearance: {
     hair: 'Dark hair',
@@ -38,23 +36,45 @@ const analysis = {
   confidence: 0.8,
   warnings: [],
 };
-const mockAdapter = {} as AnyTextAdapter;
+
+function createVisionHarness(value: unknown) {
+  const calls: iGenerateValidatedObjectOptions<unknown>[] = [];
+  const generateValidatedObject: iGenerateValidatedObject = async <T>(options: iGenerateValidatedObjectOptions<T>) => {
+    calls.push(options as iGenerateValidatedObjectOptions<unknown>);
+    return value as T;
+  };
+  const adapter = createCharacterTextAdapter({
+    endpoint: request.endpoint,
+    apiKey: request.apiKey,
+    model: request.model,
+  });
+  return {
+    calls,
+    adapter,
+    service: createCharacterVisionService({
+      generateValidatedObject,
+      createTextAdapter: () => adapter,
+      createStructuredModelOptions: createCharacterStructuredModelOptions,
+    }),
+  };
+}
 
 describe('character vision analysis', () => {
-  it('returns a validated structured analysis', async () => {
-    generateValidatedObjectMock.mockResolvedValueOnce(analysis);
+  it('returns a validated structured analysis through an injected generator', async () => {
+    const harness = createVisionHarness(analysis);
 
-    await expect(analyzeCharacterImage(request, mockAdapter)).resolves.toEqual(analysis);
-    expect(generateValidatedObjectMock).toHaveBeenCalledOnce();
+    await expect(harness.service.analyzeCharacterImage(request, harness.adapter)).resolves.toEqual(analysis);
+    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls[0]?.schema).toBe(CHARACTER_IMAGE_ANALYSIS_SCHEMA);
   });
 
   it('clamps oversized arrays returned by structured generation', async () => {
-    generateValidatedObjectMock.mockResolvedValueOnce({
+    const harness = createVisionHarness({
       ...analysis,
       suggestedTags: Array.from({ length: 12 }, (_, index) => `tag-${index}`),
     });
 
-    const result = await analyzeCharacterImage(request, mockAdapter);
+    const result = await harness.service.analyzeCharacterImage(request, harness.adapter);
     expect(result.suggestedTags).toHaveLength(10);
     expect(result).toMatchObject({
       suggestedTags: expect.arrayContaining(['tag-0', 'tag-9']),

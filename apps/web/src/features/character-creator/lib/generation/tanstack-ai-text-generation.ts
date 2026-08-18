@@ -1,5 +1,5 @@
 import { chat, EventType } from '@tanstack/ai';
-import type { AnyTextAdapter, ModelMessage, StreamChunk } from '@tanstack/ai';
+import type { AnyServerTool, AnyTextAdapter, ChatMiddleware, ModelMessage, StreamChunk, UIMessage } from '@tanstack/ai';
 import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { createOpenRouterText } from '@tanstack/ai-openrouter';
 
@@ -17,6 +17,42 @@ interface iCharacterTextAdapterOptions {
   endpoint: string;
   apiKey: string;
   model: string;
+}
+
+export interface iCharacterChatOptions {
+  adapter: AnyTextAdapter;
+  messages: Array<ModelMessage | UIMessage>;
+  systemPrompts: string[];
+  modelOptions?: Record<string, unknown>;
+  abortController: AbortController;
+  stream: true;
+  tools?: ReadonlyArray<AnyServerTool>;
+  agentLoopStrategy?: NonNullable<Parameters<typeof chat>[0]['agentLoopStrategy']>;
+  middleware?: ChatMiddleware[];
+}
+
+export type iCharacterChat = (options: iCharacterChatOptions) => AsyncIterable<StreamChunk>;
+
+type OpenRouterTextConfig = NonNullable<Parameters<typeof createOpenRouterText>[2]>;
+
+export interface iCharacterOpenRouterHttpClient {
+  request: (request: Request) => Promise<Response>;
+}
+
+type iOpenRouterTextConfig = Omit<OpenRouterTextConfig, 'httpClient'> & {
+  httpClient: iCharacterOpenRouterHttpClient;
+};
+
+export interface iCharacterTextGenerationDependencies {
+  chat: iCharacterChat;
+  openaiCompatibleText: (model: string, config: Parameters<typeof openaiCompatibleText>[1]) => AnyTextAdapter;
+  createOpenRouterText: (model: string, apiKey: string, config: iOpenRouterTextConfig) => AnyTextAdapter;
+  createOpenRouterHttpClient: () => iCharacterOpenRouterHttpClient;
+}
+
+export interface iCharacterTextGenerationService {
+  createCharacterTextAdapter: (options: iCharacterTextAdapterOptions) => AnyTextAdapter;
+  streamCharacterText: (options: iStreamCharacterTextOptions) => { textStream: ReadableStream<string> };
 }
 
 interface iCharacterModelOptions {
@@ -135,29 +171,6 @@ export function withRepairedToolCallArguments(adapter: AnyTextAdapter): AnyTextA
   });
 }
 
-export function createCharacterTextAdapter({ endpoint, apiKey, model }: iCharacterTextAdapterOptions) {
-  const normalizedEndpoint = normalizeOpenAiCompatibleBaseUrl(endpoint);
-
-  if (normalizedEndpoint.toLowerCase().includes('openrouter.ai/api')) {
-    return withRepairedToolCallArguments(
-      createOpenRouterText(model.trim() as Parameters<typeof createOpenRouterText>[0], apiKey.trim(), {
-        httpClient: createOpenRouterErrorPreservingHttpClient() as NonNullable<
-          Parameters<typeof createOpenRouterText>[2]
-        >['httpClient'],
-      }),
-    );
-  }
-
-  return withRepairedToolCallArguments(
-    openaiCompatibleText(model.trim(), {
-      name: 'character-creator',
-      baseURL: normalizedEndpoint,
-      apiKey: apiKey.trim(),
-      dangerouslyAllowBrowser: true,
-    }),
-  );
-}
-
 export function createCharacterModelOptions(
   endpoint: string,
   {
@@ -229,10 +242,14 @@ export function createCharacterToolModelOptions(endpoint: string, generationSett
   };
 }
 
-async function* streamTextEvents({ signal, ...options }: iStreamCharacterTextOptions) {
+async function* streamTextEvents(
+  { signal, ...options }: iStreamCharacterTextOptions,
+  dependencies: iCharacterTextGenerationDependencies,
+  createAdapter: (options: iCharacterTextAdapterOptions) => AnyTextAdapter,
+) {
   const { abortController, abort } = createAbortController(signal);
-  const stream = chat({
-    adapter: createCharacterTextAdapter(options),
+  const stream = dependencies.chat({
+    adapter: createAdapter(options),
     messages: toModelMessages(options.messages),
     systemPrompts: readSystemPrompts(options),
     modelOptions: createCharacterModelOptions(options.endpoint, options),
@@ -253,8 +270,60 @@ async function* streamTextEvents({ signal, ...options }: iStreamCharacterTextOpt
   }
 }
 
-export function streamCharacterText(options: iStreamCharacterTextOptions) {
-  return {
-    textStream: toTextReadableStream(suppressGenerationAbort(streamTextEvents(options), options.signal)),
+function createDefaultOpenRouterText(model: string, apiKey: string, config: iOpenRouterTextConfig): AnyTextAdapter {
+  return createOpenRouterText(model as Parameters<typeof createOpenRouterText>[0], apiKey, {
+    ...config,
+    httpClient: config.httpClient as NonNullable<OpenRouterTextConfig['httpClient']>,
+  });
+}
+
+const DEFAULT_CHARACTER_TEXT_GENERATION_DEPENDENCIES: iCharacterTextGenerationDependencies = {
+  chat: (options) => chat(options),
+  openaiCompatibleText: (model, config) => openaiCompatibleText(model, config),
+  createOpenRouterText: createDefaultOpenRouterText,
+  createOpenRouterHttpClient: () => createOpenRouterErrorPreservingHttpClient(),
+};
+
+export function createCharacterTextGenerationService(
+  dependencies: iCharacterTextGenerationDependencies = DEFAULT_CHARACTER_TEXT_GENERATION_DEPENDENCIES,
+): iCharacterTextGenerationService {
+  const createAdapter = ({ endpoint, apiKey, model }: iCharacterTextAdapterOptions) => {
+    const normalizedEndpoint = normalizeOpenAiCompatibleBaseUrl(endpoint);
+
+    if (normalizedEndpoint.toLowerCase().includes('openrouter.ai/api')) {
+      return withRepairedToolCallArguments(
+        dependencies.createOpenRouterText(model.trim(), apiKey.trim(), {
+          httpClient: dependencies.createOpenRouterHttpClient(),
+        }),
+      );
+    }
+
+    return withRepairedToolCallArguments(
+      dependencies.openaiCompatibleText(model.trim(), {
+        name: 'character-creator',
+        baseURL: normalizedEndpoint,
+        apiKey: apiKey.trim(),
+        dangerouslyAllowBrowser: true,
+      }),
+    );
   };
+
+  return {
+    createCharacterTextAdapter: createAdapter,
+    streamCharacterText: (options) => ({
+      textStream: toTextReadableStream(
+        suppressGenerationAbort(streamTextEvents(options, dependencies, createAdapter), options.signal),
+      ),
+    }),
+  };
+}
+
+const DEFAULT_CHARACTER_TEXT_GENERATION_SERVICE = createCharacterTextGenerationService();
+
+export function streamCharacterText(options: iStreamCharacterTextOptions) {
+  return DEFAULT_CHARACTER_TEXT_GENERATION_SERVICE.streamCharacterText(options);
+}
+
+export function createCharacterTextAdapter(options: iCharacterTextAdapterOptions) {
+  return DEFAULT_CHARACTER_TEXT_GENERATION_SERVICE.createCharacterTextAdapter(options);
 }

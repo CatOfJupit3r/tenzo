@@ -1,52 +1,103 @@
 import { EventType } from '@tanstack/ai';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { StreamChunk } from '@tanstack/ai';
+import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
+import { describe, expect, it } from 'vitest';
 
 import { GENERATION_PROVIDERS } from './generation-config';
+import { createOpenRouterErrorPreservingHttpClient } from './openrouter-stream-error';
 import {
   createCharacterModelOptions,
   createCharacterStructuredModelOptions,
-  createCharacterTextAdapter,
+  createCharacterTextGenerationService,
   createCharacterToolModelOptions,
-  streamCharacterText,
   withRepairedToolCallArguments,
 } from './tanstack-ai-text-generation';
+import type { iCharacterChatOptions, iCharacterTextGenerationDependencies } from './tanstack-ai-text-generation';
 
-const { chatMock, createOpenRouterTextMock, openaiCompatibleTextMock } = vi.hoisted(() => ({
-  chatMock: vi.fn(),
-  createOpenRouterTextMock: vi.fn(() => ({ name: 'openrouter' })),
-  openaiCompatibleTextMock: vi.fn(() => ({ name: 'openai-compatible' })),
-}));
-
-vi.mock('@tanstack/ai', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@tanstack/ai')),
-  chat: chatMock,
-}));
-
-vi.mock('@tanstack/ai-openai/compatible', () => ({
-  openaiCompatibleText: openaiCompatibleTextMock,
-}));
-
-vi.mock('@tanstack/ai-openrouter', () => ({
-  createOpenRouterText: createOpenRouterTextMock,
-}));
-
-afterEach(() => {
-  vi.clearAllMocks();
-});
+function createHarness() {
+  const chatCalls: iCharacterChatOptions[] = [];
+  const openAiCalls: Array<{ model: string; config: Parameters<typeof openaiCompatibleText>[1] }> = [];
+  const openRouterCalls: Array<{ model: string; apiKey: string; config: Record<string, unknown> }> = [];
+  let stream: AsyncIterable<StreamChunk> = {
+    [Symbol.asyncIterator]() {
+      return {
+        async next(): Promise<IteratorResult<StreamChunk>> {
+          return { done: true, value: undefined };
+        },
+      };
+    },
+  };
+  const adapter = openaiCompatibleText('test-model', {
+    name: 'character-creator',
+    baseURL: 'http://localhost:11434/v1',
+    apiKey: 'key',
+    dangerouslyAllowBrowser: true,
+  });
+  const dependencies: iCharacterTextGenerationDependencies = {
+    chat: (options) => {
+      chatCalls.push(options);
+      return stream;
+    },
+    openaiCompatibleText: (model, config) => {
+      openAiCalls.push({ model, config });
+      return adapter;
+    },
+    createOpenRouterText: (model, apiKey, config) => {
+      openRouterCalls.push({ model, apiKey, config });
+      return adapter;
+    },
+    createOpenRouterHttpClient: createOpenRouterErrorPreservingHttpClient,
+  };
+  return {
+    chatCalls,
+    openAiCalls,
+    openRouterCalls,
+    setStream(value: AsyncIterable<StreamChunk>) {
+      stream = value;
+    },
+    service: createCharacterTextGenerationService(dependencies),
+  };
+}
 
 describe('TanStack AI text generation', () => {
   it('repairs streamed native tool-call arguments before the runtime parses them', async () => {
-    const adapter = withRepairedToolCallArguments({
-      chatStream: () =>
-        (async function* streamChunks() {
-          yield { type: EventType.TOOL_CALL_START, toolCallId: 'call-1', toolName: 'propose_character_fields' };
-          yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-1', delta: "{changes:[{fieldKey:'descr" };
-          yield { type: EventType.TOOL_CALL_ARGS, toolCallId: 'call-1', delta: "iption',value:'Ready'}]}" };
-          yield { type: EventType.TOOL_CALL_END, toolCallId: 'call-1', toolName: 'propose_character_fields' };
-        })(),
-    } as never);
+    const adapter = withRepairedToolCallArguments(
+      Object.assign(
+        openaiCompatibleText('test-model', {
+          name: 'character-creator',
+          baseURL: 'http://localhost:11434/v1',
+          apiKey: 'key',
+          dangerouslyAllowBrowser: true,
+        }),
+        {
+          chatStream: () =>
+            (async function* streamChunks(): AsyncGenerator<StreamChunk> {
+              yield {
+                type: EventType.TOOL_CALL_START,
+                toolCallId: 'call-1',
+                toolCallName: 'propose_character_fields',
+              } as StreamChunk;
+              yield {
+                type: EventType.TOOL_CALL_ARGS,
+                toolCallId: 'call-1',
+                delta: "{changes:[{fieldKey:'descr",
+              } as StreamChunk;
+              yield {
+                type: EventType.TOOL_CALL_ARGS,
+                toolCallId: 'call-1',
+                delta: "iption',value:'Ready'}]}",
+              } as StreamChunk;
+              yield {
+                type: EventType.TOOL_CALL_END,
+                toolCallId: 'call-1',
+                toolCallName: 'propose_character_fields',
+              } as StreamChunk;
+            })(),
+        },
+      ),
+    );
 
-    const chunks = [];
+    const chunks: StreamChunk[] = [];
     for await (const chunk of adapter.chatStream({} as never)) chunks.push(chunk);
 
     expect(chunks).toEqual([
@@ -61,32 +112,39 @@ describe('TanStack AI text generation', () => {
   });
 
   it('creates a typed OpenAI-compatible adapter with a normalized endpoint', () => {
-    createCharacterTextAdapter({
+    const harness = createHarness();
+    harness.service.createCharacterTextAdapter({
       endpoint: 'http://localhost:5001',
       apiKey: 'local-key',
       model: 'local-model',
     });
 
-    expect(openaiCompatibleTextMock).toHaveBeenCalledWith('local-model', {
-      name: 'character-creator',
-      baseURL: 'http://localhost:5001/v1',
-      apiKey: 'local-key',
-      dangerouslyAllowBrowser: true,
+    expect(harness.openAiCalls).toHaveLength(1);
+    expect(harness.openAiCalls[0]).toEqual({
+      model: 'local-model',
+      config: {
+        name: 'character-creator',
+        baseURL: 'http://localhost:5001/v1',
+        apiKey: 'local-key',
+        dangerouslyAllowBrowser: true,
+      },
     });
   });
 
   it('uses the dedicated OpenRouter adapter and privacy routing', () => {
-    createCharacterTextAdapter({
+    const harness = createHarness();
+    harness.service.createCharacterTextAdapter({
       endpoint: 'https://openrouter.ai/api',
       apiKey: 'sk-or-v1-test',
       model: 'anthropic/claude-sonnet-4',
     });
 
-    expect(createOpenRouterTextMock).toHaveBeenCalledWith(
-      'anthropic/claude-sonnet-4',
-      'sk-or-v1-test',
+    expect(harness.openRouterCalls).toHaveLength(1);
+    expect(harness.openRouterCalls[0]).toEqual(
       expect.objectContaining({
-        httpClient: expect.objectContaining({ request: expect.any(Function) }),
+        model: 'anthropic/claude-sonnet-4',
+        apiKey: 'sk-or-v1-test',
+        config: expect.objectContaining({ httpClient: expect.objectContaining({ request: expect.any(Function) }) }),
       }),
     );
     expect(
@@ -178,14 +236,15 @@ describe('TanStack AI text generation', () => {
   });
 
   it('streams text events through TanStack AI', async () => {
-    chatMock.mockReturnValue(
-      (async function* streamChunks() {
-        yield { type: EventType.TEXT_MESSAGE_CONTENT, delta: 'Tan' };
-        yield { type: EventType.TEXT_MESSAGE_CONTENT, delta: 'Stack' };
+    const harness = createHarness();
+    harness.setStream(
+      (async function* streamChunks(): AsyncGenerator<StreamChunk> {
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'message-1', delta: 'Tan' } as StreamChunk;
+        yield { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'message-1', delta: 'Stack' } as StreamChunk;
       })(),
     );
 
-    const result = streamCharacterText({
+    const result = harness.service.streamCharacterText({
       provider: GENERATION_PROVIDERS.openrouter,
       endpoint: 'https://openrouter.ai/api',
       apiKey: 'sk-or-v1-test',
@@ -207,15 +266,13 @@ describe('TanStack AI text generation', () => {
 
     while (true) {
       const chunk = await reader.read();
-      if (chunk.done) {
-        break;
-      }
+      if (chunk.done) break;
       text += chunk.value;
     }
 
-    expect(chatMock).toHaveBeenCalledWith(
+    expect(harness.chatCalls).toHaveLength(1);
+    expect(harness.chatCalls[0]).toEqual(
       expect.objectContaining({
-        adapter: { name: 'openrouter' },
         messages: [{ role: 'user', content: 'A storm caller.' }],
         systemPrompts: ['Write character prose.'],
         stream: true,

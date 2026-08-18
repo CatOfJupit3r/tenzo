@@ -269,7 +269,7 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Scope:**
 
-- [ ] Choose one exact Node 24 release and align `.node-version`, `.nvmrc`, root/package engine declarations, config package engines, and both GitHub Actions workflows.
+- [ ] Choose one exact Node 26.5.0 (IMPORTANT) release and align `.node-version`, `.nvmrc`, root/package engine declarations, config package engines, and both GitHub Actions workflows.
 - [ ] Refactor `apps/web/src/lib/logging/logger.ts` so importing application code under Vitest produces a valid logger without executing a client/server RPC path incorrectly. Keep one real isomorphic production composition and avoid a test-only global fallback.
 - [ ] Move eager `getLogger` calls in `generation-error.ts`, `provider-health.ts`, and other import-time modules behind a valid factory or inject a narrow logger into their service composition.
 - [ ] Run the full suite on the pinned Node version. Repeat it enough times to detect order/timing failures only after the import failure is fixed; record failing seed/order if Vitest reports one.

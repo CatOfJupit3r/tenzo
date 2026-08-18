@@ -4,6 +4,8 @@ import type { EntityTable } from 'dexie';
 import { useSyncExternalStore } from 'react';
 import type { z } from 'zod';
 
+import { loggerFactory } from '../lib/logging/logger';
+
 interface iPersistenceResult {
   isPersisted: {
     promise: Promise<undefined>;
@@ -32,6 +34,7 @@ interface iInitializableCollection {
 }
 
 const persistentCollections = new Set<iInitializableCollection>();
+const PERSISTENT_COLLECTION_LOGGER = loggerFactory.getLogger('database.persistence');
 
 export class PersistentCollection<T, TPrimaryKey extends keyof T> {
   readonly #getKey: (item: T) => T[TPrimaryKey] & string;
@@ -39,6 +42,8 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
   readonly #schema: z.ZodType<T>;
 
   readonly #table: EntityTable<T, TPrimaryKey>;
+
+  readonly #collectionName: string;
 
   readonly #listeners = new Set<() => unknown>();
 
@@ -63,6 +68,7 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
     this.#persistenceWait = persistenceWait;
     this.#schema = schema;
     this.#table = table;
+    this.#collectionName = table.name;
     persistentCollections.add(this);
   }
 
@@ -75,13 +81,36 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
       return;
     }
 
-    const storedItems = await this.#table.toArray();
-    this.#replaceItems(storedItems);
-    this.#isInitialized = true;
-
-    liveQuery(async () => this.#table.toArray()).subscribe({
-      next: (items) => this.#replaceItems(items),
+    PERSISTENT_COLLECTION_LOGGER.debug('Persistent collection initialization started', {
+      operation: 'initialize',
+      collection: this.#collectionName,
     });
+
+    try {
+      const storedItems = await this.#table.toArray();
+      this.#replaceItems(storedItems);
+      this.#isInitialized = true;
+
+      liveQuery(async () => this.#table.toArray()).subscribe({
+        next: (items) => this.#replaceItems(items),
+        error: (error: unknown) =>
+          PERSISTENT_COLLECTION_LOGGER.error('Persistent collection live query failed', error, {
+            operation: 'live-query',
+            collection: this.#collectionName,
+          }),
+      });
+      PERSISTENT_COLLECTION_LOGGER.debug('Persistent collection initialized', {
+        operation: 'initialize',
+        collection: this.#collectionName,
+        recordCount: storedItems.length,
+      });
+    } catch (error) {
+      PERSISTENT_COLLECTION_LOGGER.error('Persistent collection initialization failed', error, {
+        operation: 'initialize',
+        collection: this.#collectionName,
+      });
+      throw error;
+    }
   }
 
   async preload() {
@@ -118,6 +147,11 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
         return undefined;
       },
       (error: unknown) => {
+        PERSISTENT_COLLECTION_LOGGER.error('Persistence mutation failed', error, {
+          operation: 'persist',
+          collection: this.#collectionName,
+          mutationType: 'insert',
+        });
         if (this.#revisions.get(key) === revision) {
           this.#items.delete(key);
           this.#emit();
@@ -154,6 +188,11 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
         return undefined;
       },
       (error: unknown) => {
+        PERSISTENT_COLLECTION_LOGGER.error('Persistence mutation failed', error, {
+          operation: 'persist',
+          collection: this.#collectionName,
+          mutationType: 'update',
+        });
         if (this.#revisions.get(key) === revision) {
           this.#items.set(key, previousValue);
           this.#emit();
@@ -167,8 +206,25 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
   }
 
   async flushPendingUpdates() {
+    PERSISTENT_COLLECTION_LOGGER.debug('Pending persistence flush started', {
+      operation: 'flush',
+      collection: this.#collectionName,
+      pendingUpdateCount: this.#pendingUpdates.size,
+    });
     this.#pendingUpdates.forEach((pendingUpdate) => pendingUpdate.debouncer.flush());
-    await Promise.all(this.#updatePersistenceChains.values());
+    try {
+      await Promise.all(this.#updatePersistenceChains.values());
+      PERSISTENT_COLLECTION_LOGGER.debug('Pending persistence flush completed', {
+        operation: 'flush',
+        collection: this.#collectionName,
+      });
+    } catch (error) {
+      PERSISTENT_COLLECTION_LOGGER.error('Pending persistence flush failed', error, {
+        operation: 'flush',
+        collection: this.#collectionName,
+      });
+      throw error;
+    }
   }
 
   delete(key: T[TPrimaryKey] & string): iPersistenceResult {
@@ -192,6 +248,11 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
           return undefined;
         },
         (error: unknown) => {
+          PERSISTENT_COLLECTION_LOGGER.error('Persistence mutation failed', error, {
+            operation: 'persist',
+            collection: this.#collectionName,
+            mutationType: 'delete',
+          });
           if (this.#revisions.get(key) === revision) {
             this.#items.set(key, previousValue);
             this.#emit();
@@ -295,6 +356,11 @@ export class PersistentCollection<T, TPrimaryKey extends keyof T> {
           pendingUpdate.resolve(undefined);
         },
         (error: unknown) => {
+          PERSISTENT_COLLECTION_LOGGER.error('Persistence mutation failed', error, {
+            operation: 'persist',
+            collection: this.#collectionName,
+            mutationType: 'update',
+          });
           if (this.#revisions.get(key) === pendingUpdate.latestRevision) {
             this.#items.set(key, pendingUpdate.previousValue);
             this.#emit();

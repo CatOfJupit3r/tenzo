@@ -11,6 +11,7 @@ Planning artifacts following the roadmap standard in [`standard.md`](../../stand
 | Roadmap | Type | Priority | Status |
 | ------- | ---- | -------- | ------ |
 | [Character Card Creator Web App](active/character-card-creator.roadmap.md) | feature-epic | P1 | Active backlog |
+| [Local SSR Error Observability](active/local-observability.roadmap.md) | observability | P1 | Active backlog |
 
 ## Archive
 

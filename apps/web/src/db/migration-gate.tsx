@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { z } from 'zod';
 
 import { createEmptyCharacterLibraryItem } from '../features/character-creator/lib/cards/character-library';
+import { loggerFactory } from '../lib/logging/logger';
 import { initializeApplicationCollections } from './collections/initialize-collections';
 import { applicationDatabase } from './database';
 import { downloadMigrationBackup, getPendingMigrations, runMigrations } from './migrations';
@@ -11,6 +12,7 @@ import type { ApplicationMigration } from './migrations';
 const MIGRATION_GATE_STATUS_SCHEMA = z.enum(['checking', 'confirmation-required', 'running', 'ready', 'error']);
 const MIGRATION_GATE_STATUSES = MIGRATION_GATE_STATUS_SCHEMA.enum;
 type MigrationGateStatus = z.infer<typeof MIGRATION_GATE_STATUS_SCHEMA>;
+const MIGRATION_LOGGER = loggerFactory.getLogger('database.migrations');
 
 interface iMigrationGateProps {
   children: ReactNode;
@@ -54,9 +56,16 @@ export function MigrationGate({ children }: iMigrationGateProps) {
   );
 
   const initialize = useCallback(async () => {
+    MIGRATION_LOGGER.debug('Local database initialization started', { operation: 'initialize' });
     try {
       const migrations = await inspectMigrations();
       setPendingMigrations(migrations);
+      MIGRATION_LOGGER.debug('Pending migrations inspected', {
+        operation: 'inspect-migrations',
+        migrationCount: migrations.length,
+        destructiveMigrationCount: migrations.filter((migration) => migration.isDestructive).length,
+        migrationIds: migrations.map((migration) => migration.id),
+      });
 
       if (migrations.some((migration) => migration.isDestructive)) {
         setStatus(MIGRATION_GATE_STATUSES['confirmation-required']);
@@ -66,7 +75,12 @@ export function MigrationGate({ children }: iMigrationGateProps) {
       setStatus(MIGRATION_GATE_STATUSES.running);
       await finishInitialization(migrations);
       setStatus(MIGRATION_GATE_STATUSES.ready);
+      MIGRATION_LOGGER.debug('Local database initialization completed', {
+        operation: 'initialize',
+        migrationCount: migrations.length,
+      });
     } catch (error) {
+      MIGRATION_LOGGER.error('Local database initialization failed', error, { operation: 'initialize' });
       setErrorMessage(error instanceof Error ? error.message : 'The local database could not be prepared.');
       setStatus(MIGRATION_GATE_STATUSES.error);
     }
@@ -82,10 +96,13 @@ export function MigrationGate({ children }: iMigrationGateProps) {
   }, [initialize]);
 
   const handleDownloadBackup = useCallback(async () => {
+    MIGRATION_LOGGER.debug('Migration backup download started', { operation: 'download-backup' });
     try {
       await downloadMigrationBackup();
       setHasDownloadedBackup(true);
+      MIGRATION_LOGGER.debug('Migration backup download completed', { operation: 'download-backup' });
     } catch (error) {
+      MIGRATION_LOGGER.error('Migration backup download failed', error, { operation: 'download-backup' });
       setErrorMessage(error instanceof Error ? error.message : 'The backup could not be downloaded.');
       setStatus(MIGRATION_GATE_STATUSES.error);
     }
@@ -98,9 +115,23 @@ export function MigrationGate({ children }: iMigrationGateProps) {
 
     try {
       setStatus(MIGRATION_GATE_STATUSES.running);
+      MIGRATION_LOGGER.debug('Destructive migrations started', {
+        operation: 'run-migrations',
+        migrationCount: pendingMigrations.length,
+        migrationIds: pendingMigrations.map((migration) => migration.id),
+      });
       await finishInitialization(pendingMigrations);
       setStatus(MIGRATION_GATE_STATUSES.ready);
+      MIGRATION_LOGGER.debug('Destructive migrations completed', {
+        operation: 'run-migrations',
+        migrationCount: pendingMigrations.length,
+      });
     } catch (error) {
+      MIGRATION_LOGGER.error('Destructive migrations failed', error, {
+        operation: 'run-migrations',
+        migrationCount: pendingMigrations.length,
+        migrationIds: pendingMigrations.map((migration) => migration.id),
+      });
       setErrorMessage(error instanceof Error ? error.message : 'The local database migration failed.');
       setStatus(MIGRATION_GATE_STATUSES.error);
     }
@@ -158,7 +189,10 @@ export function MigrationGate({ children }: iMigrationGateProps) {
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{errorMessage}</p>
         <button
           className="mt-6 rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            MIGRATION_LOGGER.debug('Local database retry requested', { operation: 'retry' });
+            window.location.reload();
+          }}
           type="button"
         >
           Retry

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { loggerFactory } from '@~/lib/logging/logger';
+
 import { CHARACTER_EDIT_FIELD_KEYS } from '../proposals/character-edit-proposal';
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import type { CharacterAssistantToolName } from './character-assistant-contracts';
@@ -7,6 +9,7 @@ import type { CharacterAssistantToolName } from './character-assistant-contracts
 export const CHARACTER_ASSISTANT_TOOL_OUTCOME_SCHEMA = z.enum(['completed', 'no-op', 'failed']);
 export const CHARACTER_ASSISTANT_TOOL_OUTCOMES = CHARACTER_ASSISTANT_TOOL_OUTCOME_SCHEMA.enum;
 export type CharacterAssistantToolOutcome = z.infer<typeof CHARACTER_ASSISTANT_TOOL_OUTCOME_SCHEMA>;
+const CHARACTER_ASSISTANT_TOOL_LOGGER = loggerFactory.getLogger('character-assistant.tool');
 
 interface iCharacterAssistantToolLog {
   model?: string;
@@ -102,8 +105,8 @@ export function logCharacterAssistantTool({
   };
 
   if (outcome === CHARACTER_ASSISTANT_TOOL_OUTCOMES.failed) {
-    console.error('[Character Assistant] Tool execution', details);
+    CHARACTER_ASSISTANT_TOOL_LOGGER.error('Tool execution', error, details);
   } else {
-    console.info('[Character Assistant] Tool execution', details);
+    CHARACTER_ASSISTANT_TOOL_LOGGER.info('Tool execution', details);
   }
 }

@@ -5,6 +5,7 @@ import { LuFileText, LuRefreshCw, LuSparkles, LuX } from 'react-icons/lu';
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { Button } from '@~/components/ui/button/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@~/components/ui/dialog';
+import { loggerFactory } from '@~/lib/logging/logger';
 import { cn } from '@~/lib/utils';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
@@ -23,6 +24,8 @@ import { CharacterAssistantConversation } from './character-assistant-conversati
 import { ChatInputEditor } from './editor/chat-input-editor';
 import { ResizablePanelHandle } from './resizable-panel-handle';
 import { WORKSPACE_PANEL_WIDTHS } from './workspace-panel-layout';
+
+const CHARACTER_ASSISTANT_PANEL_LOGGER = loggerFactory.getLogger('character-assistant.panel');
 
 function formatFieldLabel(fieldKey: CharacterEditFieldKey) {
   return fieldKey
@@ -93,12 +96,19 @@ export function CharacterAssistantPanel({
     if (!workspace.composerDraftSessionId || hydratedDraftIdRef.current !== workspace.composerDraftSessionId)
       return undefined;
     const timeout = window.setTimeout(() => {
-      void workspace.updateComposerDraft({
-        text: inputValue,
-        templateIds: inputTemplateIds,
-        scopeLabel: focusLabel,
-        document: inputDocument,
-      });
+      void workspace
+        .updateComposerDraft({
+          text: inputValue,
+          templateIds: inputTemplateIds,
+          scopeLabel: focusLabel,
+          document: inputDocument,
+        })
+        .catch((error: unknown) => {
+          CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant composer draft persistence failed', error, {
+            operation: 'update-composer-draft',
+            sessionId: workspace.composerDraftSessionId,
+          });
+        });
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [focusLabel, inputDocument, inputTemplateIds, inputValue, workspace]);
@@ -164,6 +174,9 @@ export function CharacterAssistantPanel({
               setInputDocument(null);
               setInputAttachments([]);
             } catch (error) {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant conversation creation failed', error, {
+                operation: 'create-conversation',
+              });
               toastError('Conversation was not created', getErrorMessage(error));
             }
           }}
@@ -171,6 +184,10 @@ export function CharacterAssistantPanel({
             try {
               await workspace.deleteConversation(sessionId);
             } catch (error) {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant conversation deletion failed', error, {
+                operation: 'delete-conversation',
+                sessionId,
+              });
               toastError('Conversation was not deleted', getErrorMessage(error));
             }
           }}
@@ -207,24 +224,40 @@ export function CharacterAssistantPanel({
           errorMessage={workspace.errorMessage}
           settledOutcomeRef={settledOutcomeRef}
           onApply={(proposalId, fieldKeys) => {
-            void workspace
-              .applyProposalFields(proposalId, fieldKeys)
-              .catch((error: unknown) => toastError('Changes were not applied', getErrorMessage(error)));
+            void workspace.applyProposalFields(proposalId, fieldKeys).catch((error: unknown) => {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant proposal application failed', error, {
+                operation: 'apply-proposal',
+                proposalId,
+                fieldKeyCount: fieldKeys?.length ?? 0,
+              });
+              toastError('Changes were not applied', getErrorMessage(error));
+            });
           }}
           onReject={(proposalId, fieldKeys) => {
-            void workspace
-              .rejectProposalFields(proposalId, fieldKeys)
-              .catch((error: unknown) => toastError('Proposal was not updated', getErrorMessage(error)));
+            void workspace.rejectProposalFields(proposalId, fieldKeys).catch((error: unknown) => {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant proposal rejection failed', error, {
+                operation: 'reject-proposal',
+                proposalId,
+                fieldKeyCount: fieldKeys?.length ?? 0,
+              });
+              toastError('Proposal was not updated', getErrorMessage(error));
+            });
           }}
           onApplyAll={() => {
-            void workspace
-              .applyAllProposals()
-              .catch((error: unknown) => toastError('Changes were not applied', getErrorMessage(error)));
+            void workspace.applyAllProposals().catch((error: unknown) => {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant proposal batch application failed', error, {
+                operation: 'apply-all-proposals',
+              });
+              toastError('Changes were not applied', getErrorMessage(error));
+            });
           }}
           onRejectAll={() => {
-            void workspace
-              .discardAllProposals()
-              .catch((error: unknown) => toastError('Proposals were not discarded', getErrorMessage(error)));
+            void workspace.discardAllProposals().catch((error: unknown) => {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant proposal batch rejection failed', error, {
+                operation: 'reject-all-proposals',
+              });
+              toastError('Proposals were not discarded', getErrorMessage(error));
+            });
           }}
           onJumpToField={openAssistantForField}
           onSendMessage={(message) => {
@@ -234,6 +267,11 @@ export function CharacterAssistantPanel({
             try {
               await workspace.deleteConversationFromMessage(messageId);
             } catch (error) {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant messages deletion failed', error, {
+                operation: 'delete-from-message',
+                messageId,
+                sessionId: workspace.sessionId,
+              });
               toastError('Messages were not deleted', getErrorMessage(error));
               throw error;
             }
@@ -242,6 +280,11 @@ export function CharacterAssistantPanel({
             try {
               await workspace.editLastUserMessage(messageId, content);
             } catch (error) {
+              CHARACTER_ASSISTANT_PANEL_LOGGER.error('Assistant message edit failed', error, {
+                operation: 'edit-message',
+                messageId,
+                sessionId: workspace.sessionId,
+              });
               toastError('Message was not edited', getErrorMessage(error));
               throw error;
             }

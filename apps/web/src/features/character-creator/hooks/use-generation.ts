@@ -2,12 +2,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { useAtom } from 'jotai';
 import { startTransition, useCallback, useMemo, useRef, useState } from 'react';
+import { ZodError } from 'zod';
 
 import { INTERVALS } from '@~/constants/dates';
+import { loggerFactory } from '@~/lib/logging/logger';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
 import type { CharacterCard } from '../lib/cards/card-schema';
 import { TEMPLATE_MODES } from '../lib/cards/field-templates';
+import { isGenerationAbort } from '../lib/generation/abort-safe-stream';
 import {
   decodeStoredSecret,
   encodeStoredSecret,
@@ -34,6 +37,8 @@ import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider/provider-
 import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider/provider-health-proxy';
 import { useCharacterSession } from './use-character-session';
+
+const FIELD_GENERATION_LOGGER = loggerFactory.getLogger('character-creator.field-generation');
 
 interface iFieldGenerationRuntimeState {
   isGenerating: boolean;
@@ -452,6 +457,18 @@ export function useGeneration() {
 
       const isContinuation = mode === GENERATION_MODES.continue;
       const strictTemplate = !isContinuation && fieldTemplate?.mode === TEMPLATE_MODES.strict ? fieldTemplate : null;
+      const operationContext = {
+        operation: 'field-generation',
+        fieldKey,
+        generationMode: mode,
+        requestMode: connectionSettings.requestMode,
+        model: connectionSettings.model,
+        provider: connectionSettings.provider,
+        ...(connectionHealth.providerKind ? { providerKind: connectionHealth.providerKind } : {}),
+        ...(strictTemplate ? { templateMode: strictTemplate.mode } : {}),
+        exampleCharacterCount: exampleCharacters.length,
+      };
+      FIELD_GENERATION_LOGGER.debug('Field generation started', operationContext);
 
       if (!isContinuation) {
         startTransition(() => {
@@ -505,6 +522,12 @@ export function useGeneration() {
           shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
           messages: promptResult.messages,
         };
+
+        FIELD_GENERATION_LOGGER.debug('Field generation branch selected', {
+          ...operationContext,
+          branch:
+            connectionSettings.requestMode === REQUEST_MODES.browser ? REQUEST_MODES.browser : REQUEST_MODES.proxy,
+        });
 
         if (connectionSettings.requestMode === REQUEST_MODES.browser) {
           const result = streamCharacterText({
@@ -565,10 +588,15 @@ export function useGeneration() {
         });
 
         setFieldRuntimeState(fieldKey, { isGenerating: false, errorMessage: null });
+        FIELD_GENERATION_LOGGER.debug('Field generation completed', operationContext);
       } catch (error) {
         if (abortController.signal.aborted) {
           setFieldRuntimeState(fieldKey, { isGenerating: false, errorMessage: null });
           return;
+        }
+
+        if (!(error instanceof ZodError) && !(error instanceof SyntaxError) && !isGenerationAbort(error)) {
+          FIELD_GENERATION_LOGGER.error('Field generation failed', error, operationContext);
         }
 
         const errorMessage = error instanceof Error ? error.message : 'Generation failed.';

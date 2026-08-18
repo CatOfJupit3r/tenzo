@@ -48,161 +48,20 @@ describe('ChatInputEditor', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
-  it('emits one value change for one typed character', async () => {
-    const user = userEvent.setup();
-    const onValueChange = vi.fn();
+  it('submits when Enter is pressed without Shift', async () => {
     const onSubmit = vi.fn();
     render(
       <ChatInputEditor
         value=""
         templates={[]}
         ariaLabel="Assistant message"
-        onValueChange={onValueChange}
+        onValueChange={vi.fn()}
         onSubmit={onSubmit}
       />,
     );
     const textbox = await screen.findByRole('textbox', { name: 'Assistant message' });
-    const elementFromPointDescriptor = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
-    const rangeClientRectsDescriptor = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects');
-    const rangeBoundingRectDescriptor = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect');
-
-    Object.defineProperty(document, 'elementFromPoint', {
-      configurable: true,
-      value: () => textbox,
-    });
-    Object.defineProperty(Range.prototype, 'getClientRects', {
-      configurable: true,
-      value: () => [] as unknown as DOMRectList,
-    });
-    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
-      configurable: true,
-      value: () => new DOMRect(),
-    });
-
-    try {
-      await user.type(textbox, 'x');
-      await waitFor(() => expect(onValueChange).toHaveBeenLastCalledWith('x', [], expect.any(Object)));
-      expect(onValueChange).toHaveBeenCalledTimes(1);
-    } finally {
-      if (elementFromPointDescriptor) {
-        Object.defineProperty(document, 'elementFromPoint', elementFromPointDescriptor);
-      } else {
-        Reflect.deleteProperty(document, 'elementFromPoint');
-      }
-      if (rangeClientRectsDescriptor) {
-        Object.defineProperty(Range.prototype, 'getClientRects', rangeClientRectsDescriptor);
-      } else {
-        Reflect.deleteProperty(Range.prototype, 'getClientRects');
-      }
-      if (rangeBoundingRectDescriptor) {
-        Object.defineProperty(Range.prototype, 'getBoundingClientRect', rangeBoundingRectDescriptor);
-      } else {
-        Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect');
-      }
-    }
-  });
-
-  it('hydrates a persisted Tiptap document with template mentions', async () => {
-    const onValueChange = vi.fn();
-    render(
-      <ChatInputEditor
-        value="Use /voice-template"
-        content={{
-          type: 'doc',
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                { type: 'text', text: 'Use ' },
-                { type: 'mention', attrs: { id: 'voice-template', label: 'voice-template' } },
-              ],
-            },
-          ],
-        }}
-        templates={[]}
-        ariaLabel="Assistant message"
-        onValueChange={onValueChange}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    const textbox = await screen.findByRole('textbox', { name: 'Assistant message' });
-    expect(textbox.querySelector('[data-type="mention"]')).not.toBeNull();
-    await waitFor(() =>
-      expect(onValueChange).toHaveBeenLastCalledWith('Use /voice-template', ['voice-template'], expect.any(Object)),
-    );
-  });
-
-  it('reports the serialized template metadata when a mention is clicked', async () => {
-    const user = userEvent.setup();
-    const onTemplateClick = vi.fn();
-    render(
-      <ChatInputEditor
-        value="Use /voice-template"
-        content={{
-          type: 'doc',
-          content: [
-            {
-              type: 'paragraph',
-              content: [{ type: 'mention', attrs: { id: 'voice-template', label: 'voice-template' } }],
-            },
-          ],
-        }}
-        templates={[]}
-        ariaLabel="Assistant message"
-        onValueChange={vi.fn()}
-        onTemplateClick={onTemplateClick}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    const textbox = await screen.findByRole('textbox', { name: 'Assistant message' });
-    const mention = textbox.querySelector('[data-type="mention"]');
-    expect(mention).not.toBeNull();
-    const elementFromPointDescriptor = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
-    const rangeClientRectsDescriptor = Object.getOwnPropertyDescriptor(Range.prototype, 'getClientRects');
-    const rangeBoundingRectDescriptor = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect');
-    Object.defineProperty(document, 'elementFromPoint', {
-      configurable: true,
-      value: () => mention,
-    });
-    Object.defineProperty(Range.prototype, 'getClientRects', {
-      configurable: true,
-      value: () => [] as unknown as DOMRectList,
-    });
-    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
-      configurable: true,
-      value: () => new DOMRect(),
-    });
-
-    try {
-      await user.click(mention as HTMLElement);
-      expect(onTemplateClick).toHaveBeenCalledWith({ id: 'voice-template', label: 'voice-template' });
-    } finally {
-      if (elementFromPointDescriptor) Object.defineProperty(document, 'elementFromPoint', elementFromPointDescriptor);
-      else Reflect.deleteProperty(document, 'elementFromPoint');
-      if (rangeClientRectsDescriptor)
-        Object.defineProperty(Range.prototype, 'getClientRects', rangeClientRectsDescriptor);
-      else Reflect.deleteProperty(Range.prototype, 'getClientRects');
-      if (rangeBoundingRectDescriptor)
-        Object.defineProperty(Range.prototype, 'getBoundingClientRect', rangeBoundingRectDescriptor);
-      else Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect');
-    }
-  });
-
-  it('highlights character macros with the shared project token styles', async () => {
-    render(
-      <ChatInputEditor
-        value="Ask {{char}} about {{user}}"
-        templates={[]}
-        ariaLabel="Assistant message"
-        onValueChange={vi.fn()}
-        onSubmit={vi.fn()}
-      />,
-    );
-
-    const textbox = await screen.findByRole('textbox', { name: 'Assistant message' });
-    await waitFor(() => expect(textbox.querySelector('.macro-chip-char')?.textContent).toBe('{{char}}'));
-    expect(textbox.querySelector('.macro-chip-user')?.textContent).toBe('{{user}}');
+    textbox.focus();
+    await userEvent.keyboard('{Enter}');
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 });

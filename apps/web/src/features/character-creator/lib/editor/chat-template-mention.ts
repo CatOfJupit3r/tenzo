@@ -22,6 +22,16 @@ export interface iChatTemplateMentionReference {
   label: string;
 }
 
+const CHAT_TEMPLATE_MENTION_REFERENCE_SCHEMA = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+});
+
+export function parseChatTemplateMentionReference(attrs: unknown): iChatTemplateMentionReference | null {
+  const result = CHAT_TEMPLATE_MENTION_REFERENCE_SCHEMA.safeParse(attrs);
+  return result.success ? result.data : null;
+}
+
 function sortTemplates(templates: iFieldTemplateViewModel[], preferredFieldKeys: readonly string[]) {
   return [...templates].sort((leftTemplate, rightTemplate) => {
     const isLeftPreferred = leftTemplate.fieldKeys.some((fieldKey) => preferredFieldKeys.includes(fieldKey));

@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { BUILT_IN_FIELD_TEMPLATES } from '../../constants/default-field-templates';
 import { resolveEffectiveFieldTemplateId } from '../cards/field-template-resolution';
+import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
+import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import { buildAssistantSystemPrompt, streamCharacterAssistant } from './character-assistant-runtime.server';
 
 const { chatMock } = vi.hoisted(() => ({ chatMock: vi.fn() }));
@@ -58,6 +60,39 @@ describe('native character assistant tools', () => {
       }),
     );
     expect(chatMock.mock.calls[0]?.[0]).not.toHaveProperty('outputSchema');
+  });
+
+  it('does not expose native tools for disabled dedicated fields', () => {
+    const card = createEmptyCharacterCard();
+
+    streamCharacterAssistant({
+      card,
+      focus: { kind: 'card' },
+      contextAttachments: [],
+      apiKey: 'test-key',
+      generationSettings: {
+        endpoint: 'https://openrouter.ai/api/v1',
+        model: 'test/model',
+        maxTokens: 2_000,
+        temperature: 1,
+        topP: 1,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        topK: 0,
+        minP: 0,
+      },
+      fieldShouldAllowAssistantEditing: {
+        ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+        alternate_greetings: false,
+      },
+      store: { getCard: () => card, appendProposedCard: vi.fn() },
+      messages: [{ role: 'user', content: 'Propose greetings.' }],
+      maxSteps: 8,
+    });
+
+    const toolNames = chatMock.mock.calls[0]?.[0].tools.map((tool: { name: string }) => tool.name);
+    expect(toolNames).not.toContain(CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings);
+    expect(toolNames).toContain(CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields);
   });
 });
 

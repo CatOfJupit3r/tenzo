@@ -6,13 +6,15 @@ import { generateUuid } from '@~/utils/uuid';
 import {
   CHARACTER_BOOK_SCHEMA,
   CHARACTER_CARD_SCHEMA,
+  CHARACTER_TEXT_FIELD_KEYS,
   CHARACTER_TEXT_FIELD_KEY_SCHEMA,
   CUSTOM_FIELD_SCHEMA,
 } from '../cards/card-schema';
-import type { CharacterCard, CustomField } from '../cards/card-schema';
+import type { CharacterCard, CustomField, CharacterTextFieldKey } from '../cards/card-schema';
 import { doesValueMatchStrictFieldTemplate } from '../cards/field-template-enforcement';
 import { getTemplateFieldKeyForTargetKey, TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
 import type { TemplateFieldKey } from '../cards/field-templates';
+import type { CharacterAssistantFieldEditing } from '../generation/generation-config';
 import { CHARACTER_EDIT_FIELD_KEYS, CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../proposals/character-edit-proposal';
 import type { iCharacterEditProposal } from '../proposals/character-edit-proposal';
 import {
@@ -44,6 +46,47 @@ export const PROPOSE_CHARACTER_FIELDS_INPUT_SCHEMA = z.object({
   changes: z.array(CHARACTER_FIELD_CHANGE_SCHEMA).min(1),
   summary: z.string().trim().min(1),
 });
+
+export function createProposeCharacterFieldsInputSchema(
+  fieldShouldAllowAssistantEditing?: Readonly<CharacterAssistantFieldEditing>,
+) {
+  const enabledFieldKeys = CHARACTER_TEXT_FIELD_KEYS.filter(
+    (fieldKey) => fieldShouldAllowAssistantEditing?.[fieldKey] !== false,
+  );
+  if (enabledFieldKeys.length === 0) return null;
+
+  const enabledFieldKeySchema = z.enum(enabledFieldKeys as [CharacterTextFieldKey, ...CharacterTextFieldKey[]]);
+  return z.object({
+    changes: z.array(z.object({ fieldKey: enabledFieldKeySchema, value: z.string() })).min(1),
+    summary: z.string().trim().min(1),
+  });
+}
+
+export function getAllowedCharacterAssistantToolNames(
+  fieldShouldAllowAssistantEditing?: Readonly<CharacterAssistantFieldEditing>,
+): CharacterAssistantToolName[] {
+  const toolNames: CharacterAssistantToolName[] = [
+    CHARACTER_ASSISTANT_TOOL_NAMES.read_character,
+    CHARACTER_ASSISTANT_TOOL_NAMES.record_concept,
+    CHARACTER_ASSISTANT_TOOL_NAMES.suggest_character_directions,
+  ];
+  if (CHARACTER_TEXT_FIELD_KEYS.some((fieldKey) => fieldShouldAllowAssistantEditing?.[fieldKey] !== false)) {
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields);
+  }
+  if (fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.tags] !== false) {
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags);
+  }
+  if (fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.alternate_greetings] !== false) {
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings);
+  }
+  if (fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.custom_fields] !== false) {
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields);
+  }
+  if (fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.character_book] !== false) {
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book);
+  }
+  return toolNames;
+}
 export const PROPOSE_TAGS_INPUT_SCHEMA = z.object({ tags: z.array(z.string()), summary: z.string().trim().min(1) });
 export const PROPOSE_ALTERNATE_GREETINGS_INPUT_SCHEMA = z.object({
   greetings: z.array(z.string()),
@@ -150,7 +193,13 @@ export function createProposalFromChanges({
   const proposedCard = structuredClone(store.getCard());
   updateCard(proposedCard);
   assertStrictTemplateCompliance({ fieldKeys, proposedCard, templates });
-  return { proposal: store.appendProposedCard({ toolCallId: toolCallId ?? generateUuid(), summary, proposedCard }) };
+  const proposal = store.appendProposedCard({ toolCallId: toolCallId ?? generateUuid(), summary, proposedCard });
+  if (proposal.patches.length === 0) {
+    throw new Error(
+      'The proposal did not contain any editable changes. The requested fields may already have these values or be disabled for assistant editing.',
+    );
+  }
+  return { proposal };
 }
 
 export function recordConcept(concept: iCharacterConcept) {
@@ -242,13 +291,16 @@ export function createCharacterAssistantTools({
   store,
   templates = [],
   allowedToolNames,
+  fieldShouldAllowAssistantEditing,
 }: {
   focus: CharacterAssistantFocus;
   store: iCharacterAssistantProposalStore;
   templates?: readonly iChatTemplateRef[];
   allowedToolNames?: readonly CharacterAssistantToolName[];
+  fieldShouldAllowAssistantEditing?: Readonly<CharacterAssistantFieldEditing>;
 }) {
   const handlers = createCharacterAssistantActionHandlers({ focus, store, templates });
+  const characterFieldsInputSchema = createProposeCharacterFieldsInputSchema(fieldShouldAllowAssistantEditing);
   const allTools = {
     [CHARACTER_ASSISTANT_TOOL_NAMES.read_character]: toolDefinition({
       name: CHARACTER_ASSISTANT_TOOL_NAMES.read_character,
@@ -262,12 +314,16 @@ export function createCharacterAssistantTools({
       inputSchema: CHARACTER_CONCEPT_SCHEMA,
       outputSchema: CONCEPT_TOOL_RESULT_SCHEMA,
     }).server(async (input) => handlers.recordConcept(input)),
-    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
-      description: 'Propose updates to standard character text fields.',
-      inputSchema: PROPOSE_CHARACTER_FIELDS_INPUT_SCHEMA,
-      outputSchema: PROPOSAL_TOOL_RESULT_SCHEMA,
-    }).server(async (input, context) => handlers.proposeCharacterFields(input, context?.toolCallId)),
+    ...(characterFieldsInputSchema
+      ? {
+          [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields]: toolDefinition({
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            description: 'Propose updates to enabled standard character text fields.',
+            inputSchema: characterFieldsInputSchema,
+            outputSchema: PROPOSAL_TOOL_RESULT_SCHEMA,
+          }).server(async (input, context) => handlers.proposeCharacterFields(input, context?.toolCallId)),
+        }
+      : {}),
     [CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags]: toolDefinition({
       name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags,
       description: 'Propose a complete ordered replacement for tags.',
@@ -299,8 +355,12 @@ export function createCharacterAssistantTools({
       outputSchema: SUGGEST_DIRECTIONS_RESULT_SCHEMA,
     }).server(async (input) => handlers.suggestDirections(input)),
   };
+  const editableToolNames = new Set(getAllowedCharacterAssistantToolNames(fieldShouldAllowAssistantEditing));
   const selected = new Set(allowedToolNames ?? Object.keys(allTools));
   return Object.fromEntries(
-    Object.entries(allTools).filter(([name]) => selected.has(name as CharacterAssistantToolName)),
+    Object.entries(allTools).filter(
+      ([name]) =>
+        selected.has(name as CharacterAssistantToolName) && editableToolNames.has(name as CharacterAssistantToolName),
+    ),
   );
 }

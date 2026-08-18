@@ -106,6 +106,7 @@ export const Route = createFileRoute('/api/character-assistant')({
             templates: payload.templates,
             exampleCharacters: payload.exampleCharacters,
             maxExampleContextCharacters: payload.maxExampleContextCharacters,
+            fieldShouldAllowAssistantEditing: payload.fieldShouldAllowAssistantEditing,
             store,
             messages: chatParams.messages,
             abortSignal: request.signal,

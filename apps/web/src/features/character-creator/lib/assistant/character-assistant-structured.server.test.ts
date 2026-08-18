@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
+import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
+import { createCharacterEditProposal } from '../proposals/character-edit-proposal';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS, CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import {
   generateStructuredCharacterAssistantStream,
@@ -226,6 +228,11 @@ describe('structured character assistant loop', () => {
 
   it('returns a retryable tool error when a structured strict proposal drifts', async () => {
     const options = createOptions();
+    const correctedCard = structuredClone(options.card);
+    correctedCard.data.description = 'Description: A careful archivist.';
+    options.store.appendProposedCard.mockReturnValue(
+      createCharacterEditProposal({ baseCard: options.card, proposedCard: correctedCard }) as never,
+    );
     const strictTemplate = {
       id: 'strict-description',
       name: 'Strict description',
@@ -233,20 +240,35 @@ describe('structured character assistant loop', () => {
       fieldKeys: [TEMPLATE_FIELD_KEYS.description],
       content: 'Description: {{gen:body}}',
     };
-    generateValidatedObjectMock.mockResolvedValueOnce({
-      assistantMessage: 'I drafted the description.',
-      actions: [
-        {
-          action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
-          inputJson: JSON.stringify({
-            changes: [{ fieldKey: 'description', value: 'A description without the required prefix.' }],
-            summary: 'Draft description',
-          }),
-        },
-      ],
-      isDone: true,
-      followUpSuggestions: [],
-    });
+    generateValidatedObjectMock
+      .mockResolvedValueOnce({
+        assistantMessage: 'I drafted the description.',
+        actions: [
+          {
+            action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            inputJson: JSON.stringify({
+              changes: [{ fieldKey: 'description', value: 'A description without the required prefix.' }],
+              summary: 'Draft description',
+            }),
+          },
+        ],
+        isDone: true,
+        followUpSuggestions: [],
+      })
+      .mockResolvedValueOnce({
+        assistantMessage: 'I corrected the description proposal.',
+        actions: [
+          {
+            action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            inputJson: JSON.stringify({
+              changes: [{ fieldKey: 'description', value: correctedCard.data.description }],
+              summary: 'Draft description',
+            }),
+          },
+        ],
+        isDone: true,
+        followUpSuggestions: [],
+      });
 
     const chunks = await collect(
       generateStructuredCharacterAssistantStream({
@@ -261,5 +283,98 @@ describe('structured character assistant loop', () => {
         result: expect.stringContaining('Fill only {{gen:label}} slots'),
       }),
     );
+    expect(generateValidatedObjectMock).toHaveBeenCalledTimes(2);
+    expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_RESULT)).toBe(true);
+  });
+
+  it('rejects disabled fields before executing structured proposal actions', async () => {
+    const options = createOptions();
+    const correctedCard = structuredClone(options.card);
+    correctedCard.data.name = 'Mira';
+    options.store.appendProposedCard.mockReturnValue(
+      createCharacterEditProposal({ baseCard: options.card, proposedCard: correctedCard }) as never,
+    );
+    generateValidatedObjectMock
+      .mockResolvedValueOnce({
+        assistantMessage: 'I drafted the description.',
+        actions: [
+          {
+            action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            inputJson: JSON.stringify({
+              changes: [{ fieldKey: 'description', value: 'A hidden change.' }],
+              summary: 'Change description',
+            }),
+          },
+        ],
+        isDone: true,
+        followUpSuggestions: [],
+      })
+      .mockResolvedValueOnce({
+        assistantMessage: 'I proposed an enabled field instead.',
+        actions: [
+          {
+            action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            inputJson: JSON.stringify({
+              changes: [{ fieldKey: 'name', value: correctedCard.data.name }],
+              summary: 'Change name',
+            }),
+          },
+        ],
+        isDone: true,
+        followUpSuggestions: [],
+      });
+
+    const chunks = await collect(
+      generateStructuredCharacterAssistantStream({
+        ...options,
+        fieldShouldAllowAssistantEditing: {
+          ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+          description: false,
+        },
+      }),
+    );
+    const request = generateValidatedObjectMock.mock.calls[0]?.[0];
+    const toolError = chunks.find((chunk) => chunk.type === EventType.TOOL_CALL_END && chunk.state === 'output-error');
+
+    expect(request.system).not.toContain('name|description|');
+    expect(toolError).toEqual(expect.objectContaining({ result: expect.stringContaining('Invalid option') }));
+    expect(options.store.appendProposedCard).toHaveBeenCalledOnce();
+    expect(generateValidatedObjectMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails the run when proposal retries are exhausted', async () => {
+    const options = createOptions();
+    generateValidatedObjectMock.mockResolvedValue({
+      assistantMessage: 'I drafted the description.',
+      actions: [
+        {
+          action: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+          inputJson: JSON.stringify({
+            changes: [{ fieldKey: 'description', value: 'Invalid structure.' }],
+            summary: 'Draft description',
+          }),
+        },
+      ],
+      isDone: true,
+      followUpSuggestions: [],
+    });
+
+    await expect(
+      collect(
+        generateStructuredCharacterAssistantStream({
+          ...options,
+          templates: [
+            {
+              id: 'strict-description',
+              name: 'Strict description',
+              mode: TEMPLATE_MODES.strict,
+              fieldKeys: [TEMPLATE_FIELD_KEYS.description],
+              content: 'Description: {{gen:body}}',
+            },
+          ],
+        }),
+      ),
+    ).rejects.toThrow('did not produce a valid proposal');
+    expect(generateValidatedObjectMock).toHaveBeenCalledTimes(MAX_STRUCTURED_ROUNDS);
   });
 });

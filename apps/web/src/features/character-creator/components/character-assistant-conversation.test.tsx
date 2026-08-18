@@ -10,6 +10,65 @@ import { createCharacterEditProposal } from '../lib/proposals/character-edit-pro
 import { CharacterAssistantConversation } from './character-assistant-conversation';
 
 describe('CharacterAssistantConversation', () => {
+  it('shows failed assistant tool calls', () => {
+    const messages: UIMessage[] = [
+      {
+        id: 'assistant-message',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-call',
+            id: 'failed-tool-call',
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            arguments: '{}',
+            state: 'error',
+            output: 'Description is disabled for assistant editing.',
+          },
+        ],
+      },
+    ];
+
+    render(
+      <CharacterAssistantConversation
+        messages={messages}
+        proposals={[]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert').textContent).toContain('Description is disabled for assistant editing.');
+  });
+
+  it('does not show bulk actions for empty proposals', () => {
+    const card = createEmptyCharacterCard();
+    const emptyProposal = createCharacterEditProposal({ baseCard: card, proposedCard: structuredClone(card) });
+
+    render(
+      <CharacterAssistantConversation
+        messages={[]}
+        proposals={[emptyProposal, { ...emptyProposal, id: 'another-empty-proposal' }]}
+        isRunning={false}
+        activityLabel={null}
+        errorMessage={null}
+        settledOutcomeRef={createRef<HTMLDivElement>()}
+        onApply={vi.fn()}
+        onReject={vi.fn()}
+        onApplyAll={vi.fn()}
+        onRejectAll={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Apply all' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject all' })).toBeNull();
+  });
+
   it('does not render historical concept tool calls as recorded character data', () => {
     const messages: UIMessage[] = [
       {

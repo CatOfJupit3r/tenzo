@@ -48,7 +48,10 @@ export function buildTemplateEnhancementMessages({
           'Preserve useful existing slots unless the guidance clearly calls for changing them.',
           'Do not replace slots with generated character content.',
         ].join(' ')
-      : 'This is prompt guidance. Improve its structure, specificity, and usefulness to a character-writing model.';
+      : [
+          'This is prompt guidance. Improve its structure, specificity, and usefulness to a character-writing model.',
+          'For dynamic tokens, make them in the form {{gen:label}} or {{gen:label:hint}} or {{trait_X}} with all lowercase and no spaces.',
+        ].join(' ');
 
   return [
     {

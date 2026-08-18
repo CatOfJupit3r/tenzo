@@ -2,6 +2,7 @@ import { chat, maxIterations } from '@tanstack/ai';
 import type { ModelMessage, UIMessage } from '@tanstack/ai';
 
 import type { CharacterCard } from '../cards/card-schema';
+import type { CharacterAssistantFieldEditing } from '../generation/generation-config';
 import {
   createCharacterModelOptions,
   createCharacterTextAdapter,
@@ -47,6 +48,7 @@ interface iStreamCharacterAssistantOptions {
   exampleCharacters?: iPromptExampleCharacter[];
   maxExampleContextCharacters?: number;
   allowedToolNames?: Parameters<typeof createCharacterAssistantTools>[0]['allowedToolNames'];
+  fieldShouldAllowAssistantEditing?: Readonly<CharacterAssistantFieldEditing>;
   shouldUseNativeTools?: boolean;
   store: Parameters<typeof createCharacterAssistantTools>[0]['store'];
   messages: Array<ModelMessage | UIMessage>;
@@ -219,6 +221,7 @@ export function buildAssistantSystemPrompt({
     'Do not invent card fields, silently discard character-book data, or rewrite unrelated content.',
     'If the user asks only for advice or analysis, answer without making a proposal.',
     'After proposing edits, briefly summarize their intent and mention genuine uncertainties that need review.',
+    'Never claim that an edit or proposal succeeded unless the corresponding proposal action returned successfully.',
     'Proposed field values must be complete, ready-to-save card content with the same depth and richness as dedicated field generation — never placeholders or one-to-two-sentence summaries for prose fields.',
     'Keep the conversational reply brief and put the depth into the proposed field values.',
     focusInstruction,
@@ -250,6 +253,7 @@ export function streamCharacterAssistant({
   exampleCharacters = [],
   maxExampleContextCharacters,
   allowedToolNames,
+  fieldShouldAllowAssistantEditing,
   shouldUseNativeTools = true,
   store,
   messages,
@@ -284,7 +288,17 @@ export function streamCharacterAssistant({
       }),
     ],
     ...(shouldUseNativeTools
-      ? { tools: Object.values(createCharacterAssistantTools({ focus, store, templates, allowedToolNames })) }
+      ? {
+          tools: Object.values(
+            createCharacterAssistantTools({
+              focus,
+              store,
+              templates,
+              allowedToolNames,
+              fieldShouldAllowAssistantEditing,
+            }),
+          ),
+        }
       : {}),
     messages,
     agentLoopStrategy: maxIterations(maxSteps),

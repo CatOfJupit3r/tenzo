@@ -2,15 +2,21 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
+import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
-import { createCharacterAssistantActionHandlers } from './character-assistant-tools';
+import {
+  createCharacterAssistantActionHandlers,
+  createCharacterAssistantTools,
+  createProposalFromChanges,
+  createProposeCharacterFieldsInputSchema,
+} from './character-assistant-tools';
 import type { iCharacterAssistantProposalStore } from './character-assistant-tools';
 
 function createStore(): iCharacterAssistantProposalStore & {
   appendProposedCard: ReturnType<typeof vi.fn>;
 } {
   const card = createEmptyCharacterCard();
-  const appendProposedCard = vi.fn(() => ({}) as never);
+  const appendProposedCard = vi.fn(() => ({ patches: [{}] }) as never);
   return {
     getCard: () => card,
     appendProposedCard,
@@ -28,6 +34,50 @@ function createTemplate(mode: 'prompt' | 'strict', fieldKey: 'description' | 'al
 }
 
 describe('character assistant template enforcement', () => {
+  it('removes disabled fields and dedicated tools from native tool schemas', () => {
+    const fieldShouldAllowAssistantEditing = {
+      ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+      description: false,
+      tags: false,
+    };
+    const characterFieldsSchema = createProposeCharacterFieldsInputSchema(fieldShouldAllowAssistantEditing);
+    const tools = createCharacterAssistantTools({
+      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+      store: createStore(),
+      fieldShouldAllowAssistantEditing,
+    });
+
+    expect(
+      characterFieldsSchema?.safeParse({
+        changes: [{ fieldKey: 'description', value: 'Hidden change' }],
+        summary: 'Change description',
+      }).success,
+    ).toBe(false);
+    expect(
+      characterFieldsSchema?.safeParse({
+        changes: [{ fieldKey: 'name', value: 'Mira' }],
+        summary: 'Change name',
+      }).success,
+    ).toBe(true);
+    expect(tools).not.toHaveProperty('propose_tags');
+    expect(tools).toHaveProperty('propose_character_fields');
+  });
+
+  it('rejects a proposal with no editable changes', () => {
+    const store = createStore();
+    store.appendProposedCard.mockReturnValue({ patches: [] } as never);
+
+    expect(() =>
+      createProposalFromChanges({
+        store,
+        focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+        summary: 'Keep the current name',
+        fieldKeys: ['name'],
+        updateCard: () => undefined,
+      }),
+    ).toThrow('did not contain any editable changes');
+  });
+
   it('accepts a proposal that preserves a strict template skeleton', () => {
     const store = createStore();
     const handlers = createCharacterAssistantActionHandlers({

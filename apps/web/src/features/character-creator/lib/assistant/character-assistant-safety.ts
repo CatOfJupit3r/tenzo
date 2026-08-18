@@ -1,8 +1,18 @@
 import { defineChatMiddleware, EventType } from '@tanstack/ai';
 import type { TokenUsage } from '@tanstack/ai';
 
+import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
+
 export const MAX_ASSISTANT_TOOL_CALLS_PER_RUN = 12;
 export const MAX_ASSISTANT_PARALLEL_TOOL_CALLS_PER_TURN = 4;
+
+const PROPOSAL_TOOL_NAMES = new Set<string>([
+  CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+  CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags,
+  CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings,
+  CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields,
+  CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book,
+]);
 
 export function aggregateTokenUsage(current: TokenUsage | undefined, next: TokenUsage): TokenUsage {
   return {
@@ -24,6 +34,8 @@ export function aggregateTokenUsage(current: TokenUsage | undefined, next: Token
 export function createCharacterAssistantSafetyMiddleware() {
   let parallelToolCallCount = 0;
   let totalToolCallCount = 0;
+  let proposalToolCallCount = 0;
+  let successfulProposalToolCallCount = 0;
   let usage: TokenUsage | undefined;
 
   return defineChatMiddleware({
@@ -45,7 +57,17 @@ export function createCharacterAssistantSafetyMiddleware() {
       }
       return null;
     },
+    onAfterToolCall(_context, info) {
+      if (!PROPOSAL_TOOL_NAMES.has(info.toolName)) return;
+      proposalToolCallCount += 1;
+      if (info.ok) successfulProposalToolCallCount += 1;
+    },
     onChunk(_context, chunk) {
+      if (chunk.type === EventType.RUN_FINISHED && proposalToolCallCount > 0 && successfulProposalToolCallCount === 0) {
+        const message =
+          'The assistant did not produce a valid character proposal. Review the failed tool call and retry.';
+        return { type: EventType.RUN_ERROR, message, error: { message } };
+      }
       if (chunk.type !== EventType.RUN_FINISHED || !chunk.usage) {
         return chunk;
       }

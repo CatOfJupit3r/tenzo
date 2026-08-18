@@ -13,7 +13,26 @@ vi.mock('../collections/character-assistant-sessions.collection', () => ({
   updateCharacterAssistantSession: updateSessionMock,
 }));
 
+vi.mock('@~/components/toastifications/create-jsx-toasts', () => ({
+  toastSuccess: vi.fn(),
+}));
+
 describe('useProposalActions', () => {
+  it('does not expose proposals without unresolved patches as active', () => {
+    const card = createEmptyCharacterCard();
+    const emptyProposal = createCharacterEditProposal({ baseCard: card, proposedCard: structuredClone(card) });
+    const { result } = renderHook(() =>
+      useProposalActions({
+        sessionId: 'session-2',
+        card,
+        proposals: [emptyProposal],
+        replaceCard: vi.fn().mockResolvedValue(undefined),
+      }),
+    );
+
+    expect(result.current.activeProposals).toEqual([]);
+  });
+
   it('persists proposal changes to the active conversation', async () => {
     const card = createEmptyCharacterCard();
     const proposedCard = structuredClone(card);
@@ -33,5 +52,25 @@ describe('useProposalActions', () => {
     await act(async () => result.current.rejectProposalFields(proposal.id, [patch.fieldKey]));
 
     expect(updateSessionMock).toHaveBeenCalledWith('session-2', expect.any(Function));
+  });
+
+  it('applies every proposed patch in a bulk action', async () => {
+    const card = createEmptyCharacterCard();
+    const proposedCard = structuredClone(card);
+    proposedCard.data.name = 'Mira';
+    proposedCard.data.description = 'A careful archivist.';
+    const proposal = createCharacterEditProposal({ baseCard: card, proposedCard });
+    const replaceCard = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useProposalActions({ sessionId: 'session-2', card, proposals: [proposal], replaceCard }),
+    );
+
+    await act(async () => result.current.applyAllProposals());
+
+    expect(replaceCard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: 'Mira', description: 'A careful archivist.' }),
+      }),
+    );
   });
 });

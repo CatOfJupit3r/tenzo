@@ -1,5 +1,7 @@
+import { EventType } from '@tanstack/ai';
 import { describe, expect, it } from 'vitest';
 
+import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import {
   aggregateTokenUsage,
   createCharacterAssistantSafetyMiddleware,
@@ -44,5 +46,54 @@ describe('character assistant safety middleware', () => {
     );
 
     expect(usage).toMatchObject({ promptTokens: 30, completionTokens: 13, totalTokens: 43, cost: 0.03 });
+  });
+
+  it('turns a run with only failed proposal calls into an error', async () => {
+    const middleware = createCharacterAssistantSafetyMiddleware();
+    const context = {} as never;
+    await middleware.onAfterToolCall?.(context, {
+      toolCall: {} as never,
+      tool: undefined,
+      toolName: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+      toolCallId: 'failed-proposal',
+      ok: false,
+      duration: 1,
+      error: new Error('Invalid proposal'),
+    });
+
+    const chunk = await middleware.onChunk?.(context, {
+      type: EventType.RUN_FINISHED,
+      threadId: 'thread',
+      runId: 'run',
+      finishReason: 'stop',
+    });
+
+    expect(chunk).toEqual(expect.objectContaining({ type: EventType.RUN_ERROR }));
+  });
+
+  it('allows a run when a later proposal call succeeds', async () => {
+    const middleware = createCharacterAssistantSafetyMiddleware();
+    const context = {} as never;
+    for (const [toolCallId, isOk] of [
+      ['failed-proposal', false],
+      ['successful-proposal', true],
+    ] as const) {
+      await middleware.onAfterToolCall?.(context, {
+        toolCall: {} as never,
+        tool: undefined,
+        toolName: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+        toolCallId,
+        ok: isOk,
+        duration: 1,
+      });
+    }
+    const finishedChunk = {
+      type: EventType.RUN_FINISHED,
+      threadId: 'thread',
+      runId: 'run',
+      finishReason: 'stop',
+    } as const;
+
+    expect(await middleware.onChunk?.(context, finishedChunk)).toEqual(finishedChunk);
   });
 });

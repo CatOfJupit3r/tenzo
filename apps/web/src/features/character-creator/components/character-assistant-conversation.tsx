@@ -61,6 +61,14 @@ function readMessagePartMetadata(part: object) {
   return 'metadata' in part ? part.metadata : undefined;
 }
 
+function readToolCallError(output: unknown) {
+  if (typeof output === 'string') return output;
+  if (output && typeof output === 'object' && 'error' in output && typeof output.error === 'string') {
+    return output.error;
+  }
+  return 'The assistant tool could not complete this action.';
+}
+
 function readEditableMessageText(message: UIMessage) {
   const text = message.parts
     .flatMap((part) => {
@@ -210,6 +218,15 @@ export function CharacterAssistantConversation({
   const [editedMessage, setEditedMessage] = useState('');
   const [isUpdatingMessages, setIsUpdatingMessages] = useState(false);
   const proposalsById = new Map(proposals.map((proposal) => [proposal.id, proposal]));
+  const proposedPatchCount = proposals.reduce(
+    (count, proposal) =>
+      count + proposal.patches.filter((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed).length,
+    0,
+  );
+  const unresolvedPatchCount = proposals.reduce(
+    (count, proposal) => count + proposal.patches.filter(isCharacterEditPatchUnresolved).length,
+    0,
+  );
   const conversationMessages = useMemo(() => groupCharacterAssistantConversationMessages(messages), [messages]);
   const lastUserMessageId = conversationMessages.findLast((message) => message.role === 'user')?.id ?? null;
   const deletionStartIndex = messagePendingDeletion
@@ -334,6 +351,19 @@ export function CharacterAssistantConversation({
                     <CharacterAssistantMessageText key={partKey} content={result.data.assistantMessage} />
                   ) : null;
                 }
+                if (part.type === 'tool-call' && part.state === 'error') {
+                  const toolError = readToolCallError(part.output);
+                  return (
+                    <div
+                      key={partKey}
+                      role="alert"
+                      className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-2 text-destructive"
+                    >
+                      <LuTriangleAlert className="mt-0.5 size-4 shrink-0" />
+                      <p className="text-xs">{toolError}</p>
+                    </div>
+                  );
+                }
                 if (part.type !== 'tool-call' || !part.output) return null;
                 const rendererKind = getAssistantToolRendererKind(part.name);
                 if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.proposal) {
@@ -446,14 +476,18 @@ export function CharacterAssistantConversation({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {proposals.length > 1 ? (
+      {proposedPatchCount > 1 || unresolvedPatchCount > 1 ? (
         <div className="flex justify-end gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={onRejectAll}>
-            Reject all
-          </Button>
-          <Button type="button" size="sm" onClick={onApplyAll}>
-            Apply all
-          </Button>
+          {unresolvedPatchCount > 1 ? (
+            <Button type="button" size="sm" variant="outline" onClick={onRejectAll}>
+              Reject all
+            </Button>
+          ) : null}
+          {proposedPatchCount > 1 ? (
+            <Button type="button" size="sm" onClick={onApplyAll}>
+              Apply all
+            </Button>
+          ) : null}
         </div>
       ) : null}
       <div aria-live="polite" aria-busy={isRunning}>

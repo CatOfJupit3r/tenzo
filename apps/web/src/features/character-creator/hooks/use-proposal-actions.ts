@@ -8,6 +8,7 @@ import {
   applyCharacterEditProposal,
   CHARACTER_EDIT_PATCH_STATUSES,
   CHARACTER_EDIT_PROPOSAL_STATUSES,
+  isCharacterEditPatchUnresolved,
   reduceCharacterEditProposal,
   upsertCharacterEditProposal,
 } from '../lib/proposals/character-edit-proposal';
@@ -37,7 +38,11 @@ export function useProposalActions({
   replaceCard: (nextCard: CharacterCard) => Promise<unknown>;
 }) {
   const activeProposals = useMemo(
-    () => proposals.filter((proposal) => ACTIVE_PROPOSAL_STATUSES.has(proposal.status)),
+    () =>
+      proposals.filter(
+        (proposal) =>
+          ACTIVE_PROPOSAL_STATUSES.has(proposal.status) && proposal.patches.some(isCharacterEditPatchUnresolved),
+      ),
     [proposals],
   );
   const persistProposal = useCallback(
@@ -105,6 +110,7 @@ export function useProposalActions({
   );
   const applyAllProposals = useCallback(async () => {
     let projectedCard = card;
+    let appliedPatchCount = 0;
     const results: ReturnType<typeof applyCharacterEditProposal>[] = [];
     for (const proposal of activeProposals) {
       const fieldKeys = proposal.patches
@@ -117,11 +123,16 @@ export function useProposalActions({
         throw new Error(`Review conflicts in ${result.conflictFieldKeys.join(', ')} before applying.`);
       }
       projectedCard = result.card;
+      appliedPatchCount += fieldKeys.length;
       results.push(result);
     }
-    if (results.length === 0) return;
+    if (results.length === 0) throw new Error('There are no proposed changes to apply.');
     await replaceCard(projectedCard);
     await Promise.all(results.map(async (result) => persistProposal(result.proposal)));
+    toastSuccess(
+      'Changes applied',
+      `Applied ${appliedPatchCount} character change${appliedPatchCount === 1 ? '' : 's'}.`,
+    );
   }, [activeProposals, card, persistProposal, replaceCard]);
   const discardAllProposals = useCallback(async () => {
     await Promise.all(

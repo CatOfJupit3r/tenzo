@@ -2,6 +2,7 @@ import { EventType } from '@tanstack/ai';
 import type { ModelMessage, StreamChunk, TokenUsage, UIMessage } from '@tanstack/ai';
 import { z } from 'zod';
 
+import { loggerFactory } from '@~/lib/logging/logger';
 import { generateUuid } from '@~/utils/uuid';
 
 import type { CharacterCard } from '../cards/card-schema';
@@ -47,6 +48,7 @@ export const MAX_STRUCTURED_ROUNDS = 4;
 const MAX_STRUCTURED_SCHEMA_ATTEMPTS = 2;
 const MAX_STRUCTURED_HISTORY_MESSAGES = 12;
 const MAX_STRUCTURED_HISTORY_MESSAGE_CHARACTERS = 4_000;
+const structuredAssistantLogger = loggerFactory.getLogger('character-assistant.structured');
 
 interface iStructuredAction {
   action: CharacterAssistantToolName;
@@ -333,7 +335,7 @@ export async function* generateStructuredCharacterAssistantStream(
         break;
       } catch (error) {
         if (schemaAttempt === MAX_STRUCTURED_SCHEMA_ATTEMPTS || !isRetryableStructuredSchemaError(error)) throw error;
-        console.warn('[Character Assistant] Retrying invalid structured round', {
+        structuredAssistantLogger.warn('Retrying invalid structured round', {
           model: options.generationSettings.model,
           round: roundIndex + 1,
           nextAttempt: schemaAttempt + 1,

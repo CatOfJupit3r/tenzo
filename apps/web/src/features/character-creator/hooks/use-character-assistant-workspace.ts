@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 
 import { toastError, toastInfo } from '@~/components/toastifications/create-jsx-toasts';
 import { usePersistentCollection } from '@~/db/persistent-collection';
+import { loggerFactory } from '@~/lib/logging/logger';
 
 import {
   characterAssistantComposerDraftsCollection,
@@ -61,6 +62,8 @@ interface iUseCharacterAssistantWorkspaceOptions {
   focusTemplates: iChatTemplateRef[];
 }
 
+const characterAssistantWorkspaceLogger = loggerFactory.getLogger('character-assistant.workspace');
+
 export interface iCharacterAssistantPatchView {
   proposalId: string;
   proposalSummary: string | undefined;
@@ -110,6 +113,7 @@ export function useCharacterAssistantWorkspace({
   maxExampleContextCharacters,
   focusTemplates,
 }: iUseCharacterAssistantWorkspaceOptions) {
+  const workspaceLogger = useMemo(() => characterAssistantWorkspaceLogger.child({ characterId }), [characterId]);
   const sessions = usePersistentCollection(characterAssistantSessionsCollection);
   const drafts = usePersistentCollection(characterAssistantComposerDraftsCollection);
   const characterSessions = useMemo(
@@ -162,8 +166,8 @@ export function useCharacterAssistantWorkspace({
 
   useEffect(() => {
     if (!chat.error) return;
-    console.error('[Character Assistant] Stream failed:', chat.error);
-  }, [chat.error]);
+    workspaceLogger.error('Assistant stream failed', chat.error, { operation: 'stream', sessionId });
+  }, [chat.error, sessionId, workspaceLogger]);
 
   useEffect(() => {
     if (!characterId || session) return;
@@ -248,7 +252,10 @@ export function useCharacterAssistantWorkspace({
         );
         return true;
       } catch (error) {
-        console.error('[Character Assistant] Message request failed:', error instanceof Error ? error.message : error);
+        workspaceLogger.error('Assistant message request failed', error, {
+          operation: 'send-message',
+          sessionId,
+        });
         toastError(
           'Character Assistant failed',
           error instanceof Error ? error.message : 'Character assistant failed.',
@@ -256,7 +263,7 @@ export function useCharacterAssistantWorkspace({
         return false;
       }
     },
-    [chat, focusTemplates, forwardedProps],
+    [chat, focusTemplates, forwardedProps, sessionId, workspaceLogger],
   );
   const replaceConversationMessages = useCallback(
     async (nextMessages: typeof chat.messages) => {
@@ -365,7 +372,10 @@ export function useCharacterAssistantWorkspace({
         await chat.reload();
         return true;
       } catch (error) {
-        console.error('[Character Assistant] Response retry failed:', error instanceof Error ? error.message : error);
+        workspaceLogger.error('Assistant response retry failed', error, {
+          operation: 'response-retry',
+          sessionId,
+        });
         toastError(
           'Character Assistant failed',
           error instanceof Error ? error.message : 'Character assistant failed.',

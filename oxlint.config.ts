@@ -1,0 +1,56 @@
+import { defineConfig } from "oxlint";
+
+export default defineConfig({
+  ignorePatterns: [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.tanstack/**",
+    ".agents/**",
+    ".codex/**",
+    ".claude/**",
+    "apps/web/src/routeTree.gen.ts",
+    "tools/oxlint/anti-slop/plugin.ts",
+    "tools/oxlint/anti-slop/tenzo-plugin.ts",
+    "tools/oxlint/anti-slop/rule-helpers.ts",
+    "tools/oxlint/anti-slop/rules/**",
+    "tools/oxlint/anti-slop/fixtures/rejected.ts",
+    ".github/skills/**",
+  ],
+  categories: {
+    correctness: "error",
+    suspicious: "error",
+  },
+  jsPlugins: [
+    { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/plugin.ts" },
+    { name: "tenzo", specifier: "./tools/oxlint/anti-slop/tenzo-plugin.ts" },
+  ],
+  options: {
+    reportUnusedDisableDirectives: "error",
+    respectEslintDisableDirectives: false,
+  },
+  rules: {
+    // These native style/overlap rules are intentionally owned by ESLint here.
+    "eslint/no-underscore-dangle": "off",
+    "eslint/no-unmodified-loop-condition": "off",
+    "eslint/no-unused-vars": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-useless-spread": "off",
+    "unicorn/require-module-specifiers": "off",
+    "anti-slop/no-chained-type-assertions": "error",
+    "tenzo/no-direct-runtime-detection": "error",
+    "anti-slop/no-known-value-widening": "error",
+    "anti-slop/no-module-mocking": "error",
+    "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reflect-apply": "error",
+    "anti-slop/no-reflect-get": "error",
+    "anti-slop/no-runtime-typeof": ["error", { allowInTypeGuards: true }],
+    "tenzo/no-trivial-test-assertion": "error",
+    "anti-slop/no-unknown-parameters": "error",
+    "anti-slop/no-unknown-returns": "error",
+    "anti-slop/no-unknown-type-aliases": "error",
+    "anti-slop/no-unsafe-dictionary-type": "error",
+    "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-safety-comment-for-type-assertion": "error",
+  },
+});

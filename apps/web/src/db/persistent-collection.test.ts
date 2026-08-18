@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import type { EntityTable } from 'dexie';
-import 'fake-indexeddb/auto';
+import { IDBKeyRange, indexedDB } from 'fake-indexeddb';
 import { afterEach, expect, it, vi } from 'vitest';
 import z from 'zod';
 
@@ -15,7 +15,7 @@ class TestDatabase extends Dexie {
   items!: EntityTable<iTestItem, 'id'>;
 
   constructor() {
-    super(`persistent-collection-test-${crypto.randomUUID()}`);
+    super(`persistent-collection-test-${crypto.randomUUID()}`, { indexedDB, IDBKeyRange });
     this.version(1).stores({ items: 'id' });
   }
 }

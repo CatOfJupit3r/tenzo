@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
+import { ZodError } from 'zod';
+
+import { loggerFactory } from '@~/lib/logging/logger';
 
 import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
+import { isGenerationAbort } from '../lib/generation/abort-safe-stream';
 import { REQUEST_MODES } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import { streamCharacterText } from '../lib/generation/tanstack-ai-text-generation';
@@ -12,6 +16,8 @@ import {
   buildTemplateEnhancementMessages,
   normalizeTemplateEnhancementResponse,
 } from '../lib/templates/template-enhancement';
+
+const TEMPLATE_ENHANCEMENT_LOGGER = loggerFactory.getLogger('character-creator.template-enhancement');
 
 interface iUseTemplateEnhancementOptions {
   generationSettings: iCharacterGenerationSettings;
@@ -54,6 +60,17 @@ export function useTemplateEnhancement({ generationSettings, apiKey, providerKin
       abortControllerRef.current = abortController;
       setIsEnhancing(true);
 
+      const operationContext = {
+        operation: 'template-enhancement',
+        requestMode: generationSettings.requestMode,
+        model: generationSettings.model,
+        ...(providerKind ? { providerKind } : {}),
+        templateMode: options.targetTemplate.mode,
+        referenceTemplateCount: options.referenceTemplates.length,
+        exampleCharacterCount: options.exampleCharacters.length,
+      };
+      TEMPLATE_ENHANCEMENT_LOGGER.debug('Template enhancement started', operationContext);
+
       try {
         const requestData = {
           provider: generationSettings.provider,
@@ -72,6 +89,11 @@ export function useTemplateEnhancement({ generationSettings, apiKey, providerKin
           messages: buildTemplateEnhancementMessages(options),
         };
         let generatedContent = '';
+
+        TEMPLATE_ENHANCEMENT_LOGGER.debug('Template enhancement branch selected', {
+          ...operationContext,
+          branch: generationSettings.requestMode === REQUEST_MODES.browser ? 'browser' : 'proxy',
+        });
 
         if (generationSettings.requestMode === REQUEST_MODES.browser) {
           const result = streamCharacterText({ ...requestData, signal: abortController.signal });
@@ -106,7 +128,19 @@ export function useTemplateEnhancement({ generationSettings, apiKey, providerKin
           throw new Error('The model returned an empty template.');
         }
 
+        TEMPLATE_ENHANCEMENT_LOGGER.debug('Template enhancement completed', operationContext);
+
         return enhancedContent;
+      } catch (error) {
+        if (
+          !(error instanceof ZodError) &&
+          !(error instanceof SyntaxError) &&
+          !isGenerationAbort(error, abortController.signal)
+        ) {
+          TEMPLATE_ENHANCEMENT_LOGGER.error('Template enhancement failed', error, operationContext);
+        }
+
+        throw error;
       } finally {
         if (abortControllerRef.current === abortController) {
           abortControllerRef.current = null;

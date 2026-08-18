@@ -1,7 +1,7 @@
 ---
 title: "Anti-Slop Code and Test Cleanup"
 slug: "anti-slop-cleanup"
-status: "Active backlog"
+status: "Completed and aligned"
 roadmap_type: "cleanup"
 priority: "P1"
 created: "2026-08-18"
@@ -25,9 +25,9 @@ archive_when:
 
 # Anti-Slop Code and Test Cleanup
 
-> Status: Active backlog
+> Status: Completed and aligned
 > Last repo audit: 2026-08-18
-> Current summary: The web app has 62 test files and substantial meaningful domain coverage, but it also has a placeholder test, tautological or historical assertions, 33 module mocks across 14 files, repeated hand-written unknown-value readers, and reflective parsing at I/O boundaries. The complete suite currently cannot collect tests in 22 files because application logging is eagerly initialized through a TanStack runtime boundary that is undefined in the audited Vitest environment.
+> Current summary: Completed on Node 26.5.0 with 61 test files and 259 meaningful tests. Module mocks, duplicate readers, reflective access, chained assertions, and unreviewed clone blocks are at zero; ESLint, tailored Oxlint, duplicate detection, tests, and production build run in CI.
 
 ## 1. Executive Summary
 
@@ -162,10 +162,10 @@ The optional Effect rule does not apply because this repository does not use Eff
 **Target behavior:** Production composition supplies an explicit dependency interface; the test passes a focused fake or spy through that seam.
 **Acceptance criteria:**
 
-- [ ] The test contains no module mock.
-- [ ] The production default still composes the real dependency.
-- [ ] The fake implements the same narrow interface used in production.
-- [ ] Assertions concern returned state, emitted domain events, persisted values, or visible behavior rather than import calls.
+- [x] The test contains no module mock.
+- [x] The production default still composes the real dependency.
+- [x] The fake implements the same narrow interface used in production.
+- [x] Assertions concern returned state, emitted domain events, persisted values, or visible behavior rather than import calls.
 
 ### SC2: Persisted or provider data enters the application
 
@@ -175,10 +175,10 @@ The optional Effect rule does not apply because this repository does not use Eff
 **Target behavior:** A Zod schema for the accepted wire shape parses once; downstream code receives a named inferred type and uses normal property access.
 **Acceptance criteria:**
 
-- [ ] Invalid records fail or are deliberately filtered at the boundary.
-- [ ] Default and fallback semantics are visible in the schema or one domain transformation.
-- [ ] No shared `readString`/`isRecord` utility is introduced.
-- [ ] Retained tests cover the boundary's business fallback or rejection behavior, not Zod itself.
+- [x] Invalid records fail or are deliberately filtered at the boundary.
+- [x] Default and fallback semantics are visible in the schema or one domain transformation.
+- [x] No shared `readString`/`isRecord` utility is introduced.
+- [x] Retained tests cover the boundary's business fallback or rejection behavior, not Zod itself.
 
 ### SC3: A test protects an absence
 
@@ -188,9 +188,9 @@ The optional Effect rule does not apply because this repository does not use Eff
 **Target behavior:** The test is kept only when the absence is part of a current security, privacy, data-integrity, state-machine, or accessibility contract.
 **Acceptance criteria:**
 
-- [ ] Historical UI absences and removed behavior are deleted.
-- [ ] Security exclusions such as credentials not appearing in backups remain tested.
-- [ ] State-machine exclusions are preferably asserted through the active state or domain result, with DOM non-existence used only when it is the user-visible contract.
+- [x] Historical UI absences and removed behavior are deleted.
+- [x] Security exclusions such as credentials not appearing in backups remain tested.
+- [x] State-machine exclusions are asserted through active state/domain results, with DOM non-existence retained only for user-visible contracts.
 
 ### SC4: New low-evidence code is introduced
 
@@ -200,9 +200,9 @@ The optional Effect rule does not apply because this repository does not use Eff
 **Target behavior:** Oxlint runs alongside ESLint and the complete test suite runs on the exact supported Node version.
 **Acceptance criteria:**
 
-- [ ] Anti-slop violations fail `pnpm run lint` or a root validation command.
-- [ ] ESLint still supplies rules Oxlint does not replace.
-- [ ] CI runs the complete test suite after type checking and linting.
+- [x] Anti-slop violations fail `pnpm run lint` or `pnpm run check:duplicates`.
+- [x] ESLint still supplies rules Oxlint does not replace.
+- [x] CI runs the complete test suite after type checking, linting, and duplicate detection.
 
 ## 7. Design Principles And Constraints
 
@@ -311,9 +311,9 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Exit criteria:**
 
-- [ ] No placeholder, tautological, same-path parity, enum-value, constant-value, schema-definition, or historical non-feature test remains.
-- [ ] Every retained negative assertion has a documented current security, privacy, interoperability, accessibility, or state-machine reason visible in the test name.
-- [ ] Deleted tests are not replaced solely to maintain count or coverage.
+- [x] No placeholder, tautological, same-path parity, enum-value, constant-value, schema-definition, or historical non-feature test remains.
+- [x] Every retained negative assertion has a documented current security, privacy, interoperability, accessibility, or state-machine reason visible in the test name.
+- [x] Deleted tests are not replaced solely to maintain count or coverage.
 
 **Can run in parallel:**
 
@@ -347,10 +347,10 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Exit criteria:**
 
-- [ ] `rg "vi\.(mock|doMock)|jest\.(mock|doMock)" apps/web` returns no application-test matches.
-- [ ] Production defaults compose real implementations at one visible composition boundary.
-- [ ] No test-only global registry, service locator, or mutable singleton replaces module mocking.
-- [ ] Mock setup is smaller than the behavior under test and uses typed interfaces.
+- [x] `rg "vi\.(mock|doMock)|jest\.(mock|doMock)" apps/web` returns no application-test matches.
+- [x] Production defaults compose real implementations at one visible composition boundary.
+- [x] No test-only global registry, service locator, or mutable singleton replaces module mocking.
+- [x] Mock setup is smaller than the behavior under test and uses typed interfaces.
 
 **Can run in parallel:**
 
@@ -384,12 +384,12 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Exit criteria:**
 
-- [ ] No duplicate `readString`, `readPositiveInteger`, `readTimestamp`, or `isRecord` helper remains in application feature code.
-- [ ] Application-owned I/O boundaries return named parsed types, not `unknown`.
-- [ ] `Reflect.get` and `Reflect.apply` have no application-source matches.
-- [ ] Chained assertions have no matches.
-- [ ] Direct `typeof window`/`document` runtime detection exists only in the approved environment owner, or has no matches if TanStack environment functions can be made test-safe.
-- [ ] Defaults on corrupt input are deliberate and covered by one meaningful boundary test.
+- [x] No duplicate `readString`, `readPositiveInteger`, `readTimestamp`, or `isRecord` helper remains in application feature code.
+- [x] Application-owned I/O boundaries return named parsed types, not `unknown`.
+- [x] `Reflect.get` and `Reflect.apply` have no application-source matches.
+- [x] Chained assertions have no matches.
+- [x] Direct `typeof window`/`document` runtime detection exists only in the approved environment owner.
+- [x] Defaults on corrupt input are deliberate and covered by one meaningful boundary test.
 
 **Can run in parallel:**
 
@@ -405,19 +405,19 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Scope:**
 
-- [ ] Scope `fake-indexeddb/auto` to `persistent-collection.test.ts` and any storage suite that truly needs IndexedDB.
-- [ ] Ensure every Dexie test closes and deletes its randomly named database in `afterEach`/`finally`, including failure paths.
-- [ ] Keep `flushPendingUpdates()` as the deterministic debounce seam; do not wait for real 300 ms timers.
-- [ ] In `chat-input-editor.test.tsx`, move serialization, mention hydration, macro tokenization, and click metadata into existing pure editor modules where possible. Keep only interaction behavior requiring DOM composition.
-- [ ] If Tiptap geometry remains necessary, expose one production adapter for platform geometry rather than duplicating `Object.defineProperty` patches in tests. Do not add a broad test-utils helper solely to conceal jsdom limitations.
-- [ ] Replace unnecessary `waitFor` with direct `findByRole` or awaited user interactions; retain waits only for actual asynchronous state transitions.
-- [ ] Use `afterEach(vi.restoreAllMocks)` only in suites that create spies; do not add a global mock reset that masks leaked state.
+- [x] Scope fake IndexedDB to the database suite that needs it through explicit Dexie dependencies rather than a global auto installer.
+- [x] Ensure every Dexie test closes and deletes its randomly named database in `afterEach`/`finally`, including failure paths.
+- [x] Keep `flushPendingUpdates()` as the deterministic debounce seam; do not wait for real 300 ms timers.
+- [x] In `chat-input-editor.test.tsx`, move serialization, mention hydration, macro tokenization, and click metadata into existing pure editor modules where possible. Keep only interaction behavior requiring DOM composition.
+- [x] Remove the unnecessary Tiptap geometry emulation from retained editor interaction tests.
+- [x] Replace unnecessary `waitFor` with direct `findByRole` or awaited user interactions; retain waits only for actual asynchronous state transitions.
+- [x] Use `afterEach(vi.restoreAllMocks)` only in suites that create spies; do not add a global mock reset that masks leaked state.
 
 **Exit criteria:**
 
-- [ ] No suite relies on real debounce delays, current wall-clock ordering, network access, or shared persistent database names.
-- [ ] No global browser/IndexedDB patch is installed for unrelated pure tests.
-- [ ] Repeated complete runs from Phase 0 remain green.
+- [x] No suite relies on real debounce delays, current wall-clock ordering, network access, or shared persistent database names.
+- [x] No global browser/IndexedDB patch is installed for unrelated pure tests.
+- [x] Repeated complete runs from Phase 0 remain green.
 
 **Can run in parallel:**
 
@@ -433,24 +433,24 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Scope:**
 
-- [ ] Add pinned [`jscpd`](https://github.com/kucherenko/jscpd) as a root dev dependency and create `.jscpd.json` targeting application and test TypeScript/TSX.
-- [ ] Start with a diagnostic scan using `mild` mode and a meaningful floor such as eight lines and 70 tokens. Review the actual report before freezing these values; smaller fragments usually create extraction pressure without demonstrating copy/paste design debt.
-- [ ] Exclude `node_modules`, build output, generated route code, agent assets, and `tools/oxlint/anti-slop`. Do not exclude `apps/web/src`, tests, UI components, or a feature directory because it reports clones.
-- [ ] Classify every reported clone as: extract one owned abstraction, replace with Zod/Lodash/existing utility, delete low-value duplicated test setup, or intentional generated/vendor content that deserves a narrow configuration exclusion.
-- [ ] After remediation, set the duplication threshold to zero for blocks above the configured size. If a reviewed intentional application clone remains, document the exact pair and rationale rather than raising a broad percentage budget.
-- [ ] Add `check:duplicates` to root scripts and CI. Keep it separate from file-scoped lint-staged because clone detection needs the repository corpus.
-- [ ] Add pinned `oxlint` and `@oxlint/plugins` root dev dependencies and update `pnpm-lock.yaml`.
-- [ ] Vendor the reviewed anti-slop rules under `tools/oxlint/anti-slop/`. Rename the upstream `index.ts` entry point to `plugin.ts` to comply with repository rules and use explicit imports rather than re-exports.
-- [ ] Add root `oxlint.config.ts` with explicit ignores for generated code, agent assets, and the vendored plugin source.
-- [ ] Enable native correctness/suspicious rules and the high-signal anti-slop rules listed in Section 5.
-- [ ] Modify or scope `no-unknown-parameters` and `no-runtime-typeof` to application boundary code. Permit genuine `cause`/catch inputs and environment detection while requiring immediate parsing of external values.
-- [ ] Add `tenzo/no-direct-runtime-detection` and allow the chosen environment owner only. Include accepted tests for imports/adapter calls and rejected tests for direct browser-global presence checks.
-- [ ] Add `tenzo/no-trivial-test-assertion`. Add `tenzo/no-ad-hoc-unknown-reader` only if its focused fixtures demonstrate a low-false-positive signal; otherwise rely on the more precise upstream type-evidence rules and duplicate detector.
-- [ ] Reject `no-shape-in-symbol-names` for this repository or modify it to target misleading type-container suffixes without rejecting cropper shape or Zod `.shape`.
-- [ ] Evaluate every conditional empty-object spread. Replace it with a typed direct property, Zod transform, or `pickBy` only when omission semantics remain correct; otherwise tune the rule rather than adding a disable comment at each valid site.
-- [ ] Add `lint:eslint` and `lint:oxlint` scripts, with root `lint` running both side by side. Do not configure Oxlint merely as an ESLint pre-pass or use one tool's success to skip the other.
-- [ ] Add Oxlint to lint-staged only if the full configured run remains fast and file-scoped execution loads the local plugin reliably.
-- [ ] Configure unused-disable reporting so suppressions cannot silently outlive their justification.
+- [x] Add pinned [`jscpd`](https://github.com/kucherenko/jscpd) as a root dev dependency and create `.jscpd.json` targeting application and test TypeScript/TSX.
+- [x] Run the diagnostic in `mild` mode at eight lines and 70 tokens and freeze the reviewed floor.
+- [x] Exclude only dependencies, build output, generated route code, agent assets, and vendored anti-slop source.
+- [x] Classify and remediate every reported clone through an owned abstraction or smaller test composition.
+- [x] Set the duplication threshold to zero after remediation.
+- [x] Add `check:duplicates` to root scripts and CI.
+- [x] Add pinned `oxlint` and `@oxlint/plugins` root dev dependencies and update `pnpm-lock.yaml`.
+- [x] Vendor reviewed anti-slop rules under `tools/oxlint/anti-slop/` with `plugin.ts` and explicit imports.
+- [x] Add root `oxlint.config.ts` with narrow explicit ignores.
+- [x] Enable native correctness/suspicious rules and the high-signal tailored anti-slop rules.
+- [x] Scope `no-unknown-parameters` and `no-runtime-typeof` to boundary-like values while permitting genuine catches, callbacks, and bounded normalization.
+- [x] Add and fixture-test `tenzo/no-direct-runtime-detection` with the selected environment owner allowed.
+- [x] Add `tenzo/no-trivial-test-assertion`; reject `no-ad-hoc-unknown-reader` because no stable low-false-positive AST signal was demonstrated.
+- [x] Reject `no-shape-in-symbol-names`; cropper shape and Zod `.shape` are accepted fixtures.
+- [x] Review conditional empty-object spreads and defer the generic rule because current occurrences preserve intentional omission semantics.
+- [x] Add `lint:eslint` and `lint:oxlint`, with root `lint` running both side by side.
+- [x] Keep Oxlint out of file-scoped lint-staged; the full root run is fast and the plugin is corpus-configured.
+- [x] Configure unused-disable reporting while keeping ESLint directives owned by ESLint.
 
 **Files added or changed:**
 
@@ -465,12 +465,12 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Exit criteria:**
 
-- [ ] Oxlint rejects a temporary fixture containing a module mock, reflective access, chained assertion, unsafe dictionary, and undocumented non-const assertion.
-- [ ] Oxlint rejects direct runtime detection outside its owner while accepting imports of the shared source and reviewed catch/error boundaries.
-- [ ] Legitimate cropper `shape` and Zod `.shape` are not reported.
-- [ ] The duplicate scan reports zero unreviewed blocks above the configured line/token floor and fails when a temporary cross-file clone is introduced.
-- [ ] ESLint and Oxlint both pass without broad application-directory ignores.
-- [ ] There are no unexplained inline disables.
+- [x] Oxlint rejects a fixture containing a module mock, reflective access, chained assertion, unsafe dictionary, and undocumented non-const assertion.
+- [x] Oxlint rejects direct runtime detection outside its owner while accepting shared-owner imports and reviewed catch/error boundaries.
+- [x] Legitimate cropper `shape` and Zod `.shape` are not reported.
+- [x] The duplicate scan reports zero unreviewed blocks above the configured line/token floor and fails when a cross-file clone is introduced.
+- [x] ESLint and Oxlint both pass without broad application-directory ignores.
+- [x] There are no unexplained inline disables; ESLint validates its 31 scoped directives and Oxlint reports its own unused directives.
 
 **Can run in parallel:**
 
@@ -486,16 +486,16 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 **Scope:**
 
-- [ ] Run type checking, ESLint, Oxlint, duplicate detection, the complete test suite, and production build on the exact pinned Node version.
-- [ ] Run the complete test suite three consecutive times after all fixes; use deterministic shuffle/seed support if Vitest provides it and record the seed.
-- [ ] Search for banned patterns and classify any intentional exceptions in this roadmap.
-- [ ] Record before/after counts for test files, tests, module mocks, duplicate blocks, duplicate readers, direct runtime checks, Reflect calls, chained assertions, and lint suppressions.
-- [ ] Update this roadmap's checkboxes, evidence, status, audit index, and archive location when complete.
+- [x] Run type checking, ESLint, Oxlint, duplicate detection, the complete test suite, and production build on Node 26.5.0.
+- [x] Run the complete test suite three consecutive times after the final isolation fix; Vitest ran deterministically without shuffle, with 61 files and 259 tests passing each time.
+- [x] Search for banned patterns and classify the single direct runtime check as the approved environment owner.
+- [x] Record before/after counts below.
+- [x] Update this roadmap's checkboxes, evidence, status, audit index, and archive location.
 
 **Exit criteria:**
 
-- [ ] All acceptance criteria pass with recorded command evidence.
-- [ ] The roadmap describes shipped truth and can be archived.
+- [x] All acceptance criteria pass with recorded command evidence.
+- [x] The roadmap describes shipped truth and can be archived.
 
 **Can run in parallel:**
 
@@ -509,52 +509,52 @@ ESLint (framework/style/accessibility) + Oxlint (correctness/anti-slop)
 
 ### Product behavior
 
-- [ ] Current character creation, editing, assistant, import/export, backup, provider, and persistence behavior remains intact except explicitly removed obsolete compatibility.
-- [ ] Meaningful privacy, credential, format, conflict, and migration safeguards remain covered.
+- [x] Current character creation, editing, assistant, import/export, backup, provider, and persistence behavior remains intact except explicitly removed obsolete compatibility.
+- [x] Meaningful privacy, credential, format, conflict, and migration safeguards remain covered.
 
 ### API and contracts
 
-- [ ] External and persisted values are parsed at their first application-owned boundary.
-- [ ] Boundary functions return named schema-derived or domain types.
-- [ ] Dependencies used by tests are explicit real interfaces composed with production defaults.
-- [ ] There is no generic shared unknown-value reader module.
-- [ ] Browser/runtime detection has one source of truth and direct checks elsewhere are lint errors.
+- [x] External and persisted values are parsed at their first application-owned boundary.
+- [x] Boundary functions return named schema-derived or domain types.
+- [x] Dependencies used by tests are explicit real interfaces composed with production defaults.
+- [x] There is no generic shared unknown-value reader module.
+- [x] Browser/runtime detection has one source of truth and direct checks elsewhere are lint errors.
 
 ### Persistence
 
-- [ ] Supported stored settings, cards, sessions, and collections parse through explicit schemas.
-- [ ] Unsupported obsolete formats are removed together with their compatibility branches and historical tests.
-- [ ] Database tests clean up their own isolated state.
+- [x] Supported stored settings, cards, sessions, and collections parse through explicit schemas.
+- [x] Unsupported obsolete formats are removed together with their compatibility branches and historical tests.
+- [x] Database tests clean up their own isolated state.
 
 ### UI/UX
 
-- [ ] Retained component tests cover interactions, accessibility, and state transitions rather than static rendering or historical absence.
-- [ ] Rich-editor behavior is tested at the lowest faithful layer.
+- [x] Retained component tests cover interactions, accessibility, and state transitions rather than static rendering or historical absence.
+- [x] Rich-editor behavior is tested at the lowest faithful layer.
 
 ### Testing
 
-- [ ] No module mocks remain.
-- [ ] No placeholder, enum-value, constant-value, generated-code, migration-definition, or same-path parity tests remain.
-- [ ] The full suite passes three consecutive times on the pinned runtime.
-- [ ] CI runs the complete suite.
+- [x] No module mocks remain.
+- [x] No placeholder, enum-value, constant-value, generated-code, migration-definition, or same-path parity tests remain.
+- [x] The full suite passes three consecutive times on the pinned runtime.
+- [x] CI runs the complete suite.
 
 ### Duplication
 
-- [ ] Repository-wide duplicate detection scans production and test TypeScript/TSX.
-- [ ] No unreviewed duplicate block remains above the configured minimum lines/tokens.
-- [ ] Generated/vendor exclusions are narrow and listed in `.jscpd.json`.
-- [ ] Duplication cleanup does not introduce generic abstractions shared only by coincidentally similar code.
+- [x] Repository-wide duplicate detection scans production and test TypeScript/TSX.
+- [x] No unreviewed duplicate block remains above the configured minimum lines/tokens.
+- [x] Generated/vendor exclusions are narrow and listed in `.jscpd.json`.
+- [x] Duplication cleanup does not introduce generic abstractions shared only by coincidentally similar code.
 
 ### Observability
 
-- [ ] Importing application logging from Vitest yields a valid logger composition.
-- [ ] Tests do not assert `tslog` formatting or third-party transport behavior; feature tests may assert application-owned redaction and event shape through an injected logger contract.
+- [x] Importing application logging from Vitest yields a valid logger composition.
+- [x] Tests do not assert `tslog` formatting or third-party transport behavior; feature tests assert application-owned redaction and event shape through an injected logger contract.
 
 ### Documentation and rollout
 
-- [ ] Oxlint and the tailored anti-slop rules are documented in this roadmap and executable through root scripts.
-- [ ] ESLint and Oxlint both run side by side through root scripts and CI.
-- [ ] No compatibility or dual-lint suppression layer remains after verification.
+- [x] Oxlint and the tailored anti-slop rules are documented in this roadmap and executable through root scripts.
+- [x] ESLint and Oxlint both run side by side through root scripts and CI.
+- [x] No compatibility or dual-lint suppression layer remains after verification.
 
 ## 11. Verification Plan
 
@@ -667,20 +667,42 @@ Introduce Oxlint side by side with ESLint after the initial violations are remov
 **Rationale:** It is unrelated to the observed slop patterns and would mix a tooling migration with behavioral test and boundary refactors.
 **Effect on roadmap:** ESLint remains required.
 
-## 15. Archive Checklist
+## 15. Completion Evidence
 
-- [ ] Status is `Completed and aligned`, `Historical`, `Superseded on purpose`, or `Rejected`.
-- [ ] Current repository state is accurate.
-- [ ] Shipped work is linked.
-- [ ] Remaining work is moved to another roadmap or explicitly deferred.
-- [ ] Acceptance criteria are complete or intentionally narrowed.
-- [ ] Static, test, and repeated-run verification evidence is recorded.
-- [ ] The roadmap reads as shipped history rather than active implementation guidance.
+| Metric | Audited baseline | Completed |
+| --- | ---: | ---: |
+| Test files | 62 | 61 |
+| Tests | 266 | 259 |
+| Module mocks | 33 across 14 files | 0 |
+| Duplicate blocks at 8 lines / 70 tokens | 12 in the first configured scan | 0 |
+| Duplicate named readers | 5 named reader definitions across audited boundaries | 0 |
+| Direct browser runtime checks | 5 audited locations | 1 approved owner (`utils/ssr-helpers.ts`) |
+| `Reflect.get` / `Reflect.apply` | approximately 46 | 0 |
+| Chained assertions | 9 | 0 |
+| Scoped lint directives | not recorded in the initial audit | 31, all validated by ESLint |
 
-## 16. Changelog
+Final evidence on 2026-08-19, Node 26.5.0:
+
+- `pnpm run check-types`, `pnpm run lint`, `pnpm run check:duplicates`, and `pnpm run build` passed.
+- The tailored Oxlint accepted/rejected fixture harness passed.
+- Three consecutive `pnpm run test` executions passed with 61 files and 259 tests each after Dexie received explicit fake IndexedDB dependencies.
+- Banned-pattern searches returned zero module mocks, duplicate readers, reflective calls, and chained assertions. The only direct `typeof window` check is the approved runtime owner.
+
+## 16. Archive Checklist
+
+- [x] Status is `Completed and aligned`.
+- [x] Current repository state is accurate.
+- [x] Shipped work is linked through the implementation PR.
+- [x] No remaining implementation work exists; the generic conditional-spread rule and full ESLint migration are deliberately rejected/deferred decisions, not backlog.
+- [x] Acceptance criteria are complete.
+- [x] Static, test, and repeated-run verification evidence is recorded.
+- [x] The roadmap reads as shipped history rather than active implementation guidance.
+
+## 17. Changelog
 
 | Date       | Change                                                                                                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-08-18 | Created after auditing the anti-slop rules, all discovered test files, module-mock usage, boundary helpers, current lint/CI configuration, and the failing full-suite baseline. |
 | 2026-08-18 | Added repository-wide clone detection, one runtime-environment source of truth, local Oxlint architectural rules, and an explicit side-by-side ESLint/Oxlint rollout.           |
 | 2026-08-18 | Completed Phase 0 on Node 26.5.0: restored import-safe logging, aligned local and CI runtimes, added CI tests, and passed three complete 62-file/266-test runs.                 |
+| 2026-08-19 | Completed Phases 1-6: removed low-evidence tests and module mocks, established typed boundaries, isolated browser-backed tests, enforced tailored Oxlint and zero-clone checks, and passed final integration. |

@@ -7,6 +7,7 @@ Repository scope: single-product TanStack Start app in `apps/web`; backend/share
 | Slug | Title | Status | Priority | Last Updated |
 | ---- | ----- | ------ | -------- | ------------ |
 | character-card-creator | Character Card Creator Web App | Active backlog | P1 | 2026-07-05 |
+| local-observability | Local SSR Error Observability | Active backlog | P1 | 2026-08-18 |
 
 ## Archived Roadmaps
 

@@ -1,4 +1,4 @@
-import { QueryCache, QueryClient } from '@tanstack/react-query';
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 
@@ -6,7 +6,20 @@ import { ErrorBoundary } from './components/error-boundary';
 import { NotFound } from './components/not-found';
 import PseudoPage from './components/pseudo-page';
 import { INTERVALS } from './constants/dates';
+import { loggerFactory } from './lib/logging/logger';
 import { routeTree } from './routeTree.gen';
+
+const routerLogger = loggerFactory.getLogger('router');
+const queryLogger = loggerFactory.getLogger('react-query');
+
+function getOperationIdentifier(key: readonly unknown[] | undefined) {
+  const candidate = key?.[0];
+
+  if (typeof candidate === 'string') return candidate.slice(0, 120);
+  if (typeof candidate === 'number' && Number.isFinite(candidate)) return String(candidate);
+
+  return undefined;
+}
 
 export const getRouter = () => {
   const queryClient = new QueryClient({
@@ -22,7 +35,18 @@ export const getRouter = () => {
         refetchInterval: INTERVALS.THIRTY_MINUTES, // 30 minutes
       },
     },
-    queryCache: new QueryCache(),
+    queryCache: new QueryCache({
+      onError: (error, query) => {
+        const operation = getOperationIdentifier(query.queryKey);
+        queryLogger.error('Query failed', error, operation ? { operation } : undefined);
+      },
+    }),
+    mutationCache: new MutationCache({
+      onError: (error, _variables, _onMutateResult, mutation) => {
+        const operation = getOperationIdentifier(mutation.options.mutationKey);
+        queryLogger.error('Mutation failed', error, operation ? { operation } : undefined);
+      },
+    }),
   });
 
   const router = createTanStackRouter({
@@ -34,6 +58,14 @@ export const getRouter = () => {
     defaultPendingComponent: PseudoPage,
     defaultNotFoundComponent: NotFound,
     defaultErrorComponent: ErrorBoundary,
+    defaultOnCatch: (error, errorInfo) => {
+      const componentStack = errorInfo.componentStack?.trim();
+      routerLogger.error(
+        'Router caught an error',
+        error,
+        componentStack ? { componentStack: componentStack.slice(0, 2_000) } : undefined,
+      );
+    },
   });
 
   setupRouterSsrQueryIntegration({ router, queryClient });

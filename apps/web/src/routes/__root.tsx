@@ -4,6 +4,7 @@ import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanst
 import { NuqsAdapter } from 'nuqs/adapters/tanstack-router';
 
 import { AiDevtools } from '@~/components/ai-devtools';
+import { ClientErrorObserver } from '@~/components/client-error-observer';
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';
 import { ThemeProvider } from '@~/components/themes/theme-provider';
 import ToasterContainer from '@~/components/toastifications/toaster-container';
@@ -70,6 +71,7 @@ function RootComponent() {
             </MigrationGate>
           </NuqsAdapter>
         </ThemeProvider>
+        <ClientErrorObserver />
         <Scripts />
       </body>
     </html>

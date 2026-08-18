@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { z } from 'zod';
 
-import { createEmptyCharacterLibraryItem } from '../features/character-creator/lib/cards/character-library';
 import { loggerFactory } from '../lib/logging/logger';
 import { initializeApplicationCollections } from './collections/initialize-collections';
 import { applicationDatabase } from './database';
+import { createMigrationGateService } from './migration-gate-service';
+import type { iMigrationGateService } from './migration-gate-service';
 import { downloadMigrationBackup, getPendingMigrations, runMigrations } from './migrations';
 import type { ApplicationMigration } from './migrations';
 
@@ -16,26 +17,21 @@ const MIGRATION_LOGGER = loggerFactory.getLogger('database.migrations');
 
 interface iMigrationGateProps {
   children: ReactNode;
+  service?: iMigrationGateService;
 }
 
-let initializationPromise: Promise<readonly ApplicationMigration[]> | null = null;
-
-async function inspectMigrations() {
-  initializationPromise ??= getPendingMigrations();
-  return initializationPromise;
+interface iMigrationShellProps {
+  children: ReactNode;
 }
 
-async function finishInitialization(pendingMigrations: readonly ApplicationMigration[]) {
-  await runMigrations(pendingMigrations);
+const DEFAULT_MIGRATION_GATE_SERVICE = createMigrationGateService({
+  migrationRepository: { getPendingMigrations, runMigrations },
+  backup: { download: downloadMigrationBackup },
+  characterLibrary: applicationDatabase.characterLibrary,
+  collections: { initialize: initializeApplicationCollections },
+});
 
-  if ((await applicationDatabase.characterLibrary.count()) === 0) {
-    await applicationDatabase.characterLibrary.add(createEmptyCharacterLibraryItem());
-  }
-
-  await initializeApplicationCollections();
-}
-
-function MigrationShell({ children }: iMigrationGateProps) {
+function MigrationShell({ children }: iMigrationShellProps) {
   return (
     <main className="grid min-h-svh place-items-center bg-background px-6 text-foreground">
       <section className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 shadow-xl">{children}</section>
@@ -43,7 +39,7 @@ function MigrationShell({ children }: iMigrationGateProps) {
   );
 }
 
-export function MigrationGate({ children }: iMigrationGateProps) {
+export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVICE }: iMigrationGateProps) {
   const [status, setStatus] = useState<MigrationGateStatus>(MIGRATION_GATE_STATUSES.checking);
   const [pendingMigrations, setPendingMigrations] = useState<readonly ApplicationMigration[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -58,7 +54,7 @@ export function MigrationGate({ children }: iMigrationGateProps) {
   const initialize = useCallback(async () => {
     MIGRATION_LOGGER.debug('Local database initialization started', { operation: 'initialize' });
     try {
-      const migrations = await inspectMigrations();
+      const migrations = await service.inspectMigrations();
       setPendingMigrations(migrations);
       MIGRATION_LOGGER.debug('Pending migrations inspected', {
         operation: 'inspect-migrations',
@@ -73,7 +69,7 @@ export function MigrationGate({ children }: iMigrationGateProps) {
       }
 
       setStatus(MIGRATION_GATE_STATUSES.running);
-      await finishInitialization(migrations);
+      await service.initialize(migrations);
       setStatus(MIGRATION_GATE_STATUSES.ready);
       MIGRATION_LOGGER.debug('Local database initialization completed', {
         operation: 'initialize',
@@ -84,7 +80,7 @@ export function MigrationGate({ children }: iMigrationGateProps) {
       setErrorMessage(error instanceof Error ? error.message : 'The local database could not be prepared.');
       setStatus(MIGRATION_GATE_STATUSES.error);
     }
-  }, []);
+  }, [service]);
 
   useEffect(() => {
     if (hasStartedRef.current) {
@@ -98,7 +94,7 @@ export function MigrationGate({ children }: iMigrationGateProps) {
   const handleDownloadBackup = useCallback(async () => {
     MIGRATION_LOGGER.debug('Migration backup download started', { operation: 'download-backup' });
     try {
-      await downloadMigrationBackup();
+      await service.downloadBackup();
       setHasDownloadedBackup(true);
       MIGRATION_LOGGER.debug('Migration backup download completed', { operation: 'download-backup' });
     } catch (error) {
@@ -106,7 +102,7 @@ export function MigrationGate({ children }: iMigrationGateProps) {
       setErrorMessage(error instanceof Error ? error.message : 'The backup could not be downloaded.');
       setStatus(MIGRATION_GATE_STATUSES.error);
     }
-  }, []);
+  }, [service]);
 
   const handleRunDestructiveMigrations = useCallback(async () => {
     if (!hasDownloadedBackup) {
@@ -120,7 +116,7 @@ export function MigrationGate({ children }: iMigrationGateProps) {
         migrationCount: pendingMigrations.length,
         migrationIds: pendingMigrations.map((migration) => migration.id),
       });
-      await finishInitialization(pendingMigrations);
+      await service.initialize(pendingMigrations);
       setStatus(MIGRATION_GATE_STATUSES.ready);
       MIGRATION_LOGGER.debug('Destructive migrations completed', {
         operation: 'run-migrations',
@@ -135,7 +131,7 @@ export function MigrationGate({ children }: iMigrationGateProps) {
       setErrorMessage(error instanceof Error ? error.message : 'The local database migration failed.');
       setStatus(MIGRATION_GATE_STATUSES.error);
     }
-  }, [hasDownloadedBackup, pendingMigrations]);
+  }, [hasDownloadedBackup, pendingMigrations, service]);
 
   if (status === MIGRATION_GATE_STATUSES.ready) {
     return <>{children}</>;

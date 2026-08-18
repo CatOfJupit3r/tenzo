@@ -18,12 +18,25 @@ import { useCharacterCreatorActions } from '../context/character-creator-context
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
 import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
+import type { iCharacterLibraryItem } from '../lib/cards/character-library';
 
-export function CharacterSwitcher() {
-  const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
-  const { activeCharacterId } = useCharacterCreatorContext();
-  const { handleCreateCharacter, handleRemoveCharacter, handleSelectCharacter } = useCharacterCreatorActions();
+export interface iCharacterSwitcherViewProps {
+  characterLibrary: readonly iCharacterLibraryItem[];
+  activeCharacterId: string;
+  isCharacterLibraryReady: boolean;
+  onCreateCharacter: () => unknown;
+  onRemoveCharacter: (id: string) => Promise<unknown>;
+  onSelectCharacter: (id: string) => unknown;
+}
 
+export function CharacterSwitcherView({
+  characterLibrary,
+  activeCharacterId,
+  isCharacterLibraryReady,
+  onCreateCharacter,
+  onRemoveCharacter,
+  onSelectCharacter,
+}: iCharacterSwitcherViewProps) {
   return (
     <nav aria-label="Characters" className="border-b bg-background/75 px-3 py-2 backdrop-blur-sm">
       <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-0.5">
@@ -47,7 +60,7 @@ export function CharacterSwitcher() {
                 type="button"
                 aria-current={isActiveCharacter ? 'true' : undefined}
                 className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-md text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                onClick={() => handleSelectCharacter(character.id)}
+                onClick={() => onSelectCharacter(character.id)}
               >
                 <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted/30">
                   {character.portrait?.thumbnailDataUrl ? (
@@ -83,7 +96,7 @@ export function CharacterSwitcher() {
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={async () => {
-                        await handleRemoveCharacter(character.id);
+                        await onRemoveCharacter(character.id);
                       }}
                     >
                       Delete
@@ -98,7 +111,7 @@ export function CharacterSwitcher() {
           type="button"
           variant="ghost"
           className="h-14 min-w-40 shrink-0 justify-start border border-dashed"
-          onClick={handleCreateCharacter}
+          onClick={onCreateCharacter}
         >
           <span className="flex size-9 items-center justify-center rounded-md border border-dashed">
             <LuPlus className="size-4" />
@@ -107,5 +120,22 @@ export function CharacterSwitcher() {
         </Button>
       </div>
     </nav>
+  );
+}
+
+export function CharacterSwitcher() {
+  const { characterLibrary, isCharacterLibraryReady } = useCharacterLibraryList();
+  const { activeCharacterId } = useCharacterCreatorContext();
+  const { handleCreateCharacter, handleRemoveCharacter, handleSelectCharacter } = useCharacterCreatorActions();
+
+  return (
+    <CharacterSwitcherView
+      characterLibrary={characterLibrary}
+      activeCharacterId={activeCharacterId}
+      isCharacterLibraryReady={isCharacterLibraryReady}
+      onCreateCharacter={handleCreateCharacter}
+      onRemoveCharacter={handleRemoveCharacter}
+      onSelectCharacter={handleSelectCharacter}
+    />
   );
 }

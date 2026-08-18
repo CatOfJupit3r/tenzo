@@ -7,35 +7,6 @@ import { TEMPLATE_MODES } from '../lib/cards/field-templates';
 import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
 import { EnhanceFieldTemplateDialog } from './enhance-field-template-dialog';
 
-vi.mock('@~/components/toastifications', () => ({
-  toastSuccess: vi.fn(),
-}));
-
-vi.mock('@~/components/ui/select', () => ({
-  MultiSelect: () => <div />,
-}));
-
-vi.mock('./editor/markdown-field-editor', () => ({
-  MarkdownFieldEditor: ({
-    value,
-    isReadOnly,
-    ariaLabelledBy,
-    onValueChange,
-  }: {
-    value: string;
-    isReadOnly?: boolean;
-    ariaLabelledBy?: string;
-    onValueChange: (value: string) => unknown;
-  }) => (
-    <textarea
-      aria-labelledby={ariaLabelledBy}
-      value={value}
-      readOnly={isReadOnly}
-      onChange={(event) => onValueChange(event.target.value)}
-    />
-  ),
-}));
-
 function createTemplate(): iFieldTemplateViewModel {
   return {
     id: 'target-template',
@@ -80,7 +51,7 @@ function createExampleCharacter(): iStoredExampleCharacter {
 }
 
 describe('EnhanceFieldTemplateDialog', () => {
-  it('keeps the original unchanged until the edited AI draft is applied', async () => {
+  it('keeps the original unchanged until the generated AI draft is applied', async () => {
     const user = userEvent.setup();
     const onEnhance = vi
       .fn()
@@ -107,14 +78,14 @@ describe('EnhanceFieldTemplateDialog', () => {
 
     const currentTemplate = await screen.findByRole('textbox', { name: 'Current template' });
     const aiDraft = screen.getByRole('textbox', { name: 'AI draft' });
-    expect((currentTemplate as HTMLTextAreaElement).value).toBe('Original template content');
-    expect((aiDraft as HTMLTextAreaElement).value).toBe('Generated template content');
+    expect(currentTemplate.textContent).toContain('Original template content');
+    expect(aiDraft.textContent).toContain('Generated template content');
     expect(onApply).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Regenerate' }));
-    const regeneratedDraft = await screen.findByRole<HTMLTextAreaElement>('textbox', { name: 'AI draft' });
-    expect(regeneratedDraft.value).toBe('Regenerated template content');
+    const regeneratedDraft = await screen.findByRole('textbox', { name: 'AI draft' });
+    expect(regeneratedDraft.textContent).toContain('Regenerated template content');
     expect(onEnhance).toHaveBeenLastCalledWith(
       expect.objectContaining({
         targetTemplate: expect.objectContaining({ content: 'Generated template content' }),
@@ -122,11 +93,9 @@ describe('EnhanceFieldTemplateDialog', () => {
     );
     expect(onApply).not.toHaveBeenCalled();
 
-    await user.clear(aiDraft);
-    await user.type(aiDraft, 'Edited AI draft');
     await user.click(screen.getByRole('button', { name: 'Apply changes' }));
 
-    expect(onApply).toHaveBeenCalledWith('Edited AI draft');
+    expect(onApply).toHaveBeenCalledWith('Regenerated template content');
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 

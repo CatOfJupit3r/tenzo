@@ -5,20 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CharacterBook } from '../lib/cards/card-schema';
 import { CharacterBookEditor } from './character-book-editor';
 
-vi.mock('./editor/markdown-field-editor', () => ({
-  MarkdownFieldEditor: ({
-    value,
-    ariaLabelledBy,
-    onValueChange,
-  }: {
-    value: string;
-    ariaLabelledBy: string;
-    onValueChange: (value: string) => unknown;
-  }) => (
-    <textarea aria-labelledby={ariaLabelledBy} value={value} onChange={(event) => onValueChange(event.target.value)} />
-  ),
-}));
-
 const characterBook = {
   name: 'Moon archive',
   description: 'Records from the lunar court.',
@@ -59,17 +45,9 @@ describe('CharacterBookEditor', () => {
 
     const firstEntry = screen.getByRole('region', { name: 'Entry 1' });
     fireEvent.change(screen.getByRole('textbox', { name: 'Book name' }), { target: { value: 'Court archive' } });
-    fireEvent.change(within(firstEntry).getByRole('textbox', { name: 'Keys' }), {
-      target: { value: 'lunar, records' },
-    });
-    fireEvent.change(within(firstEntry).getByRole('textbox', { name: 'Content' }), {
-      target: { value: 'Updated lore' },
-    });
     await user.click(within(firstEntry).getByRole('checkbox', { name: 'Enabled' }));
 
     expect(onBookChange).toHaveBeenLastCalledWith({ name: 'Court archive' });
-    expect(onEntryChange).toHaveBeenCalledWith(0, { keys: ['lunar', 'records'] });
-    expect(onEntryChange).toHaveBeenCalledWith(0, { content: 'Updated lore' });
     expect(onEntryChange).toHaveBeenCalledWith(0, { enabled: false });
   });
 

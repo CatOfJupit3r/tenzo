@@ -3,53 +3,38 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MigrationGate } from './migration-gate';
-
-const migrationMocks = vi.hoisted(() => ({
-  downloadMigrationBackup: vi.fn(async () => undefined),
-  getPendingMigrations: vi.fn(),
-  initializeApplicationCollections: vi.fn(async () => undefined),
-  runMigrations: vi.fn(async () => undefined),
-}));
-
-vi.mock('./migrations', () => ({
-  downloadMigrationBackup: migrationMocks.downloadMigrationBackup,
-  getPendingMigrations: migrationMocks.getPendingMigrations,
-  runMigrations: migrationMocks.runMigrations,
-}));
-
-vi.mock('./collections/initialize-collections', () => ({
-  initializeApplicationCollections: migrationMocks.initializeApplicationCollections,
-}));
-
-vi.mock('./database', () => ({
-  applicationDatabase: {
-    characterLibrary: {
-      add: vi.fn(async () => undefined),
-      count: vi.fn(async () => 1),
-    },
-  },
-}));
+import type { iMigrationGateService } from './migration-gate-service';
+import type { ApplicationMigration } from './migrations';
 
 describe('MigrationGate', () => {
+  let pendingMigrations: readonly ApplicationMigration[];
+  let service: iMigrationGateService;
+  let initialize: iMigrationGateService['initialize'];
+  let downloadBackup: iMigrationGateService['downloadBackup'];
+
   beforeEach(() => {
-    migrationMocks.downloadMigrationBackup.mockClear();
-    migrationMocks.getPendingMigrations.mockReset();
-    migrationMocks.initializeApplicationCollections.mockClear();
-    migrationMocks.runMigrations.mockClear();
+    pendingMigrations = [
+      {
+        id: 'delete-obsolete-records',
+        isDestructive: true,
+        warning: 'Obsolete records will be deleted.',
+        run: async () => undefined,
+      },
+    ];
+    initialize = vi.fn(async (_pendingMigrations: readonly ApplicationMigration[]) => undefined);
+    downloadBackup = vi.fn(async () => undefined);
+    service = {
+      inspectMigrations: vi.fn(async () => pendingMigrations),
+      downloadBackup,
+      initialize,
+    };
   });
 
   it('blocks the product UI and requires a backup before a destructive migration', async () => {
-    const destructiveMigration = {
-      id: 'delete-obsolete-records',
-      isDestructive: true,
-      warning: 'Obsolete records will be deleted.',
-      run: vi.fn(async () => undefined),
-    } as const;
-    migrationMocks.getPendingMigrations.mockResolvedValue([destructiveMigration]);
     const user = userEvent.setup();
 
     render(
-      <MigrationGate>
+      <MigrationGate service={service}>
         <div>Character editor</div>
       </MigrationGate>,
     );
@@ -61,13 +46,13 @@ describe('MigrationGate', () => {
     expect(runButton.disabled).toBe(true);
 
     await user.click(screen.getByRole('button', { name: 'Download data backup' }));
-    expect(migrationMocks.downloadMigrationBackup).toHaveBeenCalledOnce();
+    expect(downloadBackup).toHaveBeenCalledOnce();
     expect(runButton.disabled).toBe(false);
 
     await user.click(runButton);
     await waitFor(() => {
       expect(screen.getByText('Character editor')).toBeTruthy();
     });
-    expect(migrationMocks.runMigrations).toHaveBeenCalledWith([destructiveMigration]);
+    expect(initialize).toHaveBeenCalledWith(pendingMigrations);
   });
 });

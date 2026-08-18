@@ -26,12 +26,12 @@ import {
   EXAMPLE_CHARACTER_CONTEXT_FIELD_LABELS,
   getExampleCharacterDisplayName,
   hasExampleCharacterContextField,
-  toPromptExampleCharacter,
 } from '../lib/cards/example-characters';
 import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/cards/example-characters';
 import { parseTemplateSlots, TEMPLATE_MODES } from '../lib/cards/field-templates';
 import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
 import { MAX_TEMPLATE_ENHANCEMENT_REFERENCE_COUNT } from '../lib/templates/template-enhancement';
+import { buildTemplateEnhancementRequest } from '../lib/templates/template-enhancement-request';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 
 export interface iEnhanceFieldTemplateDialogProps {
@@ -96,21 +96,18 @@ export function EnhanceFieldTemplateDialog({
     setErrorMessage(null);
 
     try {
-      const enhancedContent = await onEnhance({
-        targetTemplate: candidateContent === null ? targetTemplate : { ...targetTemplate, content: candidateContent },
-        shouldIncludeCurrentTemplate,
-        referenceTemplates: selectedTemplateIds.flatMap((templateId) => {
-          const template = fieldTemplates.find((candidate) => candidate.id === templateId);
-          return template ? [template] : [];
+      const enhancedContent = await onEnhance(
+        buildTemplateEnhancementRequest({
+          targetTemplate,
+          candidateContent,
+          shouldIncludeCurrentTemplate,
+          selectedTemplateIds,
+          fieldTemplates,
+          exampleCharacters,
+          selectedExampleFieldKeys,
+          guidance,
         }),
-        exampleCharacters: exampleCharacters.flatMap((exampleCharacter) => {
-          const includedFieldKeys = selectedExampleFieldKeys[exampleCharacter.id] ?? [];
-          return includedFieldKeys.length > 0
-            ? [toPromptExampleCharacter({ ...exampleCharacter, includedFieldKeys })]
-            : [];
-        }),
-        guidance,
-      });
+      );
 
       if (targetTemplate.mode === TEMPLATE_MODES.strict && parseTemplateSlots(enhancedContent).length === 0) {
         throw new Error('The enhanced strict template did not contain any {{gen:label}} slots.');

@@ -1,7 +1,7 @@
 ---
 title: "Local SSR Error Observability"
 slug: "local-observability"
-status: "Active backlog"
+status: "Active implementation"
 roadmap_type: "observability"
 priority: "P1"
 created: "2026-08-18"
@@ -20,7 +20,7 @@ archive_when:
 
 # Local SSR Error Observability
 
-> Status: Active backlog
+> Status: Active implementation
 > Last repo audit: 2026-08-18
 > Current summary: The TanStack Start application has useful error presentation and a few structured diagnostic events, but logging is split across direct `console` calls. Browser failures remain in browser DevTools and do not reliably appear in the local SSR server process console.
 
@@ -218,19 +218,19 @@ Primary references:
 
 **Scope:**
 
-- [ ] Add one pinned `tslog` v5 dependency to `apps/web/package.json` and update the lockfile.
-- [ ] Confirm the installed v5 transport and record types from package declarations rather than coding against README assumptions.
-- [ ] Define the shared logging contracts, schema-backed closed values, reserved metadata, sanitizer, and payload bounds.
-- [ ] Implement the one isomorphic logger construction site and the typed POST server function.
-- [ ] Ensure the server function re-emits through the server branch without client-forwarding recursion.
-- [ ] Decide exact logger call conventions and provide two representative migrated call sites as patterns for workers.
+- [x] Add one pinned `tslog` v5 dependency to `apps/web/package.json` and update the lockfile.
+- [x] Confirm the installed v5 transport and record types from package declarations rather than coding against README assumptions.
+- [x] Define the shared logging contracts, schema-backed closed values, reserved metadata, sanitizer, and payload bounds.
+- [x] Implement the one isomorphic logger construction site and the typed POST server function.
+- [x] Ensure the server function re-emits through the server branch without client-forwarding recursion.
+- [x] Decide exact logger call conventions and provide two representative migrated call sites as patterns for workers.
 
 **Exit criteria:**
 
 - [ ] A deliberate client error can be emitted through the logger and appears once in the server process console.
 - [ ] A server-side call writes directly to the server process console without network forwarding.
-- [ ] Client and server bundles respect the intended environment boundary.
-- [ ] `pnpm run check-types` passes before worker dispatch.
+- [x] Client and server bundles respect the intended environment boundary.
+- [x] `pnpm run check-types` passes before worker dispatch.
 
 **Can run in parallel:**
 
@@ -246,14 +246,14 @@ Primary references:
 
 **Scope:**
 
-- [ ] Dispatch Worker A for framework/client capture integration.
-- [ ] Dispatch Worker B for character-assistant and generation call-site migration.
-- [ ] Keep workers on disjoint writable files and prohibit dependency, lockfile, logger-core, generated-route-tree, and test-file edits.
+- [x] Dispatch Worker A for framework/client capture integration.
+- [x] Dispatch Worker B for character-assistant and generation call-site migration.
+- [x] Keep workers on disjoint writable files and prohibit dependency, lockfile, logger-core, generated-route-tree, and test-file edits.
 
 **Exit criteria:**
 
-- [ ] Both workers return changed-file lists, command evidence, acceptance mappings, and explicit incomplete work.
-- [ ] The orchestrator inspects both diffs and rejects duplicate capture, unsafe metadata, compatibility wrappers, or raw console leftovers.
+- [x] Both workers return changed-file lists, command evidence, acceptance mappings, and explicit incomplete work.
+- [x] The orchestrator inspects both diffs and rejects duplicate capture, unsafe metadata, compatibility wrappers, or raw console leftovers.
 
 **Can run in parallel:**
 
@@ -285,20 +285,20 @@ The root orchestrator retains architecture, shared contracts, dependency changes
 
 **Scope:**
 
-- [ ] Review the full combined diff and resolve conflicts centrally.
-- [ ] Search application source for remaining direct console calls and classify each remaining occurrence.
-- [ ] Check for duplicate reporting between explicit feature logs, Router catch handling, Query callbacks, and browser-global events.
+- [x] Review the full combined diff and resolve conflicts centrally.
+- [x] Search application source for remaining direct console calls and classify each remaining occurrence.
+- [x] Check for duplicate reporting between explicit feature logs, Router catch handling, Query callbacks, and browser-global events.
 - [ ] Manually exercise one server/SSR error, one Router-render error, one rejected browser promise, and one assistant/generation error where practical.
 - [ ] Confirm server output is readable, structured, redacted, and tagged by runtime/component/correlation fields.
-- [ ] Run final type checking, linting, and production build once after all fixes are complete.
-- [ ] Record verification evidence, mark completed items, and archive the roadmap when all criteria pass.
+- [x] Run final type checking, linting, and production build once after all fixes are complete.
+- [x] Record verification evidence and mark completed items. Archive remains pending manual runtime verification.
 
 **Exit criteria:**
 
 - [ ] Browser and server failures appear in the server process console as specified.
-- [ ] No persistence or second observability system was introduced.
-- [ ] No automated tests were added or modified for this work.
-- [ ] Final validation is green.
+- [x] No persistence or second observability system was introduced.
+- [x] No automated tests were added or modified for this work.
+- [x] Final validation is green.
 
 **Can run in parallel:**
 
@@ -448,3 +448,4 @@ The logger should default to useful local console output. Browser forwarding is 
 | Date | Change |
 | --- | --- |
 | 2026-08-18 | Created roadmap after repository audit and TanStack Start execution-boundary review. |
+| 2026-08-18 | Implemented the logger foundation and capture-point migrations in commits `041ac8d`, `4aaf964`, `abe3a29`, and `cae2914`. Workspace type checking, linting, and production build passed; manual runtime scenarios remain pending. The only remaining direct console call is the intentional non-recursive development fallback for a failed client-log forwarding request. |

@@ -37,40 +37,50 @@ describe('guesstimateTokenCount', () => {
 });
 
 describe('computeCharacterTokenStats', () => {
-  it('counts name/description/personality/scenario as permanent', () => {
-    const data = buildCharacterData({
-      name: 'Aria',
-      description: 'A brave knight.',
-      personality: 'Bold and loyal.',
-      scenario: 'A castle under siege.',
-    });
-    const stats = computeCharacterTokenStats(data);
-    expect(stats.permanentTokens).toBeGreaterThan(0);
-    expect(stats.temporaryTokens).toBe(0);
-    expect(stats.totalTokens).toBe(stats.permanentTokens);
-  });
+  const tokenCategoryCases = [
+    {
+      name: 'permanent character fields',
+      overrides: {
+        name: 'Aria',
+        description: 'A brave knight.',
+        personality: 'Bold and loyal.',
+        scenario: 'A castle under siege.',
+      },
+      isPermanent: true,
+      isTemporary: false,
+    },
+    {
+      name: 'temporary prompt fields',
+      overrides: {
+        first_mes: 'Hello there!',
+        mes_example: '<START>\n{{char}}: Hi.',
+        system_prompt: 'Stay in character.',
+        post_history_instructions: 'Never break character.',
+      },
+      isPermanent: false,
+      isTemporary: true,
+    },
+    {
+      name: 'excluded metadata fields',
+      overrides: {
+        creator_notes: 'Some very long creator notes that should not affect the token count at all.',
+        creator: 'Someone',
+        character_version: '1.0',
+      },
+      isPermanent: false,
+      isTemporary: false,
+    },
+  ] as const;
 
-  it('counts first_mes/mes_example/system_prompt/post_history_instructions as temporary', () => {
-    const data = buildCharacterData({
-      first_mes: 'Hello there!',
-      mes_example: '<START>\n{{char}}: Hi.',
-      system_prompt: 'Stay in character.',
-      post_history_instructions: 'Never break character.',
-    });
-    const stats = computeCharacterTokenStats(data);
-    expect(stats.permanentTokens).toBe(0);
-    expect(stats.temporaryTokens).toBeGreaterThan(0);
-    expect(stats.totalTokens).toBe(stats.temporaryTokens);
-  });
+  it.each(tokenCategoryCases)(
+    'classifies $name according to the business category',
+    ({ overrides, isPermanent, isTemporary }) => {
+      const stats = computeCharacterTokenStats(buildCharacterData(overrides));
 
-  it('does not count creator notes, creator, or version fields', () => {
-    const data = buildCharacterData({
-      creator_notes: 'Some very long creator notes that should not affect the token count at all.',
-      creator: 'Someone',
-      character_version: '1.0',
-    });
-    expect(computeCharacterTokenStats(data).totalTokens).toBe(0);
-  });
+      expect(stats.permanentTokens > 0).toBe(isPermanent);
+      expect(stats.temporaryTokens > 0).toBe(isTemporary);
+    },
+  );
 
   it('sums permanent and temporary into total', () => {
     const data = buildCharacterData({

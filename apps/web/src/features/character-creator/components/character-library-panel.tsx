@@ -1,17 +1,6 @@
 import { memo, useCallback, useMemo } from 'react';
-import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuSparkles, LuTrash2, LuUserPen, LuX } from 'react-icons/lu';
+import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuSparkles, LuUserPen, LuX } from 'react-icons/lu';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@~/components/ui/alert-dialog';
 import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
@@ -23,6 +12,7 @@ import { useCharacterLibraryList } from '../hooks/use-character-library-list';
 import type { iCharacterLibraryItem } from '../lib/cards/character-library';
 import { getCharacterLibraryItemDisplayName, getCharacterLibraryItemSummary } from '../lib/cards/character-library';
 import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait/portrait-focal-point';
+import { CharacterDeleteDialog } from './character-delete-dialog';
 
 interface iCharacterLibraryPanelProps {
   isOpen: boolean;
@@ -127,31 +117,12 @@ const CharacterLibraryItem = memo(
           >
             <LuCopy className="size-4" />
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button type="button" size="icon" variant="ghost" aria-label={`Delete ${displayName}`} title="Delete">
-                <LuTrash2 className="size-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete {displayName}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This permanently deletes the character, portrait, and assistant conversation stored in this browser.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={async () => {
-                    await onRemove(character.id);
-                  }}
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <CharacterDeleteDialog
+            displayName={displayName}
+            onRemove={async () => {
+              await onRemove(character.id);
+            }}
+          />
         </div>
       </div>
     );

@@ -11,6 +11,7 @@ import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '.
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';
+import { buildFieldGenerationControlProps } from './field-generation-control-props';
 
 export interface iCustomFieldsProps {
   fields: CustomField[];
@@ -88,32 +89,24 @@ export function CustomFields({
                     }
                   />
                   <FieldGenerationControls
-                    fieldId={`custom-field-${field.id}`}
-                    label={field.label.trim() || 'Custom Field'}
-                    shouldUseGeneralCharacterIdea={generationState?.shouldUseGeneralCharacterIdea ?? true}
-                    instructionValue={generationState?.instructionValue ?? ''}
-                    errorMessage={generationState?.errorMessage ?? null}
-                    hasExistingValue={field.value.trim().length > 0}
-                    hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
-                    isGenerating={isGenerating}
-                    templateOptions={templateOptions}
-                    templateId={generationState?.templateId ?? null}
-                    isDefaultTemplateSelected={generationState?.isDefaultTemplateSelected ?? false}
-                    isExplicitTemplateNone={generationState?.isExplicitTemplateNone ?? false}
-                    isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
-                    fieldValue={field.value}
-                    templateFieldKey={TEMPLATE_FIELD_KEYS.custom_field}
-                    onTemplateIdChange={(templateId) => onTemplateIdChange(field.id, templateId)}
-                    onSaveTemplate={onSaveTemplate}
-                    onShouldUseGeneralCharacterIdeaChange={(value) =>
-                      onShouldUseGeneralCharacterIdeaChange(field.id, value)
-                    }
-                    onInstructionChange={(value) => onInstructionChange(field.id, value)}
-                    onGenerate={() => onGenerate(field.id)}
-                    onContinue={() => onContinue(field.id)}
-                    onRewrite={() => onRewrite(field.id)}
-                    onRevertRewrite={() => onRevertRewrite(field.id)}
-                    onCancel={() => onCancel(field.id)}
+                    {...buildFieldGenerationControlProps({
+                      fieldId: `custom-field-${field.id}`,
+                      label: field.label.trim() || 'Custom Field',
+                      fieldValue: field.value,
+                      templateFieldKey: TEMPLATE_FIELD_KEYS.custom_field,
+                      generationState,
+                      templateOptions,
+                      onTemplateIdChange: (templateId) => onTemplateIdChange(field.id, templateId),
+                      onSaveTemplate,
+                      onShouldUseGeneralCharacterIdeaChange: (value) =>
+                        onShouldUseGeneralCharacterIdeaChange(field.id, value),
+                      onInstructionChange: (value) => onInstructionChange(field.id, value),
+                      onGenerate: () => onGenerate(field.id),
+                      onContinue: () => onContinue(field.id),
+                      onRewrite: () => onRewrite(field.id),
+                      onRevertRewrite: () => onRevertRewrite(field.id),
+                      onCancel: () => onCancel(field.id),
+                    })}
                   />
                   <Button
                     type="button"

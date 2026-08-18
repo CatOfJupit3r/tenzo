@@ -4,13 +4,16 @@ import { generateUuid } from '@~/utils/uuid';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import {
+  CHARACTER_GENERATION_PROMPT_SETTINGS_STORAGE_SCHEMA,
   CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   sanitizeCharacterGenerationPromptSettings,
 } from '../generation/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
-import { sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
-import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
+import {
+  PORTRAIT_CROP_RECT_INPUT_SCHEMA,
+  sanitizeStoredPortraitCropRect,
+} from '../portrait/portrait-focal-point';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
 
@@ -53,36 +56,55 @@ function getTimestamp() {
   return new Date().toISOString();
 }
 
-function readString(value: unknown, fallbackValue = '') {
-  return typeof value === 'string' ? value : fallbackValue;
-}
+const PORTRAIT_REFERENCE_INPUT_SCHEMA = z
+  .object({
+    assetId: z.string().catch(''),
+    fileName: z.string().catch(''),
+    mimeType: z.string().catch('application/octet-stream'),
+    cropRect: PORTRAIT_CROP_RECT_INPUT_SCHEMA,
+    thumbnailDataUrl: z.string().catch(''),
+  })
+  .catch({
+    assetId: '',
+    fileName: '',
+    mimeType: 'application/octet-stream',
+    cropRect: null,
+    thumbnailDataUrl: '',
+  })
+  .transform((candidate) => {
+    if (candidate.assetId.trim() === '' || candidate.fileName.trim() === '') {
+      return null;
+    }
 
-function readTimestamp(value: unknown) {
-  return typeof value === 'string' && value.trim() !== '' ? value : getTimestamp();
+    return {
+      assetId: candidate.assetId,
+      fileName: candidate.fileName,
+      mimeType: candidate.mimeType,
+      cropRect: sanitizeStoredPortraitCropRect(candidate.cropRect),
+      thumbnailDataUrl: candidate.thumbnailDataUrl.startsWith('data:') ? candidate.thumbnailDataUrl : null,
+    };
+  });
+
+function createStoredCharacterLibraryItemSchema(fallbackTimestamp: string) {
+  return z.object({
+    id: z.string().catch(''),
+    card: CHARACTER_CARD_SCHEMA.optional().catch(undefined),
+    promptSettings: CHARACTER_GENERATION_PROMPT_SETTINGS_STORAGE_SCHEMA,
+    portrait: PORTRAIT_REFERENCE_INPUT_SCHEMA.nullable().catch(null),
+    source: CHARACTER_LIBRARY_SOURCE_SCHEMA.catch(CHARACTER_LIBRARY_SOURCES.manual),
+    createdAt: z
+      .string()
+      .refine((value) => value.trim() !== '')
+      .catch(fallbackTimestamp),
+    updatedAt: z
+      .string()
+      .refine((value) => value.trim() !== '')
+      .catch(fallbackTimestamp),
+  });
 }
 
 export function sanitizeCharacterPortraitReference(value: unknown): iCharacterPortraitReference | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  const candidate = value as Record<string, unknown>;
-  const assetId = readString(candidate.assetId);
-  const fileName = readString(candidate.fileName);
-  const mimeType = readString(candidate.mimeType, 'application/octet-stream');
-  const thumbnailDataUrl = readString(candidate.thumbnailDataUrl);
-
-  if (assetId.trim() === '' || fileName.trim() === '') {
-    return null;
-  }
-
-  return {
-    assetId,
-    fileName,
-    mimeType,
-    cropRect: sanitizeStoredPortraitCropRect(candidate.cropRect as Partial<iPortraitCropRect> | null | undefined),
-    thumbnailDataUrl: thumbnailDataUrl.startsWith('data:') ? thumbnailDataUrl : null,
-  };
+  return PORTRAIT_REFERENCE_INPUT_SCHEMA.parse(value);
 }
 
 export function createCharacterLibraryItem({
@@ -115,29 +137,24 @@ export function createEmptyCharacterLibraryItem(id = DEFAULT_CHARACTER_LIBRARY_I
   return createCharacterLibraryItem({ id });
 }
 
-export function sanitizeCharacterLibraryItem(value: unknown): iCharacterLibraryItem | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
+export function sanitizeCharacterLibraryItem(
+  value: unknown,
+  fallbackTimestamp = getTimestamp(),
+): iCharacterLibraryItem | null {
+  const parsed = createStoredCharacterLibraryItemSchema(fallbackTimestamp).safeParse(value);
 
-  const candidate = value as Record<string, unknown>;
-  const cardResult = CHARACTER_CARD_SCHEMA.safeParse(candidate.card);
-  const id = readString(candidate.id);
-
-  if (!cardResult.success || id.trim() === '') {
+  if (!parsed.success || !parsed.data.card || parsed.data.id.trim() === '') {
     return null;
   }
 
   return {
-    id,
-    card: cardResult.data,
-    promptSettings: sanitizeCharacterGenerationPromptSettings(candidate.promptSettings),
-    portrait: sanitizeCharacterPortraitReference(candidate.portrait),
-    source: CHARACTER_LIBRARY_SOURCE_SCHEMA.safeParse(candidate.source).success
-      ? (candidate.source as CharacterLibrarySource)
-      : CHARACTER_LIBRARY_SOURCES.manual,
-    createdAt: readTimestamp(candidate.createdAt),
-    updatedAt: readTimestamp(candidate.updatedAt),
+    id: parsed.data.id,
+    card: parsed.data.card,
+    promptSettings: parsed.data.promptSettings,
+    portrait: parsed.data.portrait,
+    source: parsed.data.source,
+    createdAt: parsed.data.createdAt,
+    updatedAt: parsed.data.updatedAt,
   };
 }
 

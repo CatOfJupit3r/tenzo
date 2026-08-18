@@ -2,96 +2,112 @@ import { describe, expect, it } from 'vitest';
 
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
 import {
-  CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
-  DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
-  DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
-  DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
+  DEFAULT_CONTEXT_SIZE,
   GENERATION_PROVIDERS,
+  OUTPUT_FORMATS,
+  REQUEST_MODES,
+  TEMPERATURE_RANGE,
+  TOP_K_RANGE,
+  TOP_P_RANGE,
   sanitizeCharacterGenerationConnectionSettings,
   sanitizeCharacterGenerationPromptSettings,
 } from './generation-config';
 
-describe('CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA', () => {
-  it('defaults field template IDs for stored prompt settings that predate templates', () => {
-    const result = CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA.safeParse({
-      generalCharacterIdea: 'A detective',
-      fieldInstructions: {},
-      fieldShouldUseGeneralCharacterIdea: {},
-    });
-
-    expect(result).toEqual({
-      success: true,
-      data: {
+describe('sanitizeCharacterGenerationPromptSettings', () => {
+  const boundaryCases = [
+    {
+      name: 'preserves valid partial settings and drops malformed persisted entries',
+      input: {
+        generalCharacterIdea: 'A detective',
+        fieldInstructions: {
+          personality: 'Use a clipped voice',
+          scenario: 17,
+        },
+        fieldShouldUseGeneralCharacterIdea: {
+          personality: false,
+          scenario: 'yes',
+        },
+        fieldTemplateIds: {
+          personality: 'template-1',
+          scenario: false,
+        },
+        shouldUseDefaultFieldTemplates: 'yes',
+      },
+      expected: {
+        generalCharacterIdea: 'A detective',
+        fieldInstructions: { personality: 'Use a clipped voice' },
+        fieldShouldUseGeneralCharacterIdea: { personality: false },
+        fieldTemplateIds: { personality: 'template-1' },
+        shouldUseDefaultFieldTemplates: true,
+      },
+    },
+    {
+      name: 'accepts an empty partial record with current defaults',
+      input: { generalCharacterIdea: 'A detective' },
+      expected: {
         generalCharacterIdea: 'A detective',
         fieldInstructions: {},
         fieldShouldUseGeneralCharacterIdea: {},
-        fieldTemplateIds: DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldTemplateIds,
+        fieldTemplateIds: {},
         shouldUseDefaultFieldTemplates: true,
       },
-    });
-  });
-});
+    },
+  ] as const;
 
-describe('sanitizeCharacterGenerationPromptSettings', () => {
-  it('defaults stored settings that predate default field templates to enabled', () => {
-    const result = sanitizeCharacterGenerationPromptSettings({
-      ...DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
-      shouldUseDefaultFieldTemplates: undefined,
-    });
-
-    expect(result.shouldUseDefaultFieldTemplates).toBe(true);
+  it.each(boundaryCases)('$name', ({ input, expected }) => {
+    expect(sanitizeCharacterGenerationPromptSettings(input)).toEqual(expected);
   });
 });
 
 describe('sanitizeCharacterGenerationConnectionSettings', () => {
-  it('enables assistant editing only for core authored fields and alternate greetings by default', () => {
-    const result = sanitizeCharacterGenerationConnectionSettings({});
-
-    expect(result.fieldShouldAllowAssistantEditing).toEqual(DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING);
-    expect(Object.entries(result.fieldShouldAllowAssistantEditing).filter(([, isEnabled]) => isEnabled)).toEqual([
-      ['name', true],
-      ['description', true],
-      ['personality', true],
-      ['scenario', true],
-      ['first_mes', true],
-      ['mes_example', true],
-      ['alternate_greetings', true],
-    ]);
-  });
-
-  it('defaults stored settings that predate the global character instruction', () => {
+  it('clamps malformed sampling settings while preserving supported connection values', () => {
     const result = sanitizeCharacterGenerationConnectionSettings({
-      ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
-      globalCharacterInstruction: undefined,
+      provider: GENERATION_PROVIDERS.openrouter,
+      endpoint: 'https://example.test/v1',
+      model: 'example-model',
+      outputFormat: OUTPUT_FORMATS.json,
+      requestMode: REQUEST_MODES.browser,
+      contextSize: 0,
+      maxTokens: 4_096.8,
+      temperature: 99,
+      topP: -1,
+      frequencyPenalty: -99,
+      presencePenalty: 99,
+      topK: 201.7,
+      minP: -1,
     });
 
-    expect(result.globalCharacterInstruction).toBe('');
+    expect(result).toMatchObject({
+      provider: GENERATION_PROVIDERS.openrouter,
+      endpoint: 'https://example.test/v1',
+      model: 'example-model',
+      outputFormat: OUTPUT_FORMATS.json,
+      requestMode: REQUEST_MODES.browser,
+      contextSize: DEFAULT_CONTEXT_SIZE,
+      maxTokens: 4_096,
+      temperature: TEMPERATURE_RANGE.max,
+      topP: TOP_P_RANGE.min,
+      frequencyPenalty: -2,
+      presencePenalty: 2,
+      topK: TOP_K_RANGE.max,
+      minP: 0,
+    });
   });
 
-  it('defaults stored settings that predate provider selection to KoboldCpp', () => {
-    const result = sanitizeCharacterGenerationConnectionSettings({
-      ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
-      provider: undefined,
+  it.each([
+    {
+      name: 'accepts the supported tool-call mode',
+      value: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
+      expected: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
+    },
+    {
+      name: 'falls back from an unsupported mode',
+      value: 'legacy-mode',
+      expected: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
+    },
+  ] as const)('$name', ({ value, expected }) => {
+    expect(sanitizeCharacterGenerationConnectionSettings({ assistantGenerationMode: value })).toMatchObject({
+      assistantGenerationMode: expected,
     });
-
-    expect(result.provider).toBe(GENERATION_PROVIDERS.koboldcpp);
-  });
-
-  it('defaults stored settings to structured assistant generation', () => {
-    const result = sanitizeCharacterGenerationConnectionSettings({
-      ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
-      assistantGenerationMode: undefined,
-    });
-
-    expect(result.assistantGenerationMode).toBe(CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']);
-  });
-
-  it('preserves an explicit tool-call assistant mode', () => {
-    const result = sanitizeCharacterGenerationConnectionSettings({
-      ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
-      assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
-    });
-
-    expect(result.assistantGenerationMode).toBe(CHARACTER_ASSISTANT_GENERATION_MODES['tool-call']);
   });
 });

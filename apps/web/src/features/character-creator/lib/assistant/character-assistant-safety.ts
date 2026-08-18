@@ -1,5 +1,6 @@
 import { defineChatMiddleware, EventType } from '@tanstack/ai';
 import type { TokenUsage } from '@tanstack/ai';
+import { z } from 'zod';
 
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import { CHARACTER_ASSISTANT_TOOL_OUTCOMES, logCharacterAssistantTool } from './character-assistant-tool-observability';
@@ -15,6 +16,11 @@ const PROPOSAL_TOOL_NAMES = new Set<string>([
   CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields,
   CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book,
 ]);
+const TOOL_RESULT_SCHEMA = z
+  .object({
+    isNoOp: z.boolean().optional(),
+  })
+  .passthrough();
 
 export function aggregateTokenUsage(current: TokenUsage | undefined, next: TokenUsage): TokenUsage {
   return {
@@ -62,8 +68,8 @@ export function createCharacterAssistantSafetyMiddleware({ model }: { model?: st
       return null;
     },
     onAfterToolCall(_context, info) {
-      const isNoOp =
-        info.result !== null && typeof info.result === 'object' && Reflect.get(info.result, 'isNoOp') === true;
+      const parsedResult = TOOL_RESULT_SCHEMA.safeParse(info.result);
+      const isNoOp = parsedResult.success && parsedResult.data.isNoOp === true;
       let outcome: CharacterAssistantToolOutcome = CHARACTER_ASSISTANT_TOOL_OUTCOMES.failed;
       if (info.ok) {
         outcome = isNoOp ? CHARACTER_ASSISTANT_TOOL_OUTCOMES['no-op'] : CHARACTER_ASSISTANT_TOOL_OUTCOMES.completed;

@@ -5,25 +5,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
 import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
+import type { iGenerateValidatedObject, iGenerateValidatedObjectOptions } from '../generation/structured-output.server';
+import {
+  createCharacterStructuredModelOptions,
+  createCharacterTextAdapter,
+} from '../generation/tanstack-ai-text-generation';
 import { createCharacterEditProposal } from '../proposals/character-edit-proposal';
 import { CHARACTER_ASSISTANT_FOCUS_KINDS, CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import {
-  generateStructuredCharacterAssistantStream,
+  createStructuredCharacterAssistantService,
   MAX_STRUCTURED_ROUNDS,
 } from './character-assistant-structured.server';
 
-const { generateValidatedObjectMock } = vi.hoisted(() => ({
-  generateValidatedObjectMock: vi.fn(),
-}));
-
-vi.mock('../generation/structured-output.server', () => ({
-  generateValidatedObject: generateValidatedObjectMock,
-}));
-
-vi.mock('../generation/tanstack-ai-text-generation', () => ({
-  createCharacterTextAdapter: vi.fn(() => ({})),
-  createCharacterStructuredModelOptions: vi.fn(() => ({})),
-}));
+const generateValidatedObjectMock = vi.fn<(options: iGenerateValidatedObjectOptions<unknown>) => Promise<unknown>>();
+const generateValidatedObject: iGenerateValidatedObject = async <T>(options: iGenerateValidatedObjectOptions<T>) =>
+  (await generateValidatedObjectMock(options as iGenerateValidatedObjectOptions<unknown>)) as T;
+const structuredAssistantService = createStructuredCharacterAssistantService({
+  generateValidatedObject,
+  createTextAdapter: (options) => createCharacterTextAdapter(options),
+  createStructuredModelOptions: createCharacterStructuredModelOptions,
+});
+const { generateStructuredCharacterAssistantStream } = structuredAssistantService;
 
 function createOptions() {
   const card = createEmptyCharacterCard();
@@ -183,7 +185,7 @@ describe('structured character assistant loop', () => {
 
     await collect(generateStructuredCharacterAssistantStream(options));
 
-    const messages = generateValidatedObjectMock.mock.calls[0]?.[0].messages;
+    const messages = (generateValidatedObjectMock.mock.calls[0]?.[0].messages ?? []) as ModelMessage[];
     expect(messages).toHaveLength(12);
     expect(messages[0].content).toBe('Message 8');
     expect(messages.at(-1)?.content).toBe('Message 19');

@@ -1,4 +1,5 @@
 import { jsonrepair } from 'jsonrepair';
+import type { z } from 'zod';
 
 export class JsonRepairError extends Error {
   public readonly inputLength: number;
@@ -15,7 +16,7 @@ export class JsonRepairError extends Error {
   }
 }
 
-export function repairJson(value: string) {
+export function repairJson(value: string): string {
   try {
     return jsonrepair(value);
   } catch (error) {
@@ -23,6 +24,6 @@ export function repairJson(value: string) {
   }
 }
 
-export function parseRepairedJson(value: string): unknown {
-  return JSON.parse(repairJson(value)) as unknown;
+export function parseRepairedJson<T>(value: string, schema: z.ZodType<T>): T {
+  return schema.parse(JSON.parse(repairJson(value)));
 }

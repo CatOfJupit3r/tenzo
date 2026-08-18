@@ -1,6 +1,29 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+
+import { serializeError } from '@~/lib/logging/log-sanitizer';
+import type { iLogger } from '@~/lib/logging/logging-contracts';
 
 import { describeGenerationError, getGenerationErrorHint, logGenerationError } from './generation-error';
+
+function createCapturingLogger() {
+  const logs: Array<{
+    level: 'error';
+    message: string;
+    error: ReturnType<typeof serializeError>;
+    context?: Record<string, unknown>;
+  }> = [];
+  const logger: iLogger = {
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: (message, error, context) => {
+      logs.push({ level: 'error', message, error: serializeError(error), context });
+    },
+    fatal: () => undefined,
+    child: () => logger,
+  };
+  return { logger, logs };
+}
 
 describe('generation errors', () => {
   it('preserves actionable nested provider details', () => {
@@ -20,13 +43,25 @@ describe('generation errors', () => {
 
   it('redacts credentials from displayed and logged errors', () => {
     const error = new Error('Authorization: Bearer secret-token apiKey=very-secret');
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { logger, logs } = createCapturingLogger();
 
     expect(describeGenerationError(error)).toBe('Authorization: Bearer [redacted] apiKey=[redacted]');
-    logGenerationError('Generation', error);
+    logGenerationError('Generation', error, logger);
 
-    expect(consoleError).toHaveBeenCalledWith('[Generation]', 'Authorization: Bearer [redacted] apiKey=[redacted]');
-    consoleError.mockRestore();
+    expect(logs).toEqual([
+      expect.objectContaining({
+        level: 'error',
+        message: 'Generation failed',
+        error: {
+          name: 'Error',
+          message: 'Authorization: Bearer [redacted] apiKey=[redacted]',
+          stack: expect.any(String),
+        },
+        context: { operation: 'Generation' },
+      }),
+    ]);
+    expect(JSON.stringify(logs)).not.toContain('secret-token');
+    expect(JSON.stringify(logs)).not.toContain('very-secret');
   });
 
   it('adds actionable guidance for masked provider failures', () => {

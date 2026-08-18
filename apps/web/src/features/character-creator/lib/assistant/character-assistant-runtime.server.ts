@@ -1,5 +1,5 @@
 import { chat, maxIterations } from '@tanstack/ai';
-import type { ModelMessage, UIMessage } from '@tanstack/ai';
+import type { ModelMessage, StreamChunk, UIMessage } from '@tanstack/ai';
 
 import type { CharacterCard } from '../cards/card-schema';
 import type { CharacterAssistantFieldEditing } from '../generation/generation-config';
@@ -8,6 +8,7 @@ import {
   createCharacterTextAdapter,
   createCharacterToolModelOptions,
 } from '../generation/tanstack-ai-text-generation';
+import type { iCharacterChat } from '../generation/tanstack-ai-text-generation';
 import { ExampleContextService, MAX_EXAMPLE_CONTEXT_CHARACTERS } from '../prompt/example-context-service';
 import type { iPromptExampleCharacter } from '../prompt/generation-contracts';
 import { FIELD_FORMAT_GUIDANCE } from '../prompt/task-instruction-service';
@@ -16,30 +17,18 @@ import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
   iCharacterAssistantDiscoveryContext,
-  iCharacterAssistantStreamRequest,
+  iCharacterAssistantGenerationSettings,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { createCharacterAssistantSafetyMiddleware } from './character-assistant-safety';
 import { createCharacterAssistantTools } from './character-assistant-tools';
 
-interface iStreamCharacterAssistantOptions {
+export interface iStreamCharacterAssistantOptions {
   card: CharacterCard;
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
   apiKey: string;
-  generationSettings: Pick<
-    iCharacterAssistantStreamRequest,
-    | 'endpoint'
-    | 'model'
-    | 'openRouterProvider'
-    | 'maxTokens'
-    | 'temperature'
-    | 'topP'
-    | 'frequencyPenalty'
-    | 'presencePenalty'
-    | 'topK'
-    | 'minP'
-  >;
+  generationSettings: iCharacterAssistantGenerationSettings;
   shouldSendDisabledSamplers?: boolean;
   globalCharacterInstruction?: string;
   generalCharacterIdea?: string;
@@ -54,6 +43,14 @@ interface iStreamCharacterAssistantOptions {
   messages: Array<ModelMessage | UIMessage>;
   maxSteps: number;
   abortSignal?: AbortSignal;
+}
+
+export interface iCharacterAssistantRuntimeDependencies {
+  chat: iCharacterChat;
+}
+
+export interface iCharacterAssistantRuntimeService {
+  streamCharacterAssistant: (options: iStreamCharacterAssistantOptions) => AsyncIterable<StreamChunk>;
 }
 
 interface iBuildCharacterAssistantInstructionsOptions extends Pick<
@@ -239,27 +236,30 @@ export function buildAssistantSystemPrompt({
     .join('\n');
 }
 
-export function streamCharacterAssistant({
-  card,
-  focus,
-  contextAttachments,
-  apiKey,
-  generationSettings,
-  shouldSendDisabledSamplers = false,
-  globalCharacterInstruction = '',
-  generalCharacterIdea = '',
-  discoveryContext,
-  templates = [],
-  exampleCharacters = [],
-  maxExampleContextCharacters,
-  allowedToolNames,
-  fieldShouldAllowAssistantEditing,
-  shouldUseNativeTools = true,
-  store,
-  messages,
-  maxSteps,
-  abortSignal,
-}: iStreamCharacterAssistantOptions) {
+function createCharacterAssistantStream(
+  {
+    card,
+    focus,
+    contextAttachments,
+    apiKey,
+    generationSettings,
+    shouldSendDisabledSamplers = false,
+    globalCharacterInstruction = '',
+    generalCharacterIdea = '',
+    discoveryContext,
+    templates = [],
+    exampleCharacters = [],
+    maxExampleContextCharacters,
+    allowedToolNames,
+    fieldShouldAllowAssistantEditing,
+    shouldUseNativeTools = true,
+    store,
+    messages,
+    maxSteps,
+    abortSignal,
+  }: iStreamCharacterAssistantOptions,
+  chatDependency: iCharacterChat,
+) {
   const abortController = new AbortController();
   if (abortSignal?.aborted) {
     abortController.abort(abortSignal.reason);
@@ -267,7 +267,7 @@ export function streamCharacterAssistant({
     abortSignal?.addEventListener('abort', () => abortController.abort(abortSignal.reason), { once: true });
   }
 
-  return chat({
+  return chatDependency({
     adapter: createCharacterTextAdapter({
       endpoint: generationSettings.endpoint,
       apiKey,
@@ -313,4 +313,18 @@ export function streamCharacterAssistant({
     abortController,
     stream: true,
   });
+}
+
+export function createCharacterAssistantRuntime(
+  dependencies: iCharacterAssistantRuntimeDependencies = { chat: (options) => chat(options) },
+): iCharacterAssistantRuntimeService {
+  return {
+    streamCharacterAssistant: (options) => createCharacterAssistantStream(options, dependencies.chat),
+  };
+}
+
+const DEFAULT_CHARACTER_ASSISTANT_RUNTIME = createCharacterAssistantRuntime();
+
+export function streamCharacterAssistant(options: iStreamCharacterAssistantOptions) {
+  return DEFAULT_CHARACTER_ASSISTANT_RUNTIME.streamCharacterAssistant(options);
 }

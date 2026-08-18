@@ -1,3 +1,5 @@
+import { getBrowserStorage } from '@~/utils/ssr-helpers';
+
 export interface iStorageApi {
   getItem: (key: string) => string | null;
   removeItem: (key: string) => void;
@@ -18,8 +20,6 @@ const createMemoryStorage = (): iStorageApi => {
   };
 };
 
-const isBrowser = typeof window !== 'undefined';
+export const localStorageApi: iStorageApi = getBrowserStorage('local') ?? createMemoryStorage();
 
-export const localStorageApi: iStorageApi = isBrowser ? window.localStorage : createMemoryStorage();
-
-export const sessionStorageApi: iStorageApi = isBrowser ? window.sessionStorage : createMemoryStorage();
+export const sessionStorageApi: iStorageApi = getBrowserStorage('session') ?? createMemoryStorage();

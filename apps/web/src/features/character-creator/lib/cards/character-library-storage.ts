@@ -1,25 +1,16 @@
+import { z } from 'zod';
+
 import { localStorageApi } from '@~/db/storage';
 
 import { sanitizeCharacterLibraryItem } from './character-library';
 import type { iCharacterLibraryItem } from './character-library';
 
-interface iStoredCharacterLibraryEntry {
-  versionKey: string;
-  data: unknown;
-}
+const STORED_CHARACTER_LIBRARY_ENTRY_SCHEMA = z.object({
+  versionKey: z.string(),
+  data: z.unknown(),
+});
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function sanitizeStoredEntry(value: unknown): iStoredCharacterLibraryEntry | null {
-  if (!isRecord(value) || typeof value.versionKey !== 'string') {
-    return null;
-  }
-
-  const character = sanitizeCharacterLibraryItem(value.data);
-  return character ? { versionKey: value.versionKey, data: character } : null;
-}
+const STORED_CHARACTER_LIBRARY_COLLECTION_SCHEMA = z.record(z.string(), STORED_CHARACTER_LIBRARY_ENTRY_SCHEMA);
 
 export function readStoredCharacterLibrary(value: string | null): iCharacterLibraryItem[] {
   if (!value) {
@@ -27,14 +18,14 @@ export function readStoredCharacterLibrary(value: string | null): iCharacterLibr
   }
 
   try {
-    const parsed = JSON.parse(value) as unknown;
-    if (!isRecord(parsed)) {
+    const parsed = STORED_CHARACTER_LIBRARY_COLLECTION_SCHEMA.safeParse(JSON.parse(value));
+    if (!parsed.success) {
       return [];
     }
 
-    return Object.values(parsed).flatMap((storedValue) => {
-      const storedEntry = sanitizeStoredEntry(storedValue);
-      return storedEntry ? [storedEntry.data as iCharacterLibraryItem] : [];
+    return Object.values(parsed.data).flatMap((storedEntry) => {
+      const character = sanitizeCharacterLibraryItem(storedEntry.data);
+      return character ? [character] : [];
     });
   } catch {
     return [];
@@ -49,8 +40,8 @@ export function hasStoredCharacterLibraryEntries(storageKey: string) {
   }
 
   try {
-    const parsed = JSON.parse(storedValue) as unknown;
-    return isRecord(parsed) && Object.keys(parsed).length > 0;
+    const parsed = STORED_CHARACTER_LIBRARY_COLLECTION_SCHEMA.safeParse(JSON.parse(storedValue));
+    return parsed.success && Object.keys(parsed.data).length > 0;
   } catch {
     return true;
   }

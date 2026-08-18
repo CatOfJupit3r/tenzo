@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24.11.1
+          node-version: 26.5.0
           cache: 'pnpm'
 
       - name: Install dependencies
@@ -35,6 +35,12 @@ jobs:
 
       - name: Lint
         run: pnpm run lint
+
+      - name: Check duplicates
+        run: pnpm run check:duplicates
+
+      - name: Test
+        run: pnpm run test
 
       - name: Build
         run: pnpm run build

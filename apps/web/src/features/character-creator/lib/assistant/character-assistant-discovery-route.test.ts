@@ -1,22 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+import type { iCharacterDiscoveryDirectionsService } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
 import { GENERATION_PROVIDERS } from '@~/features/character-creator/lib/generation/generation-config';
 
-import { handleCharacterAssistantDiscoveryRequest } from '../../../../routes/api/character-assistant-discovery';
-
-const { generateValidatedObjectMock } = vi.hoisted(() => ({
-  generateValidatedObjectMock: vi.fn(),
-}));
-
-vi.mock('@~/features/character-creator/lib/generation/structured-output.server', () => ({
-  generateValidatedObject: generateValidatedObjectMock,
-}));
-
-vi.mock('@~/features/character-creator/lib/generation/tanstack-ai-text-generation', () => ({
-  createCharacterTextAdapter: vi.fn(() => ({})),
-  createCharacterStructuredModelOptions: vi.fn(() => ({})),
-}));
+import {
+  createCharacterAssistantDiscoveryRequestHandler,
+  MAX_DISCOVERY_PREMISE_LENGTH,
+} from '../../../../routes/api/character-assistant-discovery';
 
 const BASE_REQUEST = {
   provider: GENERATION_PROVIDERS.koboldcpp,
@@ -42,28 +33,45 @@ function createRequest(payload: typeof BASE_REQUEST) {
   });
 }
 
+function createService(
+  cards: Awaited<ReturnType<iCharacterDiscoveryDirectionsService['generateCharacterDiscoveryCategory']>>,
+) {
+  const discoveryService: Pick<iCharacterDiscoveryDirectionsService, 'generateCharacterDiscoveryCategory'> = {
+    generateCharacterDiscoveryCategory: async () => cards,
+  };
+  return discoveryService;
+}
+
 describe('character assistant discovery generation route', () => {
   it('returns three scoping cards for a single requested category', async () => {
-    generateValidatedObjectMock.mockResolvedValueOnce({
-      cards: [
+    const response = await createCharacterAssistantDiscoveryRequestHandler(
+      createService([
         {
+          id: 'card-1',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
           title: 'Candid and careful',
           description: 'The character keeps emotional distance, but still answers every question directly.',
+          sourceCardId: null,
+          isUserAuthored: false,
         },
         {
+          id: 'card-2',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
           title: 'Dry and precise',
           description: 'The character speaks in clear clauses and trims every sentence to its core.',
+          sourceCardId: null,
+          isUserAuthored: false,
         },
         {
+          id: 'card-3',
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
           title: 'Quietly theatrical',
           description: 'The character layers humor over anxiety, then reveals an old wound at the end.',
+          sourceCardId: null,
+          isUserAuthored: false,
         },
-      ],
-    });
-
-    const response = await handleCharacterAssistantDiscoveryRequest({
-      request: createRequest({ ...BASE_REQUEST, category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone }),
-    });
+      ]),
+    )({ request: createRequest(BASE_REQUEST) });
     const body = (await response.json()) as { cards: unknown[] };
 
     expect(response.status).toBe(200);
@@ -75,35 +83,27 @@ describe('character assistant discovery generation route', () => {
     ).toBe(true);
   });
 
-  it('rejects malformed output when cards are materially duplicate', async () => {
-    generateValidatedObjectMock.mockResolvedValueOnce({
-      cards: [
-        {
-          title: 'Candid and careful',
-          description: 'The character keeps emotional distance, but still answers every question directly.',
-        },
-        {
-          title: 'Candid and careful',
-          description: 'The character keeps emotional distance, but still answers every question directly.',
-        },
-        {
-          title: 'Dry and precise',
-          description: 'The character speaks in clear clauses and trims every sentence to its core.',
-        },
-      ],
-    });
+  it('returns a server error when the discovery service rejects materially duplicate cards', async () => {
+    const discoveryService: Pick<iCharacterDiscoveryDirectionsService, 'generateCharacterDiscoveryCategory'> = {
+      generateCharacterDiscoveryCategory: async () => {
+        throw new Error('The model returned non-distinct direction cards.');
+      },
+    };
 
-    const response = await handleCharacterAssistantDiscoveryRequest({
-      request: createRequest({ ...BASE_REQUEST, category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone }),
+    const response = await createCharacterAssistantDiscoveryRequestHandler(discoveryService)({
+      request: createRequest(BASE_REQUEST),
     });
 
     expect(response.status).toBe(500);
     expect(await response.text()).toContain('non-distinct');
   });
 
-  it('returns a request-validation error for an unbounded premise', async () => {
-    const response = await handleCharacterAssistantDiscoveryRequest({
-      request: createRequest({ ...BASE_REQUEST, originalPremise: '' }),
+  it('returns a request-validation error for an over-limit premise', async () => {
+    const response = await createCharacterAssistantDiscoveryRequestHandler(createService([]))({
+      request: createRequest({
+        ...BASE_REQUEST,
+        originalPremise: 'x'.repeat(MAX_DISCOVERY_PREMISE_LENGTH + 1),
+      }),
     });
 
     expect(response.status).toBe(400);

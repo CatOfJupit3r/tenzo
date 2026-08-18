@@ -9,13 +9,7 @@ import { removeCharacterAssistantSessions } from '../collections/character-assis
 import { characterLibraryCollection } from '../collections/character-library.collection';
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import { createEmptyCharacterCard } from '../constants/card-defaults';
-import type {
-  CharacterBook,
-  CharacterBookEntry,
-  CharacterCard,
-  CharacterTextFieldKey,
-  CustomField,
-} from '../lib/cards/card-schema';
+import type { CharacterCard, CharacterTextFieldKey, CustomField } from '../lib/cards/card-schema';
 import {
   createCharacterLibraryItem,
   createDuplicateCharacterName,
@@ -37,6 +31,7 @@ import {
 import type { iCharacterGenerationPromptSettings } from '../lib/generation/generation-config';
 import { ensurePortraitAssetLoaded } from '../lib/portrait/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait/portrait-focal-point';
+import { createCharacterBookService } from './character-book-service';
 import { useCharacterLibraryList } from './use-character-library-list';
 
 export function useCharacterSession() {
@@ -116,6 +111,17 @@ export function useCharacterSession() {
       return transaction;
     },
     [activeCharacterKey],
+  );
+
+  const characterBookService = useMemo(
+    () =>
+      createCharacterBookService({
+        mutate: (recipe) =>
+          mutateActiveCharacter((draft) => {
+            draft.card.data.character_book = recipe(draft.card.data.character_book);
+          }),
+      }),
+    [mutateActiveCharacter],
   );
 
   const updateField = useCallback(
@@ -213,85 +219,36 @@ export function useCharacterSession() {
   );
 
   const createCharacterBook = useCallback(() => {
-    mutateActiveCharacter((draft) => {
-      draft.card.data.character_book ??= { extensions: {}, entries: [] };
-    });
-  }, [mutateActiveCharacter]);
+    characterBookService.create();
+  }, [characterBookService]);
 
   const removeCharacterBook = useCallback(() => {
-    mutateActiveCharacter((draft) => {
-      delete draft.card.data.character_book;
-    });
-  }, [mutateActiveCharacter]);
+    characterBookService.remove();
+  }, [characterBookService]);
 
   const updateCharacterBook = useCallback(
-    (patch: Partial<Omit<CharacterBook, 'entries' | 'extensions'>>) => {
-      mutateActiveCharacter((draft) => {
-        if (draft.card.data.character_book) {
-          Object.assign(draft.card.data.character_book, patch);
-        }
-      });
-    },
-    [mutateActiveCharacter],
+    (patch: Parameters<typeof characterBookService.update>[0]) => characterBookService.update(patch),
+    [characterBookService],
   );
 
   const addCharacterBookEntry = useCallback(() => {
-    mutateActiveCharacter((draft) => {
-      const characterBook = draft.card.data.character_book;
-
-      if (!characterBook) {
-        return;
-      }
-
-      characterBook.entries.push({
-        keys: [],
-        content: '',
-        extensions: {},
-        enabled: true,
-        insertion_order: characterBook.entries.length,
-      });
-    });
-  }, [mutateActiveCharacter]);
+    characterBookService.addEntry();
+  }, [characterBookService]);
 
   const updateCharacterBookEntry = useCallback(
-    (index: number, patch: Partial<Omit<CharacterBookEntry, 'extensions'>>) => {
-      mutateActiveCharacter((draft) => {
-        const entry = draft.card.data.character_book?.entries[index];
-
-        if (entry) {
-          Object.assign(entry, patch);
-        }
-      });
-    },
-    [mutateActiveCharacter],
+    (index: number, patch: Parameters<typeof characterBookService.updateEntry>[1]) =>
+      characterBookService.updateEntry(index, patch),
+    [characterBookService],
   );
 
   const removeCharacterBookEntry = useCallback(
-    (index: number) => {
-      mutateActiveCharacter((draft) => {
-        draft.card.data.character_book?.entries.splice(index, 1);
-      });
-    },
-    [mutateActiveCharacter],
+    (index: number) => characterBookService.removeEntry(index),
+    [characterBookService],
   );
 
   const reorderCharacterBookEntries = useCallback(
-    (fromIndex: number, toIndex: number) => {
-      mutateActiveCharacter((draft) => {
-        const entries = draft.card.data.character_book?.entries;
-
-        if (!entries || toIndex < 0 || toIndex >= entries.length) {
-          return;
-        }
-
-        const [movedEntry] = entries.splice(fromIndex, 1);
-
-        if (movedEntry) {
-          entries.splice(toIndex, 0, movedEntry);
-        }
-      });
-    },
-    [mutateActiveCharacter],
+    (fromIndex: number, toIndex: number) => characterBookService.reorderEntries(fromIndex, toIndex),
+    [characterBookService],
   );
 
   const updatePromptSettings = useCallback(

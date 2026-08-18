@@ -18,7 +18,10 @@ import {
 } from '../../lib/editor/chat-input-attachments';
 import type { iChatInputAttachment } from '../../lib/editor/chat-input-attachments';
 import { CHAT_INPUT_EDITOR_SERIALIZER } from '../../lib/editor/chat-input-serialization';
-import { buildChatTemplateMentionExtension } from '../../lib/editor/chat-template-mention';
+import {
+  buildChatTemplateMentionExtension,
+  parseChatTemplateMentionReference,
+} from '../../lib/editor/chat-template-mention';
 import type { iChatTemplateMentionReference } from '../../lib/editor/chat-template-mention';
 import { buildEditorAccessibilityAttributes } from '../../lib/editor/editor-contracts';
 import { createEditorHook } from '../../lib/editor/synced-editor-hook';
@@ -105,10 +108,9 @@ const useCreatedChatInputEditor = createEditorHook<iChatInputEditorHookOptions>(
         const resolvedPosition = view.state.doc.resolve(position);
         const mentionNode = resolvedPosition.nodeAfter ?? resolvedPosition.nodeBefore;
         if (mentionNode?.type.name !== 'mention') return false;
-        const id = typeof mentionNode.attrs.id === 'string' ? mentionNode.attrs.id : '';
-        const label = typeof mentionNode.attrs.label === 'string' ? mentionNode.attrs.label : '';
-        if (!id || !label) return false;
-        onTemplateClick({ id, label });
+        const mentionReference = parseChatTemplateMentionReference(mentionNode.attrs);
+        if (!mentionReference) return false;
+        onTemplateClick(mentionReference);
         return true;
       },
     },

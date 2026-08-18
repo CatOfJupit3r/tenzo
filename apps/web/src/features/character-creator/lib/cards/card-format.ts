@@ -1,9 +1,16 @@
+import { z } from 'zod';
+
+import { JSON_VALUE_SCHEMA } from '@~/lib/json-value';
+import type { iJsonValue } from '@~/lib/json-value';
 import { generateUuid } from '@~/utils/uuid';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { sanitizeCharacterGenerationPromptSettings } from '../generation/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
-import { sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
+import {
+  PORTRAIT_CROP_RECT_INPUT_SCHEMA,
+  sanitizeStoredPortraitCropRect,
+} from '../portrait/portrait-focal-point';
 import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
 import { CHARACTER_BOOK_ENTRY_POSITION_SCHEMA, CHARACTER_CARD_SCHEMA } from './card-schema';
 import type { CharacterBook, CharacterBookEntry, CharacterCard, CustomField } from './card-schema';
@@ -33,117 +40,229 @@ export interface iHybridCharacterCard extends CharacterCard {
   mes_example: string;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+const STRINGABLE_VALUE_SCHEMA = z
+  .union([z.string(), z.number(), z.boolean()])
+  .transform((value) => String(value))
+  .catch('');
 
-function toOptionalString(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
+const STRING_ARRAY_SCHEMA = z
+  .array(STRINGABLE_VALUE_SCHEMA)
+  .transform((values) => values.filter((value) => value.length > 0))
+  .catch([]);
 
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value);
-  }
+const CHARACTER_EXTENSIONS_SCHEMA = z.record(z.string(), JSON_VALUE_SCHEMA).catch({});
 
-  return '';
-}
+const CHARACTER_BOOK_ENTRY_IMPORT_SCHEMA = z
+  .object({
+    keys: STRING_ARRAY_SCHEMA,
+    content: STRINGABLE_VALUE_SCHEMA,
+    extensions: CHARACTER_EXTENSIONS_SCHEMA,
+    enabled: z.boolean().catch(true),
+    insertion_order: z.number().finite().catch(0),
+    case_sensitive: z.boolean().optional().catch(undefined),
+    name: STRINGABLE_VALUE_SCHEMA.optional().catch(undefined),
+    priority: z.number().finite().optional().catch(undefined),
+    id: z.number().finite().optional().catch(undefined),
+    comment: STRINGABLE_VALUE_SCHEMA.optional().catch(undefined),
+    selective: z.boolean().optional().catch(undefined),
+    secondary_keys: STRING_ARRAY_SCHEMA.optional().catch(undefined),
+    constant: z.boolean().optional().catch(undefined),
+    position: CHARACTER_BOOK_ENTRY_POSITION_SCHEMA.optional().catch(undefined),
+  })
+  .catch({
+    keys: [],
+    content: '',
+    extensions: {},
+    enabled: true,
+    insertion_order: 0,
+    case_sensitive: undefined,
+    name: undefined,
+    priority: undefined,
+    id: undefined,
+    comment: undefined,
+    selective: undefined,
+    secondary_keys: undefined,
+    constant: undefined,
+    position: undefined,
+  });
 
-function toStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
+const CHARACTER_BOOK_IMPORT_SCHEMA = z
+  .object({
+    name: STRINGABLE_VALUE_SCHEMA.optional().catch(undefined),
+    description: STRINGABLE_VALUE_SCHEMA.optional().catch(undefined),
+    scan_depth: z.number().finite().optional().catch(undefined),
+    token_budget: z.number().finite().optional().catch(undefined),
+    recursive_scanning: z.boolean().optional().catch(undefined),
+    extensions: CHARACTER_EXTENSIONS_SCHEMA,
+    entries: z.array(CHARACTER_BOOK_ENTRY_IMPORT_SCHEMA).catch([]),
+  })
+  .optional()
+  .catch(undefined);
 
-  return value.map((item) => toOptionalString(item)).filter((item) => item.length > 0);
-}
+const CHARACTER_DATA_IMPORT_SCHEMA = z.object({
+  name: STRINGABLE_VALUE_SCHEMA,
+  description: STRINGABLE_VALUE_SCHEMA,
+  personality: STRINGABLE_VALUE_SCHEMA,
+  scenario: STRINGABLE_VALUE_SCHEMA,
+  first_mes: STRINGABLE_VALUE_SCHEMA,
+  mes_example: STRINGABLE_VALUE_SCHEMA,
+  creator_notes: STRINGABLE_VALUE_SCHEMA,
+  system_prompt: STRINGABLE_VALUE_SCHEMA,
+  post_history_instructions: STRINGABLE_VALUE_SCHEMA,
+  alternate_greetings: STRING_ARRAY_SCHEMA,
+  character_book: CHARACTER_BOOK_IMPORT_SCHEMA,
+  tags: STRING_ARRAY_SCHEMA,
+  creator: STRINGABLE_VALUE_SCHEMA,
+  character_version: STRINGABLE_VALUE_SCHEMA,
+  extensions: CHARACTER_EXTENSIONS_SCHEMA,
+});
 
-function normalizeCharacterBookEntry(value: unknown): CharacterBookEntry {
-  const source = isRecord(value) ? value : {};
-  const { position } = source;
-  const parsedPosition = CHARACTER_BOOK_ENTRY_POSITION_SCHEMA.safeParse(position);
+const EMPTY_CHARACTER_DATA = {
+  name: '',
+  description: '',
+  personality: '',
+  scenario: '',
+  first_mes: '',
+  mes_example: '',
+  creator_notes: '',
+  system_prompt: '',
+  post_history_instructions: '',
+  alternate_greetings: [],
+  character_book: undefined,
+  tags: [],
+  creator: '',
+  character_version: '',
+  extensions: {},
+};
 
+const CHARACTER_CARD_V2_IMPORT_SCHEMA = z.object({
+  spec: z.literal('chara_card_v2'),
+  spec_version: z.literal('2.0'),
+  data: CHARACTER_DATA_IMPORT_SCHEMA.catch(EMPTY_CHARACTER_DATA),
+});
+
+const CHARACTER_CARD_V1_IMPORT_SCHEMA = CHARACTER_DATA_IMPORT_SCHEMA.extend({
+  spec: z.never().optional(),
+  spec_version: z.never().optional(),
+  data: z.never().optional(),
+});
+
+const CHARACTER_CARD_IMPORT_ENVELOPE_SCHEMA = z.union([
+  CHARACTER_CARD_V2_IMPORT_SCHEMA.transform(({ data }) => data),
+  CHARACTER_CARD_V1_IMPORT_SCHEMA,
+]);
+
+const CUSTOM_FIELD_IMPORT_SCHEMA = z
+  .object({
+    id: z.string().catch(''),
+    label: STRINGABLE_VALUE_SCHEMA,
+    value: STRINGABLE_VALUE_SCHEMA,
+  })
+  .optional()
+  .catch(undefined);
+
+const TENZO_CARD_EXTENSION_SCHEMA = z
+  .object({
+    version: z.number().finite().optional().catch(undefined),
+    custom_fields: JSON_VALUE_SCHEMA.optional().catch(undefined),
+    portrait_crop_rect: PORTRAIT_CROP_RECT_INPUT_SCHEMA.optional(),
+    general_character_idea: z.string().optional().catch(undefined),
+    field_instructions: JSON_VALUE_SCHEMA.optional().catch(undefined),
+    field_should_use_general_character_idea: JSON_VALUE_SCHEMA.optional().catch(undefined),
+  })
+  .catch({});
+
+function normalizeCharacterBookEntry(source: z.infer<typeof CHARACTER_BOOK_ENTRY_IMPORT_SCHEMA>): CharacterBookEntry {
   return {
-    keys: toStringArray(source.keys),
-    content: toOptionalString(source.content),
-    extensions: isRecord(source.extensions) ? source.extensions : {},
-    enabled: typeof source.enabled === 'boolean' ? source.enabled : true,
-    insertion_order: typeof source.insertion_order === 'number' ? source.insertion_order : 0,
-    case_sensitive: typeof source.case_sensitive === 'boolean' ? source.case_sensitive : undefined,
-    name: source.name === undefined ? undefined : toOptionalString(source.name),
-    priority: typeof source.priority === 'number' ? source.priority : undefined,
-    id: typeof source.id === 'number' ? source.id : undefined,
-    comment: source.comment === undefined ? undefined : toOptionalString(source.comment),
-    selective: typeof source.selective === 'boolean' ? source.selective : undefined,
-    secondary_keys: source.secondary_keys === undefined ? undefined : toStringArray(source.secondary_keys),
-    constant: typeof source.constant === 'boolean' ? source.constant : undefined,
-    position: parsedPosition.success ? parsedPosition.data : undefined,
+    keys: source.keys,
+    content: source.content,
+    extensions: source.extensions,
+    enabled: source.enabled,
+    insertion_order: source.insertion_order,
+    case_sensitive: source.case_sensitive,
+    name: source.name,
+    priority: source.priority,
+    id: source.id,
+    comment: source.comment,
+    selective: source.selective,
+    secondary_keys: source.secondary_keys,
+    constant: source.constant,
+    position: source.position,
   };
 }
 
-function normalizeCharacterBook(value: unknown): CharacterBook | undefined {
-  if (!isRecord(value)) {
+function normalizeCharacterBook(source: z.infer<typeof CHARACTER_BOOK_IMPORT_SCHEMA>): CharacterBook | undefined {
+  if (!source) {
     return undefined;
   }
 
   return {
-    name: value.name === undefined ? undefined : toOptionalString(value.name),
-    description: value.description === undefined ? undefined : toOptionalString(value.description),
-    scan_depth: typeof value.scan_depth === 'number' ? value.scan_depth : undefined,
-    token_budget: typeof value.token_budget === 'number' ? value.token_budget : undefined,
-    recursive_scanning: typeof value.recursive_scanning === 'boolean' ? value.recursive_scanning : undefined,
-    extensions: isRecord(value.extensions) ? value.extensions : {},
-    entries: Array.isArray(value.entries) ? value.entries.map(normalizeCharacterBookEntry) : [],
+    name: source.name,
+    description: source.description,
+    scan_depth: source.scan_depth,
+    token_budget: source.token_budget,
+    recursive_scanning: source.recursive_scanning,
+    extensions: source.extensions,
+    entries: source.entries.map(normalizeCharacterBookEntry),
   };
 }
 
-function normalizeCustomFields(value: unknown): CustomField[] {
-  if (!Array.isArray(value)) {
+function normalizeCustomFields(value: iJsonValue | undefined): CustomField[] {
+  const parsed = z.array(CUSTOM_FIELD_IMPORT_SCHEMA).safeParse(value);
+  if (!parsed.success) {
     return [];
   }
 
-  return value
-    .filter((item): item is Record<string, unknown> => isRecord(item))
-    .map((item) => ({
-      id: typeof item.id === 'string' && item.id.trim() !== '' ? item.id : generateUuid(),
-      label: toOptionalString(item.label),
-      value: toOptionalString(item.value),
-    }));
+  return parsed.data.flatMap((field) => {
+    if (!field) {
+      return [];
+    }
+
+    return [
+      {
+        id: field.id.trim() === '' ? generateUuid() : field.id,
+        label: field.label,
+        value: field.value,
+      },
+    ];
+  });
+}
+
+function parseTenzoCardExtension(value: iJsonValue | undefined) {
+  const parsed = TENZO_CARD_EXTENSION_SCHEMA.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 export function normalizeImportedCharacterCard(value: unknown): CharacterCard {
+  const source = CHARACTER_CARD_IMPORT_ENVELOPE_SCHEMA.parse(value);
   const emptyCard = createEmptyCharacterCard();
-  const source = isRecord(value) ? value : {};
-  const rawData = isRecord(source.data) ? source.data : source;
-  const rawExtensions = isRecord(rawData.extensions) ? rawData.extensions : {};
-  const rawTenzoExtension = isRecord(rawExtensions[TENZO_CARD_EXTENSION_KEY])
-    ? rawExtensions[TENZO_CARD_EXTENSION_KEY]
-    : {};
-  const { [TENZO_CARD_EXTENSION_KEY]: _tenzoExtension, ...passthroughExtensions } = rawExtensions;
+  const tenzoExtension = parseTenzoCardExtension(source.extensions[TENZO_CARD_EXTENSION_KEY]);
+  const passthroughExtensions = Object.fromEntries(
+    Object.entries(source.extensions).filter(([key]) => key !== TENZO_CARD_EXTENSION_KEY),
+  );
 
   const normalizedCard: CharacterCard = {
     spec: 'chara_card_v2',
     spec_version: '2.0',
     data: {
       ...emptyCard.data,
-      name: toOptionalString(rawData.name),
-      description: toOptionalString(rawData.description),
-      personality: toOptionalString(rawData.personality),
-      scenario: toOptionalString(rawData.scenario),
-      first_mes: toOptionalString(rawData.first_mes),
-      mes_example: toOptionalString(rawData.mes_example),
-      creator_notes: toOptionalString(rawData.creator_notes),
-      system_prompt: toOptionalString(rawData.system_prompt),
-      post_history_instructions: toOptionalString(rawData.post_history_instructions),
-      alternate_greetings: Array.isArray(rawData.alternate_greetings)
-        ? rawData.alternate_greetings.map((item) => toOptionalString(item))
-        : [],
-      character_book: normalizeCharacterBook(rawData.character_book),
-      tags: toStringArray(rawData.tags),
-      creator: toOptionalString(rawData.creator),
-      character_version: toOptionalString(rawData.character_version),
+      name: source.name,
+      description: source.description,
+      personality: source.personality,
+      scenario: source.scenario,
+      first_mes: source.first_mes,
+      mes_example: source.mes_example,
+      creator_notes: source.creator_notes,
+      system_prompt: source.system_prompt,
+      post_history_instructions: source.post_history_instructions,
+      alternate_greetings: source.alternate_greetings,
+      character_book: normalizeCharacterBook(source.character_book),
+      tags: source.tags,
+      creator: source.creator,
+      character_version: source.character_version,
       extensions: {
         ...passthroughExtensions,
-        custom_fields: normalizeCustomFields(rawTenzoExtension.custom_fields ?? rawExtensions.custom_fields),
+        custom_fields: normalizeCustomFields(tenzoExtension?.custom_fields ?? source.extensions.custom_fields),
       },
     },
   };
@@ -157,12 +276,13 @@ export interface iTenzoCardMetadata {
 }
 
 export function extractTenzoCardMetadata(value: unknown): iTenzoCardMetadata {
-  const source = isRecord(value) ? value : {};
-  const rawData = isRecord(source.data) ? source.data : source;
-  const rawExtensions = isRecord(rawData.extensions) ? rawData.extensions : {};
-  const tenzoExtension = rawExtensions[TENZO_CARD_EXTENSION_KEY];
+  const parsedCard = CHARACTER_CARD_IMPORT_ENVELOPE_SCHEMA.safeParse(value);
+  if (!parsedCard.success) {
+    return { cropRect: null, promptSettings: null };
+  }
 
-  if (!isRecord(tenzoExtension)) {
+  const tenzoExtension = parseTenzoCardExtension(parsedCard.data.extensions[TENZO_CARD_EXTENSION_KEY]);
+  if (!tenzoExtension) {
     return { cropRect: null, promptSettings: null };
   }
 
@@ -172,9 +292,7 @@ export function extractTenzoCardMetadata(value: unknown): iTenzoCardMetadata {
     tenzoExtension.field_should_use_general_character_idea !== undefined;
 
   return {
-    cropRect: sanitizeStoredPortraitCropRect(
-      tenzoExtension.portrait_crop_rect as Partial<iPortraitCropRect> | null | undefined,
-    ),
+    cropRect: sanitizeStoredPortraitCropRect(tenzoExtension.portrait_crop_rect),
     promptSettings: hasPromptSettings
       ? sanitizeCharacterGenerationPromptSettings({
           generalCharacterIdea: tenzoExtension.general_character_idea,
@@ -210,14 +328,21 @@ export interface iCharacterCardExportOptions {
 }
 
 export type iExportedCharacterCard = Omit<iHybridCharacterCard, 'data'> & {
-  data: Omit<CharacterCard['data'], 'extensions'> & { extensions: Record<string, unknown> };
+  data: Omit<CharacterCard['data'], 'extensions'> & { extensions: Record<string, iJsonValue> };
 };
 
 function buildTenzoCardExtension(customFields: CustomField[], options: iCharacterCardExportOptions) {
-  const tenzoExtension: Record<string, unknown> = {
+  const tenzoExtension: Record<string, iJsonValue> = {
     version: TENZO_CARD_EXTENSION_VERSION,
     custom_fields: customFields,
-    portrait_crop_rect: options.portraitCropRect ?? null,
+    portrait_crop_rect: options.portraitCropRect
+      ? {
+          x: options.portraitCropRect.x,
+          y: options.portraitCropRect.y,
+          width: options.portraitCropRect.width,
+          height: options.portraitCropRect.height,
+        }
+      : null,
     general_character_idea: options.promptSettings?.generalCharacterIdea ?? '',
   };
 
@@ -235,13 +360,13 @@ export function buildExportedCharacterCard(
   options: iCharacterCardExportOptions,
 ): iExportedCharacterCard {
   const hybridCard = toHybridCharacterCard(structuredClone(card));
-  const {
-    custom_fields: customFields,
-    [TENZO_CARD_EXTENSION_KEY]: _tenzoExtension,
-    ...passthroughExtensions
-  } = hybridCard.data.extensions;
+  const parsedExtensions = CHARACTER_EXTENSIONS_SCHEMA.parse(hybridCard.data.extensions);
+  const customFields = normalizeCustomFields(parsedExtensions.custom_fields);
+  const passthroughExtensions = Object.fromEntries(
+    Object.entries(parsedExtensions).filter(([key]) => key !== 'custom_fields' && key !== TENZO_CARD_EXTENSION_KEY),
+  );
 
-  const extensions: Record<string, unknown> =
+  const extensions: Record<string, iJsonValue> =
     options.detailLevel === EXPORT_DETAIL_LEVELS.minimal
       ? passthroughExtensions
       : {

@@ -1,36 +1,52 @@
-import type { AnyTextAdapter } from '@tanstack/ai';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { generateValidatedObject } from './structured-output.server';
-
-const { chatMock } = vi.hoisted(() => ({
-  chatMock: vi.fn(),
-}));
-
-vi.mock('@tanstack/ai', async () => ({
-  ...(await vi.importActual<Record<string, unknown>>('@tanstack/ai')),
-  chat: chatMock,
-}));
+import { createValidatedObjectGenerator } from './structured-output.server';
+import type { iStructuredOutputChat, iStructuredOutputChatOptions } from './structured-output.server';
+import { createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 const RESPONSE_SCHEMA = z.object({
   cards: z.array(z.object({ title: z.string() })).length(1),
 });
-const structuredOutputStream = vi.fn();
-const adapter = { structuredOutputStream } as unknown as AnyTextAdapter;
 
-beforeEach(() => {
-  chatMock.mockReset();
-});
+function createHarness() {
+  const calls: iStructuredOutputChatOptions[] = [];
+  let response: unknown = { cards: [{ title: 'Structured card' }] };
+  let failure: unknown;
+  const chatDependency: iStructuredOutputChat = async (options) => {
+    calls.push(options);
+    if (failure !== undefined) {
+      throw failure;
+    }
+    return response;
+  };
+
+  return {
+    calls,
+    setFailure(value: unknown) {
+      failure = value;
+    },
+    setResponse(value: unknown) {
+      response = value;
+    },
+    generateValidatedObject: createValidatedObjectGenerator(chatDependency),
+    adapter: createCharacterTextAdapter({
+      endpoint: 'http://localhost:11434',
+      apiKey: 'key',
+      model: 'model',
+    }),
+  };
+}
 
 describe('structured output generation', () => {
   it('uses TanStack AI native schema-backed output', async () => {
+    const harness = createHarness();
     const structuredValue = { cards: [{ title: 'Structured card' }] };
-    chatMock.mockResolvedValueOnce(structuredValue);
+    harness.setResponse(structuredValue);
 
     await expect(
-      generateValidatedObject({
-        adapter,
+      harness.generateValidatedObject({
+        adapter: harness.adapter,
         schema: RESPONSE_SCHEMA,
         schemaDescription: 'One test card.',
         system: 'Generate a card.',
@@ -38,7 +54,8 @@ describe('structured output generation', () => {
         modelOptions: { max_tokens: 100, temperature: 0.5 },
       }),
     ).resolves.toEqual(structuredValue);
-    expect(chatMock).toHaveBeenCalledWith(
+    expect(harness.calls).toHaveLength(1);
+    expect(harness.calls[0]).toEqual(
       expect.objectContaining({
         messages: [{ role: 'user', content: 'Create it.' }],
         systemPrompts: ['Generate a card.'],
@@ -47,47 +64,51 @@ describe('structured output generation', () => {
         stream: false,
       }),
     );
-    const structuredAdapter = chatMock.mock.calls[0]?.[0].adapter as AnyTextAdapter;
-    expect(structuredAdapter).not.toBe(adapter);
+    const structuredAdapter = harness.calls[0]?.adapter;
+    expect(structuredAdapter).not.toBe(harness.adapter);
     expect(structuredAdapter.structuredOutputStream).toBeUndefined();
   });
 
   it('requires either prompt text or messages', async () => {
+    const harness = createHarness();
+
     await expect(
-      generateValidatedObject({
-        adapter,
+      harness.generateValidatedObject({
+        adapter: harness.adapter,
         schema: RESPONSE_SCHEMA,
         schemaDescription: 'One test card.',
         system: 'Generate a card.',
       }),
     ).rejects.toThrow('requires a prompt or messages');
-    expect(chatMock).not.toHaveBeenCalled();
+    expect(harness.calls).toHaveLength(0);
   });
 
   it('surfaces provider failures without retrying or changing generation modes', async () => {
-    chatMock.mockRejectedValue(new Error('Provider rejected structured output.'));
+    const harness = createHarness();
+    harness.setFailure(new Error('Provider rejected structured output.'));
 
     await expect(
-      generateValidatedObject({
-        adapter,
+      harness.generateValidatedObject({
+        adapter: harness.adapter,
         schema: RESPONSE_SCHEMA,
         schemaDescription: 'One test card.',
         system: 'Generate a card.',
         prompt: 'Create it.',
       }),
     ).rejects.toThrow('Provider rejected structured output.');
-    expect(chatMock).toHaveBeenCalledOnce();
+    expect(harness.calls).toHaveLength(1);
   });
 
   it('surfaces nested provider details without inspecting request metadata', async () => {
+    const harness = createHarness();
     const providerError = Object.assign(new Error('Provider returned error'), {
       rawValue: { error: { message: 'Schema grammar rejected.', code: 'INVALID_SCHEMA' } },
     });
-    chatMock.mockRejectedValue(providerError);
+    harness.setFailure(providerError);
 
     await expect(
-      generateValidatedObject({
-        adapter,
+      harness.generateValidatedObject({
+        adapter: harness.adapter,
         schema: RESPONSE_SCHEMA,
         schemaDescription: 'One test card.',
         system: 'Generate a card.',

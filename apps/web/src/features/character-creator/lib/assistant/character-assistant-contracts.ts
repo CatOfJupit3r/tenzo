@@ -167,6 +167,19 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
 export type CharacterAssistantFocus = z.infer<typeof CHARACTER_ASSISTANT_FOCUS_SCHEMA>;
 export type CharacterAssistantToolName = z.infer<typeof CHARACTER_ASSISTANT_TOOL_NAME_SCHEMA>;
 export type iCharacterAssistantContextAttachment = z.infer<typeof CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA>;
+export type iCharacterAssistantGenerationSettings = Pick<
+  iCharacterAssistantStreamRequest,
+  | 'endpoint'
+  | 'model'
+  | 'openRouterProvider'
+  | 'maxTokens'
+  | 'temperature'
+  | 'topP'
+  | 'frequencyPenalty'
+  | 'presencePenalty'
+  | 'topK'
+  | 'minP'
+>;
 export type iCharacterAssistantConcept = z.infer<typeof CHARACTER_CONCEPT_SCHEMA>;
 export type iCharacterAssistantStreamRequest = z.infer<typeof CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA>;
 export type iCharacterAssistantDiscoveryDirectionCategory = z.infer<

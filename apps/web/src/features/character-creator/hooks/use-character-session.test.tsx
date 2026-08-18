@@ -1,58 +1,16 @@
-import { act, renderHook } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 
+import type { CharacterBook } from '../lib/cards/card-schema';
+import {
+  addCharacterBookEntry,
+  createEmptyCharacterBook,
+  removeCharacterBookEntry,
+  reorderCharacterBookEntries,
+  updateCharacterBook,
+  updateCharacterBookEntry,
+} from '../lib/cards/character-book-operations';
 import { createEmptyCharacterLibraryItem, DEFAULT_CHARACTER_LIBRARY_ITEM_ID } from '../lib/cards/character-library';
-import type { iCharacterLibraryItem } from '../lib/cards/character-library';
-import { useCharacterSession } from './use-character-session';
-
-type iCharacterUpdate = (
-  id: string,
-  recipe: (draft: iCharacterLibraryItem) => unknown,
-) => { isPersisted: { promise: Promise<unknown> } };
-
-const sessionTestState = vi.hoisted(() => ({
-  characterLibrary: [] as iCharacterLibraryItem[],
-  updateCharacter: vi.fn<iCharacterUpdate>(),
-}));
-
-vi.mock('@~/db/persistent-collection', () => ({
-  usePersistentCollection: vi.fn(() => []),
-}));
-
-vi.mock('nuqs', async () => {
-  const { DEFAULT_CHARACTER_LIBRARY_ITEM_ID: defaultCharacterId } = await import('../lib/cards/character-library');
-
-  return {
-    parseAsString: { withDefault: () => ({}) },
-    useQueryState: () => [defaultCharacterId, vi.fn()],
-  };
-});
-
-vi.mock('../collections/character-library.collection', () => ({
-  characterLibraryCollection: {
-    has: vi.fn(() => true),
-    update: sessionTestState.updateCharacter,
-  },
-}));
-
-vi.mock('../collections/character-assistant-composer-drafts.collection', () => ({
-  removeCharacterAssistantComposerDraft: vi.fn(),
-}));
-
-vi.mock('../collections/character-assistant-sessions.collection', () => ({
-  removeCharacterAssistantSession: vi.fn(),
-}));
-
-vi.mock('../collections/example-characters.collection', () => ({
-  exampleCharactersCollection: {},
-}));
-
-vi.mock('./use-character-library-list', () => ({
-  useCharacterLibraryList: () => ({
-    characterLibrary: sessionTestState.characterLibrary,
-    isCharacterLibraryReady: true,
-  }),
-}));
+import { createCharacterBookService } from './character-book-service';
 
 it('creates, edits, reorders, and removes character book entries without dropping extensions', () => {
   const character = createEmptyCharacterLibraryItem(DEFAULT_CHARACTER_LIBRARY_ITEM_ID);
@@ -70,37 +28,23 @@ it('creates, edits, reorders, and removes character book entries without droppin
       },
     ],
   };
-  sessionTestState.characterLibrary = [character];
-  sessionTestState.updateCharacter.mockImplementation((_id, recipe) => {
-    recipe(character);
-    return {
-      isPersisted: {
-        promise: new Promise(() => {
-          // Persistence remains pending so it cannot update hook state after this synchronous test.
-        }),
-      },
-    };
+
+  let characterBook: CharacterBook | undefined = character.card.data.character_book;
+  characterBook = addCharacterBookEntry(characterBook);
+  characterBook = updateCharacterBook(characterBook, { description: 'Edited description' });
+  characterBook = updateCharacterBookEntry(characterBook, 0, {
+    keys: ['first', 'updated'],
+    content: 'Edited entry',
+    enabled: false,
   });
+  characterBook = reorderCharacterBookEntries(characterBook, 1, 0);
 
-  const { result } = renderHook(() => useCharacterSession());
-
-  act(() => result.current.addCharacterBookEntry());
-  act(() => result.current.updateCharacterBook({ description: 'Edited description' }));
-  act(() =>
-    result.current.updateCharacterBookEntry(0, {
-      keys: ['first', 'updated'],
-      content: 'Edited entry',
-      enabled: false,
-    }),
-  );
-  act(() => result.current.reorderCharacterBookEntries(1, 0));
-
-  expect(character.card.data.character_book).toMatchObject({
+  expect(characterBook).toMatchObject({
     name: 'Imported lore',
     description: 'Edited description',
     extensions: { book_plugin: { retained: true } },
   });
-  expect(character.card.data.character_book?.entries[1]).toEqual({
+  expect(characterBook?.entries[1]).toEqual({
     keys: ['first', 'updated'],
     content: 'Edited entry',
     extensions: { entry_plugin: 'retained' },
@@ -109,12 +53,38 @@ it('creates, edits, reorders, and removes character book entries without droppin
     priority: 20,
   });
 
-  act(() => result.current.removeCharacterBookEntry(0));
-  expect(character.card.data.character_book?.entries).toHaveLength(1);
+  characterBook = removeCharacterBookEntry(characterBook, 0);
+  expect(characterBook?.entries).toHaveLength(1);
+});
 
-  act(() => result.current.removeCharacterBook());
+it('applies character-book operations through a narrow mutation port', () => {
+  const character = createEmptyCharacterLibraryItem(DEFAULT_CHARACTER_LIBRARY_ITEM_ID);
+  const mutate = vi.fn((recipe: (book: CharacterBook | undefined) => CharacterBook | undefined) => {
+    character.card.data.character_book = recipe(character.card.data.character_book);
+  });
+  const service = createCharacterBookService({ mutate });
+
+  service.create();
+  service.addEntry();
+  service.update({ description: 'A concise lore book.' });
+  service.updateEntry(0, { content: 'Stored entry' });
+
+  expect(mutate).toHaveBeenCalledTimes(4);
+  expect(character.card.data.character_book).toEqual({
+    description: 'A concise lore book.',
+    extensions: {},
+    entries: [
+      {
+        keys: [],
+        content: 'Stored entry',
+        extensions: {},
+        enabled: true,
+        insertion_order: 0,
+      },
+    ],
+  });
+
+  service.remove();
   expect(character.card.data.character_book).toBeUndefined();
-
-  act(() => result.current.createCharacterBook());
-  expect(character.card.data.character_book).toEqual({ extensions: {}, entries: [] });
+  expect(createEmptyCharacterBook()).toEqual({ extensions: {}, entries: [] });
 });

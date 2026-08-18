@@ -1,5 +1,28 @@
+import { z } from 'zod';
+
 import { OUTPUT_FORMATS } from './generation-config';
 import type { OutputFormat } from './generation-config';
+
+const PARSED_RESPONSE_VALUE_SCHEMA = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(z.unknown()),
+  z
+    .object({
+      response: z.unknown().optional(),
+      message: z.unknown().optional(),
+    })
+    .passthrough(),
+]);
+const PARSED_RESPONSE_OBJECT_SCHEMA = z
+  .object({
+    response: z.unknown().optional(),
+    message: z.unknown().optional(),
+  })
+  .passthrough();
+type iParsedResponseValue = z.infer<typeof PARSED_RESPONSE_VALUE_SCHEMA>;
 
 function extractLastCodeBlock(content: string) {
   const codeBlockRegex = /```(?:\w+\n|\n)?([\s\S]*?)```/g;
@@ -18,32 +41,31 @@ function decodeLooseJsonString(value: string) {
   return value.replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t').replace(/\\"/g, '"');
 }
 
-export function coerceParsedResponseToText(value: unknown): string {
+export function coerceParsedResponseToText(value: iParsedResponseValue): string {
   if (typeof value === 'string') {
     return value.trim();
   }
 
   if (Array.isArray(value)) {
     return value
-      .map((entry) => coerceParsedResponseToText(entry))
+      .map((entry) => coerceParsedResponseToText(parseResponseValue(entry)))
       .filter(Boolean)
       .join('\n')
       .trim();
   }
 
-  if (value && typeof value === 'object') {
-    const responseValue = Reflect.get(value, 'response');
-    if (responseValue !== undefined) {
-      return coerceParsedResponseToText(responseValue);
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const parsedObject = PARSED_RESPONSE_OBJECT_SCHEMA.safeParse(value);
+    if (parsedObject.success && 'response' in parsedObject.data && parsedObject.data.response !== undefined) {
+      return coerceParsedResponseToText(parseResponseValue(parsedObject.data.response));
     }
 
-    const messageValue = Reflect.get(value, 'message');
-    if (messageValue !== undefined) {
-      return coerceParsedResponseToText(messageValue);
+    if (parsedObject.success && 'message' in parsedObject.data && parsedObject.data.message !== undefined) {
+      return coerceParsedResponseToText(parseResponseValue(parsedObject.data.message));
     }
 
     const firstValue = Object.values(value)[0];
-    return firstValue === undefined ? '' : coerceParsedResponseToText(firstValue);
+    return firstValue === undefined ? '' : coerceParsedResponseToText(parseResponseValue(firstValue));
   }
 
   if (value == null) {
@@ -51,6 +73,11 @@ export function coerceParsedResponseToText(value: unknown): string {
   }
 
   return String(value).trim();
+}
+
+function parseResponseValue(value: unknown): iParsedResponseValue {
+  const parsed = PARSED_RESPONSE_VALUE_SCHEMA.safeParse(value);
+  return parsed.success ? parsed.data : String(value);
 }
 
 export function parseResponse(content: string, format: OutputFormat): string {
@@ -80,8 +107,7 @@ export function parseResponse(content: string, format: OutputFormat): string {
   }
 
   try {
-    const parsed = JSON.parse(cleanedContent) as unknown;
-    return coerceParsedResponseToText(parsed);
+    return coerceParsedResponseToText(parseResponseValue(JSON.parse(cleanedContent)));
   } catch {
     const responseMatch = /"response"\s*:\s*"([\s\S]*)/i.exec(cleanedContent);
     if (responseMatch?.[1] !== undefined) {

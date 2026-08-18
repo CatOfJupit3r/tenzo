@@ -1,4 +1,7 @@
+import { z } from 'zod';
+
 import { loggerFactory } from '@~/lib/logging/logger';
+import type { iLogger } from '@~/lib/logging/logging-contracts';
 
 const ERROR_DETAIL_KEYS = [
   'message',
@@ -15,6 +18,28 @@ const ERROR_DETAIL_KEYS = [
 const ERROR_CHILD_KEYS = ['rawValue', 'error', 'metadata', 'cause', 'rawEvent', 'response'] as const;
 const MAX_ERROR_MESSAGE_LENGTH = 1_200;
 const GENERATION_LOGGER = loggerFactory.getLogger('character-creator.generation');
+
+const GENERATION_ERROR_OBJECT_SCHEMA = z
+  .object({
+    message: z.union([z.string(), z.number()]).optional(),
+    code: z.union([z.string(), z.number()]).optional(),
+    status: z.union([z.string(), z.number()]).optional(),
+    statusCode: z.union([z.string(), z.number()]).optional(),
+    error_type: z.union([z.string(), z.number()]).optional(),
+    provider_code: z.union([z.string(), z.number()]).optional(),
+    provider_name: z.union([z.string(), z.number()]).optional(),
+    raw: z.union([z.string(), z.number()]).optional(),
+    responseBody: z.union([z.string(), z.number()]).optional(),
+    rawValue: z.unknown().optional(),
+    error: z.unknown().optional(),
+    metadata: z.unknown().optional(),
+    cause: z.unknown().optional(),
+    rawEvent: z.unknown().optional(),
+    response: z.unknown().optional(),
+    errors: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
+type iGenerationErrorObject = z.infer<typeof GENERATION_ERROR_OBJECT_SCHEMA>;
 
 function redactSensitiveValues(value: string) {
   return value
@@ -33,31 +58,35 @@ function appendErrorDetail(details: string[], key: (typeof ERROR_DETAIL_KEYS)[nu
   details.push(`${key}: ${sanitizedValue}`);
 }
 
-function collectGenerationErrorDetails(error: unknown, details: string[], visited: Set<unknown>) {
-  if (error === null || error === undefined || visited.has(error)) return;
-  visited.add(error);
+function collectGenerationErrorDetails(error: unknown, details: string[], visited: Set<object>) {
+  if (error === null || error === undefined) return;
 
   if (typeof error === 'string') {
     details.push(redactSensitiveValues(error));
     return;
   }
   if (typeof error !== 'object') return;
+  if (visited.has(error)) return;
+  visited.add(error);
+
+  const parsed = GENERATION_ERROR_OBJECT_SCHEMA.safeParse(error);
+  if (!parsed.success) return;
+  const errorObject: iGenerationErrorObject = parsed.data;
 
   for (const key of ERROR_DETAIL_KEYS) {
-    appendErrorDetail(details, key, Reflect.get(error, key));
+    appendErrorDetail(details, key, errorObject[key]);
   }
   for (const key of ERROR_CHILD_KEYS) {
-    collectGenerationErrorDetails(Reflect.get(error, key), details, visited);
+    collectGenerationErrorDetails(errorObject[key], details, visited);
   }
-  const nestedErrors = Reflect.get(error, 'errors');
-  if (Array.isArray(nestedErrors)) {
-    nestedErrors.forEach((nestedError) => collectGenerationErrorDetails(nestedError, details, visited));
+  if (errorObject.errors) {
+    errorObject.errors.forEach((nestedError) => collectGenerationErrorDetails(nestedError, details, visited));
   }
 }
 
 export function describeGenerationError(error: unknown, fallbackMessage = 'Unknown provider error.') {
   const details: string[] = [];
-  collectGenerationErrorDetails(error, details, new Set());
+  collectGenerationErrorDetails(error, details, new Set<object>());
   const message = [...new Set(details)].join(' | ').trim() || fallbackMessage;
   return message.length > MAX_ERROR_MESSAGE_LENGTH ? `${message.slice(0, MAX_ERROR_MESSAGE_LENGTH - 3)}...` : message;
 }
@@ -82,8 +111,8 @@ export function getGenerationErrorHint(error: unknown) {
   return null;
 }
 
-export function logGenerationError(context: string, error: unknown) {
-  GENERATION_LOGGER.error('Generation failed', error, {
+export function logGenerationError(context: string, error: unknown, logger: iLogger = GENERATION_LOGGER) {
+  logger.error('Generation failed', error, {
     operation: context,
   });
 }

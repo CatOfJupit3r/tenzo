@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { loggerFactory } from '@~/lib/logging/logger';
+import type { iLogger } from '@~/lib/logging/logging-contracts';
 
 import { CHARACTER_EDIT_FIELD_KEYS } from '../proposals/character-edit-proposal';
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
@@ -30,33 +31,42 @@ const DEDICATED_TOOL_FIELD_KEYS = {
   [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book]: CHARACTER_EDIT_FIELD_KEYS.character_book,
 } satisfies Partial<Record<CharacterAssistantToolName, string>>;
 
-function readInputRecord(input: unknown) {
-  return input && typeof input === 'object' && !Array.isArray(input) ? (input as Record<string, unknown>) : null;
-}
+const TOOL_INPUT_SCHEMA = z
+  .object({
+    changes: z.array(z.object({ fieldKey: z.string() }).passthrough()).optional(),
+    tags: z.array(z.unknown()).optional(),
+    greetings: z.array(z.unknown()).optional(),
+    fields: z.array(z.unknown()).optional(),
+    characterBook: z
+      .object({
+        entries: z.array(z.unknown()).optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+  })
+  .passthrough();
+type iCharacterAssistantToolInput = z.infer<typeof TOOL_INPUT_SCHEMA>;
 
-function readRequestedFieldKeys(toolName: string, input: unknown) {
-  const dedicatedFieldKey = DEDICATED_TOOL_FIELD_KEYS[toolName as keyof typeof DEDICATED_TOOL_FIELD_KEYS];
+const TOOL_ERROR_METADATA_SCHEMA = z
+  .object({
+    position: z.number().finite().optional(),
+    inputLength: z.number().finite().optional(),
+  })
+  .passthrough();
+
+function readRequestedFieldKeys(toolName: string, input: iCharacterAssistantToolInput | null) {
+  const dedicatedFieldKey = Object.entries(DEDICATED_TOOL_FIELD_KEYS).find(([key]) => key === toolName)?.[1];
   if (dedicatedFieldKey) return [dedicatedFieldKey];
   if (toolName !== CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields) return [];
-  const record = readInputRecord(input);
-  if (!Array.isArray(record?.changes)) return [];
-  return record.changes.flatMap((change) => {
-    const changeRecord = readInputRecord(change);
-    return typeof changeRecord?.fieldKey === 'string' ? [changeRecord.fieldKey] : [];
-  });
+  return input?.changes?.map((change) => change.fieldKey) ?? [];
 }
 
-function readItemCount(input: unknown) {
-  const record = readInputRecord(input);
-  if (!record) return undefined;
-  for (const key of ['changes', 'tags', 'greetings', 'fields'] as const) {
-    if (Array.isArray(record[key])) return record[key].length;
+function readItemCount(input: iCharacterAssistantToolInput | null) {
+  for (const values of [input?.changes, input?.tags, input?.greetings, input?.fields]) {
+    if (values) return values.length;
   }
-  if (record.characterBook && typeof record.characterBook === 'object') {
-    const entries = Reflect.get(record.characterBook, 'entries');
-    if (Array.isArray(entries)) return entries.length;
-  }
-  return undefined;
+  return input?.characterBook?.entries?.length;
 }
 
 function classifyToolError(error: unknown) {
@@ -69,20 +79,15 @@ function classifyToolError(error: unknown) {
   return 'execution';
 }
 
-export function logCharacterAssistantTool({
-  model,
-  mode,
-  outcome,
-  runId,
-  toolCallId,
-  toolName,
-  durationMs,
-  input,
-  error,
-}: iCharacterAssistantToolLog) {
-  const inputRecord = readInputRecord(input);
-  const errorPosition = error && typeof error === 'object' ? Reflect.get(error, 'position') : undefined;
-  const inputLength = error && typeof error === 'object' ? Reflect.get(error, 'inputLength') : undefined;
+export function logCharacterAssistantTool(
+  { model, mode, outcome, runId, toolCallId, toolName, durationMs, input, error }: iCharacterAssistantToolLog,
+  logger: iLogger = CHARACTER_ASSISTANT_TOOL_LOGGER,
+) {
+  const parsedInput = TOOL_INPUT_SCHEMA.safeParse(input);
+  const inputRecord = parsedInput.success ? parsedInput.data : null;
+  const parsedError = TOOL_ERROR_METADATA_SCHEMA.safeParse(error);
+  const errorPosition = parsedError.success ? parsedError.data.position : undefined;
+  const inputLength = parsedError.success ? parsedError.data.inputLength : undefined;
   const details = {
     event: 'character-assistant-tool',
     mode,
@@ -93,8 +98,8 @@ export function logCharacterAssistantTool({
     toolName,
     durationMs,
     inputKeys: inputRecord ? Object.keys(inputRecord).sort() : [],
-    requestedFieldKeys: readRequestedFieldKeys(toolName, input),
-    itemCount: readItemCount(input),
+    requestedFieldKeys: readRequestedFieldKeys(toolName, inputRecord),
+    itemCount: readItemCount(inputRecord),
     ...(error === undefined
       ? {}
       : {
@@ -105,8 +110,8 @@ export function logCharacterAssistantTool({
   };
 
   if (outcome === CHARACTER_ASSISTANT_TOOL_OUTCOMES.failed) {
-    CHARACTER_ASSISTANT_TOOL_LOGGER.error('Tool execution', error, details);
+    logger.error('Tool execution', error, details);
   } else {
-    CHARACTER_ASSISTANT_TOOL_LOGGER.info('Tool execution', details);
+    logger.info('Tool execution', details);
   }
 }

@@ -9,6 +9,7 @@ import type { CharacterCard } from '../cards/card-schema';
 import type { CharacterAssistantFieldEditing } from '../generation/generation-config';
 import { parseRepairedJson } from '../generation/json-repair';
 import { generateValidatedObject } from '../generation/structured-output.server';
+import type { iGenerateValidatedObject } from '../generation/structured-output.server';
 import {
   createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
@@ -21,7 +22,7 @@ import type {
   CharacterAssistantToolName,
   iCharacterAssistantContextAttachment,
   iCharacterAssistantDiscoveryContext,
-  iCharacterAssistantStreamRequest,
+  iCharacterAssistantGenerationSettings,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { buildAssistantSystemPrompt } from './character-assistant-runtime.server';
@@ -49,6 +50,7 @@ const MAX_STRUCTURED_SCHEMA_ATTEMPTS = 2;
 const MAX_STRUCTURED_HISTORY_MESSAGES = 12;
 const MAX_STRUCTURED_HISTORY_MESSAGE_CHARACTERS = 4_000;
 const STRUCTURED_ASSISTANT_LOGGER = loggerFactory.getLogger('character-assistant.structured');
+const ACTION_INPUT_JSON_SCHEMA = z.record(z.string(), z.unknown());
 
 interface iStructuredAction {
   action: CharacterAssistantToolName;
@@ -138,7 +140,7 @@ function buildStructuredActionCatalog(
 }
 
 function parseActionInputJson(action: iStructuredAction) {
-  const parsed = action.input ?? parseRepairedJson(action.inputJson ?? '{}');
+  const parsed = action.input ?? parseRepairedJson(action.inputJson ?? '{}', ACTION_INPUT_JSON_SCHEMA);
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parsed;
   }
@@ -181,24 +183,12 @@ function compactStructuredHistory(messages: Array<ModelMessage | UIMessage>) {
     .slice(-MAX_STRUCTURED_HISTORY_MESSAGES);
 }
 
-interface iStructuredAssistantOptions {
+export interface iStructuredAssistantOptions {
   card: CharacterCard;
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
   apiKey: string;
-  generationSettings: Pick<
-    iCharacterAssistantStreamRequest,
-    | 'endpoint'
-    | 'model'
-    | 'openRouterProvider'
-    | 'maxTokens'
-    | 'temperature'
-    | 'topP'
-    | 'frequencyPenalty'
-    | 'presencePenalty'
-    | 'topK'
-    | 'minP'
-  >;
+  generationSettings: iCharacterAssistantGenerationSettings;
   shouldSendDisabledSamplers?: boolean;
   globalCharacterInstruction?: string;
   generalCharacterIdea?: string;
@@ -210,6 +200,16 @@ interface iStructuredAssistantOptions {
   store: iCharacterAssistantProposalStore;
   messages: Array<ModelMessage | UIMessage>;
   abortSignal?: AbortSignal;
+}
+
+export interface iStructuredCharacterAssistantDependencies {
+  generateValidatedObject: iGenerateValidatedObject;
+  createTextAdapter: typeof createCharacterTextAdapter;
+  createStructuredModelOptions: typeof createCharacterStructuredModelOptions;
+}
+
+export interface iStructuredCharacterAssistantService {
+  generateStructuredCharacterAssistantStream: (options: iStructuredAssistantOptions) => AsyncGenerator<StreamChunk>;
 }
 
 function createActionExecution(
@@ -247,8 +247,9 @@ function createActionExecution(
   return { input, execute: async () => handlers.suggestDirections(input) };
 }
 
-export async function* generateStructuredCharacterAssistantStream(
+async function* generateStructuredCharacterAssistantStreamWithDependencies(
   options: iStructuredAssistantOptions,
+  dependencies: iStructuredCharacterAssistantDependencies,
 ): AsyncGenerator<StreamChunk> {
   const threadId = generateUuid();
   const runId = generateUuid();
@@ -304,8 +305,8 @@ export async function* generateStructuredCharacterAssistantStream(
     let round: z.infer<typeof structuredRoundSchema> | undefined;
     for (let schemaAttempt = 1; schemaAttempt <= MAX_STRUCTURED_SCHEMA_ATTEMPTS; schemaAttempt += 1) {
       try {
-        round = await generateValidatedObject({
-          adapter: createCharacterTextAdapter({
+        round = await dependencies.generateValidatedObject({
+          adapter: dependencies.createTextAdapter({
             endpoint: options.generationSettings.endpoint,
             apiKey: options.apiKey,
             model: options.generationSettings.model,
@@ -325,7 +326,7 @@ export async function* generateStructuredCharacterAssistantStream(
                       'Return a valid structured round. Every action must use its typed input object and only fields permitted by the schema.',
                   },
                 ],
-          modelOptions: createCharacterStructuredModelOptions(options.generationSettings.endpoint, {
+          modelOptions: dependencies.createStructuredModelOptions(options.generationSettings.endpoint, {
             ...options.generationSettings,
             shouldSendDisabledSamplers: options.shouldSendDisabledSamplers ?? false,
           }),
@@ -367,7 +368,7 @@ export async function* generateStructuredCharacterAssistantStream(
         yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: JSON.stringify(execution.input) };
         const output = await execution.execute(toolCallId);
         failedActionMessages.delete(action.action);
-        const isNoOp = output !== null && typeof output === 'object' && Reflect.get(output, 'isNoOp') === true;
+        const isNoOp = output !== null && typeof output === 'object' && 'isNoOp' in output && output.isNoOp;
         logCharacterAssistantTool({
           mode: 'structured-output',
           model: options.generationSettings.model,
@@ -459,4 +460,23 @@ export async function* generateStructuredCharacterAssistantStream(
   yield { type: EventType.TEXT_MESSAGE_END, messageId };
   yield { type: EventType.CUSTOM, name: 'structured-output.complete', value: { object: finalResponse, raw } };
   yield { type: EventType.RUN_FINISHED, threadId, runId, finishReason: 'stop', ...(usage ? { usage } : {}) };
+}
+
+export function createStructuredCharacterAssistantService(
+  dependencies: iStructuredCharacterAssistantDependencies = {
+    generateValidatedObject,
+    createTextAdapter: createCharacterTextAdapter,
+    createStructuredModelOptions: createCharacterStructuredModelOptions,
+  },
+): iStructuredCharacterAssistantService {
+  return {
+    generateStructuredCharacterAssistantStream: (options) =>
+      generateStructuredCharacterAssistantStreamWithDependencies(options, dependencies),
+  };
+}
+
+const DEFAULT_STRUCTURED_CHARACTER_ASSISTANT_SERVICE = createStructuredCharacterAssistantService();
+
+export function generateStructuredCharacterAssistantStream(options: iStructuredAssistantOptions) {
+  return DEFAULT_STRUCTURED_CHARACTER_ASSISTANT_SERVICE.generateStructuredCharacterAssistantStream(options);
 }

@@ -4,20 +4,20 @@ import extractChunks from 'png-chunks-extract';
 
 const CHARACTER_CHUNK_KEYWORDS = new Set(['chara', 'ccv3']);
 
-interface iPngChunk {
+export interface iPngChunk {
   name: string;
   data: Uint8Array;
 }
 
-interface iDecodedPngTextChunk {
+export interface iDecodedPngTextChunk {
   keyword: string;
   text: string;
 }
 
-const extractPngChunks = extractChunks as (pngBytes: Uint8Array) => iPngChunk[];
-const encodePngChunks = encodeChunks as (chunks: iPngChunk[]) => Uint8Array;
-const decodePngTextChunk = pngChunkText.decode as (chunkData: Uint8Array) => iDecodedPngTextChunk;
-const encodePngTextChunk = pngChunkText.encode as (keyword: string, text: string) => iPngChunk;
+export const extractPngChunks = extractChunks as (pngBytes: Uint8Array) => iPngChunk[];
+export const encodePngChunks = encodeChunks as (chunks: iPngChunk[]) => Uint8Array;
+export const decodePngTextChunk = pngChunkText.decode as (chunkData: Uint8Array) => iDecodedPngTextChunk;
+export const encodePngTextChunk = pngChunkText.encode as (keyword: string, text: string) => iPngChunk;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';

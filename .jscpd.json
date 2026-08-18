@@ -1,0 +1,19 @@
+{
+  "threshold": 0,
+  "reporters": ["console"],
+  "noTips": true,
+  "mode": "mild",
+  "minLines": 8,
+  "minTokens": 70,
+  "format": ["typescript", "tsx"],
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.output/**",
+    "**/routeTree.gen.ts",
+    "**/.agents/**",
+    "**/.codex/**",
+    "**/tools/oxlint/anti-slop/**"
+  ]
+}

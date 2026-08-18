@@ -133,152 +133,114 @@ export const DEFAULT_CHARACTER_GENERATION_SETTINGS: iCharacterGenerationSettings
   ...DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
 };
 
-function readString(value: unknown, fallbackValue: string) {
-  return typeof value === 'string' ? value : fallbackValue;
-}
+const STORED_STRING_RECORD_SCHEMA = z
+  .record(z.string(), z.string().optional().catch(undefined))
+  .transform((entries) =>
+    Object.fromEntries(Object.entries(entries).filter((entry): entry is [string, string] => entry[1] !== undefined)),
+  )
+  .catch({});
 
-function readBoolean(value: unknown, fallbackValue: boolean) {
-  return typeof value === 'boolean' ? value : fallbackValue;
-}
+const STORED_BOOLEAN_RECORD_SCHEMA = z
+  .record(z.string(), z.boolean().optional().catch(undefined))
+  .transform((entries) =>
+    Object.fromEntries(Object.entries(entries).filter((entry): entry is [string, boolean] => entry[1] !== undefined)),
+  )
+  .catch({});
 
-function readPositiveInteger(value: unknown, fallbackValue: number) {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallbackValue;
-}
+const STORED_ASSISTANT_FIELD_EDITING_SCHEMA = z
+  .partialRecord(CHARACTER_EDIT_FIELD_KEY_SCHEMA, z.boolean().optional().catch(undefined))
+  .transform((entries) =>
+    Object.fromEntries(Object.entries(entries).filter((entry): entry is [string, boolean] => entry[1] !== undefined)),
+  )
+  .catch({});
 
-function readFloatInRange(value: unknown, range: { min: number; max: number }, fallbackValue: number) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallbackValue;
-  }
+const createClampedNumberSchema = (range: { min: number; max: number }, shouldRound = false) =>
+  z
+    .number()
+    .finite()
+    .transform((value) => (shouldRound ? Math.round(value) : value))
+    .transform((value) => Math.min(range.max, Math.max(range.min, value)))
+    .optional();
 
-  return Math.min(range.max, Math.max(range.min, value));
-}
+const STORED_CHARACTER_GENERATION_CONNECTION_SETTINGS_SCHEMA = z
+  .object({
+    globalCharacterInstruction: z.string().optional().catch(undefined),
+    provider: GENERATION_PROVIDER_SCHEMA.optional().catch(undefined),
+    endpoint: z.string().optional().catch(undefined),
+    model: z.string().optional().catch(undefined),
+    openRouterProvider: z.string().optional().catch(undefined),
+    visionModel: z.string().optional().catch(undefined),
+    apiKeyCiphertext: z.string().optional().catch(undefined),
+    contextSize: z.number().finite().positive().transform(Math.floor).optional().catch(undefined),
+    maxTokens: z.number().finite().positive().transform(Math.floor).optional().catch(undefined),
+    outputFormat: OUTPUT_FORMAT_SCHEMA.optional().catch(undefined),
+    requestMode: REQUEST_MODE_SCHEMA.optional().catch(undefined),
+    assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.optional().catch(undefined),
+    temperature: createClampedNumberSchema(TEMPERATURE_RANGE),
+    topP: createClampedNumberSchema(TOP_P_RANGE),
+    frequencyPenalty: createClampedNumberSchema(FREQUENCY_PENALTY_RANGE),
+    presencePenalty: createClampedNumberSchema(PRESENCE_PENALTY_RANGE),
+    topK: createClampedNumberSchema(TOP_K_RANGE, true),
+    minP: createClampedNumberSchema(MIN_P_RANGE),
+    fieldShouldAllowAssistantEditing: STORED_ASSISTANT_FIELD_EDITING_SCHEMA.optional().catch(undefined),
+  })
+  .catch({});
 
-function readIntegerInRange(value: unknown, range: { min: number; max: number }, fallbackValue: number) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return fallbackValue;
-  }
-
-  return Math.min(range.max, Math.max(range.min, Math.round(value)));
-}
-
-function readStringRecord(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, string] => typeof entry[0] === 'string' && typeof entry[1] === 'string',
-    ),
-  );
-}
-
-function readFieldInstructions(value: unknown) {
-  return readStringRecord(value) ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldInstructions;
-}
-
-function readFieldTemplateIds(value: unknown) {
-  return readStringRecord(value) ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldTemplateIds;
-}
-
-function readFieldShouldUseGeneralCharacterIdea(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.fieldShouldUseGeneralCharacterIdea;
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, boolean] => typeof entry[0] === 'string' && typeof entry[1] === 'boolean',
-    ),
-  );
-}
-
-function readAssistantFieldEditing(value: unknown): CharacterAssistantFieldEditing {
-  const parsedPreferences = z.partialRecord(CHARACTER_EDIT_FIELD_KEY_SCHEMA, z.boolean()).safeParse(value);
-
-  return {
-    ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
-    ...(parsedPreferences.success ? parsedPreferences.data : {}),
-  };
-}
+export const CHARACTER_GENERATION_PROMPT_SETTINGS_STORAGE_SCHEMA = z
+  .object({
+    generalCharacterIdea: z.string().optional().catch(undefined),
+    fieldInstructions: STORED_STRING_RECORD_SCHEMA.optional().catch(undefined),
+    fieldShouldUseGeneralCharacterIdea: STORED_BOOLEAN_RECORD_SCHEMA.optional().catch(undefined),
+    fieldTemplateIds: STORED_STRING_RECORD_SCHEMA.optional().catch(undefined),
+    shouldUseDefaultFieldTemplates: z.boolean().optional().catch(undefined),
+  })
+  .catch({})
+  .transform((candidate) => ({
+    generalCharacterIdea:
+      candidate.generalCharacterIdea ?? DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.generalCharacterIdea,
+    fieldInstructions: candidate.fieldInstructions ?? {},
+    fieldShouldUseGeneralCharacterIdea: candidate.fieldShouldUseGeneralCharacterIdea ?? {},
+    fieldTemplateIds: candidate.fieldTemplateIds ?? {},
+    shouldUseDefaultFieldTemplates:
+      candidate.shouldUseDefaultFieldTemplates ??
+      DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.shouldUseDefaultFieldTemplates,
+  }));
 
 export function sanitizeCharacterGenerationConnectionSettings(value: unknown): iCharacterGenerationConnectionSettings {
-  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  const candidate = STORED_CHARACTER_GENERATION_CONNECTION_SETTINGS_SCHEMA.parse(value);
 
   return {
-    globalCharacterInstruction: readString(
-      candidate.globalCharacterInstruction,
+    globalCharacterInstruction:
+      candidate.globalCharacterInstruction ??
       DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.globalCharacterInstruction,
-    ),
-    provider: GENERATION_PROVIDER_SCHEMA.safeParse(candidate.provider).success
-      ? (candidate.provider as GenerationProvider)
-      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.provider,
-    endpoint: readString(candidate.endpoint, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.endpoint),
-    model: readString(candidate.model, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.model),
-    openRouterProvider: readString(
-      candidate.openRouterProvider,
-      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.openRouterProvider,
-    ),
-    visionModel: readString(candidate.visionModel, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.visionModel),
-    apiKeyCiphertext: readString(
-      candidate.apiKeyCiphertext,
-      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.apiKeyCiphertext,
-    ),
-    contextSize: readPositiveInteger(
-      candidate.contextSize,
-      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.contextSize,
-    ),
-    maxTokens: readPositiveInteger(candidate.maxTokens, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.maxTokens),
-    outputFormat: OUTPUT_FORMAT_SCHEMA.safeParse(candidate.outputFormat).success
-      ? (candidate.outputFormat as OutputFormat)
-      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.outputFormat,
-    requestMode: REQUEST_MODE_SCHEMA.safeParse(candidate.requestMode).success
-      ? (candidate.requestMode as RequestMode)
-      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.requestMode,
-    assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.safeParse(candidate.assistantGenerationMode)
-      .success
-      ? (candidate.assistantGenerationMode as CharacterAssistantGenerationMode)
-      : DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.assistantGenerationMode,
-    temperature: readFloatInRange(
-      candidate.temperature,
-      TEMPERATURE_RANGE,
-      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.temperature,
-    ),
-    topP: readFloatInRange(candidate.topP, TOP_P_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topP),
-    frequencyPenalty: readFloatInRange(
-      candidate.frequencyPenalty,
-      FREQUENCY_PENALTY_RANGE,
-      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.frequencyPenalty,
-    ),
-    presencePenalty: readFloatInRange(
-      candidate.presencePenalty,
-      PRESENCE_PENALTY_RANGE,
-      DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.presencePenalty,
-    ),
-    topK: readIntegerInRange(candidate.topK, TOP_K_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topK),
-    minP: readFloatInRange(candidate.minP, MIN_P_RANGE, DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.minP),
-    fieldShouldAllowAssistantEditing: readAssistantFieldEditing(candidate.fieldShouldAllowAssistantEditing),
+    provider: candidate.provider ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.provider,
+    endpoint: candidate.endpoint ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.endpoint,
+    model: candidate.model ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.model,
+    openRouterProvider:
+      candidate.openRouterProvider ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.openRouterProvider,
+    visionModel: candidate.visionModel ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.visionModel,
+    apiKeyCiphertext: candidate.apiKeyCiphertext ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.apiKeyCiphertext,
+    contextSize: candidate.contextSize ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.contextSize,
+    maxTokens: candidate.maxTokens ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.maxTokens,
+    outputFormat: candidate.outputFormat ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.outputFormat,
+    requestMode: candidate.requestMode ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.requestMode,
+    assistantGenerationMode:
+      candidate.assistantGenerationMode ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.assistantGenerationMode,
+    temperature: candidate.temperature ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.temperature,
+    topP: candidate.topP ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topP,
+    frequencyPenalty: candidate.frequencyPenalty ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.frequencyPenalty,
+    presencePenalty: candidate.presencePenalty ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.presencePenalty,
+    topK: candidate.topK ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topK,
+    minP: candidate.minP ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.minP,
+    fieldShouldAllowAssistantEditing: {
+      ...DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
+      ...candidate.fieldShouldAllowAssistantEditing,
+    },
   };
 }
 
 export function sanitizeCharacterGenerationPromptSettings(value: unknown): iCharacterGenerationPromptSettings {
-  const candidate = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-
-  return {
-    generalCharacterIdea: readString(
-      candidate.generalCharacterIdea,
-      DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.generalCharacterIdea,
-    ),
-    fieldInstructions: readFieldInstructions(candidate.fieldInstructions),
-    fieldShouldUseGeneralCharacterIdea: readFieldShouldUseGeneralCharacterIdea(
-      candidate.fieldShouldUseGeneralCharacterIdea,
-    ),
-    fieldTemplateIds: readFieldTemplateIds(candidate.fieldTemplateIds),
-    shouldUseDefaultFieldTemplates: readBoolean(
-      candidate.shouldUseDefaultFieldTemplates,
-      DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS.shouldUseDefaultFieldTemplates,
-    ),
-  };
+  return CHARACTER_GENERATION_PROMPT_SETTINGS_STORAGE_SCHEMA.parse(value);
 }
 
 export function sanitizeCharacterGenerationSettings(value: unknown): iCharacterGenerationSettings {

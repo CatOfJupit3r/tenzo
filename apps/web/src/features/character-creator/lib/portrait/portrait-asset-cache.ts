@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { createBrowserObjectUrl, revokeBrowserObjectUrl } from '@~/utils/ssr-helpers';
+
 import { readCharacterAssetBlob } from '../cards/image-store';
 import { readPortraitDimensions } from './portrait-focal-point';
 import type { iPortraitDimensions } from './portrait-focal-point';
@@ -17,7 +19,6 @@ export interface iPortraitAssetEntry {
 }
 
 const MAX_RETAINED_ASSETS = 24;
-const isBrowser = typeof window !== 'undefined';
 
 /**
  * Shared, persistent cache of decoded portrait assets keyed by `assetId`. Object
@@ -53,9 +54,7 @@ function notify() {
 }
 
 function revokeObjectUrl(objectUrl: string | null) {
-  if (objectUrl && isBrowser) {
-    URL.revokeObjectURL(objectUrl);
-  }
+  revokeBrowserObjectUrl(objectUrl);
 }
 
 function evictOverflow() {
@@ -134,7 +133,7 @@ export async function ensurePortraitAssetLoaded(assetId: string): Promise<iPortr
       const loadedEntry: iPortraitAssetEntry = {
         status: PORTRAIT_ASSET_STATUSES.loaded,
         blob,
-        objectUrl: isBrowser ? URL.createObjectURL(blob) : null,
+        objectUrl: createBrowserObjectUrl(blob),
         dimensions,
         error: null,
       };
@@ -170,7 +169,7 @@ export function primePortraitAsset(assetId: string, blob: Blob, dimensions: iPor
   const primedEntry: iPortraitAssetEntry = {
     status: PORTRAIT_ASSET_STATUSES.loaded,
     blob,
-    objectUrl: isBrowser ? URL.createObjectURL(blob) : null,
+    objectUrl: createBrowserObjectUrl(blob),
     dimensions,
     error: null,
   };

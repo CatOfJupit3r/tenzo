@@ -1,13 +1,17 @@
+import { z } from 'zod';
+
 import type { iStorageApi } from '@~/db/storage';
 import { generateUuid } from '@~/utils/uuid';
 
 import { sanitizeCharacterAssistantSession } from './character-assistant-session';
 import type { iCharacterAssistantSession } from './character-assistant-session';
 
-interface iStoredCollectionItem {
-  versionKey: string;
-  data: unknown;
-}
+const STORED_COLLECTION_ITEM_SCHEMA = z.object({
+  versionKey: z.string(),
+  data: z.unknown(),
+});
+
+const STORED_COLLECTION_SCHEMA = z.record(z.string(), STORED_COLLECTION_ITEM_SCHEMA);
 
 interface iMigrateCharacterAssistantSessionStorageOptions {
   storage: iStorageApi;
@@ -15,41 +19,33 @@ interface iMigrateCharacterAssistantSessionStorageOptions {
   storageKey: string;
 }
 
-export function readStoredCollectionItems(value: string | null) {
+export function readStoredCollectionItems(value: string | null): iCharacterAssistantSession[] {
   if (!value) {
     return [];
   }
 
   try {
-    const parsedValue = JSON.parse(value) as unknown;
-    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+    const parsedValue = STORED_COLLECTION_SCHEMA.safeParse(JSON.parse(value));
+    if (!parsedValue.success) {
       return [];
     }
 
-    return Object.values(parsedValue as Record<string, unknown>).flatMap((storedItem) => {
-      if (!storedItem || typeof storedItem !== 'object' || Array.isArray(storedItem) || !('data' in storedItem)) {
-        return [];
-      }
-
-      return [(storedItem as iStoredCollectionItem).data];
+    return Object.values(parsedValue.data).flatMap((storedItem) => {
+      const session = sanitizeCharacterAssistantSession(storedItem.data);
+      return session ? [session] : [];
     });
   } catch {
     return [];
   }
 }
 
-export function selectLatestSessions(values: unknown[]) {
+export function selectLatestSessions(values: readonly iCharacterAssistantSession[]) {
   const sessionsByCharacterId = new Map<string, iCharacterAssistantSession>();
 
   values.forEach((value) => {
-    const session = sanitizeCharacterAssistantSession(value);
-    if (!session) {
-      return;
-    }
-
-    const existingSession = sessionsByCharacterId.get(session.characterId);
-    if (!existingSession || existingSession.updatedAt < session.updatedAt) {
-      sessionsByCharacterId.set(session.characterId, session);
+    const existingSession = sessionsByCharacterId.get(value.characterId);
+    if (!existingSession || existingSession.updatedAt < value.updatedAt) {
+      sessionsByCharacterId.set(value.characterId, value);
     }
   });
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { localStorageApi } from '@~/db/storage';
+
 import { WORKSPACE_PANEL_WIDTHS, clampWorkspacePanelWidth } from '../components/workspace-panel-layout';
 
 const SECTION_PANEL_WIDTH_STORAGE_KEY = 'tenzo:character-creator:section-panel-width';
@@ -7,20 +9,12 @@ const SECTION_PANEL_COLLAPSED_STORAGE_KEY = 'tenzo:character-creator:section-pan
 const ASSISTANT_PANEL_WIDTH_STORAGE_KEY = 'tenzo:character-creator:assistant-panel-width';
 
 function readStoredWidth(storageKey: string, fallbackWidth: number, minWidth: number, maxWidth: number) {
-  if (typeof window === 'undefined') {
-    return fallbackWidth;
-  }
-
-  const storedWidth = Number.parseFloat(window.localStorage.getItem(storageKey) ?? '');
+  const storedWidth = Number.parseFloat(localStorageApi.getItem(storageKey) ?? '');
   return Number.isFinite(storedWidth) ? clampWorkspacePanelWidth(storedWidth, minWidth, maxWidth) : fallbackWidth;
 }
 
 function readStoredCollapsedState() {
-  if (typeof window === 'undefined') {
-    return false;
-  }
-
-  return window.localStorage.getItem(SECTION_PANEL_COLLAPSED_STORAGE_KEY) === 'true';
+  return localStorageApi.getItem(SECTION_PANEL_COLLAPSED_STORAGE_KEY) === 'true';
 }
 
 export function useWorkspacePanelLayout() {
@@ -55,15 +49,15 @@ export function useWorkspacePanelLayout() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(SECTION_PANEL_WIDTH_STORAGE_KEY, String(storedSectionPanelWidth));
+    localStorageApi.setItem(SECTION_PANEL_WIDTH_STORAGE_KEY, String(storedSectionPanelWidth));
   }, [storedSectionPanelWidth]);
 
   useEffect(() => {
-    window.localStorage.setItem(ASSISTANT_PANEL_WIDTH_STORAGE_KEY, String(storedAssistantPanelWidth));
+    localStorageApi.setItem(ASSISTANT_PANEL_WIDTH_STORAGE_KEY, String(storedAssistantPanelWidth));
   }, [storedAssistantPanelWidth]);
 
   useEffect(() => {
-    window.localStorage.setItem(SECTION_PANEL_COLLAPSED_STORAGE_KEY, String(isSectionPanelCollapsed));
+    localStorageApi.setItem(SECTION_PANEL_COLLAPSED_STORAGE_KEY, String(isSectionPanelCollapsed));
   }, [isSectionPanelCollapsed]);
 
   return {

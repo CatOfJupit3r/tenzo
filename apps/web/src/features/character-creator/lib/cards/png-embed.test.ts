@@ -1,26 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import pngChunkText from 'png-chunk-text';
-import encodeChunks from 'png-chunks-encode';
-import extractChunks from 'png-chunks-extract';
 import { describe, expect, it } from 'vitest';
 
-import { embedCharacterCardInPng, readCharacterCardFromPng } from './png-embed';
-
-interface iPngChunk {
-  name: string;
-  data: Uint8Array;
-}
-
-interface iDecodedPngTextChunk {
-  keyword: string;
-  text: string;
-}
-
-const extractPngChunks = extractChunks as (pngBytes: Uint8Array) => iPngChunk[];
-const encodePngChunks = encodeChunks as (chunks: iPngChunk[]) => Uint8Array;
-const decodePngTextChunk = pngChunkText.decode as (chunkData: Uint8Array) => iDecodedPngTextChunk;
-const encodePngTextChunk = pngChunkText.encode as (keyword: string, text: string) => iPngChunk;
+import {
+  decodePngTextChunk,
+  embedCharacterCardInPng,
+  encodePngChunks,
+  encodePngTextChunk,
+  extractPngChunks,
+  readCharacterCardFromPng,
+} from './png-embed';
 
 function readSamplePng(): Uint8Array {
   return new Uint8Array(readFileSync(resolve(process.cwd(), 'public/favicon/favicon-96x96.png')));

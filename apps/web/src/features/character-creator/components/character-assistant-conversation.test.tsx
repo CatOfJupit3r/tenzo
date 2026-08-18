@@ -8,6 +8,27 @@ import { createEmptyCharacterCard } from '../constants/card-defaults';
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from '../lib/assistant/character-assistant-contracts';
 import { createCharacterEditProposal } from '../lib/proposals/character-edit-proposal';
 import { CharacterAssistantConversation } from './character-assistant-conversation';
+import type { iCharacterAssistantConversationProps } from './character-assistant-conversation';
+
+function getConversationProps(overrides: Partial<iCharacterAssistantConversationProps> = {}) {
+  return {
+    messages: [],
+    proposals: [],
+    isRunning: false,
+    activityLabel: null,
+    errorMessage: null,
+    settledOutcomeRef: createRef<HTMLDivElement>(),
+    onApply: vi.fn(),
+    onReject: vi.fn(),
+    onApplyAll: vi.fn(),
+    onRejectAll: vi.fn(),
+    ...overrides,
+  } satisfies iCharacterAssistantConversationProps;
+}
+
+function renderConversation(overrides: Partial<iCharacterAssistantConversationProps> = {}) {
+  return render(<CharacterAssistantConversation {...getConversationProps(overrides)} />);
+}
 
 describe('CharacterAssistantConversation', () => {
   it('shows idempotent proposal calls as a successful no-op', () => {
@@ -32,20 +53,7 @@ describe('CharacterAssistantConversation', () => {
       },
     ];
 
-    render(
-      <CharacterAssistantConversation
-        messages={messages}
-        proposals={[]}
-        isRunning={false}
-        activityLabel={null}
-        errorMessage={null}
-        settledOutcomeRef={createRef<HTMLDivElement>()}
-        onApply={vi.fn()}
-        onReject={vi.fn()}
-        onApplyAll={vi.fn()}
-        onRejectAll={vi.fn()}
-      />,
-    );
+    renderConversation({ messages });
 
     expect(screen.getByRole('status').textContent).toContain('already match the current card');
     expect(screen.queryByRole('alert')).toBeNull();
@@ -69,20 +77,7 @@ describe('CharacterAssistantConversation', () => {
       },
     ];
 
-    render(
-      <CharacterAssistantConversation
-        messages={messages}
-        proposals={[]}
-        isRunning={false}
-        activityLabel={null}
-        errorMessage={null}
-        settledOutcomeRef={createRef<HTMLDivElement>()}
-        onApply={vi.fn()}
-        onReject={vi.fn()}
-        onApplyAll={vi.fn()}
-        onRejectAll={vi.fn()}
-      />,
-    );
+    renderConversation({ messages });
 
     expect(screen.getByRole('alert').textContent).toContain('Description is disabled for assistant editing.');
   });
@@ -91,20 +86,7 @@ describe('CharacterAssistantConversation', () => {
     const card = createEmptyCharacterCard();
     const emptyProposal = createCharacterEditProposal({ baseCard: card, proposedCard: structuredClone(card) });
 
-    render(
-      <CharacterAssistantConversation
-        messages={[]}
-        proposals={[emptyProposal, { ...emptyProposal, id: 'another-empty-proposal' }]}
-        isRunning={false}
-        activityLabel={null}
-        errorMessage={null}
-        settledOutcomeRef={createRef<HTMLDivElement>()}
-        onApply={vi.fn()}
-        onReject={vi.fn()}
-        onApplyAll={vi.fn()}
-        onRejectAll={vi.fn()}
-      />,
-    );
+    renderConversation({ proposals: [emptyProposal, { ...emptyProposal, id: 'another-empty-proposal' }] });
 
     expect(screen.queryByRole('button', { name: 'Apply all' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reject all' })).toBeNull();
@@ -120,20 +102,7 @@ describe('CharacterAssistantConversation', () => {
       },
     ];
 
-    const { container } = render(
-      <CharacterAssistantConversation
-        messages={messages}
-        proposals={[]}
-        isRunning={false}
-        activityLabel={null}
-        errorMessage={null}
-        settledOutcomeRef={createRef<HTMLDivElement>()}
-        onApply={vi.fn()}
-        onReject={vi.fn()}
-        onApplyAll={vi.fn()}
-        onRejectAll={vi.fn()}
-      />,
-    );
+    const { container } = renderConversation({ messages });
 
     await screen.findByText('{{char}}');
     expect(container.querySelector('strong .macro-chip-char')?.textContent).toBe('{{char}}');
@@ -181,21 +150,7 @@ describe('CharacterAssistantConversation', () => {
     const onApply = vi.fn();
     const onReject = vi.fn();
     const onJumpToField = vi.fn();
-    render(
-      <CharacterAssistantConversation
-        messages={messages}
-        proposals={[proposal]}
-        isRunning={false}
-        activityLabel={null}
-        errorMessage={null}
-        settledOutcomeRef={createRef<HTMLDivElement>()}
-        onApply={onApply}
-        onReject={onReject}
-        onApplyAll={vi.fn()}
-        onRejectAll={vi.fn()}
-        onJumpToField={onJumpToField}
-      />,
-    );
+    renderConversation({ messages, proposals: [proposal], onApply, onReject, onJumpToField });
 
     await user.click(screen.getByRole('button', { name: 'Description proposed' }));
     expect(screen.getByText('- Old description')).toBeTruthy();
@@ -241,20 +196,7 @@ describe('CharacterAssistantConversation', () => {
       },
     ];
 
-    render(
-      <CharacterAssistantConversation
-        messages={messages}
-        proposals={[]}
-        isRunning={false}
-        activityLabel={null}
-        errorMessage={null}
-        settledOutcomeRef={createRef<HTMLDivElement>()}
-        onApply={vi.fn()}
-        onReject={vi.fn()}
-        onApplyAll={vi.fn()}
-        onRejectAll={vi.fn()}
-      />,
-    );
+    renderConversation({ messages });
 
     expect(screen.queryByRole('region', { name: 'Assistant proposal' })).toBeNull();
   });
@@ -277,20 +219,7 @@ describe('CharacterAssistantConversation', () => {
       },
     ];
 
-    render(
-      <CharacterAssistantConversation
-        messages={messages}
-        proposals={[]}
-        isRunning={false}
-        activityLabel={null}
-        errorMessage={null}
-        settledOutcomeRef={createRef<HTMLDivElement>()}
-        onApply={vi.fn()}
-        onReject={vi.fn()}
-        onApplyAll={vi.fn()}
-        onRejectAll={vi.fn()}
-      />,
-    );
+    renderConversation({ messages });
 
     expect(screen.getAllByText('The character is ready.')).toHaveLength(1);
   });
@@ -356,29 +285,19 @@ describe('CharacterAssistantConversation', () => {
 
     function ConversationHarness() {
       const [messages, setMessages] = useState(initialMessages);
-      return (
-        <CharacterAssistantConversation
-          messages={messages}
-          proposals={[]}
-          isRunning={false}
-          activityLabel={null}
-          errorMessage={null}
-          settledOutcomeRef={createRef<HTMLDivElement>()}
-          onApply={vi.fn()}
-          onReject={vi.fn()}
-          onApplyAll={vi.fn()}
-          onRejectAll={vi.fn()}
-          onDeleteFromMessage={async (messageId) => {
-            setMessages((current) =>
-              current.slice(
-                0,
-                current.findIndex((message) => message.id === messageId),
-              ),
-            );
-          }}
-          onEditLastUserMessage={onEdit}
-        />
-      );
+      const conversationProps = getConversationProps({
+        messages,
+        onDeleteFromMessage: async (messageId) => {
+          setMessages((current) =>
+            current.slice(
+              0,
+              current.findIndex((message) => message.id === messageId),
+            ),
+          );
+        },
+        onEditLastUserMessage: onEdit,
+      });
+      return <CharacterAssistantConversation {...conversationProps} />;
     }
 
     render(<ConversationHarness />);

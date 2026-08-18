@@ -17,7 +17,7 @@ import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
   iCharacterAssistantDiscoveryContext,
-  iCharacterAssistantStreamRequest,
+  iCharacterAssistantGenerationSettings,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { createCharacterAssistantSafetyMiddleware } from './character-assistant-safety';
@@ -28,19 +28,7 @@ export interface iStreamCharacterAssistantOptions {
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
   apiKey: string;
-  generationSettings: Pick<
-    iCharacterAssistantStreamRequest,
-    | 'endpoint'
-    | 'model'
-    | 'openRouterProvider'
-    | 'maxTokens'
-    | 'temperature'
-    | 'topP'
-    | 'frequencyPenalty'
-    | 'presencePenalty'
-    | 'topK'
-    | 'minP'
-  >;
+  generationSettings: iCharacterAssistantGenerationSettings;
   shouldSendDisabledSamplers?: boolean;
   globalCharacterInstruction?: string;
   generalCharacterIdea?: string;

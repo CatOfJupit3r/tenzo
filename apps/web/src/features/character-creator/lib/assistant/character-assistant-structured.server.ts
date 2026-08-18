@@ -22,7 +22,7 @@ import type {
   CharacterAssistantToolName,
   iCharacterAssistantContextAttachment,
   iCharacterAssistantDiscoveryContext,
-  iCharacterAssistantStreamRequest,
+  iCharacterAssistantGenerationSettings,
   iChatTemplateRef,
 } from './character-assistant-contracts';
 import { buildAssistantSystemPrompt } from './character-assistant-runtime.server';
@@ -188,19 +188,7 @@ export interface iStructuredAssistantOptions {
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
   apiKey: string;
-  generationSettings: Pick<
-    iCharacterAssistantStreamRequest,
-    | 'endpoint'
-    | 'model'
-    | 'openRouterProvider'
-    | 'maxTokens'
-    | 'temperature'
-    | 'topP'
-    | 'frequencyPenalty'
-    | 'presencePenalty'
-    | 'topK'
-    | 'minP'
-  >;
+  generationSettings: iCharacterAssistantGenerationSettings;
   shouldSendDisabledSamplers?: boolean;
   globalCharacterInstruction?: string;
   generalCharacterIdea?: string;

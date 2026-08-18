@@ -1,4 +1,5 @@
 import type { iArea, iMediaSize, iSize } from '@~/components/ui/cropper';
+import { z } from 'zod';
 
 export const SILLY_TAVERN_PORTRAIT_ASPECT_RATIO = 2 / 3;
 export const SILLY_TAVERN_PORTRAIT_WIDTH = 512;
@@ -17,6 +18,16 @@ export interface iPortraitCropRect {
   width: number;
   height: number;
 }
+
+export const PORTRAIT_CROP_RECT_INPUT_SCHEMA = z
+  .object({
+    x: z.number().finite().optional().catch(undefined),
+    y: z.number().finite().optional().catch(undefined),
+    width: z.number().finite().optional().catch(undefined),
+    height: z.number().finite().optional().catch(undefined),
+  })
+  .nullable()
+  .catch(null);
 
 export interface iPortraitEditorTransform {
   x: number;

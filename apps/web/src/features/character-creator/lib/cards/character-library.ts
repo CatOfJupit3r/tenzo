@@ -10,7 +10,10 @@ import {
   sanitizeCharacterGenerationPromptSettings,
 } from '../generation/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
-import { sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
+import {
+  PORTRAIT_CROP_RECT_INPUT_SCHEMA,
+  sanitizeStoredPortraitCropRect,
+} from '../portrait/portrait-focal-point';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
 
@@ -52,16 +55,6 @@ export type iCharacterLibraryItem = z.infer<typeof CHARACTER_LIBRARY_ITEM_SCHEMA
 function getTimestamp() {
   return new Date().toISOString();
 }
-
-const PORTRAIT_CROP_RECT_INPUT_SCHEMA = z
-  .object({
-    x: z.number().finite().optional().catch(undefined),
-    y: z.number().finite().optional().catch(undefined),
-    width: z.number().finite().optional().catch(undefined),
-    height: z.number().finite().optional().catch(undefined),
-  })
-  .nullable()
-  .catch(null);
 
 const PORTRAIT_REFERENCE_INPUT_SCHEMA = z
   .object({

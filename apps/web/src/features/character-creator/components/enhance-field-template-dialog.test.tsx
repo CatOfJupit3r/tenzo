@@ -6,6 +6,7 @@ import type { iStoredExampleCharacter } from '../lib/cards/example-characters';
 import { TEMPLATE_MODES } from '../lib/cards/field-templates';
 import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
 import { EnhanceFieldTemplateDialog } from './enhance-field-template-dialog';
+import type { iEnhanceFieldTemplateDialogProps } from './enhance-field-template-dialog';
 
 function createTemplate(): iFieldTemplateViewModel {
   return {
@@ -50,6 +51,23 @@ function createExampleCharacter(): iStoredExampleCharacter {
   };
 }
 
+function renderDialog(overrides: Partial<iEnhanceFieldTemplateDialogProps> = {}) {
+  return render(
+    <EnhanceFieldTemplateDialog
+      isOpen
+      isEnhancing={false}
+      targetTemplate={createTemplate()}
+      fieldTemplates={[createTemplate()]}
+      exampleCharacters={[]}
+      onOpenChange={vi.fn()}
+      onCancel={vi.fn()}
+      onEnhance={vi.fn().mockResolvedValue('Generated template content')}
+      onApply={vi.fn()}
+      {...overrides}
+    />,
+  );
+}
+
 describe('EnhanceFieldTemplateDialog', () => {
   it('keeps the original unchanged until the generated AI draft is applied', async () => {
     const user = userEvent.setup();
@@ -60,19 +78,7 @@ describe('EnhanceFieldTemplateDialog', () => {
     const onApply = vi.fn();
     const onOpenChange = vi.fn();
 
-    render(
-      <EnhanceFieldTemplateDialog
-        isOpen
-        isEnhancing={false}
-        targetTemplate={createTemplate()}
-        fieldTemplates={[createTemplate()]}
-        exampleCharacters={[]}
-        onOpenChange={onOpenChange}
-        onCancel={vi.fn()}
-        onEnhance={onEnhance}
-        onApply={onApply}
-      />,
-    );
+    renderDialog({ onOpenChange, onEnhance, onApply });
 
     await user.click(screen.getByRole('button', { name: 'Generate draft' }));
 
@@ -103,19 +109,7 @@ describe('EnhanceFieldTemplateDialog', () => {
     const user = userEvent.setup();
     const onEnhance = vi.fn().mockResolvedValue('Generated template content');
 
-    render(
-      <EnhanceFieldTemplateDialog
-        isOpen
-        isEnhancing={false}
-        targetTemplate={createTemplate()}
-        fieldTemplates={[createTemplate()]}
-        exampleCharacters={[createExampleCharacter()]}
-        onOpenChange={vi.fn()}
-        onCancel={vi.fn()}
-        onEnhance={onEnhance}
-        onApply={vi.fn()}
-      />,
-    );
+    renderDialog({ exampleCharacters: [createExampleCharacter()], onEnhance });
 
     await user.click(screen.getByRole('checkbox', { name: 'Description' }));
     await user.click(screen.getByRole('button', { name: 'Generate draft' }));
@@ -137,19 +131,7 @@ describe('EnhanceFieldTemplateDialog', () => {
     const user = userEvent.setup();
     const onEnhance = vi.fn().mockResolvedValue('Generated template content');
 
-    render(
-      <EnhanceFieldTemplateDialog
-        isOpen
-        isEnhancing={false}
-        targetTemplate={createTemplate()}
-        fieldTemplates={[createTemplate()]}
-        exampleCharacters={[createExampleCharacter()]}
-        onOpenChange={vi.fn()}
-        onCancel={vi.fn()}
-        onEnhance={onEnhance}
-        onApply={vi.fn()}
-      />,
-    );
+    renderDialog({ exampleCharacters: [createExampleCharacter()], onEnhance });
 
     await user.click(screen.getByRole('checkbox', { name: 'Include current template content' }));
     await user.click(screen.getByRole('button', { name: 'Generate draft' }));
@@ -162,19 +144,7 @@ describe('EnhanceFieldTemplateDialog', () => {
     const onApply = vi.fn();
     const onOpenChange = vi.fn();
 
-    render(
-      <EnhanceFieldTemplateDialog
-        isOpen
-        isEnhancing={false}
-        targetTemplate={createTemplate()}
-        fieldTemplates={[createTemplate()]}
-        exampleCharacters={[]}
-        onOpenChange={onOpenChange}
-        onCancel={vi.fn()}
-        onEnhance={vi.fn().mockResolvedValue('Generated template content')}
-        onApply={onApply}
-      />,
-    );
+    renderDialog({ onOpenChange, onApply });
 
     await user.click(screen.getByRole('button', { name: 'Generate draft' }));
     await user.click(await screen.findByRole('button', { name: 'Discard' }));

@@ -12,6 +12,23 @@ interface iErrorBoundaryProps {
   reset?: () => void;
 }
 
+function ErrorBoundaryActions({ onReset }: { onReset: () => unknown }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button onClick={onReset} variant="default">
+        <HiOutlineRefresh className="mr-2 size-4" />
+        Try Again
+      </Button>
+      <Button variant="outline" asChild>
+        <Link to="/">
+          <HiOutlineHome className="mr-2 size-4" />
+          Go Home
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
 export function ErrorBoundary({ error, reset }: iErrorBoundaryProps) {
   const router = useRouter();
 
@@ -54,18 +71,7 @@ export function ErrorBoundary({ error, reset }: iErrorBoundaryProps) {
               </div>
             ) : null}
 
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={handleReset} variant="default">
-                <HiOutlineRefresh className="mr-2 size-4" />
-                Try Again
-              </Button>
-              <Button variant="outline" asChild>
-                <Link to="/">
-                  <HiOutlineHome className="mr-2 size-4" />
-                  Go Home
-                </Link>
-              </Button>
-            </div>
+            <ErrorBoundaryActions onReset={handleReset} />
           </CardContent>
         </Card>
       </div>
@@ -92,18 +98,7 @@ export function ErrorBoundary({ error, reset }: iErrorBoundaryProps) {
             the home page.
           </p>
 
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={handleReset} variant="default">
-              <HiOutlineRefresh className="mr-2 size-4" />
-              Try Again
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/">
-                <HiOutlineHome className="mr-2 size-4" />
-                Go Home
-              </Link>
-            </Button>
-          </div>
+          <ErrorBoundaryActions onReset={handleReset} />
         </CardContent>
       </Card>
     </div>

@@ -328,6 +328,43 @@ const flattenOptions = (options?: readonly (iOptionType | GroupBase<iOptionType>
 type SingleSelectBaseProps = Props<iOptionType, false, GroupBase<iOptionType>>;
 type MultiSelectBaseProps = Props<iOptionType, true, GroupBase<iOptionType>>;
 type CreatableSingleSelectBaseProps = CreatableProps<iOptionType, false, GroupBase<iOptionType>>;
+type iSingleSelectChangeHandler = NonNullable<SingleSelectBaseProps['onChange']>;
+
+function useSingleSelectValues(
+  value: string | null | undefined,
+  defaultValue: string | null | undefined,
+  options: readonly (iOptionType | GroupBase<iOptionType>)[] | undefined,
+  isCreatable: boolean,
+) {
+  const flatOptions = useMemo(() => flattenOptions(options), [options]);
+  const resolveValue = useCallback(
+    (candidate: string | null | undefined) => {
+      if (candidate === undefined) return undefined;
+      if (candidate === null || (isCreatable && candidate === '')) return null;
+      return (
+        flatOptions.find((option) => option.value === candidate) ??
+        (isCreatable ? { label: candidate, value: candidate } : null)
+      );
+    },
+    [flatOptions, isCreatable],
+  );
+
+  return {
+    computedValue: useMemo(() => resolveValue(value), [resolveValue, value]),
+    computedDefaultValue: useMemo(() => resolveValue(defaultValue), [defaultValue, resolveValue]),
+  };
+}
+
+function emitSingleSelectChange(
+  selected: Parameters<iSingleSelectChangeHandler>[0],
+  actionMeta: Parameters<iSingleSelectChangeHandler>[1],
+  onOptionChange: NonNullable<SingleSelectBaseProps['onChange']> | undefined,
+  onValueChange: iSingleSelectProps['onValueChange'] | undefined,
+) {
+  onOptionChange?.(selected, actionMeta);
+  const normalizedOption = selected ?? null;
+  onValueChange?.(normalizedOption?.value ?? null, normalizedOption, actionMeta);
+}
 
 const ForwardedSelectSingle = forwardRef<
   SelectInstance<iOptionType, false, GroupBase<iOptionType>>,
@@ -357,19 +394,7 @@ export interface iSingleSelectProps extends Omit<
 export const SingleSelect = forwardRef<SelectInstance<iOptionType, false, GroupBase<iOptionType>>, iSingleSelectProps>(
   // eslint-disable-next-line prefer-arrow-callback
   function SingleSelect({ value, defaultValue, onValueChange, onOptionChange, options, ...rest }, ref) {
-    const flatOptions = useMemo(() => flattenOptions(options), [options]);
-
-    const computedValue = useMemo<iOptionType | null | undefined>(() => {
-      if (value === undefined) return undefined;
-      if (value === null) return null;
-      return flatOptions.find((option) => option.value === value) ?? null;
-    }, [flatOptions, value]);
-
-    const computedDefaultValue = useMemo<iOptionType | null | undefined>(() => {
-      if (defaultValue === undefined) return undefined;
-      if (defaultValue === null) return null;
-      return flatOptions.find((option) => option.value === defaultValue) ?? null;
-    }, [defaultValue, flatOptions]);
+    const { computedValue, computedDefaultValue } = useSingleSelectValues(value, defaultValue, options, false);
 
     return (
       <ForwardedSelectSingle
@@ -378,11 +403,7 @@ export const SingleSelect = forwardRef<SelectInstance<iOptionType, false, GroupB
         options={options}
         value={computedValue}
         defaultValue={computedDefaultValue}
-        onChange={(selected, actionMeta) => {
-          onOptionChange?.(selected, actionMeta);
-          const normalizedOption = selected ?? null;
-          onValueChange?.(normalizedOption?.value ?? null, normalizedOption, actionMeta);
-        }}
+        onChange={(selected, actionMeta) => emitSingleSelectChange(selected, actionMeta, onOptionChange, onValueChange)}
       />
     );
   },
@@ -404,21 +425,7 @@ export const CreatableSingleSelect = forwardRef<
 >(
   // eslint-disable-next-line prefer-arrow-callback
   function CreatableSingleSelect({ value, defaultValue, onValueChange, onOptionChange, options, ...rest }, ref) {
-    const flatOptions = useMemo(() => flattenOptions(options), [options]);
-
-    const computedValue = useMemo<iOptionType | null | undefined>(() => {
-      if (value === undefined) return undefined;
-      if (value === null || value === '') return null;
-      return flatOptions.find((option) => option.value === value) ?? { label: value, value };
-    }, [flatOptions, value]);
-
-    const computedDefaultValue = useMemo<iOptionType | null | undefined>(() => {
-      if (defaultValue === undefined) return undefined;
-      if (defaultValue === null || defaultValue === '') return null;
-      return (
-        flatOptions.find((option) => option.value === defaultValue) ?? { label: defaultValue, value: defaultValue }
-      );
-    }, [defaultValue, flatOptions]);
+    const { computedValue, computedDefaultValue } = useSingleSelectValues(value, defaultValue, options, true);
 
     return (
       <ForwardedCreatableSelectSingle
@@ -427,11 +434,7 @@ export const CreatableSingleSelect = forwardRef<
         options={options}
         value={computedValue}
         defaultValue={computedDefaultValue}
-        onChange={(selected, actionMeta) => {
-          onOptionChange?.(selected, actionMeta);
-          const normalizedOption = selected ?? null;
-          onValueChange?.(normalizedOption?.value ?? null, normalizedOption, actionMeta);
-        }}
+        onChange={(selected, actionMeta) => emitSingleSelectChange(selected, actionMeta, onOptionChange, onValueChange)}
       />
     );
   },

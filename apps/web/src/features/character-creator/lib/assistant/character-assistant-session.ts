@@ -11,28 +11,44 @@ const CONTENT_PART_SOURCE_SCHEMA = z.discriminatedUnion('type', [
   z.object({ type: z.literal('url'), value: z.string(), mimeType: z.string().optional() }),
 ]);
 
-const CONTENT_PART_SCHEMA = z.union([
-  z.object({ type: z.literal('text'), content: z.string(), metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({ type: z.literal('image'), source: CONTENT_PART_SOURCE_SCHEMA, metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({ type: z.literal('audio'), source: CONTENT_PART_SOURCE_SCHEMA, metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({ type: z.literal('video'), source: CONTENT_PART_SOURCE_SCHEMA, metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({
-    type: z.literal('document'),
-    source: CONTENT_PART_SOURCE_SCHEMA,
-    metadata: JSON_VALUE_SCHEMA.optional(),
-  }),
-]);
+const TEXT_CONTENT_PART_SCHEMA = z.object({
+  type: z.literal('text'),
+  content: z.string(),
+  metadata: JSON_VALUE_SCHEMA.optional(),
+});
+const IMAGE_CONTENT_PART_SCHEMA = z.object({
+  type: z.literal('image'),
+  source: CONTENT_PART_SOURCE_SCHEMA,
+  metadata: JSON_VALUE_SCHEMA.optional(),
+});
+const AUDIO_CONTENT_PART_SCHEMA = z.object({
+  type: z.literal('audio'),
+  source: CONTENT_PART_SOURCE_SCHEMA,
+  metadata: JSON_VALUE_SCHEMA.optional(),
+});
+const VIDEO_CONTENT_PART_SCHEMA = z.object({
+  type: z.literal('video'),
+  source: CONTENT_PART_SOURCE_SCHEMA,
+  metadata: JSON_VALUE_SCHEMA.optional(),
+});
+const DOCUMENT_CONTENT_PART_SCHEMA = z.object({
+  type: z.literal('document'),
+  source: CONTENT_PART_SOURCE_SCHEMA,
+  metadata: JSON_VALUE_SCHEMA.optional(),
+});
+
+const CONTENT_PART_SCHEMAS = [
+  TEXT_CONTENT_PART_SCHEMA,
+  IMAGE_CONTENT_PART_SCHEMA,
+  AUDIO_CONTENT_PART_SCHEMA,
+  VIDEO_CONTENT_PART_SCHEMA,
+  DOCUMENT_CONTENT_PART_SCHEMA,
+] as const;
+
+const CONTENT_PART_SCHEMA = z.union(CONTENT_PART_SCHEMAS);
 
 const UI_MESSAGE_PART_SCHEMA: z.ZodType<UIMessage['parts'][number]> = z.union([
-  z.object({ type: z.literal('text'), content: z.string(), metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({ type: z.literal('image'), source: CONTENT_PART_SOURCE_SCHEMA, metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({ type: z.literal('audio'), source: CONTENT_PART_SOURCE_SCHEMA, metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({ type: z.literal('video'), source: CONTENT_PART_SOURCE_SCHEMA, metadata: JSON_VALUE_SCHEMA.optional() }),
-  z.object({
-    type: z.literal('document'),
-    source: CONTENT_PART_SOURCE_SCHEMA,
-    metadata: JSON_VALUE_SCHEMA.optional(),
-  }),
+  ...CONTENT_PART_SCHEMAS,
   z.object({
     type: z.literal('tool-call'),
     id: z.string(),

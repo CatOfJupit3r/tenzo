@@ -8,6 +8,7 @@ import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '.
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
 import { FieldGenerationControls } from './field-generation-controls';
+import { buildFieldGenerationControlProps } from './field-generation-control-props';
 
 export interface iAlternateGreetingsProps {
   greetings: string[];
@@ -84,32 +85,24 @@ export function AlternateGreetings({
                   </span>
                   <div className="flex gap-1">
                     <FieldGenerationControls
-                      fieldId={`alternate-greeting-${index}`}
-                      label={`Alternate Greeting ${index + 1}`}
-                      shouldUseGeneralCharacterIdea={generationState?.shouldUseGeneralCharacterIdea ?? true}
-                      instructionValue={generationState?.instructionValue ?? ''}
-                      errorMessage={generationState?.errorMessage ?? null}
-                      hasExistingValue={greeting.trim().length > 0}
-                      hasRewriteBackup={generationState?.hasRewriteBackup ?? false}
-                      isGenerating={isGenerating}
-                      templateOptions={templateOptions}
-                      templateId={generationState?.templateId ?? null}
-                      isDefaultTemplateSelected={generationState?.isDefaultTemplateSelected ?? false}
-                      isExplicitTemplateNone={generationState?.isExplicitTemplateNone ?? false}
-                      isStrictTemplateSelected={generationState?.isStrictTemplateSelected ?? false}
-                      fieldValue={greeting}
-                      templateFieldKey={TEMPLATE_FIELD_KEYS.alternate_greeting}
-                      onTemplateIdChange={(templateId) => onTemplateIdChange(index, templateId)}
-                      onSaveTemplate={onSaveTemplate}
-                      onShouldUseGeneralCharacterIdeaChange={(value) =>
-                        onShouldUseGeneralCharacterIdeaChange(index, value)
-                      }
-                      onInstructionChange={(value) => onInstructionChange(index, value)}
-                      onGenerate={() => onGenerate(index)}
-                      onContinue={() => onContinue(index)}
-                      onRewrite={() => onRewrite(index)}
-                      onRevertRewrite={() => onRevertRewrite(index)}
-                      onCancel={() => onCancel(index)}
+                      {...buildFieldGenerationControlProps({
+                        fieldId: `alternate-greeting-${index}`,
+                        label: `Alternate Greeting ${index + 1}`,
+                        fieldValue: greeting,
+                        templateFieldKey: TEMPLATE_FIELD_KEYS.alternate_greeting,
+                        generationState,
+                        templateOptions,
+                        onTemplateIdChange: (templateId) => onTemplateIdChange(index, templateId),
+                        onSaveTemplate,
+                        onShouldUseGeneralCharacterIdeaChange: (value) =>
+                          onShouldUseGeneralCharacterIdeaChange(index, value),
+                        onInstructionChange: (value) => onInstructionChange(index, value),
+                        onGenerate: () => onGenerate(index),
+                        onContinue: () => onContinue(index),
+                        onRewrite: () => onRewrite(index),
+                        onRevertRewrite: () => onRevertRewrite(index),
+                        onCancel: () => onCancel(index),
+                      })}
                     />
                     <Button
                       type="button"

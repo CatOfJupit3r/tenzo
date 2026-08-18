@@ -1,16 +1,5 @@
-import { LuImage, LuPlus, LuTrash2 } from 'react-icons/lu';
+import { LuImage, LuPlus } from 'react-icons/lu';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@~/components/ui/alert-dialog';
 import { Button } from '@~/components/ui/button/button';
 import { cn } from '@~/lib/utils';
 
@@ -19,6 +8,7 @@ import { useCharacterCreatorContext } from '../context/character-creator-context
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
 import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
 import type { iCharacterLibraryItem } from '../lib/cards/character-library';
+import { CharacterDeleteDialog } from './character-delete-dialog';
 
 export interface iCharacterSwitcherViewProps {
   characterLibrary: readonly iCharacterLibraryItem[];
@@ -71,39 +61,13 @@ export function CharacterSwitcherView({
                 </span>
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{displayName}</span>
               </button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    aria-label={`Delete ${displayName}`}
-                    title="Delete"
-                  >
-                    <LuTrash2 className="size-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete {displayName}?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This permanently deletes the character, portrait, and assistant conversation stored in this
-                      browser.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={async () => {
-                        await onRemoveCharacter(character.id);
-                      }}
-                    >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <CharacterDeleteDialog
+                displayName={displayName}
+                className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                onRemove={async () => {
+                  await onRemoveCharacter(character.id);
+                }}
+              />
             </div>
           );
         })}

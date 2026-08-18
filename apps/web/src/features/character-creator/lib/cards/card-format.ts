@@ -7,7 +7,10 @@ import { generateUuid } from '@~/utils/uuid';
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { sanitizeCharacterGenerationPromptSettings } from '../generation/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
-import { sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
+import {
+  PORTRAIT_CROP_RECT_INPUT_SCHEMA,
+  sanitizeStoredPortraitCropRect,
+} from '../portrait/portrait-focal-point';
 import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
 import { CHARACTER_BOOK_ENTRY_POSITION_SCHEMA, CHARACTER_CARD_SCHEMA } from './card-schema';
 import type { CharacterBook, CharacterBookEntry, CharacterCard, CustomField } from './card-schema';
@@ -162,16 +165,7 @@ const TENZO_CARD_EXTENSION_SCHEMA = z
   .object({
     version: z.number().finite().optional().catch(undefined),
     custom_fields: JSON_VALUE_SCHEMA.optional().catch(undefined),
-    portrait_crop_rect: z
-      .object({
-        x: z.number().finite().optional().catch(undefined),
-        y: z.number().finite().optional().catch(undefined),
-        width: z.number().finite().optional().catch(undefined),
-        height: z.number().finite().optional().catch(undefined),
-      })
-      .nullable()
-      .optional()
-      .catch(null),
+    portrait_crop_rect: PORTRAIT_CROP_RECT_INPUT_SCHEMA.optional(),
     general_character_idea: z.string().optional().catch(undefined),
     field_instructions: JSON_VALUE_SCHEMA.optional().catch(undefined),
     field_should_use_general_character_idea: JSON_VALUE_SCHEMA.optional().catch(undefined),

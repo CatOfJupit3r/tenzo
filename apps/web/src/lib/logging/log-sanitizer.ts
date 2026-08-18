@@ -7,9 +7,17 @@ const MAX_STRING_LENGTH = 2_000;
 const REDACTED_VALUE = '[redacted]';
 const SENSITIVE_KEY_PATTERN = /(authorization|api[-_]?key|token|secret|password|prompt|content|requestbody)/i;
 const BEARER_PATTERN = /Bearer\s+[A-Za-z0-9._~+/=-]+/gi;
+const SENSITIVE_VALUE_PATTERNS = [
+  /(["']?authorization["']?\s*[:=]\s*["']?)(?!Bearer\s)[^"'\s,}]+/gi,
+  /(["']?api[-_]?key["']?\s*[:=]\s*["']?)[^"'\s,}]+/gi,
+  /(["']?(?:token|secret|password)["']?\s*[:=]\s*["']?)[^"'\s,}]+/gi,
+] as const;
 
 function sanitizeString(value: string) {
-  const redacted = value.replace(BEARER_PATTERN, 'Bearer [redacted]');
+  const redacted = SENSITIVE_VALUE_PATTERNS.reduce(
+    (currentValue, pattern) => currentValue.replace(pattern, `$1${REDACTED_VALUE}`),
+    value.replace(BEARER_PATTERN, 'Bearer [redacted]'),
+  );
   return redacted.length > MAX_STRING_LENGTH ? `${redacted.slice(0, MAX_STRING_LENGTH - 3)}...` : redacted;
 }
 

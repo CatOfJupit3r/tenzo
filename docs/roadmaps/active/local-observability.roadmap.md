@@ -449,3 +449,4 @@ The logger should default to useful local console output. Browser forwarding is 
 | --- | --- |
 | 2026-08-18 | Created roadmap after repository audit and TanStack Start execution-boundary review. |
 | 2026-08-18 | Implemented the logger foundation and capture-point migrations in commits `041ac8d`, `4aaf964`, `abe3a29`, and `cae2914`. Workspace type checking, linting, and production build passed; manual runtime scenarios remain pending. The only remaining direct console call is the intentional non-recursive development fallback for a failed client-log forwarding request. |
+| 2026-08-18 | Expanded safe diagnostics across AI routes, generation, template enhancement, migrations, persistence, provider probing, assistant state, and import/export flows in commits `6184ced`, `38510a9`, and `8fce4c3`. Added bounded debug lifecycle records, captured deferred generation-stream failures, and standardized logger constants to `CONSTANT_CASE`. |

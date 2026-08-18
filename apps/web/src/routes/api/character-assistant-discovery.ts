@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 
 import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
@@ -10,11 +10,15 @@ import { REQUEST_MODES } from '@~/features/character-creator/lib/generation/gene
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation/generation-stream-contracts';
 import { loggerFactory } from '@~/lib/logging/logger';
 
+export const MAX_DISCOVERY_PREMISE_LENGTH = 2_000;
+
 const DISCOVERY_ROUTE_REQUEST_SCHEMA = CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA.omit({
   instructions: true,
   messages: true,
 }).extend({
-  originalPremise: CHARACTER_CONCEPT_SCHEMA.shape.premise,
+  originalPremise: CHARACTER_CONCEPT_SCHEMA.shape.premise.pipe(
+    z.string().max(MAX_DISCOVERY_PREMISE_LENGTH, 'Premise is too long.'),
+  ),
   category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
 });
 

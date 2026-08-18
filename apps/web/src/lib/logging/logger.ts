@@ -1,6 +1,7 @@
-import { createIsomorphicFn, createServerFn } from '@tanstack/react-start';
+import { createServerFn } from '@tanstack/react-start';
 import { Logger } from 'tslog';
 
+import { isOnClient } from '../../utils/ssr-helpers';
 import { sanitizeLogContext, serializeError } from './log-sanitizer';
 import { clientLogRecordSchema, LOG_LEVELS, LOG_RUNTIMES } from './logging-contracts';
 import type { ClientLogRecord, iLogger, iLoggerFactory, LogContext, LogLevel, LogRuntime } from './logging-contracts';
@@ -76,15 +77,13 @@ function createApplicationLogger(
   };
 }
 
-const createLoggerFactory = createIsomorphicFn()
-  .server(
-    (): iLoggerFactory => ({
-      getLogger: (component) => createApplicationLogger(getServerTsLogger(), LOG_RUNTIMES.server, component),
-    }),
-  )
-  .client((): iLoggerFactory => {
-    const CLIENT_LOGGER = createTsLogger(LOG_RUNTIMES.client);
-    return { getLogger: (component) => createApplicationLogger(CLIENT_LOGGER, LOG_RUNTIMES.client, component) };
-  });
+function createApplicationLoggerFactory(runtime: LogRuntime): iLoggerFactory {
+  const tsLogger = runtime === LOG_RUNTIMES.server ? getServerTsLogger() : createTsLogger(LOG_RUNTIMES.client);
+  return {
+    getLogger: (component) => createApplicationLogger(tsLogger, runtime, component),
+  };
+}
 
-export const loggerFactory = createLoggerFactory();
+const APPLICATION_RUNTIME = isOnClient ? LOG_RUNTIMES.client : LOG_RUNTIMES.server;
+
+export const loggerFactory = createApplicationLoggerFactory(APPLICATION_RUNTIME);

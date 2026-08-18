@@ -1,4 +1,5 @@
 import { loggerFactory } from '@~/lib/logging/logger';
+import type { iLogger } from '@~/lib/logging/logging-contracts';
 
 const ERROR_DETAIL_KEYS = [
   'message',
@@ -82,8 +83,8 @@ export function getGenerationErrorHint(error: unknown) {
   return null;
 }
 
-export function logGenerationError(context: string, error: unknown) {
-  GENERATION_LOGGER.error('Generation failed', error, {
+export function logGenerationError(context: string, error: unknown, logger: iLogger = GENERATION_LOGGER) {
+  logger.error('Generation failed', error, {
     operation: context,
   });
 }

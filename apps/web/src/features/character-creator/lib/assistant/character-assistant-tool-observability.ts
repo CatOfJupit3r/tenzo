@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { loggerFactory } from '@~/lib/logging/logger';
+import type { iLogger } from '@~/lib/logging/logging-contracts';
 
 import { CHARACTER_EDIT_FIELD_KEYS } from '../proposals/character-edit-proposal';
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
@@ -69,17 +70,10 @@ function classifyToolError(error: unknown) {
   return 'execution';
 }
 
-export function logCharacterAssistantTool({
-  model,
-  mode,
-  outcome,
-  runId,
-  toolCallId,
-  toolName,
-  durationMs,
-  input,
-  error,
-}: iCharacterAssistantToolLog) {
+export function logCharacterAssistantTool(
+  { model, mode, outcome, runId, toolCallId, toolName, durationMs, input, error }: iCharacterAssistantToolLog,
+  logger: iLogger = CHARACTER_ASSISTANT_TOOL_LOGGER,
+) {
   const inputRecord = readInputRecord(input);
   const errorPosition = error && typeof error === 'object' ? Reflect.get(error, 'position') : undefined;
   const inputLength = error && typeof error === 'object' ? Reflect.get(error, 'inputLength') : undefined;
@@ -105,8 +99,8 @@ export function logCharacterAssistantTool({
   };
 
   if (outcome === CHARACTER_ASSISTANT_TOOL_OUTCOMES.failed) {
-    CHARACTER_ASSISTANT_TOOL_LOGGER.error('Tool execution', error, details);
+    logger.error('Tool execution', error, details);
   } else {
-    CHARACTER_ASSISTANT_TOOL_LOGGER.info('Tool execution', details);
+    logger.info('Tool execution', details);
   }
 }

@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
 import { GENERATION_PROVIDERS } from '@~/features/character-creator/lib/generation/generation-config';
 
-import { handleCharacterAssistantDiscoveryRequest } from '../../../../routes/api/character-assistant-discovery';
+import {
+  handleCharacterAssistantDiscoveryRequest,
+  MAX_DISCOVERY_PREMISE_LENGTH,
+} from '../../../../routes/api/character-assistant-discovery';
 
 const { generateValidatedObjectMock } = vi.hoisted(() => ({
   generateValidatedObjectMock: vi.fn(),
@@ -101,9 +104,12 @@ describe('character assistant discovery generation route', () => {
     expect(await response.text()).toContain('non-distinct');
   });
 
-  it('returns a request-validation error for an unbounded premise', async () => {
+  it('returns a request-validation error for an over-limit premise', async () => {
     const response = await handleCharacterAssistantDiscoveryRequest({
-      request: createRequest({ ...BASE_REQUEST, originalPremise: '' }),
+      request: createRequest({
+        ...BASE_REQUEST,
+        originalPremise: 'x'.repeat(MAX_DISCOVERY_PREMISE_LENGTH + 1),
+      }),
     });
 
     expect(response.status).toBe(400);

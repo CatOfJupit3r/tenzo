@@ -2,6 +2,7 @@ import { useAtom, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastSuccess } from '@~/components/toastifications';
+import { loggerFactory } from '@~/lib/logging/logger';
 import { generateUuid } from '@~/utils/uuid';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
@@ -53,6 +54,7 @@ import { useFieldTemplates } from './use-field-templates';
 import { useGeneration } from './use-generation';
 
 const exampleContextService = new ExampleContextService();
+const CHARACTER_CREATOR_PAGE_LOGGER = loggerFactory.getLogger('character-creator.page');
 
 async function createImportedPortraitReference(
   importedCardFile: iImportedCharacterCardFile,
@@ -453,6 +455,11 @@ export function useCharacterCreatorPage() {
   );
 
   const handleHealthCheck = useCallback(async () => {
+    CHARACTER_CREATOR_PAGE_LOGGER.debug('Provider health check started', {
+      operation: 'provider-health-check',
+      requestMode: generationSettings.requestMode,
+      model: generationSettings.model.trim() || undefined,
+    });
     try {
       const result = await probeConnection();
       const detailParts = [
@@ -464,11 +471,18 @@ export function useCharacterCreatorPage() {
         'Endpoint checked',
         detailParts.length > 0 ? detailParts.join(' | ') : (result.providerName ?? 'Provider metadata inferred.'),
       );
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('Provider health check completed', {
+        operation: 'provider-health-check',
+        requestMode: generationSettings.requestMode,
+        model: result.currentModel ?? (generationSettings.model.trim() || undefined),
+        modelCount: result.models.length,
+        hasContextSize: result.contextSize !== null,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Health check failed.';
       toastError('Health check failed', message);
     }
-  }, [probeConnection]);
+  }, [generationSettings.model, generationSettings.requestMode, probeConnection]);
 
   const handlePortraitSelect = useCallback(
     async (file: File) => {
@@ -494,6 +508,13 @@ export function useCharacterCreatorPage() {
 
   const restoreFullBackup = useCallback(
     async (backup: iTenzoBackup) => {
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('Full backup restore started', {
+        operation: 'restore-backup',
+        characterCount: backup.characters.length,
+        exampleCount: backup.exampleCharacters.length,
+        assetCount: backup.assets.length,
+        hasConnectionSettings: backup.connectionSettings !== null,
+      });
       await Promise.all(
         backup.assets.map(async (asset) =>
           writeCharacterAssetBlob(asset.assetId, new Blob([asset.bytes.slice()], { type: asset.mimeType })),
@@ -535,12 +556,23 @@ export function useCharacterCreatorPage() {
       ].filter((part): part is string => part !== null);
 
       toastSuccess('Backup restored', summaryParts.join(' | '));
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('Full backup restore completed', {
+        operation: 'restore-backup',
+        characterCount: backup.characters.length,
+        exampleCount: importedExampleCount,
+        assetCount: backup.assets.length,
+        hasConnectionSettings: backup.connectionSettings !== null,
+      });
     },
     [setStoredGenerationSettings],
   );
 
   const handleImport = useCallback(
     async (file: File) => {
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('Character import started', {
+        operation: 'import',
+        fileCount: 1,
+      });
       try {
         if (isArchiveFile(file)) {
           const importedArchive = await importArchiveFile(file);
@@ -565,13 +597,29 @@ export function useCharacterCreatorPage() {
             toastError('Some archive entries were skipped', importedArchive.failedPaths.join(' | '));
           }
 
+          CHARACTER_CREATOR_PAGE_LOGGER.debug('Character archive import completed', {
+            operation: 'import',
+            archiveKind: 'cards',
+            importedCardCount: importedArchive.cards.length,
+            failedEntryCount: importedArchive.failedPaths.length,
+          });
+
           return;
         }
 
         const importedCardFile = await importCharacterCardFile(file);
         await importCardAsCharacter(importedCardFile);
         toastSuccess('Character imported', importedCardFile.fileName);
+        CHARACTER_CREATOR_PAGE_LOGGER.debug('Character import completed', {
+          operation: 'import',
+          archiveKind: 'single-card',
+          importedCardCount: 1,
+        });
       } catch (error) {
+        CHARACTER_CREATOR_PAGE_LOGGER.error('Character import failed', error, {
+          operation: 'import',
+          fileCount: 1,
+        });
         const message = error instanceof Error ? error.message : 'The selected file could not be imported.';
         toastError('Import failed', message);
         throw error;
@@ -643,6 +691,10 @@ export function useCharacterCreatorPage() {
         if (portraitAssetId) invalidatePortraitAsset(portraitAssetId);
         toastSuccess('Character deleted', 'The character and its local data were removed from this browser.');
       } catch (error) {
+        CHARACTER_CREATOR_PAGE_LOGGER.error('Character deletion failed', error, {
+          operation: 'delete-character',
+          characterId: id,
+        });
         toastError('Character was not deleted', error instanceof Error ? error.message : 'The action failed.');
         throw error;
       }
@@ -796,12 +848,14 @@ export function useCharacterCreatorPage() {
 
       const importedExamples: ReturnType<typeof createStoredExampleCharacter>[] = [];
       const failedImports: string[] = [];
+      let firstFailedImportError: unknown;
 
       for (const file of files.slice(0, availableSlots)) {
         try {
           const importedCardFile = await importCharacterCardFile(file);
           importedExamples.push(createStoredExampleCharacter(importedCardFile));
         } catch (error) {
+          firstFailedImportError ??= error;
           const message = error instanceof Error ? error.message : 'Import failed.';
           failedImports.push(`${file.name}: ${message}`);
         }
@@ -827,7 +881,19 @@ export function useCharacterCreatorPage() {
       }
 
       if (failedImports.length > 0) {
+        CHARACTER_CREATOR_PAGE_LOGGER.error('Some example character imports failed', firstFailedImportError, {
+          operation: 'import-examples',
+          selectedFileCount: files.length,
+          importedExampleCount: importedExamples.length,
+          failedEntryCount: failedImports.length,
+        });
         toastError('Some examples were skipped', failedImports.join(' | '));
+      } else {
+        CHARACTER_CREATOR_PAGE_LOGGER.debug('Example character import completed', {
+          operation: 'import-examples',
+          selectedFileCount: files.length,
+          importedExampleCount: importedExamples.length,
+        });
       }
     },
     [addExampleCharacters, exampleCharacters.length],
@@ -863,34 +929,75 @@ export function useCharacterCreatorPage() {
   );
 
   const handleExportJson = useCallback(async () => {
+    CHARACTER_CREATOR_PAGE_LOGGER.debug('JSON character export started', {
+      operation: 'export-json',
+      characterId: activeCharacterId,
+      detailLevel: exportSettings.detailLevel,
+    });
     try {
       await exportCharacterCardJson(card, getActiveCardExportOptions());
       toastSuccess('JSON exported', 'The hybrid V1+V2 card file has been downloaded.');
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('JSON character export completed', {
+        operation: 'export-json',
+        characterId: activeCharacterId,
+        detailLevel: exportSettings.detailLevel,
+      });
     } catch (error) {
+      CHARACTER_CREATOR_PAGE_LOGGER.error('JSON character export failed', error, {
+        operation: 'export-json',
+        characterId: activeCharacterId,
+        detailLevel: exportSettings.detailLevel,
+      });
       const message = error instanceof Error ? error.message : 'The character card could not be exported as JSON.';
       toastError('JSON export failed', message);
       throw error;
     }
-  }, [card, getActiveCardExportOptions]);
+  }, [activeCharacterId, card, exportSettings.detailLevel, getActiveCardExportOptions]);
 
   const handleExportPng = useCallback(async () => {
     if (!portraitBlob) {
+      CHARACTER_CREATOR_PAGE_LOGGER.warn('PNG character export unavailable', {
+        operation: 'export-png',
+        characterId: activeCharacterId,
+        reason: 'missing-portrait',
+      });
       toastError('PNG export failed', 'Add a portrait image before exporting PNG.');
       return;
     }
 
+    CHARACTER_CREATOR_PAGE_LOGGER.debug('PNG character export started', {
+      operation: 'export-png',
+      characterId: activeCharacterId,
+      detailLevel: exportSettings.detailLevel,
+    });
     try {
       await exportCharacterCardPng(card, portraitBlob, portraitCropRect, getActiveCardExportOptions());
       toastSuccess('PNG exported', 'The portrait now contains an updated `chara` metadata chunk.');
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('PNG character export completed', {
+        operation: 'export-png',
+        characterId: activeCharacterId,
+        detailLevel: exportSettings.detailLevel,
+      });
     } catch (error) {
+      CHARACTER_CREATOR_PAGE_LOGGER.error('PNG character export failed', error, {
+        operation: 'export-png',
+        characterId: activeCharacterId,
+        detailLevel: exportSettings.detailLevel,
+      });
       const message = error instanceof Error ? error.message : 'The character card could not be exported as PNG.';
       toastError('PNG export failed', message);
       throw error;
     }
-  }, [card, getActiveCardExportOptions, portraitBlob, portraitCropRect]);
+  }, [activeCharacterId, card, exportSettings.detailLevel, getActiveCardExportOptions, portraitBlob, portraitCropRect]);
 
   const handleBulkExport = useCallback(
     async (characterIds: string[]) => {
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('Character archive export started', {
+        operation: 'export-archive',
+        selectedCharacterCount: characterIds.length,
+        archiveFormat: exportSettings.archiveFormat,
+        detailLevel: exportSettings.detailLevel,
+      });
       try {
         const bulkCharacters: iBulkExportCharacter[] = [];
 
@@ -915,7 +1022,19 @@ export function useCharacterCreatorPage() {
           'Characters exported',
           `${bulkCharacters.length} ${bulkCharacters.length === 1 ? 'character card' : 'character cards'} were bundled into the archive.`,
         );
+        CHARACTER_CREATOR_PAGE_LOGGER.debug('Character archive export completed', {
+          operation: 'export-archive',
+          exportedCharacterCount: bulkCharacters.length,
+          archiveFormat: exportSettings.archiveFormat,
+          detailLevel: exportSettings.detailLevel,
+        });
       } catch (error) {
+        CHARACTER_CREATOR_PAGE_LOGGER.error('Character archive export failed', error, {
+          operation: 'export-archive',
+          selectedCharacterCount: characterIds.length,
+          archiveFormat: exportSettings.archiveFormat,
+          detailLevel: exportSettings.detailLevel,
+        });
         const message = error instanceof Error ? error.message : 'The selected characters could not be exported.';
         toastError('Bulk export failed', message);
         throw error;
@@ -925,6 +1044,12 @@ export function useCharacterCreatorPage() {
   );
 
   const handleExportAll = useCallback(async () => {
+    CHARACTER_CREATOR_PAGE_LOGGER.debug('Full backup export started', {
+      operation: 'export-backup',
+      characterCount: characterLibrary.length,
+      exampleCount: exampleCharacters.length,
+      archiveFormat: exportSettings.archiveFormat,
+    });
     try {
       const assets: iBackupPortraitAsset[] = [];
 
@@ -955,7 +1080,20 @@ export function useCharacterCreatorPage() {
       );
 
       toastSuccess('Backup exported', 'The archive contains every character, portrait, example, and setting.');
+      CHARACTER_CREATOR_PAGE_LOGGER.debug('Full backup export completed', {
+        operation: 'export-backup',
+        characterCount: characterLibrary.length,
+        exampleCount: exampleCharacters.length,
+        assetCount: assets.length,
+        archiveFormat: exportSettings.archiveFormat,
+      });
     } catch (error) {
+      CHARACTER_CREATOR_PAGE_LOGGER.error('Full backup export failed', error, {
+        operation: 'export-backup',
+        characterCount: characterLibrary.length,
+        exampleCount: exampleCharacters.length,
+        archiveFormat: exportSettings.archiveFormat,
+      });
       const message = error instanceof Error ? error.message : 'The backup archive could not be created.';
       toastError('Backup export failed', message);
       throw error;

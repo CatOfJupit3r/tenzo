@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { loggerFactory } from '@~/lib/logging/logger';
+
 import { REQUEST_MODES } from '../generation/generation-config';
 import type { RequestMode } from '../generation/generation-config';
 import { mergeModelCapabilities, readModelCapabilities } from './model-capabilities';
@@ -63,6 +65,7 @@ const PROVIDER_KIND_LABELS = {
   [PROVIDER_KINDS['openai-compatible']]: 'OpenAI-compatible',
   [PROVIDER_KINDS.unknown]: 'Unknown provider',
 } satisfies Record<ProviderKind, string>;
+const PROVIDER_HEALTH_LOGGER = loggerFactory.getLogger('provider.health');
 
 function buildEndpointCandidates(endpoint: string, model?: string): iEndpointCandidates {
   const openAiBaseUrl = normalizeOpenAiCompatibleBaseUrl(endpoint);
@@ -335,6 +338,29 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
       ? jsonFetcher(candidates.modelEndpointsUrl, requestInit).catch(() => null)
       : Promise.resolve(null),
   ]);
+
+  const probeResults = [
+    { category: 'models', isAttempted: true, result: modelsResponse },
+    { category: 'kobold-model', isAttempted: true, result: koboldModelResponse },
+    { category: 'kobold-context', isAttempted: true, result: koboldContextResponse },
+    { category: 'kobold-public-context', isAttempted: true, result: koboldPublicContextResponse },
+    { category: 'properties', isAttempted: true, result: propsResponse },
+    { category: 'service-info', isAttempted: true, result: serviceInfoResponse },
+    { category: 'model-endpoints', isAttempted: candidates.modelEndpointsUrl !== null, result: modelEndpointsResponse },
+  ] as const;
+  const attemptedProbeResults = probeResults.filter((probe) => probe.isAttempted);
+  const successfulProbeCategories = attemptedProbeResults
+    .filter((probe) => probe.result?.isOk === true)
+    .map((probe) => probe.category);
+  PROVIDER_HEALTH_LOGGER.debug('Provider metadata probe completed', {
+    operation: 'probe-provider-metadata',
+    requestMode: request.requestMode,
+    model: readString(request.model) ?? undefined,
+    attemptedProbeCount: attemptedProbeResults.length,
+    successfulProbeCount: successfulProbeCategories.length,
+    successfulProbeCategories,
+    failedProbeCount: attemptedProbeResults.length - successfulProbeCategories.length,
+  });
 
   const models = modelsResponse?.isOk ? extractModels(modelsResponse.data) : [];
   const modelContextSizes = modelsResponse?.isOk ? extractModelContextSizes(modelsResponse.data) : {};

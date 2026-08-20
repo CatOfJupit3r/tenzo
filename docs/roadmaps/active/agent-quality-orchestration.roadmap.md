@@ -5,7 +5,7 @@ status: "Active backlog"
 roadmap_type: "agentic-epic"
 priority: "P1"
 created: "2026-08-20"
-updated: "2026-08-20"
+updated: "2026-08-21"
 last_repo_audit: "2026-08-20"
 source_of_truth: true
 related_docs:
@@ -342,7 +342,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 - [ ] Create a versioned, content-safe eval corpus covering sparse premises, partial cards, focused edits, full-card creation, strict templates, examples, long conversations, and mature but policy-compliant creative themes.
 - [ ] Capture current single-agent outputs, tokens, latency, tool outcomes, and user-visible proposals as the baseline.
 - [ ] Define field-specific rubrics for fidelity, completeness, specificity, roleplay usability, voice, format, coherence, and non-repetition.
-- [ ] Implement deterministic quality metrics for empty/short outputs, macro/template preservation, exact sentence reuse, and normalized n-gram overlap.
+- [x] Implement deterministic quality metrics for empty/short outputs, macro/template preservation, exact sentence reuse, and normalized n-gram overlap.
 - [ ] Define blinded pairwise human review and a ZDR/unmoderated model-judge protocol.
 - [ ] Set provisional per-route latency and cost ceilings from baseline measurements rather than guesses.
 

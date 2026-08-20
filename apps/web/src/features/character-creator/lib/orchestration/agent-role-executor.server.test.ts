@@ -3,7 +3,9 @@ import type { AnyTextAdapter, StreamChunk, TokenUsage } from '@tanstack/ai';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import type { iAgentRoleCallEvent } from '../evaluation/agent-run-observability';
 import type { iGenerateValidatedObject, iGenerateValidatedObjectOptions } from '../generation/structured-output.server';
+import type { iCharacterChatOptions } from '../generation/tanstack-ai-text-generation';
 import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import type { iAgentRoleProfile } from '../provider/agent-role-contracts';
 import { MODEL_CAPABILITIES } from '../provider/model-capabilities';
@@ -68,7 +70,7 @@ function createCatalog(
 }
 
 function createDependencies(catalog: iProviderPolicyCatalog, overrides: Partial<iAgentRoleExecutorDependencies> = {}) {
-  const logs: Record<string, unknown>[] = [];
+  const logs: iAgentRoleCallEvent[] = [];
   const generationCalls: Array<Record<string, unknown>> = [];
   const fetchCalls: iAgentRoleCallOptions[] = [];
   const dependencies: iAgentRoleExecutorDependencies = {
@@ -86,11 +88,11 @@ function createDependencies(catalog: iProviderPolicyCatalog, overrides: Partial<
       return catalog;
     },
     createAdapter: () => EMPTY_ADAPTER,
-    generateValidatedObject: (async <T>(options: object) => {
-      generationCalls.push(options as unknown as Record<string, unknown>);
+    generateValidatedObject: (async <T>(options: iGenerateValidatedObjectOptions<T>) => {
+      generationCalls.push({ modelOptions: options.modelOptions });
       return { accepted: true } as T;
     }) as iGenerateValidatedObject,
-    logAgentRoleCall: (event) => logs.push(event as unknown as Record<string, unknown>),
+    logAgentRoleCall: (event) => logs.push(event),
     ...overrides,
   };
   return { dependencies, logs, generationCalls, fetchCalls };
@@ -222,7 +224,7 @@ describe('agent role executor', () => {
 
   it('parses structured output with the caller schema', async () => {
     const harness = createDependencies(createCatalog(), {
-      generateValidatedObject: (async <T>(_options: object) =>
+      generateValidatedObject: (async <T>(_options: iGenerateValidatedObjectOptions<T>) =>
         ({ accepted: 'not-a-boolean' }) as T) as iGenerateValidatedObject,
     });
     const executor = createAgentRoleExecutor(harness.dependencies);
@@ -325,7 +327,7 @@ describe('agent role executor', () => {
   });
 
   it('collects raw prose without tools or structured output', async () => {
-    let chatOptions: Record<string, unknown> | undefined;
+    let chatOptions: iCharacterChatOptions | undefined;
     const stream = (async function* streamChunks(): AsyncGenerator<StreamChunk> {
       yield { type: EventType.TEXT_MESSAGE_CONTENT, delta: 'raw prose' } as StreamChunk;
       yield {
@@ -335,7 +337,7 @@ describe('agent role executor', () => {
     })();
     const harness = createDependencies(createCatalog(), {
       chat: (options) => {
-        chatOptions = options as unknown as Record<string, unknown>;
+        chatOptions = options;
         return stream;
       },
     });
@@ -347,7 +349,7 @@ describe('agent role executor', () => {
 
     expect(result.value).toBe('raw prose');
     expect(chatOptions?.tools).toBeUndefined();
-    expect(chatOptions?.outputSchema).toBeUndefined();
+    expect(chatOptions && 'outputSchema' in chatOptions).toBe(false);
     expect(harness.logs[0]).toMatchObject({ inputTokens: 3, outputTokens: 2, outcome: 'completed' });
   });
 });

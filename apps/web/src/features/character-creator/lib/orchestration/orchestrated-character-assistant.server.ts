@@ -229,10 +229,10 @@ function createOrchestrationRun(
     roleAssignments: options.roleAssignments,
   });
   const usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-  const executeStructured = async <T>(
+  const executeStructured = async <T, TInput>(
     role: keyof typeof profiles,
     schema: z.ZodType<T>,
-    roleInput: unknown,
+    roleInput: TInput,
     schemaDescription: string,
   ): Promise<iAgentOrchestrationCallResult<T>> => {
     const execution = await dependencies.executor.executeStructured({

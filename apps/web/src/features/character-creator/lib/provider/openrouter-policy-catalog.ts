@@ -33,26 +33,28 @@ export const OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA = z
   .object({ data: z.array(OPENROUTER_ZDR_ENDPOINT_SCHEMA).catch([]) })
   .passthrough();
 
+interface iOpenRouterPolicyCatalogInput {
+  modelsPayload: unknown;
+  zdrPayload: unknown;
+  selectedModel: string;
+  now: Date;
+}
+
 function readPricePerMillion(value: string | undefined): number | null {
   if (value === undefined) return null;
   const price = Number(value) * 1_000_000;
   return Number.isFinite(price) && price >= 0 ? price : null;
 }
 
-export function buildOpenRouterPolicyCatalog(
-  modelsPayload: unknown,
-  zdrPayload: unknown,
-  selectedModel: string,
-  now: Date,
-): iProviderPolicyCatalog | null {
-  const modelsResult = OPENROUTER_POLICY_MODELS_RESPONSE_SCHEMA.safeParse(modelsPayload);
-  const zdrResult = OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA.safeParse(zdrPayload);
+export function buildOpenRouterPolicyCatalog(input: iOpenRouterPolicyCatalogInput): iProviderPolicyCatalog | null {
+  const modelsResult = OPENROUTER_POLICY_MODELS_RESPONSE_SCHEMA.safeParse(input.modelsPayload);
+  const zdrResult = OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA.safeParse(input.zdrPayload);
   if (!modelsResult.success || !zdrResult.success) return null;
 
-  const model = modelsResult.data.data.find((candidate) => candidate.id === selectedModel);
+  const model = modelsResult.data.data.find((candidate) => candidate.id === input.selectedModel);
   if (!model) return null;
   const endpoints = zdrResult.data.data.flatMap((endpoint) => {
-    if (endpoint.model_id !== selectedModel) return [];
+    if (endpoint.model_id !== input.selectedModel) return [];
     const providerSlug = endpoint.tag?.split('/')[0];
     const capabilities = readModelCapabilities(endpoint.supported_parameters);
     const promptPricePerMillionUsd = readPricePerMillion(endpoint.pricing?.prompt);
@@ -75,7 +77,7 @@ export function buildOpenRouterPolicyCatalog(
   });
 
   return {
-    fetchedAt: now.toISOString(),
-    models: [{ modelId: selectedModel, isModerated: model.top_provider.is_moderated, endpoints }],
+    fetchedAt: input.now.toISOString(),
+    models: [{ modelId: input.selectedModel, isModerated: model.top_provider.is_moderated, endpoints }],
   };
 }

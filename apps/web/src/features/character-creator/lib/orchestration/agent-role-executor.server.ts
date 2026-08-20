@@ -221,15 +221,21 @@ async function defaultFetchPolicyCatalog(
   fetchJson: (url: string, init?: RequestInit) => Promise<Response>,
 ): Promise<iProviderPolicyCatalog | null> {
   const baseUrl = normalizeOpenAiCompatibleBaseUrl(options.endpoint);
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (options.apiKey.trim()) headers.Authorization = `Bearer ${options.apiKey.trim()}`;
+  const headers = new Headers();
+  headers.set('Accept', 'application/json');
+  if (options.apiKey.trim()) headers.set('Authorization', `Bearer ${options.apiKey.trim()}`);
   const [modelsResponse, endpointsResponse] = await Promise.all([
     fetchJson(`${baseUrl}/models`, { headers }),
     fetchJson(`${baseUrl}/endpoints/zdr`, { headers }),
   ]);
   if (!modelsResponse.ok || !endpointsResponse.ok) return null;
   const [modelsPayload, endpointsPayload] = await Promise.all([modelsResponse.json(), endpointsResponse.json()]);
-  return buildOpenRouterPolicyCatalog(modelsPayload, endpointsPayload, options.modelId, options.now);
+  return buildOpenRouterPolicyCatalog({
+    modelsPayload,
+    zdrPayload: endpointsPayload,
+    selectedModel: options.modelId,
+    now: options.now,
+  });
 }
 
 function isCancellation(error: unknown, signal?: AbortSignal) {

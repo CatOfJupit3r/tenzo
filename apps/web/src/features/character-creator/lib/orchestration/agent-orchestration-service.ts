@@ -55,6 +55,11 @@ export interface iAgentOrchestrationDependencies {
   ) => Promise<{ proposalId: string }>;
 }
 
+interface iProseJobResultCandidate {
+  job: iProseJob;
+  output: unknown;
+}
+
 function emitPhase(input: iAgentOrchestrationInput, phase: AgentProgressPhase) {
   input.onPhaseChange?.(phase);
 }
@@ -74,15 +79,15 @@ function createBaseResult(input: iAgentOrchestrationInput): iAgentOrchestrationR
   };
 }
 
-function assertJobResult(job: iProseJob, output: unknown): iProseJobResult {
-  const result = PROSE_JOB_RESULT_SCHEMA.parse(output);
-  if (result.jobId !== job.id) throw new Error(`Prose result does not match job ${job.id}.`);
+function assertJobResult(candidate: iProseJobResultCandidate): iProseJobResult {
+  const result = PROSE_JOB_RESULT_SCHEMA.parse(candidate.output);
+  if (result.jobId !== candidate.job.id) throw new Error(`Prose result does not match job ${candidate.job.id}.`);
   const resultFieldKeys = Object.keys(result.fields);
   if (
-    resultFieldKeys.length !== job.fieldKeys.length ||
-    resultFieldKeys.some((fieldKey) => !job.fieldKeys.includes(fieldKey as CharacterTextFieldKey))
+    resultFieldKeys.length !== candidate.job.fieldKeys.length ||
+    resultFieldKeys.some((fieldKey) => !candidate.job.fieldKeys.includes(fieldKey as CharacterTextFieldKey))
   ) {
-    throw new Error(`Prose result for ${job.id} must contain only its assigned fields.`);
+    throw new Error(`Prose result for ${candidate.job.id} must contain only its assigned fields.`);
   }
   return result;
 }
@@ -116,7 +121,7 @@ async function runProseJobs(
       if (!budget.recordCall(result.value.result.usage)) {
         return { drafts, isComplete: false, isBudgetExhausted: true };
       }
-      const proseResult = assertJobResult(result.value.job, result.value.result.output);
+      const proseResult = assertJobResult({ job: result.value.job, output: result.value.result.output });
       Object.assign(drafts, proseResult.fields);
       pendingJobs.delete(result.value.job.id);
       completedJobIds.add(result.value.job.id);

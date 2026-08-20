@@ -458,7 +458,12 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   const selectedModel = requestedModel ?? currentModel;
   const policyCatalog =
     rawModelsResponse?.isOk && rawZdrEndpointsResponse?.isOk && selectedModel
-      ? buildOpenRouterPolicyCatalog(rawModelsResponse.data, rawZdrEndpointsResponse.data, selectedModel, new Date())
+      ? buildOpenRouterPolicyCatalog({
+          modelsPayload: rawModelsResponse.data,
+          zdrPayload: rawZdrEndpointsResponse.data,
+          selectedModel,
+          now: new Date(),
+        })
       : null;
   const selectedModelCapabilities = mergeModelCapabilities(modelProviders.map((provider) => provider.capabilities));
   if (selectedModel && selectedModelCapabilities) {

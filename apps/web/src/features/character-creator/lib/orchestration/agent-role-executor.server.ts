@@ -71,7 +71,9 @@ export interface iStructuredAgentRoleCallOptions<T> extends iAgentRoleCallOption
   schemaDescription?: string;
 }
 
-export interface iProseAgentRoleCallOptions extends iAgentRoleCallOptions {}
+export interface iProseAgentRoleCallOptions extends iAgentRoleCallOptions {
+  isRepair?: boolean;
+}
 
 export interface iAgentRoleExecutionUsage {
   inputTokens: number;
@@ -409,7 +411,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         outputTokens: usage.outputTokens,
         costUsd: executionUsage.costUsd,
         latencyMs,
-        qualityFindingCount: 0,
+        qualityFindingCount: profile.role === AGENT_ROLES.critic && Array.isArray(value) ? value.length : 0,
         repairCount: 0,
         policyFailureReason: null,
       });
@@ -531,7 +533,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         costUsd: executionUsage.costUsd,
         latencyMs,
         qualityFindingCount: 0,
-        repairCount: 0,
+        repairCount: options.isRepair === true ? 1 : 0,
         policyFailureReason: null,
       });
       return {
@@ -559,7 +561,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         costUsd: estimateCost(usage, catalog, profile, providerId),
         latencyMs,
         qualityFindingCount: 0,
-        repairCount: 0,
+        repairCount: options.isRepair === true ? 1 : 0,
         policyFailureReason,
       });
       if (error instanceof AgentRoleExecutionError) throw error;

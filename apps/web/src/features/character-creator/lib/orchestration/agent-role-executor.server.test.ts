@@ -237,6 +237,22 @@ describe('agent role executor', () => {
     ).rejects.toThrow();
   });
 
+  it('records content-free critic finding counts', async () => {
+    const harness = createDependencies(createCatalog(), {
+      generateValidatedObject: (async <T>(_options: iGenerateValidatedObjectOptions<T>) =>
+        [{ finding: 'one' }, { finding: 'two' }] as T) as iGenerateValidatedObject,
+    });
+    const executor = createAgentRoleExecutor(harness.dependencies);
+
+    await executor.executeStructured({
+      ...callOptions(createProfile()),
+      schema: z.array(z.object({ finding: z.string() })),
+    });
+
+    expect(harness.logs[0]).toMatchObject({ role: AGENT_ROLES.critic, qualityFindingCount: 2 });
+    expect(JSON.stringify(harness.logs)).not.toContain('finding');
+  });
+
   it('estimates multi-provider routing cost conservatively', async () => {
     const baseCatalog = createCatalog();
     const catalog: iProviderPolicyCatalog = {
@@ -345,11 +361,17 @@ describe('agent role executor', () => {
 
     const result = await executor.executeProse({
       ...callOptions(createProfile({ role: AGENT_ROLES['prose-worker'], requiredCapabilities: [] })),
+      isRepair: true,
     });
 
     expect(result.value).toBe('raw prose');
     expect(chatOptions?.tools).toBeUndefined();
     expect(chatOptions && 'outputSchema' in chatOptions).toBe(false);
-    expect(harness.logs[0]).toMatchObject({ inputTokens: 3, outputTokens: 2, outcome: 'completed' });
+    expect(harness.logs[0]).toMatchObject({
+      inputTokens: 3,
+      outputTokens: 2,
+      outcome: 'completed',
+      repairCount: 1,
+    });
   });
 });

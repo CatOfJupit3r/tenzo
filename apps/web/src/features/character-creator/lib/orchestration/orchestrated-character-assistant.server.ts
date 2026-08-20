@@ -27,7 +27,11 @@ import {
   QUALITY_FINDING_SCHEMA,
 } from './agent-orchestration-contracts';
 import type { AgentProgressPhase, iProseJob } from './agent-orchestration-contracts';
-import { AGENT_ORCHESTRATION_EVENT_NAMES } from './agent-orchestration-events';
+import {
+  AGENT_ORCHESTRATION_EVENT_NAMES,
+  AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA,
+  AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA,
+} from './agent-orchestration-events';
 import { createAgentOrchestrationService } from './agent-orchestration-service';
 import type { iAgentOrchestrationCallResult } from './agent-orchestration-service';
 import { createAgentRoleExecutor } from './agent-role-executor.server';
@@ -104,6 +108,30 @@ function addTokenUsage(total: TokenUsage, result: iAgentRoleExecutionResult<unkn
   total.promptTokens += result.usage.inputTokens;
   total.completionTokens += result.usage.outputTokens;
   total.totalTokens += result.usage.totalTokens;
+}
+
+interface iAgentRunMetrics {
+  runId: string;
+  roleCallCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  latencyMs: number;
+}
+
+function addRoleMetrics(total: iAgentRunMetrics, result: iAgentRoleExecutionResult<unknown>) {
+  total.inputTokens += result.usage.inputTokens;
+  total.outputTokens += result.usage.outputTokens;
+  total.costUsd += result.usage.costUsd;
+  total.latencyMs += result.usage.latencyMs;
+}
+
+function emitRunMetrics(queue: iStreamEventQueue, metrics: iAgentRunMetrics) {
+  queue.push({
+    type: EventType.CUSTOM,
+    name: AGENT_ORCHESTRATION_EVENT_NAMES.metrics,
+    value: AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metrics),
+  });
 }
 
 function readMessageText(message: ModelMessage | UIMessage): string {
@@ -208,6 +236,14 @@ function createOrchestrationRun(
 ) {
   const { payload } = options;
   const runId = dependencies.generateUuid();
+  const metrics: iAgentRunMetrics = {
+    runId,
+    roleCallCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    costUsd: 0,
+    latencyMs: 0,
+  };
   const prompt = getLatestUserPrompt(options.messages);
   const requestedFieldKeys = getAllowedCharacterAssistantTextFieldKeys(
     payload.fieldShouldAllowAssistantEditing,
@@ -235,6 +271,7 @@ function createOrchestrationRun(
     roleInput: TInput,
     schemaDescription: string,
   ): Promise<iAgentOrchestrationCallResult<T>> => {
+    metrics.roleCallCount += 1;
     const execution = await dependencies.executor.executeStructured({
       profile: profiles[role],
       endpoint: payload.endpoint,
@@ -247,9 +284,11 @@ function createOrchestrationRun(
       abortSignal: options.abortSignal,
     });
     addTokenUsage(usage, execution);
+    addRoleMetrics(metrics, execution);
     return { output: execution.value, usage: toCallUsage(execution) };
   };
-  const executeProse = async (job: iProseJob, extraInput: unknown = {}) => {
+  const executeProse = async (job: iProseJob, extraInput: unknown = {}, isRepair = false) => {
+    metrics.roleCallCount += 1;
     const execution = await dependencies.executor.executeProse({
       profile: profiles[AGENT_ROLES['prose-worker']],
       endpoint: payload.endpoint,
@@ -258,8 +297,10 @@ function createOrchestrationRun(
       prompt: stringifyRoleInput({ job, ...(extraInput as object) }),
       localCapabilities: payload.localCapabilities,
       abortSignal: options.abortSignal,
+      isRepair,
     });
     addTokenUsage(usage, execution);
+    addRoleMetrics(metrics, execution);
     return { output: parseProseResult(job, execution.value), usage: toCallUsage(execution) };
   };
   const briefService = createCharacterBriefService({
@@ -298,7 +339,7 @@ function createOrchestrationRun(
       return result;
     },
     repair: async (job, drafts, findings, abortSignal) => {
-      const result = await executeProse(job, { drafts, findings, isTargetedRepair: true });
+      const result = await executeProse(job, { drafts, findings, isTargetedRepair: true }, true);
       abortSignal?.throwIfAborted();
       return result;
     },
@@ -374,6 +415,16 @@ function createOrchestrationRun(
         role: 'tool',
         state: 'output-available',
       });
+      queue.push({
+        type: EventType.CUSTOM,
+        name: AGENT_ORCHESTRATION_EVENT_NAMES.proposal,
+        value: AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA.parse({
+          runId,
+          proposalId: proposalOutput.proposal?.id ?? toolCallId,
+          toolCallId,
+          proposedFieldCount: changes.length,
+        }),
+      });
       return { proposalId: proposalOutput.proposal?.id ?? toolCallId };
     },
   });
@@ -393,6 +444,7 @@ function createOrchestrationRun(
   return {
     runId,
     usage,
+    metrics,
     promise: service.run({
       ...briefInput,
       runId,
@@ -415,6 +467,12 @@ export function createOrchestratedCharacterAssistantService(
       const run = createOrchestrationRun(options, dependencies, queue);
       const threadId = options.messages.at(-1)?.id ?? run.runId;
       const messageId = dependencies.generateUuid();
+      let hasEmittedMetrics = false;
+      const emitFinalRunMetrics = () => {
+        if (hasEmittedMetrics) return;
+        hasEmittedMetrics = true;
+        emitRunMetrics(queue, run.metrics);
+      };
       const completion = run.promise
         .then((result) => {
           if (result.brief) {
@@ -457,6 +515,7 @@ export function createOrchestratedCharacterAssistantService(
             name: 'structured-output.complete',
             value: { object: finalResponse, raw },
           });
+          emitFinalRunMetrics();
           queue.push({
             type: EventType.RUN_FINISHED,
             threadId,
@@ -464,6 +523,10 @@ export function createOrchestratedCharacterAssistantService(
             finishReason: 'stop',
             usage: run.usage,
           });
+        })
+        .catch((error) => {
+          emitFinalRunMetrics();
+          throw error;
         })
         .finally(() => queue.finish());
 

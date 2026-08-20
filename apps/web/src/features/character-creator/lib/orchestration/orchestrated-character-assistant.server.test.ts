@@ -12,7 +12,12 @@ import { createCharacterEditProposal } from '../proposals/character-edit-proposa
 import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import { PROVIDER_KINDS } from '../provider/provider-health';
 import { AGENT_ROUTES } from './agent-orchestration-contracts';
-import type { iAgentRoleExecutor } from './agent-role-executor.server';
+import {
+  AGENT_ORCHESTRATION_EVENT_NAMES,
+  AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA,
+  AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA,
+} from './agent-orchestration-events';
+import type { iAgentRoleExecutionUsage, iAgentRoleExecutor } from './agent-role-executor.server';
 import { createOrchestratedCharacterAssistantService } from './orchestrated-character-assistant.server';
 
 const PROSE = [
@@ -46,7 +51,11 @@ function createPayload(message: string) {
   });
 }
 
-function createExecution<T>(value: T, role: keyof typeof AGENT_ROLES) {
+function createExecution<T>(
+  value: T,
+  role: keyof typeof AGENT_ROLES,
+  usageOverrides: Partial<iAgentRoleExecutionUsage> = {},
+) {
   return {
     value,
     runId: 'run-1',
@@ -61,6 +70,7 @@ function createExecution<T>(value: T, role: keyof typeof AGENT_ROLES) {
       costUsd: 0,
       latencyMs: 10,
       retryCount: 0,
+      ...usageOverrides,
     },
   };
 }
@@ -101,6 +111,18 @@ describe('orchestrated character assistant stream', () => {
     expect(executor.executeProse).not.toHaveBeenCalled();
     expect(store.appendProposedCard).not.toHaveBeenCalled();
     expect(chunks.some((chunk) => chunk.type === EventType.RUN_FINISHED)).toBe(true);
+    const metricsChunk = chunks.find(
+      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.metrics,
+    );
+    if (metricsChunk?.type !== EventType.CUSTOM) throw new Error('Metrics event was not emitted.');
+    expect(AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metricsChunk.value)).toEqual({
+      runId: 'run-1',
+      roleCallCount: 1,
+      inputTokens: 10,
+      outputTokens: 10,
+      costUsd: 0,
+      latencyMs: 10,
+    });
   });
 
   it('submits a focused draft through the existing proposal store only after review', async () => {
@@ -111,7 +133,9 @@ describe('orchestrated character assistant stream', () => {
     const executeStructured: iAgentRoleExecutor['executeStructured'] = async (options) => {
       roles.push(options.profile.role);
       if (options.profile.role === AGENT_ROLES['intent-router']) {
-        return createExecution({ route: AGENT_ROUTES['focused-edit'], answer: null }, 'intent-router') as never;
+        return createExecution({ route: AGENT_ROUTES['focused-edit'], answer: null }, 'intent-router', {
+          costUsd: 0.01,
+        }) as never;
       }
       if (options.profile.role === AGENT_ROLES.orchestrator) {
         return createExecution(
@@ -134,13 +158,14 @@ describe('orchestrated character assistant stream', () => {
             styleBible: ['Specific, grounded prose.'],
           },
           'orchestrator',
+          { costUsd: 0.02 },
         ) as never;
       }
-      return createExecution([], 'critic') as never;
+      return createExecution([], 'critic', { costUsd: 0.04 }) as never;
     };
     const executor = {
       executeStructured,
-      executeProse: vi.fn(async () => createExecution(PROSE, 'prose-worker')),
+      executeProse: vi.fn(async () => createExecution(PROSE, 'prose-worker', { costUsd: 0.03 })),
     } satisfies iAgentRoleExecutor;
     let projectedCard = structuredClone(payload.card);
     const appendProposedCard = vi.fn(({ proposedCard, toolCallId, summary }) => {
@@ -167,5 +192,27 @@ describe('orchestrated character assistant stream', () => {
     expect(projectedCard.data.description).toBe(PROSE);
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_END)).toBe(true);
     expect(chunks.filter((chunk) => chunk.type === EventType.CUSTOM).length).toBeGreaterThan(1);
+    const proposalChunk = chunks.find(
+      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.proposal,
+    );
+    if (proposalChunk?.type !== EventType.CUSTOM) throw new Error('Proposal event was not emitted.');
+    expect(AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA.parse(proposalChunk.value)).toMatchObject({
+      runId: 'run-1',
+      proposedFieldCount: 1,
+    });
+    const metricsChunk = chunks.find(
+      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.metrics,
+    );
+    if (metricsChunk?.type !== EventType.CUSTOM) throw new Error('Metrics event was not emitted.');
+    expect(AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metricsChunk.value)).toEqual({
+      runId: 'run-1',
+      roleCallCount: 4,
+      inputTokens: 40,
+      outputTokens: 40,
+      costUsd: 0.1,
+      latencyMs: 40,
+    });
+    expect(JSON.stringify(metricsChunk)).not.toContain('Mira');
+    expect(JSON.stringify(metricsChunk)).not.toContain('apiKey');
   });
 });

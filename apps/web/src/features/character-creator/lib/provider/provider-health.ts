@@ -4,9 +4,10 @@ import { loggerFactory } from '@~/lib/logging/logger';
 
 import { REQUEST_MODES } from '../generation/generation-config';
 import type { RequestMode } from '../generation/generation-config';
-import { mergeModelCapabilities, MODEL_CAPABILITIES, readModelCapabilities } from './model-capabilities';
+import { mergeModelCapabilities, readModelCapabilities } from './model-capabilities';
 import type { iModelCapabilities, iModelProviderOption } from './model-capabilities';
 import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
+import { buildOpenRouterPolicyCatalog, OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA } from './openrouter-policy-catalog';
 import type { iProviderPolicyCatalog } from './provider-policy-resolver';
 
 export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openrouter', 'openai-compatible', 'unknown']);
@@ -198,26 +199,6 @@ const OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA = z
   .passthrough();
 type iOpenRouterEndpointsResponse = z.infer<typeof OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA>;
 
-const OPENROUTER_ZDR_ENDPOINT_SCHEMA = z
-  .object({
-    model_id: OPTIONAL_TRIMMED_STRING_SCHEMA,
-    tag: OPTIONAL_TRIMMED_STRING_SCHEMA,
-    supported_parameters: SUPPORTED_PARAMETERS_SCHEMA,
-    status: z.number().int().optional(),
-    pricing: z
-      .object({
-        prompt: OPTIONAL_TRIMMED_STRING_SCHEMA,
-        completion: OPTIONAL_TRIMMED_STRING_SCHEMA,
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough();
-const OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA = z
-  .object({ data: z.array(OPENROUTER_ZDR_ENDPOINT_SCHEMA).catch([]) })
-  .passthrough();
-type iOpenRouterZdrEndpointsResponse = z.infer<typeof OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA>;
-
 const KOBOLD_MODEL_RESPONSE_SCHEMA = z.union([
   z.string().transform((value) => value.trim()),
   z
@@ -365,57 +346,6 @@ function extractModelProviders(payload: iOpenRouterEndpointsResponse): iModelPro
   });
 }
 
-function getModelEntries(payload: iOpenAiModelsResponse): iProviderModelEntry[] {
-  if (Array.isArray(payload)) return payload;
-  return payload.data ?? payload.models ?? [];
-}
-
-function readPricePerMillion(value: string | undefined): number | null {
-  if (value === undefined) return null;
-  const price = Number(value) * 1_000_000;
-  return Number.isFinite(price) && price >= 0 ? price : null;
-}
-
-function extractPolicyCatalog(
-  modelsPayload: iOpenAiModelsResponse,
-  zdrPayload: iOpenRouterZdrEndpointsResponse,
-  selectedModel: string | null,
-): iProviderPolicyCatalog | null {
-  if (!selectedModel) return null;
-  const modelEntry = getModelEntries(modelsPayload).find(
-    (entry) => typeof entry !== 'string' && (entry.id ?? entry.model_name ?? entry.name) === selectedModel,
-  );
-  if (!modelEntry || typeof modelEntry === 'string' || modelEntry.top_provider?.is_moderated === undefined) return null;
-
-  const endpoints = zdrPayload.data.flatMap((endpoint) => {
-    if (endpoint.model_id !== selectedModel) return [];
-    const providerSlug = endpoint.tag?.split('/')[0];
-    const capabilities = readModelCapabilities(endpoint.supported_parameters);
-    const promptPricePerMillionUsd = readPricePerMillion(endpoint.pricing?.prompt);
-    const completionPricePerMillionUsd = readPricePerMillion(endpoint.pricing?.completion);
-    if (!providerSlug || !capabilities || promptPricePerMillionUsd === null || completionPricePerMillionUsd === null) {
-      return [];
-    }
-
-    return [
-      {
-        providerSlug,
-        isZeroDataRetention: true,
-        doesCollectData: false,
-        isAvailable: endpoint.status === 0,
-        supportedCapabilities: Object.values(MODEL_CAPABILITIES).filter((capability) => capabilities[capability]),
-        promptPricePerMillionUsd,
-        completionPricePerMillionUsd,
-      },
-    ];
-  });
-
-  return {
-    fetchedAt: new Date().toISOString(),
-    models: [{ modelId: selectedModel, isModerated: modelEntry.top_provider.is_moderated, endpoints }],
-  };
-}
-
 function extractCurrentModel(payload: iKoboldModelResponse) {
   if (typeof payload === 'string') {
     return payload || null;
@@ -527,8 +457,8 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     (propsResponse?.isOk && propsResponse.data ? extractContextSize(propsResponse.data) : null);
   const selectedModel = requestedModel ?? currentModel;
   const policyCatalog =
-    modelsResponse?.isOk && modelsResponse.data && zdrEndpointsResponse?.isOk && zdrEndpointsResponse.data
-      ? extractPolicyCatalog(modelsResponse.data, zdrEndpointsResponse.data, selectedModel)
+    rawModelsResponse?.isOk && rawZdrEndpointsResponse?.isOk && selectedModel
+      ? buildOpenRouterPolicyCatalog(rawModelsResponse.data, rawZdrEndpointsResponse.data, selectedModel, new Date())
       : null;
   const selectedModelCapabilities = mergeModelCapabilities(modelProviders.map((provider) => provider.capabilities));
   if (selectedModel && selectedModelCapabilities) {

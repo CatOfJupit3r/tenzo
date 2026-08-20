@@ -1,0 +1,20 @@
+{
+  "profiles": [
+    {
+      "id": "baseline-euryale-novita",
+      "pipeline": "single-agent",
+      "providerKind": "openrouter",
+      "endpoint": "https://openrouter.ai/api/v1",
+      "modelId": "sao10k/l3.1-euryale-70b",
+      "allowedProviderSlug": "novita",
+      "localCapabilities": ["structured-output", "tool-calling"],
+      "qualityProfile": "balanced",
+      "maximumOutputTokens": 2000,
+      "temperature": 0.8,
+      "topP": 1,
+      "promptPricePerMillionUsd": 1.4504,
+      "completionPricePerMillionUsd": 1.4504,
+      "seed": null
+    }
+  ]
+}

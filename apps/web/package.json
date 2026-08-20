@@ -9,6 +9,7 @@
     "serve": "vite preview --host",
     "check-types": "tsgo --noEmit",
     "eval:agent": "tsx src/features/character-creator/lib/evaluation/agent-eval-cli.server.ts",
+    "eval:agent:review": "tsx src/features/character-creator/lib/evaluation/agent-eval-review-cli.server.ts",
     "lint": "eslint . --fix",
     "prettify": "prettier --write ./src/",
     "test": "vitest run",

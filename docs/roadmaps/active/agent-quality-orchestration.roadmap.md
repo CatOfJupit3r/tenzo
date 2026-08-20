@@ -339,18 +339,18 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [ ] Create a versioned, content-safe eval corpus covering sparse premises, partial cards, focused edits, full-card creation, strict templates, examples, long conversations, and mature but policy-compliant creative themes.
+- [x] Create a versioned, content-safe eval corpus covering sparse premises, partial cards, focused edits, full-card creation, strict templates, examples, long conversations, and mature but policy-compliant creative themes.
 - [ ] Capture current single-agent outputs, tokens, latency, tool outcomes, and user-visible proposals as the baseline.
-- [ ] Define field-specific rubrics for fidelity, completeness, specificity, roleplay usability, voice, format, coherence, and non-repetition.
+- [x] Define field-specific rubrics for fidelity, completeness, specificity, roleplay usability, voice, format, coherence, and non-repetition.
 - [x] Implement deterministic quality metrics for empty/short outputs, macro/template preservation, exact sentence reuse, and normalized n-gram overlap.
-- [ ] Define blinded pairwise human review and a ZDR/unmoderated model-judge protocol.
+- [x] Define blinded pairwise human review and a ZDR/unmoderated model-judge protocol.
 - [ ] Set provisional per-route latency and cost ceilings from baseline measurements rather than guesses.
 
 **Exit criteria:**
 
-- [ ] At least 30 representative cases cover every requested route and the known brevity/duplication failures.
+- [x] At least 30 representative cases cover every requested route and the known brevity/duplication failures.
 - [ ] Baseline artifacts can be regenerated without storing API keys or logging prompt content.
-- [ ] The scorecard distinguishes useful depth from padded length.
+- [x] The scorecard distinguishes useful depth from padded length.
 
 **Can run in parallel:**
 

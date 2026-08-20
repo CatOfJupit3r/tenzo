@@ -69,7 +69,9 @@ interface iCharacterModelOptions {
 }
 
 const OPENROUTER_PROVIDER_PRIVACY_OPTIONS = {
+  allowFallbacks: false,
   dataCollection: 'deny',
+  requireParameters: true,
   zdr: true,
 } as const;
 

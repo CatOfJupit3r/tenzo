@@ -4,9 +4,10 @@ import { loggerFactory } from '@~/lib/logging/logger';
 
 import { REQUEST_MODES } from '../generation/generation-config';
 import type { RequestMode } from '../generation/generation-config';
-import { mergeModelCapabilities, readModelCapabilities } from './model-capabilities';
+import { mergeModelCapabilities, MODEL_CAPABILITIES, readModelCapabilities } from './model-capabilities';
 import type { iModelCapabilities, iModelProviderOption } from './model-capabilities';
 import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
+import type { iProviderPolicyCatalog } from './provider-policy-resolver';
 
 export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openrouter', 'openai-compatible', 'unknown']);
 export const PROVIDER_KINDS = PROVIDER_KIND_SCHEMA.enum;
@@ -33,6 +34,7 @@ export interface iConnectionHealthResult {
   modelContextSizes: Record<string, number>;
   modelCapabilities: Record<string, iModelCapabilities>;
   modelProviders: iModelProviderOption[];
+  policyCatalog: iProviderPolicyCatalog | null;
 }
 
 export interface iProviderModelOption {
@@ -63,6 +65,7 @@ interface iEndpointCandidates {
   propsUrl: string;
   serviceInfoUrl: string;
   modelEndpointsUrl: string | null;
+  zdrEndpointsUrl: string | null;
 }
 
 const PROVIDER_KIND_LABELS = {
@@ -93,6 +96,7 @@ function buildEndpointCandidates(endpoint: string, model?: string): iEndpointCan
     propsUrl: `${baseUrl}/props`,
     serviceInfoUrl: `${baseUrl}/.well-known/serviceinfo`,
     modelEndpointsUrl: isOpenRouter && modelPath ? `${openAiBaseUrl}/models/${modelPath}/endpoints` : null,
+    zdrEndpointsUrl: isOpenRouter ? `${openAiBaseUrl}/endpoints/zdr` : null,
   };
 }
 
@@ -158,6 +162,7 @@ const PROVIDER_MODEL_ENTRY_SCHEMA = z.union([
       context_window: OPTIONAL_POSITIVE_INTEGER_SCHEMA,
       max_context_length: OPTIONAL_POSITIVE_INTEGER_SCHEMA,
       supported_parameters: SUPPORTED_PARAMETERS_SCHEMA,
+      top_provider: z.object({ is_moderated: z.boolean().optional() }).passthrough().optional(),
     })
     .passthrough(),
 ]);
@@ -192,6 +197,26 @@ const OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA = z
   })
   .passthrough();
 type iOpenRouterEndpointsResponse = z.infer<typeof OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA>;
+
+const OPENROUTER_ZDR_ENDPOINT_SCHEMA = z
+  .object({
+    model_id: OPTIONAL_TRIMMED_STRING_SCHEMA,
+    tag: OPTIONAL_TRIMMED_STRING_SCHEMA,
+    supported_parameters: SUPPORTED_PARAMETERS_SCHEMA,
+    status: z.number().int().optional(),
+    pricing: z
+      .object({
+        prompt: OPTIONAL_TRIMMED_STRING_SCHEMA,
+        completion: OPTIONAL_TRIMMED_STRING_SCHEMA,
+      })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+const OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA = z
+  .object({ data: z.array(OPENROUTER_ZDR_ENDPOINT_SCHEMA).catch([]) })
+  .passthrough();
+type iOpenRouterZdrEndpointsResponse = z.infer<typeof OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA>;
 
 const KOBOLD_MODEL_RESPONSE_SCHEMA = z.union([
   z.string().transform((value) => value.trim()),
@@ -340,6 +365,57 @@ function extractModelProviders(payload: iOpenRouterEndpointsResponse): iModelPro
   });
 }
 
+function getModelEntries(payload: iOpenAiModelsResponse): iProviderModelEntry[] {
+  if (Array.isArray(payload)) return payload;
+  return payload.data ?? payload.models ?? [];
+}
+
+function readPricePerMillion(value: string | undefined): number | null {
+  if (value === undefined) return null;
+  const price = Number(value) * 1_000_000;
+  return Number.isFinite(price) && price >= 0 ? price : null;
+}
+
+function extractPolicyCatalog(
+  modelsPayload: iOpenAiModelsResponse,
+  zdrPayload: iOpenRouterZdrEndpointsResponse,
+  selectedModel: string | null,
+): iProviderPolicyCatalog | null {
+  if (!selectedModel) return null;
+  const modelEntry = getModelEntries(modelsPayload).find(
+    (entry) => typeof entry !== 'string' && (entry.id ?? entry.model_name ?? entry.name) === selectedModel,
+  );
+  if (!modelEntry || typeof modelEntry === 'string' || modelEntry.top_provider?.is_moderated === undefined) return null;
+
+  const endpoints = zdrPayload.data.flatMap((endpoint) => {
+    if (endpoint.model_id !== selectedModel) return [];
+    const providerSlug = endpoint.tag?.split('/')[0];
+    const capabilities = readModelCapabilities(endpoint.supported_parameters);
+    const promptPricePerMillionUsd = readPricePerMillion(endpoint.pricing?.prompt);
+    const completionPricePerMillionUsd = readPricePerMillion(endpoint.pricing?.completion);
+    if (!providerSlug || !capabilities || promptPricePerMillionUsd === null || completionPricePerMillionUsd === null) {
+      return [];
+    }
+
+    return [
+      {
+        providerSlug,
+        isZeroDataRetention: true,
+        doesCollectData: false,
+        isAvailable: endpoint.status === 0,
+        supportedCapabilities: Object.values(MODEL_CAPABILITIES).filter((capability) => capabilities[capability]),
+        promptPricePerMillionUsd,
+        completionPricePerMillionUsd,
+      },
+    ];
+  });
+
+  return {
+    fetchedAt: new Date().toISOString(),
+    models: [{ modelId: selectedModel, isModerated: modelEntry.top_provider.is_moderated, endpoints }],
+  };
+}
+
 function extractCurrentModel(payload: iKoboldModelResponse) {
   if (typeof payload === 'string') {
     return payload || null;
@@ -381,6 +457,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     rawPropsResponse,
     rawServiceInfoResponse,
     rawModelEndpointsResponse,
+    rawZdrEndpointsResponse,
   ] = await Promise.all([
     jsonFetcher(candidates.modelsUrl, requestInit).catch(() => null),
     jsonFetcher(candidates.koboldModelUrl, requestInit).catch(() => null),
@@ -391,6 +468,9 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     candidates.modelEndpointsUrl
       ? jsonFetcher(candidates.modelEndpointsUrl, requestInit).catch(() => null)
       : Promise.resolve(null),
+    candidates.zdrEndpointsUrl
+      ? jsonFetcher(candidates.zdrEndpointsUrl, requestInit).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const modelsResponse = parseProbeResult(rawModelsResponse, OPENAI_MODELS_RESPONSE_SCHEMA);
   const koboldModelResponse = parseProbeResult(rawKoboldModelResponse, KOBOLD_MODEL_RESPONSE_SCHEMA);
@@ -399,6 +479,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   const propsResponse = parseProbeResult(rawPropsResponse, CONTEXT_RESPONSE_SCHEMA);
   const serviceInfoResponse = parseProbeResult(rawServiceInfoResponse, SERVICE_INFO_RESPONSE_SCHEMA);
   const modelEndpointsResponse = parseProbeResult(rawModelEndpointsResponse, OPENROUTER_ENDPOINTS_RESPONSE_SCHEMA);
+  const zdrEndpointsResponse = parseProbeResult(rawZdrEndpointsResponse, OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA);
   const requestedModel = OPTIONAL_TRIMMED_STRING_SCHEMA.parse(request.model);
 
   const probeResults = [
@@ -409,6 +490,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     { category: 'properties', isAttempted: true, result: propsResponse },
     { category: 'service-info', isAttempted: true, result: serviceInfoResponse },
     { category: 'model-endpoints', isAttempted: candidates.modelEndpointsUrl !== null, result: modelEndpointsResponse },
+    { category: 'zdr-endpoints', isAttempted: candidates.zdrEndpointsUrl !== null, result: zdrEndpointsResponse },
   ] as const;
   const attemptedProbeResults = probeResults.filter((probe) => probe.isAttempted);
   const successfulProbeCategories = attemptedProbeResults
@@ -444,6 +526,10 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
       : null) ??
     (propsResponse?.isOk && propsResponse.data ? extractContextSize(propsResponse.data) : null);
   const selectedModel = requestedModel ?? currentModel;
+  const policyCatalog =
+    modelsResponse?.isOk && modelsResponse.data && zdrEndpointsResponse?.isOk && zdrEndpointsResponse.data
+      ? extractPolicyCatalog(modelsResponse.data, zdrEndpointsResponse.data, selectedModel)
+      : null;
   const selectedModelCapabilities = mergeModelCapabilities(modelProviders.map((provider) => provider.capabilities));
   if (selectedModel && selectedModelCapabilities) {
     modelCapabilities[selectedModel] = selectedModelCapabilities;
@@ -505,6 +591,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
     modelContextSizes,
     modelCapabilities,
     modelProviders,
+    policyCatalog,
   } satisfies iConnectionHealthResult;
 }
 

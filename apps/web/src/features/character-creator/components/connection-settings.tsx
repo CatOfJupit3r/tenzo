@@ -18,6 +18,7 @@ import {
 } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import {
+  getRequiredModelCapabilities,
   getModelCompatibilityStatus,
   MODEL_CAPABILITIES,
   MODEL_COMPATIBILITY_STATUSES,
@@ -30,6 +31,7 @@ import type {
 } from '../lib/provider/model-capabilities';
 import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
+import type { iProviderPolicyCatalog } from '../lib/provider/provider-policy-resolver';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iConnectionHealthViewModel {
@@ -44,6 +46,7 @@ export interface iConnectionHealthViewModel {
   modelContextSizes: Record<string, number>;
   modelCapabilities: Record<string, iModelCapabilities>;
   modelProviders: iModelProviderOption[];
+  policyCatalog: iProviderPolicyCatalog | null;
 }
 
 const MODEL_CAPABILITY_LABELS = {
@@ -161,6 +164,20 @@ export function ConnectionSettings({
     selectedModelCapabilities,
     generationSettings.assistantGenerationMode,
   );
+  const policyModel = connectionHealth.policyCatalog?.models.find((model) => model.modelId === selectedModel);
+  const requiredCapabilities = getRequiredModelCapabilities(generationSettings.assistantGenerationMode);
+  const policyEndpoints =
+    policyModel?.endpoints.filter(
+      (endpoint) =>
+        (!generationSettings.openRouterProvider || endpoint.providerSlug === generationSettings.openRouterProvider) &&
+        endpoint.isZeroDataRetention &&
+        !endpoint.doesCollectData &&
+        endpoint.isAvailable &&
+        requiredCapabilities.every((capability) => endpoint.supportedCapabilities.includes(capability)),
+    ) ?? [];
+  const isCurrentProfileEligible = isUsingOpenRouter
+    ? Boolean(policyModel && !policyModel.isModerated && policyEndpoints.length > 0)
+    : compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.compatible;
 
   return (
     <div className="space-y-4">
@@ -346,6 +363,41 @@ export function ConnectionSettings({
             {compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.unknown ? (
               <p>The provider did not publish capability metadata for this model.</p>
             ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {connectionHealth.hasCompletedCheck ? (
+        <Alert variant={isCurrentProfileEligible ? 'default' : 'destructive'}>
+          <AlertTitle>
+            {isCurrentProfileEligible
+              ? 'Current assistant profile is eligible'
+              : 'Current assistant profile is blocked'}
+          </AlertTitle>
+          <AlertDescription className="space-y-1">
+            {isUsingOpenRouter ? (
+              <>
+                <p>Zero data retention, denied provider data collection, and unmoderated routing are mandatory.</p>
+                {policyModel?.isModerated ? <p>The selected model is reported as moderated.</p> : null}
+                {!connectionHealth.policyCatalog ? <p>Live ZDR policy metadata is unavailable or stale.</p> : null}
+                {connectionHealth.policyCatalog && !policyModel ? (
+                  <p>The selected model is absent from the policy catalog.</p>
+                ) : null}
+                {policyModel && !policyModel.isModerated && policyEndpoints.length === 0 ? (
+                  <p>No available ZDR endpoint satisfies the selected provider and capability requirements.</p>
+                ) : null}
+                {policyEndpoints.length > 0 ? (
+                  <p>
+                    Eligible routing providers: {policyEndpoints.map((endpoint) => endpoint.providerSlug).join(', ')}.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p>
+                Local KoboldCpp does not require third-party ZDR certification. Capability requirements still apply and
+                no remote privacy claim is made.
+              </p>
+            )}
           </AlertDescription>
         </Alert>
       ) : null}

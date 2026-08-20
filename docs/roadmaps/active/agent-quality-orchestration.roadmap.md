@@ -366,18 +366,18 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [ ] Define schema-backed agent roles, capability requirements, role profiles, endpoint eligibility results, and explicit failure reasons.
-- [ ] Add a provider-policy resolver backed by the live ZDR endpoint catalog with a bounded cache of policy metadata only.
+- [x] Define schema-backed agent roles, capability requirements, role profiles, endpoint eligibility results, and explicit failure reasons.
+- [x] Add a provider-policy resolver backed by the live ZDR endpoint catalog with a bounded cache of policy metadata only.
 - [ ] Require unmoderated eligibility and ZDR at health check and immediately before every remote role call.
-- [ ] Preserve per-request `zdr: true`, data collection denied, and parameter support requirements.
-- [ ] Add role-aware usage, cost, latency, model, provider, retry, and failure observability without content logging.
-- [ ] Add a settings view that shows why a profile is eligible or blocked and makes the privacy invariants non-disableable.
+- [x] Preserve per-request `zdr: true`, data collection denied, and parameter support requirements.
+- [x] Add role-aware usage, cost, latency, model, provider, retry, and failure observability without content logging.
+- [x] Add a settings view that shows why a profile is eligible or blocked and makes the privacy invariants non-disableable.
 
 **Exit criteria:**
 
-- [ ] Tests prove no role call can be built for a retaining, data-collecting, moderated, or capability-incompatible endpoint.
-- [ ] Provider fallback cannot escape the eligible endpoint set.
-- [ ] Local KoboldCpp profiles are identified separately and do not make claims about third-party ZDR certification.
+- [x] Tests prove no role call can be built for a retaining, data-collecting, moderated, or capability-incompatible endpoint.
+- [x] Provider fallback cannot escape the eligible endpoint set.
+- [x] Local KoboldCpp profiles are identified separately and do not make claims about third-party ZDR certification.
 
 **Can run in parallel:**
 

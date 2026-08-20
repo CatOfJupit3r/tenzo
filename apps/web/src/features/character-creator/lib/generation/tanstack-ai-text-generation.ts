@@ -4,6 +4,7 @@ import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { createOpenRouterText } from '@tanstack/ai-openrouter';
 
 import { normalizeOpenAiCompatibleBaseUrl } from '../provider/openai-compatible-endpoint';
+import type { ProviderPolicyResolution } from '../provider/provider-policy-resolver';
 import { suppressGenerationAbort } from './abort-safe-stream';
 import type { iCharacterGenerationStreamRequest } from './generation-stream-contracts';
 import { repairJson } from './json-repair';
@@ -236,6 +237,30 @@ export function createCharacterToolModelOptions(endpoint: string, generationSett
     provider: {
       ...modelOptions.provider,
       requireParameters: true,
+    },
+  };
+}
+
+export function createAgentRoleModelOptions(
+  endpoint: string,
+  generationSettings: iCharacterModelOptions,
+  policyResolution: ProviderPolicyResolution,
+) {
+  if (!policyResolution.isEligible) {
+    throw new Error(`Agent role endpoint is ineligible: ${policyResolution.failures[0]?.reason ?? 'unknown'}.`);
+  }
+
+  const modelOptions = createCharacterModelOptions(endpoint, generationSettings);
+  if (policyResolution.isLocal || !policyResolution.routing) return modelOptions;
+
+  return {
+    ...modelOptions,
+    provider: {
+      only: policyResolution.routing.only,
+      allowFallbacks: policyResolution.routing.allowFallbacks,
+      dataCollection: policyResolution.routing.dataCollection,
+      zdr: policyResolution.routing.zdr,
+      requireParameters: policyResolution.routing.requireParameters,
     },
   };
 }

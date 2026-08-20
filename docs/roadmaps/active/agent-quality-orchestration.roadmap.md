@@ -145,10 +145,10 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Target behavior:** The enricher returns a typed brief containing confirmed facts, conservative inferences, creative options, missing high-impact decisions, and field coverage goals.
 **Acceptance criteria:**
 
-- [ ] User-provided facts and model-added assumptions are distinguishable in the contract.
-- [ ] Low-impact gaps can receive reversible defaults; high-impact identity, relationship, tone, or consent-sensitive gaps become concise user questions.
-- [ ] A sparse but sufficient premise can proceed without forcing an interview.
-- [ ] The brief contains enough field-specific material to plan the requested scope.
+- [x] User-provided facts and model-added assumptions are distinguishable in the contract.
+- [x] Low-impact gaps can receive reversible defaults; high-impact identity, relationship, tone, or consent-sensitive gaps become concise user questions.
+- [x] A sparse but sufficient premise can proceed without forcing an interview.
+- [x] The brief contains enough field-specific material to plan the requested scope.
 
 ### SC2: Multi-field generation avoids restatement
 
@@ -158,10 +158,10 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Target behavior:** The orchestrator creates a content-ownership map before drafting and prose workers receive both their assigned content and a negative ledger of material owned elsewhere.
 **Acceptance criteria:**
 
-- [ ] Every major fact or beat has a primary field and optional allowed echoes.
-- [ ] Description establishes identity and durable facts; personality explains behavioral tendencies; scenario establishes the active situation; greetings and examples demonstrate rather than summarize.
-- [ ] Repeated phrases and semantically redundant passages above configured thresholds are flagged.
-- [ ] Repairs target only the offending fields or passages.
+- [x] Every major fact or beat has a primary field and optional allowed echoes.
+- [x] Description establishes identity and durable facts; personality explains behavioral tendencies; scenario establishes the active situation; greetings and examples demonstrate rather than summarize.
+- [x] Repeated phrases and semantically redundant passages above configured thresholds are flagged.
+- [x] Repairs target only the offending fields or passages.
 
 ### SC3: One-field edit remains proportionate
 
@@ -171,9 +171,9 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Target behavior:** The orchestrator selects a reduced path: normalize intent, plan the focused field against the current card, draft once, run focused quality checks, and propose that field only.
 **Acceptance criteria:**
 
-- [ ] No unrelated field is proposed.
-- [ ] Existing card facts are used as constraints, not copied wholesale into the draft.
-- [ ] The reduced path stays within its separate cost and latency budget.
+- [x] No unrelated field is proposed.
+- [x] Existing card facts are used as constraints, not copied wholesale into the draft.
+- [x] The reduced path stays within its separate cost and latency budget.
 
 ### SC4: Model or endpoint is not eligible
 
@@ -183,10 +183,10 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Target behavior:** A centralized policy resolver validates model, endpoint, capabilities, moderation flag, and ZDR status before every role call.
 **Acceptance criteria:**
 
-- [ ] A remote call cannot start unless an eligible endpoint is resolved.
-- [ ] Provider fallback stays inside the eligible allowlist.
-- [ ] Capability or privacy mismatch returns an actionable error; it never relaxes the policy.
-- [ ] The user can switch to a compliant configured profile or local inference.
+- [x] A remote call cannot start unless an eligible endpoint is resolved.
+- [x] Provider fallback stays inside the eligible allowlist.
+- [x] Capability or privacy mismatch returns an actionable error; it never relaxes the policy.
+- [x] The user can switch to a compliant configured profile or local inference.
 
 ### SC5: A draft fails quality review
 
@@ -196,10 +196,10 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Target behavior:** Deterministic checks and a structured critic return typed findings tied to fields and rubric dimensions; the orchestrator issues bounded repair jobs.
 **Acceptance criteria:**
 
-- [ ] Findings contain field, severity, evidence category, and repair instruction without chain-of-thought.
-- [ ] A run has a fixed maximum number of repair passes and tokens.
-- [ ] Unresolved quality failures are disclosed instead of hidden.
-- [ ] Successful fields are preserved byte-for-byte unless a coherence repair explicitly requires them.
+- [x] Findings contain field, severity, evidence category, and repair instruction without chain-of-thought.
+- [x] A run has a fixed maximum number of repair passes and tokens.
+- [x] Unresolved quality failures are disclosed instead of hidden.
+- [x] Successful fields are preserved byte-for-byte unless a coherence repair explicitly requires them.
 
 ### SC6: A user asks for advice rather than edits
 
@@ -209,9 +209,9 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Target behavior:** The intent router selects a conversational answer path and does not invoke enrichment, prose workers, or proposal tools unnecessarily.
 **Acceptance criteria:**
 
-- [ ] Advice-only turns use at most one eligible model call unless a tool read is required.
-- [ ] No proposal is created.
-- [ ] The response preserves the existing concise conversational style.
+- [x] Advice-only turns use at most one eligible model call unless a tool read is required.
+- [x] No proposal is created.
+- [x] The response preserves the existing concise conversational style.
 
 ## 7. Design Principles And Constraints
 
@@ -645,11 +645,12 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 
 - Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
 - Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
-- Root `pnpm run check-types` passed after live-route integration.
+- Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
+- Root `pnpm run test` passed 69 files and 316 tests.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
 - Manual rendered-UI QA confirmed the quality/cost selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
-- Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, removal of the unused legacy runtime, and final full lint/test validation after that removal.
+- Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, and removal of the unused legacy runtime after acceptance.
 
 ### Trace expectations
 

@@ -9,6 +9,7 @@ updated: "2026-07-05"
 last_repo_audit: "2026-07-05"
 source_of_truth: true
 related_docs:
+  - "docs/roadmaps/active/agent-quality-orchestration.roadmap.md"
   - "inspo/spec_v2.md"
   - "inspo/as-extension/src/generate.ts"
   - "inspo/chargen/README.md"

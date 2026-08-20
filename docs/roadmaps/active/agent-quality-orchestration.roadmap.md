@@ -25,7 +25,7 @@ archive_when:
 
 > Status: Active backlog
 > Last repo audit: 2026-08-20
-> Current summary: Koneko has a capable single-model character assistant with native-tool and bounded structured-output modes, reviewable proposals, rich prompt context, and per-request OpenRouter privacy routing. The same model still has to interpret sparse ideas, plan a coherent card, write long-form field content, avoid cross-field repetition, and operate tools in one run; there is no task decomposition, shared content plan, quality gate, comparative eval suite, or role-specific model selection.
+> Current summary: The live assistant route now uses a typed brief, ownership plan, tool-free prose jobs, deterministic and structured quality review, bounded repairs, and the existing reviewable proposal actions. Every remote role call refreshes or revalidates bounded ZDR/unmoderated policy metadata and fails closed. The frozen baseline capture, paid multi-model tournament, blinded review, evidence-backed defaults, and removal of the now-unused single-agent implementation remain open.
 
 ## 1. Executive Summary
 
@@ -122,16 +122,16 @@ OpenRouter's current documentation says `provider.zdr: true` restricts a request
 - [OpenRouter data collection](https://openrouter.ai/docs/guides/privacy/data-collection)
 - [OpenRouter guardrails](https://openrouter.ai/docs/guides/features/guardrails/overview)
 
-The 2026-08-20 public catalog snapshot identified the following research candidates. Prices are catalog list prices per million tokens at audit time and must not be treated as stable configuration:
+The public catalog was refreshed without credentials on 2026-08-21 at 01:21 Europe/Kyiv. All six research candidates were still reported unmoderated and had at least one live ZDR endpoint. Prices are endpoint list-price ranges per million tokens at refresh time and must not be treated as stable configuration:
 
 | Candidate                                                                        | Intended eval role                                | Unmoderated catalog flag | ZDR endpoint observed | Tool support | Structured-output support | Input / output $/M |
 | -------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------ | --------------------- | ------------ | ------------------------- | ------------------ |
 | `cognitivecomputations/dolphin-mistral-24b-venice-edition` (`venice/uncensored`) | Prose worker                                      | Yes                      | Venice                | No           | No; response format only  | 0.20 / 0.90        |
-| `sao10k/l3.1-euryale-70b`                                                        | Prose worker or orchestrator challenger           | Yes                      | DeepInfra, Novita     | Yes          | Yes                       | 0.85 / 0.85        |
+| `sao10k/l3.1-euryale-70b`                                                        | Prose worker or orchestrator challenger           | Yes                      | DeepInfra, Novita     | Yes          | Yes                       | 0.85-1.4504 / 0.85-1.4504 |
 | `nousresearch/hermes-3-llama-3.1-70b`                                            | Enricher or prose challenger                      | Yes                      | DeepInfra             | No           | Yes                       | 0.70 / 0.70        |
 | `nousresearch/hermes-4-70b`                                                      | Enricher or prose challenger                      | Yes                      | Nebius                | No           | No; response format only  | 0.13 / 0.40        |
-| `qwen/qwen3-235b-a22b-2507`                                                      | Cheap structured orchestrator/enricher challenger | Yes                      | Multiple              | Yes          | Yes                       | 0.09 / 0.55        |
-| `minimax/minimax-m2.5`                                                           | Structured orchestrator challenger                | Yes                      | Multiple              | Yes          | Yes                       | 0.23 / 0.90        |
+| `qwen/qwen3-235b-a22b-2507`                                                      | Cheap structured orchestrator/enricher challenger | Yes                      | Multiple              | Yes          | Yes                       | 0.09-0.25 / 0.55-1.00 |
+| `minimax/minimax-m2.5`                                                           | Structured orchestrator challenger                | Yes                      | Multiple              | Yes          | Yes                       | 0.225-0.60 / 0.90-2.40 |
 
 Catalog capability flags establish eligibility, not suitability. The implementation phase must refresh this snapshot, verify the exact chosen endpoint, and run the repository eval suite before setting defaults.
 
@@ -368,7 +368,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 - [x] Define schema-backed agent roles, capability requirements, role profiles, endpoint eligibility results, and explicit failure reasons.
 - [x] Add a provider-policy resolver backed by the live ZDR endpoint catalog with a bounded cache of policy metadata only.
-- [ ] Require unmoderated eligibility and ZDR at health check and immediately before every remote role call.
+- [x] Require unmoderated eligibility and ZDR at health check and immediately before every remote role call.
 - [x] Preserve per-request `zdr: true`, data collection denied, and parameter support requirements.
 - [x] Add role-aware usage, cost, latency, model, provider, retry, and failure observability without content logging.
 - [x] Add a settings view that shows why a profile is eligible or blocked and makes the privacy invariants non-disableable.
@@ -393,18 +393,18 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [ ] Add the typed character-brief contract with provenance for user facts, card facts, reference-derived inspiration, and model assumptions.
-- [ ] Implement the cheap enricher profile using structured output only.
-- [ ] Classify gaps by impact and ask only questions that materially affect correctness or user intent.
-- [ ] Support a fast path when the prompt and current card already provide a sufficient brief.
-- [ ] Show a compact assumption summary before proposals and allow the user to revise it.
-- [ ] Bound enrichment to the requested focus so a one-field edit does not become a full redesign.
+- [x] Add the typed character-brief contract with provenance for user facts, card facts, reference-derived inspiration, and model assumptions.
+- [x] Implement the cheap enricher profile using structured output only.
+- [x] Classify gaps by impact and ask only questions that materially affect correctness or user intent.
+- [x] Support a fast path when the prompt and current card already provide a sufficient brief.
+- [x] Show a compact assumption summary before proposals and allow the user to revise it.
+- [x] Bound enrichment to the requested focus so a one-field edit does not become a full redesign.
 
 **Exit criteria:**
 
 - [ ] Sparse eval prompts produce briefs that meet coverage thresholds without contradicting supplied facts.
-- [ ] High-impact invented facts are either labeled choices or require clarification.
-- [ ] Sufficient prompts do not incur an unnecessary enrichment call.
+- [x] High-impact invented facts are either labeled choices or require clarification.
+- [x] Sufficient prompts do not incur an unnecessary enrichment call.
 
 **Can run in parallel:**
 
@@ -420,20 +420,20 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [ ] Implement the typed content plan and ownership ledger.
-- [ ] Define field responsibilities, allowed echoes, forbidden restatements, relevant context slices, and depth targets.
-- [ ] Split prose jobs by semantic coupling: description/personality, scenario, greetings, example dialogue, and other independent field groups as requested.
-- [ ] Run independent jobs concurrently only when their content ownership is settled and neither consumes the other's output.
-- [ ] Give prose workers no tools and accept raw text or minimal field-key envelopes.
-- [ ] Preserve strict template rendering, macros, and existing focused-edit boundaries.
-- [ ] Submit successful drafts through the existing proposal action handlers only after quality checks.
+- [x] Implement the typed content plan and ownership ledger.
+- [x] Define field responsibilities, allowed echoes, forbidden restatements, relevant context slices, and depth targets.
+- [x] Split prose jobs by semantic coupling: description/personality, scenario, greetings, example dialogue, and other independent field groups as requested.
+- [x] Run independent jobs concurrently only when their content ownership is settled and neither consumes the other's output.
+- [x] Give prose workers no tools and accept raw text or minimal field-key envelopes.
+- [x] Preserve strict template rendering, macros, and existing focused-edit boundaries.
+- [x] Submit successful drafts through the existing proposal action handlers only after quality checks.
 
 **Exit criteria:**
 
-- [ ] Every proposed passage traces to a field job and content-plan entry.
-- [ ] Prose workers cannot mutate state or call proposal tools.
-- [ ] Focused edits take the reduced path.
-- [ ] Aborted or failed jobs do not create partial live proposals.
+- [x] Every proposed passage traces to a field job and content-plan entry.
+- [x] Prose workers cannot mutate state or call proposal tools.
+- [x] Focused edits take the reduced path.
+- [x] Aborted or failed jobs do not create partial live proposals.
 
 **Can run in parallel:**
 
@@ -449,19 +449,19 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [ ] Run deterministic field and cross-field checks before critic inference.
-- [ ] Add the structured critic rubric and localized findings contract.
-- [ ] Compare drafts against the brief, content plan, current card, templates, and other proposed fields.
-- [ ] Add a maximum of two targeted repair passes per failing field group.
-- [ ] Preserve passing fields and measure whether each repair actually improves the failed dimensions.
-- [ ] Surface unresolved findings with the proposal instead of looping or hiding them.
+- [x] Run deterministic field and cross-field checks before critic inference.
+- [x] Add the structured critic rubric and localized findings contract.
+- [x] Compare drafts against the brief, content plan, current card, templates, and other proposed fields.
+- [x] Add a maximum of two targeted repair passes per failing field group.
+- [x] Preserve passing fields and measure whether each repair actually improves the failed dimensions.
+- [x] Surface unresolved findings with the proposal instead of looping or hiding them.
 
 **Exit criteria:**
 
-- [ ] Known duplicated fixtures are caught by deterministic or critic checks.
-- [ ] Known concise-but-complete fixtures are not rejected solely for length.
-- [ ] Repair cannot exceed configured call, token, latency, or cost budgets.
-- [ ] A failed critic or repair has an explicit recoverable user state.
+- [x] Known duplicated fixtures are caught by deterministic or critic checks.
+- [x] Known concise-but-complete fixtures are not rejected solely for length.
+- [x] Repair cannot exceed configured call, token, latency, or cost budgets.
+- [x] A failed critic or repair has an explicit recoverable user state.
 
 **Can run in parallel:**
 
@@ -477,7 +477,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [ ] Refresh the live ZDR/unmoderated candidate set and record the catalog timestamp.
+- [x] Refresh the live ZDR/unmoderated candidate set and record the catalog timestamp.
 - [ ] Evaluate at least three eligible structured candidates for router/enricher/orchestrator/critic duties and at least three eligible prose candidates.
 - [ ] Include the current user-selected model and local KoboldCpp when they satisfy the role contract.
 - [ ] Compare single-model, two-model, and role-specialized configurations.
@@ -489,7 +489,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 - [ ] Selected defaults beat the baseline on the primary quality score and both reported pain points.
 - [ ] No selected profile has a policy violation in the test matrix.
 - [ ] The chosen profile's p95 cost and latency are within accepted budgets.
-- [ ] Model/provider IDs remain replaceable configuration, not branching application logic.
+- [x] Model/provider IDs remain replaceable configuration, not branching application logic.
 
 **Can run in parallel:**
 
@@ -505,8 +505,8 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [ ] Add phase progress, cancellation, assumption review, quality-warning, and partial-failure presentation to the assistant UI.
-- [ ] Add a simple quality/cost profile selector without exposing internal graph complexity by default.
+- [x] Add phase progress, cancellation, assumption review, quality-warning, and partial-failure presentation to the assistant UI.
+- [x] Add a simple quality/cost profile selector without exposing internal graph complexity by default.
 - [ ] Run the new pipeline behind a temporary development-only comparison switch.
 - [ ] Complete manual QA and eval acceptance gates.
 - [ ] Replace the old assistant runtime and remove the temporary comparison switch, obsolete mode branches, prompts, and tests.
@@ -514,8 +514,8 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Exit criteria:**
 
-- [ ] Users can understand what stage is active and cancel the full run.
-- [ ] Existing proposal accept/reject behavior is unchanged.
+- [x] Users can understand what stage is active and cancel the full run.
+- [x] Existing proposal accept/reject behavior is unchanged.
 - [ ] The single-agent generation path is removed after verification.
 - [ ] Type checks, lint, tests, build, manual QA, and AI eval gates pass.
 
@@ -533,45 +533,45 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 - [ ] Sparse ideas produce materially richer proposals than the baseline without forced verbosity.
 - [ ] Multi-field runs meet the accepted cross-field duplication thresholds.
-- [ ] Focused edits remain focused and use the reduced pipeline.
-- [ ] Advice-only turns do not invoke the drafting pipeline.
-- [ ] High-impact assumptions are reviewable or clarified before drafting.
+- [x] Focused edits remain focused and use the reduced pipeline.
+- [x] Advice-only turns do not invoke the drafting pipeline.
+- [x] High-impact assumptions are reviewable or clarified before drafting.
 
 ### API and contracts
 
-- [ ] Every control-plane output is schema validated.
-- [ ] Role profiles declare capabilities and budgets without making privacy invariants configurable.
-- [ ] Prose workers have no tools or mutation authority.
-- [ ] Existing proposal actions remain the only route to reviewable edits.
+- [x] Every control-plane output is schema validated.
+- [x] Role profiles declare capabilities and budgets without making privacy invariants configurable.
+- [x] Prose workers have no tools or mutation authority.
+- [x] Existing proposal actions remain the only route to reviewable edits.
 
 ### Persistence
 
-- [ ] Saved role/quality preferences use existing local-first storage patterns.
-- [ ] Transient briefs, plans, drafts, and findings are cleaned up on completion or cancellation unless explicitly saved by the user.
-- [ ] Server logs and telemetry contain no card or prompt content.
+- [x] Saved role/quality preferences use existing local-first storage patterns.
+- [x] Transient briefs, plans, drafts, and findings are cleaned up on completion or cancellation unless explicitly saved by the user.
+- [x] Server logs and telemetry contain no card or prompt content.
 
 ### UI and UX
 
-- [ ] The user sees stable progress phases, cancellation, and actionable recovery states.
-- [ ] Assumptions and unresolved quality warnings are concise and distinguishable from confirmed facts.
-- [ ] Advanced role/model settings do not overwhelm the default connection workflow.
+- [x] The user sees stable progress phases, cancellation, and actionable recovery states.
+- [x] Assumptions and unresolved quality warnings are concise and distinguishable from confirmed facts.
+- [x] Advanced role/model settings do not overwhelm the default connection workflow.
 
 ### Testing
 
-- [ ] Unit tests cover contracts, policy resolution, deterministic quality rules, budgets, and repair limits.
-- [ ] Integration tests cover orchestration state transitions, tool boundaries, partial failures, cancellation, and proposal submission.
-- [ ] The versioned eval corpus covers at least 30 cases and every known failure class.
+- [x] Unit tests cover contracts, policy resolution, deterministic quality rules, budgets, and repair limits.
+- [x] Integration tests cover orchestration state transitions, tool boundaries, partial failures, cancellation, and proposal submission.
+- [x] The versioned eval corpus covers at least 30 cases and every known failure class.
 - [ ] The selected profiles beat the frozen baseline under blinded review and automated gates.
 
 ### Observability
 
 - [ ] One run ID correlates every role call, quality check, repair, and proposal action.
 - [ ] Tokens, cost, latency, model, endpoint provider, retries, and content-free quality metrics are recorded per role.
-- [ ] Privacy or moderation eligibility failures have distinct safe error categories.
+- [x] Privacy or moderation eligibility failures have distinct safe error categories.
 
 ### Documentation
 
-- [ ] The parent character-creator roadmap points to this roadmap for agent quality work.
+- [x] The parent character-creator roadmap points to this roadmap for agent quality work.
 - [ ] Selected model-role profiles record catalog date, eval revision, prices, and rationale.
 - [ ] Verification evidence and rollout decision are recorded in this roadmap.
 
@@ -640,6 +640,16 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 5. Force an ineligible provider route and confirm the run fails without fallback.
 6. Force one worker and one critic failure and verify targeted recovery states.
 7. Accept and reject proposals and confirm existing card/session behavior remains correct.
+
+### Verification evidence: 2026-08-21 implementation checkpoint
+
+- Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
+- Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
+- Root `pnpm run check-types` passed after live-route integration.
+- Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
+- Manual rendered-UI QA confirmed the quality/cost selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
+- Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
+- Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, removal of the unused legacy runtime, and final full lint/test validation after that removal.
 
 ### Trace expectations
 

@@ -349,7 +349,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 **Exit criteria:**
 
 - [x] At least 30 representative cases cover every requested route and the known brevity/duplication failures.
-- [ ] Baseline artifacts can be regenerated without storing API keys or logging prompt content.
+- [x] Baseline artifacts can be regenerated without storing API keys or logging prompt content.
 - [x] The scorecard distinguishes useful depth from padded length.
 
 **Can run in parallel:**
@@ -565,8 +565,8 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 ### Observability
 
-- [ ] One run ID correlates every role call, quality check, repair, and proposal action.
-- [ ] Tokens, cost, latency, model, endpoint provider, retries, and content-free quality metrics are recorded per role.
+- [x] One run ID correlates every role call, quality check, repair, and proposal action.
+- [x] Tokens, cost, latency, model, endpoint provider, retries, and content-free quality metrics are recorded per role.
 - [x] Privacy or moderation eligibility failures have distinct safe error categories.
 
 ### Documentation
@@ -646,10 +646,12 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
 - Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
 - Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
-- Root `pnpm run test` passed 69 files and 316 tests.
+- Root `pnpm run test` passed 71 files and 321 tests.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
 - Manual rendered-UI QA confirmed the quality/cost selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
+- `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Credentials are accepted only from `TENZO_AGENT_EVAL_API_KEY` and are excluded from output.
+- Content-free metrics now correlate role calls, critic finding counts, targeted repairs, aggregate usage, and proposal submission under one run ID.
 - Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, and removal of the unused legacy runtime after acceptance.
 
 ### Trace expectations

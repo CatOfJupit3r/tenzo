@@ -63,6 +63,7 @@ interface iUseCharacterAssistantWorkspaceOptions {
 }
 
 const CHARACTER_ASSISTANT_WORKSPACE_LOGGER = loggerFactory.getLogger('character-assistant.workspace');
+const SESSION_UPDATE_WAIT_MS = 300;
 
 export interface iCharacterAssistantPatchView {
   proposalId: string;
@@ -185,7 +186,7 @@ export function useCharacterAssistantWorkspace({
   }, [characterId, storedComposerDraft]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session) return undefined;
     const hasMessageChanges = !areMessagesEqual(session.messages, chat.messages);
     const proposals = chat.messages.flatMap((message) =>
       message.parts.flatMap((part) => {
@@ -199,22 +200,33 @@ export function useCharacterAssistantWorkspace({
     );
     const newConcept = readNewRecordedCharacterConcept(chat.messages, session.lastRecordedConceptToolCallId);
     if (!hasMessageChanges && missingProposals.length === 0 && !newConcept) {
-      return;
+      return undefined;
     }
-    if (newConcept) updateGeneralCharacterIdea(newConcept.concept.premise);
-    void updateCharacterAssistantSession(session.id, (draft) => {
-      if (hasMessageChanges) {
-        draft.messages = structuredClone(chat.messages);
-      }
-      missingProposals.forEach((proposal) => {
-        draft.proposals = supersedeOverlappingCharacterEditProposals(draft.proposals, proposal);
-        draft.proposals.push(proposal);
+
+    const updateTimer = setTimeout(() => {
+      if (newConcept) updateGeneralCharacterIdea(newConcept.concept.premise);
+      void updateCharacterAssistantSession(session.id, (draft) => {
+        if (hasMessageChanges) {
+          draft.messages = structuredClone(chat.messages);
+        }
+        missingProposals.forEach((proposal) => {
+          if (draft.proposals.some((storedProposal) => storedProposal.id === proposal.id)) return;
+          draft.proposals = supersedeOverlappingCharacterEditProposals(draft.proposals, proposal);
+          draft.proposals.push(proposal);
+        });
+        if (newConcept) {
+          draft.lastRecordedConceptToolCallId = newConcept.toolCallId;
+        }
+      }).catch((error: unknown) => {
+        WORKSPACE_LOGGER.error('Assistant session persistence failed', error, {
+          operation: 'persist-session',
+          sessionId: session.id,
+        });
       });
-      if (newConcept) {
-        draft.lastRecordedConceptToolCallId = newConcept.toolCallId;
-      }
-    });
-  }, [chat.messages, session, updateGeneralCharacterIdea]);
+    }, SESSION_UPDATE_WAIT_MS);
+
+    return () => clearTimeout(updateTimer);
+  }, [chat.messages, session, updateGeneralCharacterIdea, WORKSPACE_LOGGER]);
 
   const proposalActions = useProposalActions({
     sessionId,

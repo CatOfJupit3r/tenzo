@@ -157,9 +157,15 @@ async function* repairToolCallArguments(stream: AsyncIterable<StreamChunk>): Asy
 }
 
 export function withRepairedToolCallArguments(adapter: AnyTextAdapter): AnyTextAdapter {
+  const structuredOutputStream = adapter.structuredOutputStream?.bind(adapter);
+  const supportsCombinedToolsAndSchema = adapter.supportsCombinedToolsAndSchema?.bind(adapter);
+
   return {
     ...adapter,
     chatStream: (options) => repairToolCallArguments(adapter.chatStream(options)),
+    structuredOutput: async (options) => adapter.structuredOutput(options),
+    ...(structuredOutputStream ? { structuredOutputStream } : {}),
+    ...(supportsCombinedToolsAndSchema ? { supportsCombinedToolsAndSchema } : {}),
   };
 }
 

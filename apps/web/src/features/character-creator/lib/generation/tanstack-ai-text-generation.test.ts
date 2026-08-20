@@ -1,5 +1,5 @@
 import { EventType } from '@tanstack/ai';
-import type { StreamChunk } from '@tanstack/ai';
+import type { AnyTextAdapter, StreamChunk } from '@tanstack/ai';
 import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { describe, expect, it } from 'vitest';
 
@@ -60,6 +60,39 @@ function createHarness() {
 }
 
 describe('TanStack AI text generation', () => {
+  it('preserves prototype-backed structured output capabilities', async () => {
+    const structuredValue = { cards: [{ title: 'Structured card' }] };
+    const adapter = Object.assign(
+      Object.create({
+        async structuredOutput(this: AnyTextAdapter) {
+          expect(this).toBe(adapter);
+          return { data: structuredValue, rawText: JSON.stringify(structuredValue) };
+        },
+        supportsCombinedToolsAndSchema(this: AnyTextAdapter) {
+          expect(this).toBe(adapter);
+          return true;
+        },
+      }) as AnyTextAdapter,
+      {
+        kind: 'text' as const,
+        name: 'prototype-adapter',
+        model: 'test-model',
+        chatStream: () =>
+          (async function* completedStream(): AsyncGenerator<StreamChunk> {
+            yield { type: EventType.RUN_FINISHED } as StreamChunk;
+          })(),
+      },
+    );
+
+    const repairedAdapter = withRepairedToolCallArguments(adapter);
+
+    await expect(repairedAdapter.structuredOutput({} as never)).resolves.toEqual({
+      data: structuredValue,
+      rawText: JSON.stringify(structuredValue),
+    });
+    expect(repairedAdapter.supportsCombinedToolsAndSchema?.()).toBe(true);
+  });
+
   it('repairs streamed native tool-call arguments before the runtime parses them', async () => {
     const adapter = withRepairedToolCallArguments(
       Object.assign(

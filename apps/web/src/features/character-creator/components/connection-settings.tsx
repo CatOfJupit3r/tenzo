@@ -17,6 +17,7 @@ import {
   REQUEST_MODES,
 } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import { AGENT_QUALITY_PROFILE_LABELS, AGENT_QUALITY_PROFILES } from '../lib/provider/agent-quality-profile';
 import {
   getRequiredModelCapabilities,
   getModelCompatibilityStatus,
@@ -128,6 +129,11 @@ const assistantGenerationModeOptions: iOptionType[] = [
     description: 'Multi-step agent tools for models with reliable native function calling.',
   },
 ];
+
+const agentQualityProfileOptions: iOptionType[] = Object.values(AGENT_QUALITY_PROFILES).map((value) => ({
+  label: AGENT_QUALITY_PROFILE_LABELS[value],
+  value,
+}));
 
 export interface iConnectionSettingsProps {
   generationSettings: iCharacterGenerationSettings;
@@ -277,6 +283,25 @@ export function ConnectionSettings({
           />
           <p className="text-sm text-muted-foreground">
             The structured agent loop works without native tools. Tool calls use provider-native function calling.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="agent-quality-profile">Quality and cost</Label>
+          <SingleSelect
+            inputId="agent-quality-profile"
+            options={agentQualityProfileOptions}
+            value={generationSettings.agentQualityProfile}
+            onValueChange={(value) => {
+              if (value && AGENT_QUALITY_PROFILES[value as keyof typeof AGENT_QUALITY_PROFILES]) {
+                onSettingsChange({
+                  agentQualityProfile: value as iCharacterGenerationSettings['agentQualityProfile'],
+                });
+              }
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Controls bounded drafting and review effort. Privacy requirements remain mandatory for every profile.
           </p>
         </div>
 

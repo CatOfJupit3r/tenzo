@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
+import { AGENT_QUALITY_PROFILES } from '../provider/agent-quality-profile';
 import {
   DEFAULT_CONTEXT_SIZE,
   GENERATION_PROVIDERS,
@@ -108,6 +109,15 @@ describe('sanitizeCharacterGenerationConnectionSettings', () => {
   ] as const)('$name', ({ value, expected }) => {
     expect(sanitizeCharacterGenerationConnectionSettings({ assistantGenerationMode: value })).toMatchObject({
       assistantGenerationMode: expected,
+    });
+  });
+
+  it('persists supported quality profiles and rejects unknown values', () => {
+    expect(
+      sanitizeCharacterGenerationConnectionSettings({ agentQualityProfile: AGENT_QUALITY_PROFILES.quality }),
+    ).toMatchObject({ agentQualityProfile: AGENT_QUALITY_PROFILES.quality });
+    expect(sanitizeCharacterGenerationConnectionSettings({ agentQualityProfile: 'unbounded' })).toMatchObject({
+      agentQualityProfile: AGENT_QUALITY_PROFILES.balanced,
     });
   });
 });

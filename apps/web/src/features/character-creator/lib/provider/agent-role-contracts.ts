@@ -63,7 +63,3 @@ export const AGENT_ROLE_PROFILE_SCHEMA = z
 
 export type iAgentRoleBudget = z.infer<typeof AGENT_ROLE_BUDGET_SCHEMA>;
 export type iAgentRoleProfile = z.infer<typeof AGENT_ROLE_PROFILE_SCHEMA>;
-
-export const AGENT_QUALITY_PROFILE_SCHEMA = z.enum(['economy', 'balanced', 'quality']);
-export const AGENT_QUALITY_PROFILES = AGENT_QUALITY_PROFILE_SCHEMA.enum;
-export type AgentQualityProfile = z.infer<typeof AGENT_QUALITY_PROFILE_SCHEMA>;

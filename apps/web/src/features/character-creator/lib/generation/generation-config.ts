@@ -7,6 +7,8 @@ import {
 import type { CharacterAssistantGenerationMode } from '../assistant/character-assistant-generation-mode';
 import { CHARACTER_EDIT_FIELD_KEYS, CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
 import type { CharacterEditFieldKey } from '../proposals/character-edit-proposal';
+import { AGENT_QUALITY_PROFILES, AGENT_QUALITY_PROFILE_SCHEMA } from '../provider/agent-quality-profile';
+import type { AgentQualityProfile } from '../provider/agent-quality-profile';
 
 export const OUTPUT_FORMAT_SCHEMA = z.enum(['xml', 'json', 'none']);
 export const OUTPUT_FORMATS = OUTPUT_FORMAT_SCHEMA.enum;
@@ -77,6 +79,7 @@ export interface iCharacterGenerationConnectionSettings {
   outputFormat: OutputFormat;
   requestMode: RequestMode;
   assistantGenerationMode: CharacterAssistantGenerationMode;
+  agentQualityProfile: AgentQualityProfile;
   temperature: number;
   topP: number;
   frequencyPenalty: number;
@@ -111,6 +114,7 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
   assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
+  agentQualityProfile: AGENT_QUALITY_PROFILES.balanced,
   temperature: 1,
   topP: 1,
   frequencyPenalty: 0,
@@ -176,6 +180,7 @@ const STORED_CHARACTER_GENERATION_CONNECTION_SETTINGS_SCHEMA = z
     outputFormat: OUTPUT_FORMAT_SCHEMA.optional().catch(undefined),
     requestMode: REQUEST_MODE_SCHEMA.optional().catch(undefined),
     assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.optional().catch(undefined),
+    agentQualityProfile: AGENT_QUALITY_PROFILE_SCHEMA.optional().catch(undefined),
     temperature: createClampedNumberSchema(TEMPERATURE_RANGE),
     topP: createClampedNumberSchema(TOP_P_RANGE),
     frequencyPenalty: createClampedNumberSchema(FREQUENCY_PENALTY_RANGE),
@@ -226,6 +231,8 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
     requestMode: candidate.requestMode ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.requestMode,
     assistantGenerationMode:
       candidate.assistantGenerationMode ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.assistantGenerationMode,
+    agentQualityProfile:
+      candidate.agentQualityProfile ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.agentQualityProfile,
     temperature: candidate.temperature ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.temperature,
     topP: candidate.topP ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.topP,
     frequencyPenalty: candidate.frequencyPenalty ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.frequencyPenalty,

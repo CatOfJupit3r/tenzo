@@ -58,4 +58,25 @@ describe('agent role profile service', () => {
       }),
     ).toThrow('OpenRouter or local KoboldCpp');
   });
+
+  it('accepts replaceable per-role assignments for evaluation without branching on model IDs', () => {
+    const profiles = createAgentRoleProfiles({
+      qualityProfile: AGENT_QUALITY_PROFILES.quality,
+      providerKind: PROVIDER_KINDS.openrouter,
+      modelId: 'default/model',
+      allowedProviderSlug: 'default-provider',
+      maximumProseOutputTokens: 2_000,
+      proseTemperature: 1,
+      topP: 1,
+      roleAssignments: {
+        [AGENT_ROLES['prose-worker']]: { modelId: 'prose/model', allowedProviderSlug: 'prose-provider' },
+      },
+    });
+
+    expect(profiles[AGENT_ROLES['prose-worker']]).toMatchObject({
+      modelId: 'prose/model',
+      allowedProviderSlugs: ['prose-provider'],
+    });
+    expect(profiles[AGENT_ROLES.critic].modelId).toBe('default/model');
+  });
 });

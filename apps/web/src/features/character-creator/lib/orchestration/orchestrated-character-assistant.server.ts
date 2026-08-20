@@ -16,6 +16,7 @@ import type { CharacterTextFieldKey } from '../cards/card-schema';
 import { TEMPLATE_MODES } from '../cards/field-templates';
 import { parseRepairedJson } from '../generation/json-repair';
 import { AGENT_ROLES } from '../provider/agent-role-contracts';
+import type { AgentRole } from '../provider/agent-role-contracts';
 import { PROVIDER_KINDS } from '../provider/provider-health';
 import {
   AGENT_PROGRESS_PHASES,
@@ -43,6 +44,7 @@ export interface iOrchestratedCharacterAssistantOptions {
   messages: Array<ModelMessage | UIMessage>;
   store: iCharacterAssistantProposalStore;
   abortSignal?: AbortSignal;
+  roleAssignments?: Partial<Record<AgentRole, { modelId: string; allowedProviderSlug: string }>>;
 }
 
 export interface iOrchestratedCharacterAssistantDependencies {
@@ -224,6 +226,7 @@ function createOrchestrationRun(
     maximumProseOutputTokens: payload.maxTokens,
     proseTemperature: payload.temperature,
     topP: payload.topP,
+    roleAssignments: options.roleAssignments,
   });
   const usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
   const executeStructured = async <T>(

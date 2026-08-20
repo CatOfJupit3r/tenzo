@@ -57,6 +57,7 @@ export interface iCreateAgentRoleProfilesOptions {
   maximumProseOutputTokens: number;
   proseTemperature: number;
   topP: number;
+  roleAssignments?: Partial<Record<AgentRole, { modelId: string; allowedProviderSlug: string }>>;
 }
 
 function getRoleOutputTokens(role: AgentRole, maximumProseOutputTokens: number, limits: iAgentQualitySafetyLimits) {
@@ -89,10 +90,11 @@ export function createAgentRoleProfiles(
         id: `${options.qualityProfile}-${role}`,
         role,
         providerKind: options.providerKind,
-        modelId: options.modelId,
+        modelId: options.roleAssignments?.[role]?.modelId ?? options.modelId,
         allowedProviderSlugs:
-          options.providerKind === PROVIDER_KINDS.openrouter && options.allowedProviderSlug.trim()
-            ? [options.allowedProviderSlug.trim()]
+          options.providerKind === PROVIDER_KINDS.openrouter &&
+          (options.roleAssignments?.[role]?.allowedProviderSlug ?? options.allowedProviderSlug).trim()
+            ? [(options.roleAssignments?.[role]?.allowedProviderSlug ?? options.allowedProviderSlug).trim()]
             : [],
         requiredCapabilities: AGENT_ROLE_CAPABILITY_REQUIREMENTS[role],
         temperature: getRoleTemperature(role, options.proseTemperature),

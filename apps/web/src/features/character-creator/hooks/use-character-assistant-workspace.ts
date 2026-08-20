@@ -453,6 +453,10 @@ export function useCharacterAssistantWorkspace({
     updateComposerDraft,
     cancelRun: () => {
       chat.stop();
+      setOrchestrationPhase(null);
+      setAssumptionSummary([]);
+      setQualityFindings([]);
+      setRecoveryMessage(null);
       toastInfo('Assistant stopped', 'The current assistant run was cancelled.');
     },
     ...proposalActions,

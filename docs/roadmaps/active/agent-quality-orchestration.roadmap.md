@@ -122,7 +122,7 @@ OpenRouter's current documentation says `provider.zdr: true` restricts a request
 - [OpenRouter data collection](https://openrouter.ai/docs/guides/privacy/data-collection)
 - [OpenRouter guardrails](https://openrouter.ai/docs/guides/features/guardrails/overview)
 
-The public catalog was refreshed without credentials on 2026-08-21 at 01:21 Europe/Kyiv. All six research candidates were still reported unmoderated and had at least one live ZDR endpoint. Prices are endpoint list-price ranges per million tokens at refresh time and must not be treated as stable configuration:
+The public catalog was refreshed without credentials on 2026-08-21 at 02:01 Europe/Kyiv. All six research candidates were still reported unmoderated and had at least one live ZDR endpoint. Prices are endpoint list-price ranges per million tokens at refresh time and must not be treated as stable configuration:
 
 | Candidate                                                                        | Intended eval role                                | Unmoderated catalog flag | ZDR endpoint observed | Tool support | Structured-output support | Input / output $/M |
 | -------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------ | --------------------- | ------------ | ------------------------- | ------------------ |
@@ -646,11 +646,13 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
 - Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
 - Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
-- Root `pnpm run test` passed 71 files and 321 tests.
+- Root `pnpm run test` passed 72 files and 324 tests.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
 - Manual rendered-UI QA confirmed the quality/cost selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
 - `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Credentials are accepted only from `TENZO_AGENT_EVAL_API_KEY` and are excluded from output.
+- Schema-validated baseline and 12-case screening configurations pin the refreshed provider slugs and prices. The screening matrix covers the current Euryale model, three structured candidates, three prose candidates, and single-model, two-model, and role-specialized layouts. Local KoboldCpp was probed and omitted because no endpoint was available.
+- `pnpm --filter web run eval:agent:review -- prepare ...` creates separately stored randomized public ballots and a private identity key; the `score` mode enforces three distinct reviewers per comparison and aggregates blinded overall and per-dimension decisions.
 - Content-free metrics now correlate role calls, critic finding counts, targeted repairs, aggregate usage, and proposal submission under one run ID.
 - Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, and removal of the unused legacy runtime after acceptance.
 

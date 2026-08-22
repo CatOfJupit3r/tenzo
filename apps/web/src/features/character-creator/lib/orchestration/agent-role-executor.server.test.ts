@@ -1,6 +1,6 @@
 import { EventType } from '@tanstack/ai';
 import type { AnyTextAdapter, StreamChunk, TokenUsage } from '@tanstack/ai';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import type { iAgentRoleCallEvent } from '../evaluation/agent-run-observability';
@@ -235,6 +235,36 @@ describe('agent role executor', () => {
         schema: z.object({ accepted: z.boolean() }),
       }),
     ).rejects.toThrow();
+  });
+
+  it('retries transient provider failures and records the retry count', async () => {
+    let attempt = 0;
+    const generate = vi.fn(async (options: iGenerateValidatedObjectOptions<{ accepted: boolean }>) => {
+      attempt += 1;
+      options.onUsage?.({
+        promptTokens: attempt === 1 ? 3 : 4,
+        completionTokens: attempt === 1 ? 2 : 3,
+        totalTokens: attempt === 1 ? 5 : 7,
+      } as TokenUsage);
+      if (attempt === 1) {
+        throw Object.assign(new Error('Rate limited with 429.'), { retryAfter: 0, status: 429 });
+      }
+      return { accepted: true };
+    });
+    const harness = createDependencies(createCatalog(), {
+      generateValidatedObject: generate as iGenerateValidatedObject,
+    });
+    const executor = createAgentRoleExecutor(harness.dependencies);
+
+    const result = await executor.executeStructured({
+      ...callOptions(createProfile()),
+      schema: z.object({ accepted: z.boolean() }),
+    });
+
+    expect(generate).toHaveBeenCalledTimes(2);
+    expect(result.usage.retryCount).toBe(1);
+    expect(result.usage).toMatchObject({ inputTokens: 7, outputTokens: 5, totalTokens: 12 });
+    expect(harness.logs[0]).toMatchObject({ outcome: 'completed', retryCount: 1 });
   });
 
   it('records content-free critic finding counts', async () => {

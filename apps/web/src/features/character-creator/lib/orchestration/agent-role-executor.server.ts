@@ -28,6 +28,8 @@ import type {
   ProviderPolicyResolution,
   iProviderPolicyCatalog,
 } from '../provider/provider-policy-resolver';
+import { createAgentCallPacer } from './agent-call-pacer.server';
+import type { iAgentCallPacer } from './agent-call-pacer.server';
 import { getAgentRolePrompt } from './agent-role-prompts';
 
 export interface iAgentRolePolicyCatalogFetchOptions {
@@ -51,6 +53,7 @@ export interface iAgentRoleExecutorDependencies {
   now?: () => Date;
   generateUuid?: () => string;
   logAgentRoleCall?: (event: iAgentRoleCallEvent) => void;
+  pacer?: iAgentCallPacer;
 }
 
 export interface iAgentRoleCallOptions {
@@ -149,6 +152,15 @@ function readUsage(usage: TokenUsage | undefined) {
   const outputTokens = toNonNegativeInteger(usage?.completionTokens);
   const totalTokens = toNonNegativeInteger(usage?.totalTokens ?? inputTokens + outputTokens);
   return { inputTokens, outputTokens, totalTokens };
+}
+
+function addUsage(
+  current: { inputTokens: number; outputTokens: number; totalTokens: number },
+  next: { inputTokens: number; outputTokens: number; totalTokens: number },
+) {
+  current.inputTokens += next.inputTokens;
+  current.outputTokens += next.outputTokens;
+  current.totalTokens += next.totalTokens;
 }
 
 function buildGenerationSettings(profile: iAgentRoleProfile) {
@@ -252,7 +264,14 @@ function toFailureReason(error: unknown): ProviderPolicyFailureReason | null {
 function createDefaultDependencies(): Required<
   Pick<
     iAgentRoleExecutorDependencies,
-    'cache' | 'createAdapter' | 'generateValidatedObject' | 'chat' | 'now' | 'generateUuid' | 'logAgentRoleCall'
+    | 'cache'
+    | 'createAdapter'
+    | 'generateValidatedObject'
+    | 'chat'
+    | 'now'
+    | 'generateUuid'
+    | 'logAgentRoleCall'
+    | 'pacer'
   >
 > &
   Pick<iAgentRoleExecutorDependencies, 'fetchPolicyCatalog' | 'fetchJson'> {
@@ -264,6 +283,7 @@ function createDefaultDependencies(): Required<
     now: () => new Date(),
     generateUuid,
     logAgentRoleCall,
+    pacer: createAgentCallPacer(),
     fetchPolicyCatalog: undefined,
     fetchJson: async (url, init) => fetch(url, init),
   };
@@ -290,6 +310,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
     now: providedDependencies.now ?? defaults.now,
     generateUuid: providedDependencies.generateUuid ?? defaults.generateUuid,
     logAgentRoleCall: providedDependencies.logAgentRoleCall ?? defaults.logAgentRoleCall,
+    pacer: providedDependencies.pacer ?? defaults.pacer,
   };
 
   const resolveForCall = async (
@@ -363,7 +384,8 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
     const startedAt = performance.now();
     let catalog: iProviderPolicyCatalog | null = null;
     let providerId: string = profile.providerKind;
-    let usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    let retryCount = 0;
     let resolution: ProviderPolicyResolution | null = null;
     try {
       const resolved = await resolveForCall(profile, options.endpoint, options.apiKey ?? '', options.localCapabilities);
@@ -371,31 +393,45 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       resolution = resolved.resolution;
       providerId = getProviderId(profile, resolution);
       if (!resolution.isEligible) throw createPolicyError(profile, resolution);
+      const currentResolution = resolution;
       const adapter = (dependencies.createAdapter ?? createCharacterTextAdapter)({
         endpoint: options.endpoint,
         apiKey: options.apiKey ?? '',
         model: profile.modelId,
       });
-      const generatedValue = await (dependencies.generateValidatedObject ?? generateValidatedObject)({
-        adapter,
-        schema,
-        schemaDescription: options.schemaDescription ?? `Structured output for ${profile.role}.`,
-        system: buildSystemPrompts(profile.role, options.systemPrompt).join('\n\n'),
-        prompt: options.prompt,
-        messages: options.messages,
-        modelOptions: createAgentRoleModelOptions(options.endpoint, buildGenerationSettings(profile), resolution),
-        abortSignal: options.abortSignal,
-        onUsage: (nextUsage) => {
-          usage = readUsage(nextUsage);
-        },
-      });
+      const paced = await dependencies.pacer.execute(async (abortSignal) => {
+        let attemptUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+        try {
+          return await (dependencies.generateValidatedObject ?? generateValidatedObject)({
+            adapter,
+            schema,
+            schemaDescription: options.schemaDescription ?? `Structured output for ${profile.role}.`,
+            system: buildSystemPrompts(profile.role, options.systemPrompt).join('\n\n'),
+            prompt: options.prompt,
+            messages: options.messages,
+            modelOptions: createAgentRoleModelOptions(
+              options.endpoint,
+              buildGenerationSettings(profile),
+              currentResolution,
+            ),
+            abortSignal,
+            onUsage: (nextUsage) => {
+              attemptUsage = readUsage(nextUsage);
+            },
+          });
+        } finally {
+          addUsage(usage, attemptUsage);
+        }
+      }, options.abortSignal);
+      retryCount = paced.retryCount;
+      const generatedValue = paced.value;
       const value = schema.parse(generatedValue);
       const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
       const executionUsage = {
         ...usage,
         costUsd: estimateCost(usage, catalog, profile, providerId),
         latencyMs,
-        retryCount: 0,
+        retryCount,
       };
       const budgetError = createBudgetError(profile, executionUsage);
       if (budgetError) throw budgetError;
@@ -406,7 +442,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         modelId: profile.modelId,
         providerId,
         outcome: 'completed',
-        retryCount: 0,
+        retryCount,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         costUsd: executionUsage.costUsd,
@@ -434,7 +470,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         modelId: profile.modelId,
         providerId,
         outcome: isCancellation(error, options.abortSignal) ? 'cancelled' : 'failed',
-        retryCount: 0,
+        retryCount,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         costUsd: estimateCost(usage, catalog, profile, providerId),
@@ -467,7 +503,8 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
     const startedAt = performance.now();
     let catalog: iProviderPolicyCatalog | null = null;
     let providerId: string = profile.providerKind;
-    let usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    let retryCount = 0;
     try {
       const resolved = await resolveForCall(profile, options.endpoint, options.apiKey ?? '', options.localCapabilities);
       catalog = resolved.catalog;
@@ -478,38 +515,45 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         apiKey: options.apiKey ?? '',
         model: profile.modelId,
       });
-      const abortController = new AbortController();
-      const abort = () => abortController.abort(options.abortSignal?.reason);
-      if (options.abortSignal?.aborted) abort();
-      else options.abortSignal?.addEventListener('abort', abort, { once: true });
-      const stream = (dependencies.chat ?? ((chatOptions) => chat(chatOptions)))({
-        adapter,
-        messages: buildMessages(options.prompt, options.messages),
-        systemPrompts: buildSystemPrompts(profile.role, options.systemPrompt),
-        modelOptions: createAgentRoleModelOptions(
-          options.endpoint,
-          buildGenerationSettings(profile),
-          resolved.resolution,
-        ),
-        abortController,
-        stream: true,
-      });
-      let value = '';
-      try {
-        for await (const chunk of stream) {
-          if (chunk.type === EventType.TEXT_MESSAGE_CONTENT && chunk.delta) value += chunk.delta;
-          if (chunk.type === EventType.RUN_FINISHED && chunk.usage) usage = readUsage(chunk.usage);
-          if (chunk.type === EventType.RUN_ERROR) throw new Error(chunk.message);
+      const paced = await dependencies.pacer.execute(async (abortSignal) => {
+        const abortController = new AbortController();
+        const abort = () => abortController.abort(abortSignal.reason);
+        if (abortSignal.aborted) abort();
+        else abortSignal.addEventListener('abort', abort, { once: true });
+        const stream = (dependencies.chat ?? ((chatOptions) => chat(chatOptions)))({
+          adapter,
+          messages: buildMessages(options.prompt, options.messages),
+          systemPrompts: buildSystemPrompts(profile.role, options.systemPrompt),
+          modelOptions: createAgentRoleModelOptions(
+            options.endpoint,
+            buildGenerationSettings(profile),
+            resolved.resolution,
+          ),
+          abortController,
+          stream: true,
+        });
+        let value = '';
+        let attemptUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+        try {
+          for await (const chunk of stream) {
+            if (chunk.type === EventType.TEXT_MESSAGE_CONTENT && chunk.delta) value += chunk.delta;
+            if (chunk.type === EventType.RUN_FINISHED && chunk.usage) attemptUsage = readUsage(chunk.usage);
+            if (chunk.type === EventType.RUN_ERROR) throw new Error(chunk.message);
+          }
+          return value;
+        } finally {
+          addUsage(usage, attemptUsage);
+          abortSignal.removeEventListener('abort', abort);
         }
-      } finally {
-        options.abortSignal?.removeEventListener('abort', abort);
-      }
+      }, options.abortSignal);
+      retryCount = paced.retryCount;
+      const { value } = paced;
       const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
       const executionUsage = {
         ...usage,
         costUsd: estimateCost(usage, catalog, profile, providerId),
         latencyMs,
-        retryCount: 0,
+        retryCount,
       };
       if (!value.trim()) {
         throw new AgentRoleExecutionError(`Agent role "${profile.role}" returned empty prose.`, {
@@ -527,7 +571,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         modelId: profile.modelId,
         providerId,
         outcome: 'completed',
-        retryCount: 0,
+        retryCount,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         costUsd: executionUsage.costUsd,
@@ -555,7 +599,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         modelId: profile.modelId,
         providerId,
         outcome: isCancellation(error, options.abortSignal) ? 'cancelled' : 'failed',
-        retryCount: 0,
+        retryCount,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         costUsd: estimateCost(usage, catalog, profile, providerId),

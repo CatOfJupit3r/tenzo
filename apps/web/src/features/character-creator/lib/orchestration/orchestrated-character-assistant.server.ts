@@ -24,7 +24,6 @@ import {
   CHARACTER_BRIEF_SCHEMA,
   CHARACTER_CONTENT_PLAN_SCHEMA,
   PROSE_JOB_RESULT_SCHEMA,
-  QUALITY_FINDING_SCHEMA,
 } from './agent-orchestration-contracts';
 import type { AgentProgressPhase, iProseJob } from './agent-orchestration-contracts';
 import {
@@ -328,16 +327,6 @@ function createOrchestrationRun(
     },
   });
   const qualityService = createQualityGateService({
-    criticize: async (input, deterministicFindings, abortSignal) => {
-      const result = await executeStructured(
-        AGENT_ROLES.critic,
-        QUALITY_FINDING_SCHEMA.array(),
-        { ...input, deterministicFindings },
-        'Localized character draft quality findings.',
-      );
-      abortSignal?.throwIfAborted();
-      return result;
-    },
     repair: async (job, drafts, findings, abortSignal) => {
       const result = await executeProse(job, { drafts, findings, isTargetedRepair: true }, true);
       abortSignal?.throwIfAborted();

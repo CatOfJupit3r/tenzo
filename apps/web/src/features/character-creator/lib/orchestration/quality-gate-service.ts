@@ -32,11 +32,6 @@ export interface iQualityRoleResult<T> {
 }
 
 export interface iQualityGateDependencies {
-  criticize: (
-    input: iQualityGateInput,
-    deterministicFindings: readonly iQualityFinding[],
-    abortSignal?: AbortSignal,
-  ) => Promise<iQualityRoleResult<unknown>>;
   repair: (
     job: iProseJob,
     currentDrafts: Partial<Record<CharacterTextFieldKey, string>>,
@@ -49,7 +44,6 @@ export interface iQualityGateResult {
   drafts: Partial<Record<CharacterTextFieldKey, string>>;
   findings: iQualityFinding[];
   repairCount: number;
-  isCriticAvailable: boolean;
   isRepairAvailable: boolean;
   isBudgetExhausted: boolean;
 }
@@ -82,12 +76,17 @@ function runDeterministicChecks(input: iQualityGateInput): iQualityFinding[] {
   return evaluateDeterministicQuality({ fields: input.drafts, constraints }).findings.map(convertDeterministicFinding);
 }
 
-function countUnresolvedFindings(findings: readonly iQualityFinding[]): number {
-  return findings.filter((finding) => !finding.isResolved).length;
+function countBlockingFindings(findings: readonly iQualityFinding[]): number {
+  return findings.filter((finding) => !finding.isResolved && finding.severity === QUALITY_FINDING_SEVERITIES.error)
+    .length;
 }
 
-function getJobFindings(job: iProseJob, findings: readonly iQualityFinding[]): iQualityFinding[] {
-  return findings.filter((finding) => finding.fieldKeys.some((fieldKey) => job.fieldKeys.includes(fieldKey)));
+function getBlockingJobFindings(job: iProseJob, findings: readonly iQualityFinding[]): iQualityFinding[] {
+  return findings.filter(
+    (finding) =>
+      finding.severity === QUALITY_FINDING_SEVERITIES.error &&
+      finding.fieldKeys.some((fieldKey) => job.fieldKeys.includes(fieldKey)),
+  );
 }
 
 export function createQualityGateService(dependencies: iQualityGateDependencies) {
@@ -99,41 +98,15 @@ export function createQualityGateService(dependencies: iQualityGateDependencies)
     ): Promise<iQualityGateResult> {
       const budget = createAgentRunBudget(budgetLimits);
       let drafts = { ...input.drafts };
-      let deterministicFindings = runDeterministicChecks({ ...input, drafts });
-      let criticFindings: iQualityFinding[] = [];
-
-      try {
-        if (!budget.canStartCall()) throw new Error('Quality budget exhausted before critic call.');
-        const criticResult = await dependencies.criticize({ ...input, drafts }, deterministicFindings, abortSignal);
-        budget.recordCall(criticResult.usage);
-        criticFindings = QUALITY_FINDING_SCHEMA.array().parse(criticResult.output);
-      } catch {
-        return {
-          drafts,
-          findings: deterministicFindings,
-          repairCount: 0,
-          isCriticAvailable: false,
-          isRepairAvailable: true,
-          isBudgetExhausted: budget.getSnapshot().isExhausted,
-        };
-      }
-
-      let findings = [...deterministicFindings, ...criticFindings];
+      let findings = runDeterministicChecks({ ...input, drafts });
       let repairCount = 0;
 
       for (const job of input.jobs) {
         for (let pass = 0; pass < MAX_QUALITY_REPAIR_PASSES; pass += 1) {
-          const jobFindings = getJobFindings(job, findings);
+          const jobFindings = getBlockingJobFindings(job, findings);
           if (jobFindings.length === 0) break;
           if (!budget.canStartCall()) {
-            return {
-              drafts,
-              findings,
-              repairCount,
-              isCriticAvailable: true,
-              isRepairAvailable: true,
-              isBudgetExhausted: true,
-            };
+            return { drafts, findings, repairCount, isRepairAvailable: true, isBudgetExhausted: true };
           }
 
           let repairResult: Awaited<ReturnType<iQualityGateDependencies['repair']>>;
@@ -144,22 +117,15 @@ export function createQualityGateService(dependencies: iQualityGateDependencies)
               drafts,
               findings,
               repairCount,
-              isCriticAvailable: true,
               isRepairAvailable: false,
               isBudgetExhausted: budget.getSnapshot().isExhausted,
             };
           }
           repairCount += 1;
           if (!budget.recordCall(repairResult.usage)) {
-            return {
-              drafts,
-              findings,
-              repairCount,
-              isCriticAvailable: true,
-              isRepairAvailable: true,
-              isBudgetExhausted: true,
-            };
+            return { drafts, findings, repairCount, isRepairAvailable: true, isBudgetExhausted: true };
           }
+
           const repaired = PROSE_JOB_RESULT_SCHEMA.parse(repairResult.output);
           if (repaired.jobId !== job.id) throw new Error(`Repair result does not match job ${job.id}.`);
           const candidateDrafts = { ...drafts };
@@ -169,47 +135,9 @@ export function createQualityGateService(dependencies: iQualityGateDependencies)
             if (repairedValue !== undefined) candidateDrafts[fieldKey] = repairedValue;
           }
 
-          const candidateInput = { ...input, drafts: candidateDrafts };
-          const candidateDeterministicFindings = runDeterministicChecks(candidateInput);
-          if (!budget.canStartCall()) {
-            return {
-              drafts,
-              findings,
-              repairCount,
-              isCriticAvailable: true,
-              isRepairAvailable: true,
-              isBudgetExhausted: true,
-            };
-          }
-          let criticResult: Awaited<ReturnType<iQualityGateDependencies['criticize']>>;
-          try {
-            criticResult = await dependencies.criticize(candidateInput, candidateDeterministicFindings, abortSignal);
-          } catch {
-            return {
-              drafts,
-              findings,
-              repairCount,
-              isCriticAvailable: false,
-              isRepairAvailable: true,
-              isBudgetExhausted: budget.getSnapshot().isExhausted,
-            };
-          }
-          if (!budget.recordCall(criticResult.usage)) {
-            return {
-              drafts,
-              findings,
-              repairCount,
-              isCriticAvailable: true,
-              isRepairAvailable: true,
-              isBudgetExhausted: true,
-            };
-          }
-          const candidateCriticFindings = QUALITY_FINDING_SCHEMA.array().parse(criticResult.output);
-          const candidateFindings = [...candidateDeterministicFindings, ...candidateCriticFindings];
-          if (countUnresolvedFindings(candidateFindings) >= countUnresolvedFindings(findings)) break;
-
+          const candidateFindings = runDeterministicChecks({ ...input, drafts: candidateDrafts });
+          if (countBlockingFindings(candidateFindings) >= countBlockingFindings(findings)) break;
           drafts = candidateDrafts;
-          deterministicFindings = candidateDeterministicFindings;
           findings = candidateFindings;
         }
       }
@@ -218,7 +146,6 @@ export function createQualityGateService(dependencies: iQualityGateDependencies)
         drafts,
         findings,
         repairCount,
-        isCriticAvailable: true,
         isRepairAvailable: true,
         isBudgetExhausted: budget.getSnapshot().isExhausted,
       };

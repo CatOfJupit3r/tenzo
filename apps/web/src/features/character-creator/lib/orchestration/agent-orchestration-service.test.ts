@@ -7,21 +7,15 @@ import {
   AGENT_ORCHESTRATION_RECOVERIES,
   AGENT_PROGRESS_PHASES,
   AGENT_ROUTES,
-  QUALITY_FINDING_EVIDENCE,
   QUALITY_FINDING_SEVERITIES,
 } from './agent-orchestration-contracts';
-import type {
-  iCharacterBrief,
-  iCharacterContentPlan,
-  iProseJob,
-  iQualityFinding,
-} from './agent-orchestration-contracts';
+import type { iCharacterBrief, iCharacterContentPlan, iProseJob } from './agent-orchestration-contracts';
 import { createAgentOrchestrationService } from './agent-orchestration-service';
 import type { iAgentOrchestrationInput } from './agent-orchestration-service';
 import { createCharacterBriefService } from './character-brief-service';
 import { createContentPlanService } from './content-plan-service';
 import { FIELD_WRITING_STRATEGIES } from './field-writing-strategy';
-import { createQualityGateService, MAX_QUALITY_REPAIR_PASSES } from './quality-gate-service';
+import { createQualityGateService } from './quality-gate-service';
 
 const ZERO_USAGE = { inputTokens: 0, outputTokens: 0, costUsd: 0, latencyMs: 0 };
 const RUN_BUDGET = {
@@ -111,18 +105,6 @@ function createJob(fieldKeys: Array<'description' | 'personality'> = ['descripti
     strictTemplates: {},
     maximumOutputTokens: 600,
     dependsOnJobIds: [],
-  };
-}
-
-function createFinding(ruleId: string, fieldKeys: Array<'description' | 'personality'>): iQualityFinding {
-  return {
-    ruleId,
-    fieldKeys,
-    severity: QUALITY_FINDING_SEVERITIES.warning,
-    evidence: QUALITY_FINDING_EVIDENCE.specificity,
-    explanation: 'The draft needs a more specific behavior.',
-    repairInstruction: 'Add one concrete behavior without changing other fields.',
-    isResolved: false,
   };
 }
 
@@ -262,17 +244,10 @@ describe('content plan service', () => {
 });
 
 describe('quality gate service', () => {
-  it('runs deterministic checks before the critic and repairs only failing fields', async () => {
+  it('repairs deterministic errors while leaving passing fields untouched', async () => {
     const passingPersonality = 'Reserved in public, but she answers sincere questions with careful warmth.';
     const plan = createPlan(['description', 'personality']);
     plan.entries[0].requiredMacros = ['{{char}}'];
-    const criticize = vi
-      .fn()
-      .mockImplementationOnce(async (_input, deterministicFindings) => {
-        expect(deterministicFindings).not.toEqual([]);
-        return Promise.resolve({ output: [], usage: ZERO_USAGE });
-      })
-      .mockResolvedValue({ output: [], usage: ZERO_USAGE });
     const repair = vi.fn().mockResolvedValue({
       output: {
         jobId: 'prose-description-personality',
@@ -283,7 +258,7 @@ describe('quality gate service', () => {
       },
       usage: ZERO_USAGE,
     });
-    const service = createQualityGateService({ criticize, repair });
+    const service = createQualityGateService({ repair });
     const job = createJob(['description', 'personality']);
     const result = await service.review(
       {
@@ -299,36 +274,30 @@ describe('quality gate service', () => {
       RUN_BUDGET,
     );
 
-    expect(criticize).toHaveBeenCalled();
     expect(repair).toHaveBeenCalled();
     expect(result.drafts.personality).toBe(passingPersonality);
   });
 
-  it('bounds targeted repairs to two passes and reports budget state', async () => {
-    const criticize = vi
-      .fn()
-      .mockResolvedValueOnce({
-        output: [
-          createFinding('one', ['description']),
-          createFinding('two', ['description']),
-          createFinding('three', ['description']),
-        ],
-        usage: ZERO_USAGE,
-      })
-      .mockResolvedValueOnce({
-        output: [createFinding('two', ['description']), createFinding('three', ['description'])],
-        usage: ZERO_USAGE,
-      })
-      .mockResolvedValueOnce({ output: [createFinding('three', ['description'])], usage: ZERO_USAGE });
+  it('stops targeted repair when deterministic errors do not improve', async () => {
+    const plan = createPlan();
+    plan.entries[0].requiredMacros = ['{{char}}', '{{user}}'];
     const repair = vi
       .fn()
-      .mockImplementation(async (job: iProseJob) =>
-        Promise.resolve({ output: { jobId: job.id, fields: { description: 'Improved draft.' } }, usage: ZERO_USAGE }),
-      );
-    const result = await createQualityGateService({ criticize, repair }).review(
+      .mockResolvedValueOnce({
+        output: { jobId: 'prose-description', fields: { description: '{{char}} improves the draft.' } },
+        usage: ZERO_USAGE,
+      })
+      .mockResolvedValueOnce({
+        output: {
+          jobId: 'prose-description',
+          fields: { description: '{{char}} improves the draft for {{user}}.' },
+        },
+        usage: ZERO_USAGE,
+      });
+    const result = await createQualityGateService({ repair }).review(
       {
         brief: createBrief(),
-        plan: createPlan(),
+        plan,
         jobs: [createJob()],
         drafts: { description: 'Initial complete draft.' },
         currentFields: {},
@@ -336,30 +305,30 @@ describe('quality gate service', () => {
       RUN_BUDGET,
     );
 
-    expect(repair).toHaveBeenCalledTimes(MAX_QUALITY_REPAIR_PASSES);
-    expect(result.repairCount).toBe(MAX_QUALITY_REPAIR_PASSES);
-    expect(result.findings).toHaveLength(1);
+    expect(repair).toHaveBeenCalledTimes(1);
+    expect(result.repairCount).toBe(1);
+    expect(result.findings.some((finding) => finding.severity === QUALITY_FINDING_SEVERITIES.error)).toBe(true);
   });
 
   it('returns an explicit recoverable state when a targeted repair fails', async () => {
-    const finding = createFinding('critic-finding', ['description']);
+    const plan = createPlan();
+    plan.entries[0].requiredMacros = ['{{char}}'];
     const result = await createQualityGateService({
-      criticize: vi.fn().mockResolvedValue({ output: [finding], usage: ZERO_USAGE }),
       repair: vi.fn().mockRejectedValue(new Error('repair unavailable')),
     }).review(
       {
         brief: createBrief(),
-        plan: createPlan(),
+        plan,
         jobs: [createJob()],
-        drafts: { description: 'A complete draft with a critic finding.' },
+        drafts: { description: 'A complete draft missing its required macro.' },
         currentFields: {},
       },
       RUN_BUDGET,
     );
 
     expect(result.isRepairAvailable).toBe(false);
-    expect(result.findings).toEqual([finding]);
-    expect(result.drafts.description).toBe('A complete draft with a critic finding.');
+    expect(result.findings).not.toEqual([]);
+    expect(result.drafts.description).toBe('A complete draft missing its required macro.');
   });
 });
 
@@ -381,7 +350,6 @@ describe('agent orchestration service', () => {
         drafts: { description: 'A complete focused description.' },
         findings: [],
         repairCount: 0,
-        isCriticAvailable: true,
         isRepairAvailable: true,
         isBudgetExhausted: false,
       }),

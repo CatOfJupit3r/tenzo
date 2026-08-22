@@ -204,9 +204,7 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
         );
         result.drafts = quality.drafts;
         result.findings = quality.findings;
-        if (!quality.isCriticAvailable) {
-          result.recovery = AGENT_ORCHESTRATION_RECOVERIES['critic-unavailable'];
-        } else if (!quality.isRepairAvailable) {
+        if (!quality.isRepairAvailable) {
           result.recovery = AGENT_ORCHESTRATION_RECOVERIES['repair-unavailable'];
         } else if (quality.isBudgetExhausted) {
           result.recovery = AGENT_ORCHESTRATION_RECOVERIES['repair-budget-exhausted'];

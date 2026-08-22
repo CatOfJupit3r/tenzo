@@ -161,7 +161,6 @@ export type iQualityFinding = z.infer<typeof QUALITY_FINDING_SCHEMA>;
 export const AGENT_ORCHESTRATION_RECOVERY_SCHEMA = z.enum([
   'clarification-required',
   'profile-ineligible',
-  'critic-unavailable',
   'repair-unavailable',
   'repair-budget-exhausted',
   'partial-draft',

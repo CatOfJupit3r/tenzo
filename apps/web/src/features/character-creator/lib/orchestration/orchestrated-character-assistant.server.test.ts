@@ -187,7 +187,7 @@ describe('orchestrated character assistant stream', () => {
       }),
     );
 
-    expect(roles).toEqual([AGENT_ROLES['intent-router'], AGENT_ROLES.orchestrator, AGENT_ROLES.critic]);
+    expect(roles).toEqual([AGENT_ROLES['intent-router'], AGENT_ROLES.orchestrator]);
     expect(appendProposedCard).toHaveBeenCalledTimes(1);
     expect(projectedCard.data.description).toBe(PROSE);
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_END)).toBe(true);
@@ -206,11 +206,11 @@ describe('orchestrated character assistant stream', () => {
     if (metricsChunk?.type !== EventType.CUSTOM) throw new Error('Metrics event was not emitted.');
     expect(AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metricsChunk.value)).toEqual({
       runId: 'run-1',
-      roleCallCount: 4,
-      inputTokens: 40,
-      outputTokens: 40,
-      costUsd: 0.1,
-      latencyMs: 40,
+      roleCallCount: 3,
+      inputTokens: 30,
+      outputTokens: 30,
+      costUsd: 0.06,
+      latencyMs: 30,
     });
     expect(JSON.stringify(metricsChunk)).not.toContain('Mira');
     expect(JSON.stringify(metricsChunk)).not.toContain('apiKey');

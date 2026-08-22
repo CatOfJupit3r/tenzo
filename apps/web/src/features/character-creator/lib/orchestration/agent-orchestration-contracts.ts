@@ -137,14 +137,7 @@ export type iProseJobResult = z.infer<typeof PROSE_JOB_RESULT_SCHEMA>;
 
 export const QUALITY_FINDING_SEVERITY_SCHEMA = z.enum(['warning', 'error']);
 export const QUALITY_FINDING_SEVERITIES = QUALITY_FINDING_SEVERITY_SCHEMA.enum;
-export const QUALITY_FINDING_EVIDENCE_SCHEMA = z.enum([
-  'deterministic',
-  'fidelity',
-  'coherence',
-  'specificity',
-  'voice',
-  'semantic-repetition',
-]);
+export const QUALITY_FINDING_EVIDENCE_SCHEMA = z.enum(['deterministic']);
 export const QUALITY_FINDING_EVIDENCE = QUALITY_FINDING_EVIDENCE_SCHEMA.enum;
 
 export const QUALITY_FINDING_SCHEMA = z.object({

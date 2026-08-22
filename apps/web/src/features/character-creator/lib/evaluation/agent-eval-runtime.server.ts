@@ -133,7 +133,7 @@ const STRUCTURED_OUTPUT_COMPLETE_SCHEMA = z.object({
 
 async function verifySingleAgentPolicy(options: iAgentEvalRuntimeOptions) {
   const { profile } = options;
-  const role = profileSupportsNativeTools(profile) ? AGENT_ROLES.orchestrator : AGENT_ROLES['intent-router'];
+  const role = profileSupportsNativeTools(profile) ? AGENT_ROLES['content-planner'] : AGENT_ROLES['intent-router'];
   const roleProfile = AGENT_ROLE_PROFILE_SCHEMA.parse({
     id: `${profile.id}-baseline-policy`,
     role,

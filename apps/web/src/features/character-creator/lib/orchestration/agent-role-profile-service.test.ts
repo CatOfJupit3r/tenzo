@@ -41,7 +41,7 @@ describe('agent role profile service', () => {
       topP: 1,
     });
 
-    expect(profiles[AGENT_ROLES.critic].allowedProviderSlugs).toEqual([]);
+    expect(profiles[AGENT_ROLES['content-planner']].allowedProviderSlugs).toEqual([]);
     expect(profiles[AGENT_ROLES['prose-worker']].budget.maximumOutputTokens).toBe(750);
   });
 
@@ -77,6 +77,6 @@ describe('agent role profile service', () => {
       modelId: 'prose/model',
       allowedProviderSlugs: ['prose-provider'],
     });
-    expect(profiles[AGENT_ROLES.critic].modelId).toBe('default/model');
+    expect(profiles[AGENT_ROLES['content-planner']].modelId).toBe('default/model');
   });
 });

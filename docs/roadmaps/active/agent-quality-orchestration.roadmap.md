@@ -32,7 +32,7 @@ archive_when:
 Replace the one-model-does-everything generation path with a small, observable orchestration pipeline optimized for sparse user prompts and rich character-card prose:
 
 1. a cheap structured **brief enricher** turns fragments into an explicit character brief while labeling assumptions and unresolved choices;
-2. a structured **orchestrator** creates a field plan, assigns each fact or dramatic beat to a primary field, and decides which prose jobs are needed;
+2. a structured **content planner** creates a field plan, assigns each fact or dramatic beat to a primary field, and decides which prose jobs are needed;
 3. one or more **prose workers** write the assigned fields from bounded briefs, either in isolated per-field calls or one combined call selected by the user, without tool responsibilities;
 4. a deterministic **safeguard gate** checks objective format, macro, completeness, and duplication rules, then requests targeted repairs only for blocking violations; subjective quality remains the user's decision at proposal review;
 5. the orchestrator converts accepted drafts into the existing reviewable proposal actions.
@@ -275,30 +275,29 @@ User turn + projected card + focus + references
 | -------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
 | Intent router  | Choose advice, focused edit, multi-field edit, or creation path                 | Latest turn, focus, compact run state                                      | Typed route decision             | None                                                       | Cheap structured output                                   |
 | Brief enricher | Expand sparse input and expose assumptions/gaps                                 | User facts, selected references, requested scope                           | `iCharacterBrief`                | None                                                       | Cheap structured output, strong instruction following     |
-| Orchestrator   | Plan fields, allocate content, dispatch jobs, request repairs, submit proposals | Brief, projected card, constraints, quality findings                       | Typed plan and workflow commands | Read projected character; submit existing proposal actions | Reliable structured output and tools                      |
+| Content planner | Plan fields and allocate content                                                 | Brief, projected card, constraints                                          | Typed content plan               | None                                                       | Reliable structured output                               |
 | Prose worker   | Write one isolated field or all requested fields, according to the user setting | Field brief, style guide, owned facts, forbidden repeats, relevant context | Raw field text or field envelope | None                                                       | Creative prose, long-form coherence, low refusal behavior |
 
-The default topology uses logical roles, not necessarily different models. One eligible inexpensive model may serve router and enricher profiles. The orchestrator may share that model or use a stronger structured-output profile. The prose worker remains independently selectable.
+The default topology uses logical roles, not necessarily different models. One eligible inexpensive model may serve router and enricher profiles. The content planner may share that model or use a stronger structured-output profile. The prose worker remains independently selectable.
 
 ### Core contracts
 
 - `iCharacterBrief`: confirmed facts, source-tagged assumptions, optional creative choices, unresolved questions, tone/style, boundaries, required motifs, avoided motifs, and requested field coverage.
 - `iCharacterContentPlan`: field jobs, coupled-field groups, per-field purpose, owned facts/beats, allowed echoes, forbidden restatements, required macros, template constraints, depth targets, and ordering dependencies.
 - `iProseJob`: one field or coupled group with only relevant context, a run-level style bible, positive requirements, negative ledger, and output budget.
-- `iQualityFinding`: rule or rubric identifier, field keys, severity, evidence class, concise explanation, and targeted repair instruction.
+- `iQualityFinding`: deterministic rule identifier, field keys, severity, concise explanation, and targeted repair instruction.
 - `iAgentRoleProfile`: model ID, allowed provider slugs, role, generation parameters, context/output budgets, and required capabilities. Privacy invariants are not configurable fields.
 - `iAgentRunSummary`: run ID, selected route, role calls, endpoint/provider IDs, token usage, cost, latency, repair count, outcome, and content-free quality metrics.
 
 ### Tool boundaries and human approval
 
-- Enricher and prose worker have no application tools.
-- Orchestrator can call the existing projected-card read and proposal actions only. It cannot accept its own proposals, mutate the live card, change provider policy, or modify saved settings.
+- Model roles receive no application tools. The application-owned orchestration service reads projected state and submits proposals after validation.
 - High-impact unresolved choices pause before drafting only when proceeding would materially alter the character. The user sees concise options plus an open response path.
 - All generated edits continue through existing proposal review. User acceptance remains the only live-card mutation authority.
 
 ### Persisted and transient state
 
-- Persist role profiles, user-selected quality/cost mode, saved generation settings, accepted card changes, and explicitly saved creative briefs in local storage/IndexedDB using existing local-first patterns.
+- Persist the user-selected generation budget and field-call strategy with saved generation settings. Accepted card changes and explicitly saved creative briefs continue through existing local-first storage patterns.
 - Keep active orchestration plans, drafts, deterministic findings, and repair state transient for the run. Conversation messages and resulting proposals continue to follow existing session storage behavior.
 - Persist content-free eval results and operational summaries. Do not persist chain-of-thought or raw provider request/response bodies in telemetry.
 
@@ -475,7 +474,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 **Scope:**
 
 - [x] Refresh the live ZDR/unmoderated candidate set and record the catalog timestamp.
-- [ ] Evaluate at least three eligible structured candidates for router/enricher/orchestrator duties and at least three eligible prose candidates.
+- [ ] Evaluate at least three eligible structured candidates for router/enricher/content-planner duties and at least three eligible prose candidates.
 - [ ] Include the current user-selected model and local KoboldCpp when they satisfy the role contract.
 - [ ] Compare single-model, two-model, and role-specialized configurations.
 - [ ] Score quality, refusal rate, schema/tool reliability, duplication, fidelity, latency, and total cost per successful run.
@@ -587,7 +586,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 - Test deterministic repetition rules on exact duplicates, paraphrases outside deterministic scope, intentional names/macros, and valid motif echoes.
 - Test budgets across role calls and repair passes.
 - Test the workflow state machine for success, advice fast path, clarification pause/resume, partial worker failure, repair failure, cancellation, and proposal-handler failure.
-- Assert that only the orchestrator receives application tools and that proposal acceptance remains user-owned.
+- Assert that no model role receives application tools, proposal submission stays application-owned, and proposal acceptance remains user-owned.
 
 ### AI evals
 
@@ -612,7 +611,7 @@ Primary scorecard:
 | -------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
 | User-intent fidelity | Human pairwise plus structured judge                              | No regression from baseline; no contradicted confirmed facts |
 | Useful depth         | Field rubric, information-unit count, human review                | Material win over baseline on sparse cases                   |
-| Cross-field novelty  | Exact sentence and normalized n-gram metrics plus semantic critic | Material reduction in unintentional repetition               |
+| Cross-field novelty  | Exact sentence and normalized n-gram metrics plus blinded human review | Material reduction in unintentional repetition             |
 | Coherence            | Structured judge plus human review                                | No regression while novelty improves                         |
 | Roleplay usability   | Human rubric for greetings/examples                               | Material win on relevant fields                              |
 | Refusal behavior     | Allowed-content regression set                                    | No unexplained refusals from selected profiles               |
@@ -712,6 +711,13 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Date:** 2026-08-23
 **Rationale:** Character prose quality is taste-dependent. A mandatory model critic adds calls, latency, and cost while still requiring user review.
 **Effect on roadmap:** The runtime critic and critic-unavailable recovery branch are removed. Deterministic warnings remain visible, and offline blinded evaluation may still use judges as research evidence rather than as a production gate.
+
+### Decision: Keep application tools out of model roles
+
+**Status:** accepted
+**Date:** 2026-08-23
+**Rationale:** The planner only needs structured output. Requiring native tool calling narrowed eligible models without adding runtime value, while proposal submission is safer and cheaper as deterministic application code.
+**Effect on roadmap:** Router, enricher, content-planner, and prose roles have no application tools. The content planner requires structured output but not tool calling; the application service remains the sole proposal submitter.
 
 ### Decision: Make field-call granularity explicit
 

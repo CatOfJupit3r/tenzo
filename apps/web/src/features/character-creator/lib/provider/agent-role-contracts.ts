@@ -3,16 +3,15 @@ import { z } from 'zod';
 import { MODEL_CAPABILITY_SCHEMA, MODEL_CAPABILITIES } from './model-capabilities';
 import { PROVIDER_KIND_SCHEMA, PROVIDER_KINDS } from './provider-health';
 
-export const AGENT_ROLE_SCHEMA = z.enum(['intent-router', 'brief-enricher', 'orchestrator', 'prose-worker', 'critic']);
+export const AGENT_ROLE_SCHEMA = z.enum(['intent-router', 'brief-enricher', 'content-planner', 'prose-worker']);
 export const AGENT_ROLES = AGENT_ROLE_SCHEMA.enum;
 export type AgentRole = z.infer<typeof AGENT_ROLE_SCHEMA>;
 
 export const AGENT_ROLE_CAPABILITY_REQUIREMENTS = {
   [AGENT_ROLES['intent-router']]: [MODEL_CAPABILITIES['structured-output']],
   [AGENT_ROLES['brief-enricher']]: [MODEL_CAPABILITIES['structured-output']],
-  [AGENT_ROLES.orchestrator]: [MODEL_CAPABILITIES['structured-output'], MODEL_CAPABILITIES['tool-calling']],
+  [AGENT_ROLES['content-planner']]: [MODEL_CAPABILITIES['structured-output']],
   [AGENT_ROLES['prose-worker']]: [],
-  [AGENT_ROLES.critic]: [MODEL_CAPABILITIES['structured-output']],
 } satisfies Record<AgentRole, readonly z.infer<typeof MODEL_CAPABILITY_SCHEMA>[]>;
 
 export const AGENT_ROLE_BUDGET_SCHEMA = z.object({

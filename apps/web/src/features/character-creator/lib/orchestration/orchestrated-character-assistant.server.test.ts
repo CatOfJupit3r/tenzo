@@ -137,7 +137,7 @@ describe('orchestrated character assistant stream', () => {
           costUsd: 0.01,
         }) as never;
       }
-      if (options.profile.role === AGENT_ROLES.orchestrator) {
+      if (options.profile.role === AGENT_ROLES['content-planner']) {
         return createExecution(
           {
             entries: [
@@ -157,11 +157,11 @@ describe('orchestrated character assistant stream', () => {
             coupledFieldGroups: [],
             styleBible: ['Specific, grounded prose.'],
           },
-          'orchestrator',
+          'content-planner',
           { costUsd: 0.02 },
         ) as never;
       }
-      return createExecution([], 'critic', { costUsd: 0.04 }) as never;
+      throw new Error(`Unexpected structured role ${options.profile.role}.`);
     };
     const executor = {
       executeStructured,
@@ -187,7 +187,7 @@ describe('orchestrated character assistant stream', () => {
       }),
     );
 
-    expect(roles).toEqual([AGENT_ROLES['intent-router'], AGENT_ROLES.orchestrator]);
+    expect(roles).toEqual([AGENT_ROLES['intent-router'], AGENT_ROLES['content-planner']]);
     expect(appendProposedCard).toHaveBeenCalledTimes(1);
     expect(projectedCard.data.description).toBe(PROSE);
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_END)).toBe(true);

@@ -317,7 +317,7 @@ function createOrchestrationRun(
   const planService = createContentPlanService({
     planContent: async (input, abortSignal) => {
       const result = await executeStructured(
-        AGENT_ROLES.orchestrator,
+        AGENT_ROLES['content-planner'],
         CHARACTER_CONTENT_PLAN_SCHEMA,
         input,
         'Field ownership and content plan.',

@@ -164,17 +164,13 @@
           "modelId": "sao10k/l3.1-euryale-70b",
           "allowedProviderSlug": "novita"
         },
-        "orchestrator": {
+        "content-planner": {
           "modelId": "minimax/minimax-m2.5",
           "allowedProviderSlug": "digitalocean"
         },
         "prose-worker": {
           "modelId": "cognitivecomputations/dolphin-mistral-24b-venice-edition",
           "allowedProviderSlug": "venice"
-        },
-        "critic": {
-          "modelId": "qwen/qwen3-235b-a22b-2507",
-          "allowedProviderSlug": "deepinfra"
         }
       }
     }

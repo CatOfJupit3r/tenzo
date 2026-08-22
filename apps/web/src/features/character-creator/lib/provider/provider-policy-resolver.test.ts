@@ -12,8 +12,8 @@ const NOW = new Date('2026-08-21T00:00:00.000Z');
 
 function createProfile(overrides: Partial<iAgentRoleProfile> = {}): iAgentRoleProfile {
   return {
-    id: 'orchestrator-test',
-    role: AGENT_ROLES.orchestrator,
+    id: 'content-planner-test',
+    role: AGENT_ROLES['content-planner'],
     providerKind: PROVIDER_KINDS.openrouter,
     modelId: 'test/unmoderated',
     allowedProviderSlugs: ['eligible-provider'],

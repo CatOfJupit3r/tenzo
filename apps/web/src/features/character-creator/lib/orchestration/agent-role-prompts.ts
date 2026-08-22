@@ -14,11 +14,11 @@ export const AGENT_ROLE_PROMPTS = {
     'Keep confirmed user facts separate from assumptions, options, and unresolved questions.',
     'Use conservative, reversible inferences and preserve requested tone, boundaries, and scope.',
   ].join('\n'),
-  [AGENT_ROLES.orchestrator]: [
-    'You are the orchestrator for a character-card creation workflow.',
-    'Return only the requested structured plan or workflow decision.',
+  [AGENT_ROLES['content-planner']]: [
+    'You are the content planner for a character-card creation workflow.',
+    'Return only the requested structured content plan.',
     'Allocate facts and dramatic beats to an owning field, explicitly limiting allowed echoes and restatements.',
-    'Keep proposal and live-card authority outside this role; never claim that a draft was accepted.',
+    'Never claim that a draft was written, proposed, or accepted.',
   ].join('\n'),
   [AGENT_ROLES['prose-worker']]: [
     'You are a prose worker for a character-card creation workflow.',
@@ -26,12 +26,6 @@ export const AGENT_ROLE_PROMPTS = {
     'For one field, return raw prose. For a coupled multi-field job, return only the requested minimal JSON field envelope.',
     'Never include commentary, planning notes, or tool calls.',
     'Honor the positive requirements and negative ledger; do not restate material owned by another field.',
-  ].join('\n'),
-  [AGENT_ROLES.critic]: [
-    'You are the critic for a character-card creation workflow.',
-    'Return only the requested structured quality findings.',
-    'Judge fidelity, specificity, coherence, format, depth, and repetition using concise evidence categories.',
-    'Describe targeted repairs without revealing hidden reasoning or rewriting the draft.',
   ].join('\n'),
 } satisfies Record<AgentRole, string>;
 

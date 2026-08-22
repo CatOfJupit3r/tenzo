@@ -22,7 +22,7 @@ const EMPTY_ADAPTER = {} as AnyTextAdapter;
 function createProfile(overrides: Partial<iAgentRoleProfile> = {}): iAgentRoleProfile {
   return {
     id: 'role-test',
-    role: AGENT_ROLES.critic,
+    role: AGENT_ROLES['content-planner'],
     providerKind: PROVIDER_KINDS.openrouter,
     modelId: 'test/unmoderated',
     allowedProviderSlugs: ['eligible-provider'],
@@ -265,22 +265,6 @@ describe('agent role executor', () => {
     expect(result.usage.retryCount).toBe(1);
     expect(result.usage).toMatchObject({ inputTokens: 7, outputTokens: 5, totalTokens: 12 });
     expect(harness.logs[0]).toMatchObject({ outcome: 'completed', retryCount: 1 });
-  });
-
-  it('records content-free critic finding counts', async () => {
-    const harness = createDependencies(createCatalog(), {
-      generateValidatedObject: (async <T>(_options: iGenerateValidatedObjectOptions<T>) =>
-        [{ finding: 'one' }, { finding: 'two' }] as T) as iGenerateValidatedObject,
-    });
-    const executor = createAgentRoleExecutor(harness.dependencies);
-
-    await executor.executeStructured({
-      ...callOptions(createProfile()),
-      schema: z.array(z.object({ finding: z.string() })),
-    });
-
-    expect(harness.logs[0]).toMatchObject({ role: AGENT_ROLES.critic, qualityFindingCount: 2 });
-    expect(JSON.stringify(harness.logs)).not.toContain('finding');
   });
 
   it('estimates multi-provider routing cost conservatively', async () => {

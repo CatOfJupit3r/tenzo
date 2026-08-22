@@ -96,9 +96,7 @@ describe('agent eval runtime', () => {
       ...PROFILE,
       pipeline: AGENT_EVAL_PIPELINES.orchestrated,
       id: 'specialized-candidate',
-      roleAssignments: {
-        critic: { modelId: 'qwen/qwen3-235b-a22b', allowedProviderSlug: 'deepinfra' },
-      },
+      roleAssignments: {},
     } satisfies iAgentEvalExecutionProfile;
 
     const result = await runtime.runCase({ evalCase: AGENT_EVAL_CORPUS[4], profile, apiKey: 'secret-key' });

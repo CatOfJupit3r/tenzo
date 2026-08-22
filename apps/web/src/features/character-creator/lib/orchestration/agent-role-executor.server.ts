@@ -447,7 +447,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         outputTokens: usage.outputTokens,
         costUsd: executionUsage.costUsd,
         latencyMs,
-        qualityFindingCount: profile.role === AGENT_ROLES.critic && Array.isArray(value) ? value.length : 0,
+        qualityFindingCount: 0,
         repairCount: 0,
         policyFailureReason: null,
       });

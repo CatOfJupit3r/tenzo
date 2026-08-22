@@ -100,7 +100,7 @@ Model names are deployment profiles, not architecture. As of the audit date, the
 
 ### Generation and provider routing
 
-- `generation-config.ts` stores one endpoint, one model, one optional OpenRouter provider, one sampler profile, and one assistant generation mode for all assistant responsibilities.
+- `generation-config.ts` stores one endpoint, one model, one optional OpenRouter provider, samplers, a generation-budget profile, and the field-call strategy. The obsolete live structured-loop/tool-call selector has been removed.
 - `tanstack-ai-text-generation.ts` already adds `dataCollection: 'deny'` and `zdr: true` to OpenRouter requests. Tool and structured calls also require parameter support.
 - Connection health records model capabilities for structured responses and tool calling, but it does not validate the selected endpoint against an unmoderated-model policy.
 - The UI describes OpenRouter routing as ZDR and data-collection-denied. It does not expose distinct orchestrator, enricher, or writer profiles.
@@ -652,6 +652,7 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - Content-free metrics now correlate role calls, deterministic finding counts, targeted repairs, aggregate usage, retry counts, and proposal submission under one run ID.
 - Users can persist `Separate call per field` (the default) or `One combined call`. Separate mode prevents larger fields from crowding out smaller ones; combined mode reduces requests and repeated context.
 - TanStack Pacer now caps model-call concurrency at two and retries only transient network, timeout, HTTP 408/409/425/429, and 5xx failures up to three attempts with exponential backoff, jitter, `Retry-After` support, cancellation, and aggregate usage accounting.
+- The live assistant mode selector and persisted mode setting were removed. Native-tool and structured single-agent execution remain reachable only from the frozen baseline evaluator until comparison evidence is captured, after which those files can be deleted.
 - Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, and removal of the unused legacy runtime after acceptance.
 
 ### Trace expectations
@@ -718,6 +719,13 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Date:** 2026-08-23
 **Rationale:** The planner only needs structured output. Requiring native tool calling narrowed eligible models without adding runtime value, while proposal submission is safer and cheaper as deterministic application code.
 **Effect on roadmap:** Router, enricher, content-planner, and prose roles have no application tools. The content planner requires structured output but not tool calling; the application service remains the sole proposal submitter.
+
+### Decision: Remove the obsolete live assistant execution-mode setting
+
+**Status:** accepted
+**Date:** 2026-08-23
+**Rationale:** The production API has one application-owned orchestration path. Offering “structured loop” and “tool calls” implied two live runtimes and could incorrectly block an otherwise eligible structured-output model for lacking tool calling.
+**Effect on roadmap:** The setting, preset field, request property, compatibility branch, and UI selector are removed. Tool capability remains in provider metadata only to support the frozen baseline comparison before legacy deletion.
 
 ### Decision: Make field-call granularity explicit
 

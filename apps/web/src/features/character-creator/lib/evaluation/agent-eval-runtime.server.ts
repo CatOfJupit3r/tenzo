@@ -9,7 +9,6 @@ import {
   CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA,
 } from '../assistant/character-assistant-contracts';
 import type { CharacterAssistantFocus, iChatTemplateRef } from '../assistant/character-assistant-contracts';
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
 import { streamCharacterAssistant } from '../assistant/character-assistant-runtime.server';
 import { generateStructuredCharacterAssistantStream } from '../assistant/character-assistant-structured.server';
 import type { iCharacterAssistantProposalStore } from '../assistant/character-assistant-tools';
@@ -370,9 +369,6 @@ function createPayload(
     messages,
     contextAttachments: createContextAttachments(evalCase),
     templates,
-    assistantGenerationMode: profile.localCapabilities.includes(MODEL_CAPABILITIES['tool-calling'])
-      ? CHARACTER_ASSISTANT_GENERATION_MODES['tool-call']
-      : CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
     agentQualityProfile: profile.qualityProfile,
     localCapabilities: profile.localCapabilities,
     fieldShouldAllowAssistantEditing: DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
 import { FIELD_WRITING_STRATEGIES } from '../orchestration/field-writing-strategy';
 import { AGENT_QUALITY_PROFILES } from '../provider/agent-quality-profile';
 import {
@@ -93,23 +92,6 @@ describe('sanitizeCharacterGenerationConnectionSettings', () => {
       presencePenalty: 2,
       topK: TOP_K_RANGE.max,
       minP: 0,
-    });
-  });
-
-  it.each([
-    {
-      name: 'accepts the supported tool-call mode',
-      value: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
-      expected: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
-    },
-    {
-      name: 'falls back from an unsupported mode',
-      value: 'legacy-mode',
-      expected: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
-    },
-  ] as const)('$name', ({ value, expected }) => {
-    expect(sanitizeCharacterGenerationConnectionSettings({ assistantGenerationMode: value })).toMatchObject({
-      assistantGenerationMode: expected,
     });
   });
 

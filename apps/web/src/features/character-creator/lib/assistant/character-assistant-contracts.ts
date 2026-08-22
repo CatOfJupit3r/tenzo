@@ -14,10 +14,6 @@ import { CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-pro
 import { AGENT_QUALITY_PROFILES, AGENT_QUALITY_PROFILE_SCHEMA } from '../provider/agent-quality-profile';
 import { MODEL_CAPABILITY_SCHEMA } from '../provider/model-capabilities';
 import { PROVIDER_KIND_SCHEMA, PROVIDER_KINDS } from '../provider/provider-health';
-import {
-  CHARACTER_ASSISTANT_GENERATION_MODES,
-  CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA,
-} from './character-assistant-generation-mode';
 
 export const CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA = z.enum(['card', 'field', 'fields']);
 export const CHARACTER_ASSISTANT_FOCUS_KINDS = CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA.enum;
@@ -158,9 +154,6 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(MAX_CHAT_TEMPLATE_REF_COUNT).optional().default([]),
   exampleCharacters: z.array(PROMPT_EXAMPLE_CHARACTER_SCHEMA).max(MAX_EXAMPLE_CHARACTER_COUNT).optional().default([]),
   maxExampleContextCharacters: z.number().int().positive().optional(),
-  assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA.optional().default(
-    CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
-  ),
   providerKind: PROVIDER_KIND_SCHEMA.optional().default(PROVIDER_KINDS.unknown),
   agentQualityProfile: AGENT_QUALITY_PROFILE_SCHEMA.optional().default(AGENT_QUALITY_PROFILES.balanced),
   fieldWritingStrategy: FIELD_WRITING_STRATEGY_SCHEMA.optional().default(FIELD_WRITING_STRATEGIES['separate-fields']),

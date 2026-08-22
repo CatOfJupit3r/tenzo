@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA } from '../assistant/character-assistant-generation-mode';
 import {
   FREQUENCY_PENALTY_RANGE,
   MIN_P_RANGE,
@@ -18,7 +17,6 @@ export const GENERATION_PRESET_SETTINGS_SCHEMA = z.object({
   contextSize: z.number().int().positive(),
   maxTokens: z.number().int().positive(),
   outputFormat: OUTPUT_FORMAT_SCHEMA,
-  assistantGenerationMode: CHARACTER_ASSISTANT_GENERATION_MODE_SCHEMA,
   temperature: z.number().min(TEMPERATURE_RANGE.min).max(TEMPERATURE_RANGE.max),
   topP: z.number().min(TOP_P_RANGE.min).max(TOP_P_RANGE.max),
   frequencyPenalty: z.number().min(FREQUENCY_PENALTY_RANGE.min).max(FREQUENCY_PENALTY_RANGE.max),
@@ -46,7 +44,6 @@ export function createGenerationPresetSettings(
     contextSize: settings.contextSize,
     maxTokens: settings.maxTokens,
     outputFormat: settings.outputFormat,
-    assistantGenerationMode: settings.assistantGenerationMode,
     temperature: settings.temperature,
     topP: settings.topP,
     frequencyPenalty: settings.frequencyPenalty,

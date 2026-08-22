@@ -643,7 +643,7 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
 - Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
 - Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
-- Root `pnpm run test` passed 72 files and 324 tests.
+- Root `pnpm run test` passed 73 files and 331 tests, including separate/combined field writing, transient-only retries, retry exhaustion, cancellation, and aggregate retry usage accounting.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
 - Manual rendered-UI QA confirmed the generation-budget selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.

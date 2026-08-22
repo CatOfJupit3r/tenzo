@@ -5,8 +5,8 @@ status: "Active backlog"
 roadmap_type: "agentic-epic"
 priority: "P1"
 created: "2026-08-20"
-updated: "2026-08-21"
-last_repo_audit: "2026-08-20"
+updated: "2026-08-23"
+last_repo_audit: "2026-08-23"
 source_of_truth: true
 related_docs:
   - "docs/roadmaps/active/character-card-creator.roadmap.md"
@@ -24,7 +24,7 @@ archive_when:
 # Agent Quality Orchestration
 
 > Status: Active backlog
-> Last repo audit: 2026-08-20
+> Last repo audit: 2026-08-23
 > Current summary: The live assistant route now uses a typed brief, ownership plan, configurable separate or combined tool-free prose jobs, deterministic safeguards, bounded targeted repairs, and the existing user-reviewed proposal actions. Model calls are concurrency-paced and transient failures use bounded retry with backoff, jitter, cancellation, and retry accounting. Every remote role call refreshes or revalidates bounded ZDR/unmoderated policy metadata and fails closed. The frozen baseline capture, paid multi-model tournament, blinded review, evidence-backed defaults, and removal of the now-unused single-agent implementation remain open.
 
 ## 1. Executive Summary
@@ -687,6 +687,45 @@ Provider model availability and prices are expected to change. Refresh eligible 
 | Observability captures sensitive prose           | Local creative content leaks into logs        | Content-free events, centralized redaction, tests for forbidden fields, no raw provider payload logging                  | Observability owner   |
 
 ## 14. Decisions, Deferrals, And Superseded Work
+
+### Implementation conversation record: simplify the runtime
+
+**Status:** accepted product direction
+**Date:** 2026-08-23
+**Source:** User review of the implemented orchestration flow during this roadmap
+
+The initial design was judged too call-heavy for ordinary use. The user explicitly retained the planning and enrichment value, allowed a narrowly targeted repair worker, and rejected mandatory model-based quality judgment. Reviewers should assess the implementation against the accepted scope below rather than the earlier five-role topology.
+
+| Initial direction | Accepted direction | Product reason |
+| --- | --- | --- |
+| Always decompose multi-field writing into worker jobs, including coupled groups | Default to one isolated call per field and provide a persisted `One combined call` option | Isolated calls prevent one field from consuming the attention or output budget needed by another; combined mode lets the user trade some isolation for fewer requests and less repeated context |
+| Run a structured critic on every assembled draft and again after repairs | Do not run a model critic in the live path; present proposals for user judgment | Subjective grading spends tokens without replacing the user's taste, and repeated critic calls multiply latency and rate-limit exposure |
+| Repair deterministic and subjective findings | Invoke the prose repair worker only for objective blocking violations such as missing required macros or strict-template failures | Repair remains useful for concrete correctness failures without creating a self-grading generation loop |
+| Present `Economy`, `Balanced`, and `Quality` as quality/cost choices | Present generation-budget choices as `Economy`, `Balanced`, and `Expanded` | The setting controls bounded resources, not a promise that the application can decide prose quality for the user |
+| Allow independent prose jobs to fan out without a centralized provider-pressure control | Pace all model calls through a shared concurrency cap and retry only transient failures | Separate-field mode can create bursts; bounded queuing plus retry/backoff handles 429 and temporary provider failures without retrying policy, schema, budget, or cancellation errors |
+
+The resulting live path is: route intent, enrich only when the brief is sparse, create one ownership plan, write using the selected field-call strategy, run deterministic safeguards, repair only blocking violations when necessary, and submit one reviewable proposal. No additional critic, scorer, judge, or autonomous intermediary is part of the runtime.
+
+### Decision: Keep subjective quality user-owned
+
+**Status:** accepted
+**Date:** 2026-08-23
+**Rationale:** Character prose quality is taste-dependent. A mandatory model critic adds calls, latency, and cost while still requiring user review.
+**Effect on roadmap:** The runtime critic and critic-unavailable recovery branch are removed. Deterministic warnings remain visible, and offline blinded evaluation may still use judges as research evidence rather than as a production gate.
+
+### Decision: Make field-call granularity explicit
+
+**Status:** accepted
+**Date:** 2026-08-23
+**Rationale:** A combined prompt can under-generate smaller fields because fields compete for context and output attention. Separate calls cost more but give each field an isolated budget.
+**Effect on roadmap:** `Separate call per field` is persisted as the default. `One combined call` is an explicit user-selectable efficiency mode, and both paths use the same content plan and proposal boundary.
+
+### Decision: Centralize provider-pressure handling with TanStack Pacer
+
+**Status:** accepted
+**Date:** 2026-08-23
+**Rationale:** Per-field requests can arrive in bursts and providers can respond with temporary network or rate-limit failures. Unbounded retries would amplify both spend and load.
+**Effect on roadmap:** Model calls share a concurrency limit of two. HTTP 408/409/425/429/5xx and recognized transient network failures receive at most three attempts with exponential backoff, jitter, bounded `Retry-After`, cancellation, content-free retry telemetry, and aggregate usage accounting. All other failures are attempted once.
 
 ### Decision: Use a fixed role pipeline, not autonomous agent spawning
 

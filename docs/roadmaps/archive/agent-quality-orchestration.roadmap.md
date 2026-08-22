@@ -622,9 +622,10 @@ Objective release gates cover schema validity, provider eligibility, scope, macr
 ### Verification evidence: 2026-08-23 implementation checkpoint
 
 - Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
-- Simplification and cleanup commits include `ce1b48b`, `3fd41d5`, `0f7cdcd`, `70ee004`, `0cf866b`, `d90ac96`, and `0801d72`.
+- Simplification and cleanup commits include `ce1b48b`, `3fd41d5`, `0f7cdcd`, `70ee004`, `0cf866b`, `d90ac96`, `0801d72`, and `954a6ed`.
 - Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
 - Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
+- Root `pnpm run check:duplicates` passed with zero clones after shared structured/prose execution lifecycle code was extracted.
 - Root `pnpm run test` passed 65 files and 289 tests, including separate/combined field writing, transient-only retries, retry exhaustion, cancellation, aggregate retry usage accounting, policy enforcement, deterministic safeguards, and application-owned proposal submission.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
 - Manual rendered-UI QA on the active character session confirmed `Economy`, `Balanced`, and `Expanded` generation-budget choices; `Separate call per field` selected by default; the `One combined call` alternative; immutable ZDR/data-collection-denied and key-handling copy; the field permission controls; and removal of the obsolete assistant execution-mode selector. The settings dialog opened and closed without browser warnings or errors.

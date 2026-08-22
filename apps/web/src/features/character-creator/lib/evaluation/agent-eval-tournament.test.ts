@@ -20,7 +20,7 @@ const BASE_PROFILE = {
   modelId: 'baseline/model',
   allowedProviderSlug: 'provider-a',
   localCapabilities: ['structured-output', 'tool-calling'],
-  qualityProfile: 'balanced',
+  generationBudget: 'balanced',
   maximumOutputTokens: 1_000,
   temperature: 0.8,
   topP: 1,

@@ -156,7 +156,7 @@ export function useCharacterAssistantWorkspace({
     topK: generationSettings.topK,
     minP: generationSettings.minP,
     shouldSendDisabledSamplers,
-    agentQualityProfile: generationSettings.agentQualityProfile,
+    agentGenerationBudget: generationSettings.agentGenerationBudget,
     fieldWritingStrategy: generationSettings.fieldWritingStrategy,
     providerKind: providerKind ?? undefined,
     localCapabilities,

@@ -8,7 +8,7 @@
       "modelId": "sao10k/l3.1-euryale-70b",
       "allowedProviderSlug": "novita",
       "localCapabilities": ["structured-output", "tool-calling"],
-      "qualityProfile": "balanced",
+      "generationBudget": "balanced",
       "maximumOutputTokens": 2000,
       "temperature": 0.8,
       "topP": 1,

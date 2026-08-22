@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AGENT_QUALITY_PROFILES } from '../provider/agent-quality-profile';
+import { AGENT_GENERATION_BUDGETS } from '../provider/agent-generation-budget';
 import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import { MODEL_CAPABILITIES } from '../provider/model-capabilities';
 import { PROVIDER_KINDS } from '../provider/provider-health';
@@ -9,7 +9,7 @@ import { createAgentRoleProfiles } from './agent-role-profile-service';
 describe('agent role profile service', () => {
   it('builds replaceable same-model roles with immutable capability requirements', () => {
     const profiles = createAgentRoleProfiles({
-      qualityProfile: AGENT_QUALITY_PROFILES.balanced,
+      generationBudget: AGENT_GENERATION_BUDGETS.balanced,
       providerKind: PROVIDER_KINDS.openrouter,
       modelId: 'test/model',
       allowedProviderSlug: 'test-provider',
@@ -32,7 +32,7 @@ describe('agent role profile service', () => {
 
   it('keeps local profiles separate from remote provider routing', () => {
     const profiles = createAgentRoleProfiles({
-      qualityProfile: AGENT_QUALITY_PROFILES.economy,
+      generationBudget: AGENT_GENERATION_BUDGETS.economy,
       providerKind: PROVIDER_KINDS.koboldcpp,
       modelId: 'koboldcpp/local',
       allowedProviderSlug: 'must-not-be-used',
@@ -48,7 +48,7 @@ describe('agent role profile service', () => {
   it('rejects unsupported provider kinds before a role can be executed', () => {
     expect(() =>
       createAgentRoleProfiles({
-        qualityProfile: AGENT_QUALITY_PROFILES.quality,
+        generationBudget: AGENT_GENERATION_BUDGETS.expanded,
         providerKind: PROVIDER_KINDS.unknown,
         modelId: 'unknown/model',
         allowedProviderSlug: '',
@@ -61,7 +61,7 @@ describe('agent role profile service', () => {
 
   it('accepts replaceable per-role assignments for evaluation without branching on model IDs', () => {
     const profiles = createAgentRoleProfiles({
-      qualityProfile: AGENT_QUALITY_PROFILES.quality,
+      generationBudget: AGENT_GENERATION_BUDGETS.expanded,
       providerKind: PROVIDER_KINDS.openrouter,
       modelId: 'default/model',
       allowedProviderSlug: 'default-provider',

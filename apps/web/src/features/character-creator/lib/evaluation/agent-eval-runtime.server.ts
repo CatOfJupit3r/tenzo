@@ -34,7 +34,7 @@ import { AgentRolePolicyError } from '../orchestration/agent-role-executor.serve
 import { streamOrchestratedCharacterAssistant } from '../orchestration/orchestrated-character-assistant.server';
 import { createCharacterEditProposal, preserveAssistantProtectedFields } from '../proposals/character-edit-proposal';
 import type { iCharacterEditProposal } from '../proposals/character-edit-proposal';
-import { AGENT_QUALITY_PROFILES, AGENT_QUALITY_PROFILE_SCHEMA } from '../provider/agent-quality-profile';
+import { AGENT_GENERATION_BUDGETS, AGENT_GENERATION_BUDGET_SCHEMA } from '../provider/agent-generation-budget';
 import { AGENT_ROLES, AGENT_ROLE_PROFILE_SCHEMA, AGENT_ROLE_SCHEMA } from '../provider/agent-role-contracts';
 import { MODEL_CAPABILITIES, MODEL_CAPABILITY_SCHEMA } from '../provider/model-capabilities';
 import { probeProviderMetadata, PROVIDER_KINDS } from '../provider/provider-health';
@@ -61,7 +61,7 @@ export const AGENT_EVAL_EXECUTION_PROFILE_SCHEMA = z
     modelId: z.string().trim().min(1),
     allowedProviderSlug: z.string().trim().default(''),
     localCapabilities: z.array(MODEL_CAPABILITY_SCHEMA).default([]),
-    qualityProfile: AGENT_QUALITY_PROFILE_SCHEMA.default(AGENT_QUALITY_PROFILES.balanced),
+    generationBudget: AGENT_GENERATION_BUDGET_SCHEMA.default(AGENT_GENERATION_BUDGETS.balanced),
     maximumOutputTokens: z.number().int().positive().default(2_000),
     temperature: z.number().min(0).max(2).default(0.8),
     topP: z.number().min(0).max(1).default(1),
@@ -369,7 +369,7 @@ function createPayload(
     messages,
     contextAttachments: createContextAttachments(evalCase),
     templates,
-    agentQualityProfile: profile.qualityProfile,
+    agentGenerationBudget: profile.generationBudget,
     localCapabilities: profile.localCapabilities,
     fieldShouldAllowAssistantEditing: DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
   });

@@ -1,5 +1,5 @@
-import { AGENT_QUALITY_PROFILES } from '../provider/agent-quality-profile';
-import type { AgentQualityProfile } from '../provider/agent-quality-profile';
+import { AGENT_GENERATION_BUDGETS } from '../provider/agent-generation-budget';
+import type { AgentGenerationBudget } from '../provider/agent-generation-budget';
 import {
   AGENT_ROLES,
   AGENT_ROLE_CAPABILITY_REQUIREMENTS,
@@ -9,7 +9,7 @@ import type { AgentRole, iAgentRoleProfile } from '../provider/agent-role-contra
 import { PROVIDER_KINDS } from '../provider/provider-health';
 import type { ProviderKind } from '../provider/provider-health';
 
-interface iAgentQualitySafetyLimits {
+interface iAgentGenerationSafetyLimits {
   maximumInputTokens: number;
   maximumCostUsd: number;
   maximumLatencyMs: number;
@@ -19,8 +19,8 @@ interface iAgentQualitySafetyLimits {
   proseOutputMultiplier: number;
 }
 
-const AGENT_QUALITY_SAFETY_LIMITS = {
-  [AGENT_QUALITY_PROFILES.economy]: {
+const AGENT_GENERATION_SAFETY_LIMITS = {
+  [AGENT_GENERATION_BUDGETS.economy]: {
     maximumInputTokens: 16_000,
     maximumCostUsd: 0.04,
     maximumLatencyMs: 45_000,
@@ -29,7 +29,7 @@ const AGENT_QUALITY_SAFETY_LIMITS = {
     structuredOutputTokens: 1_200,
     proseOutputMultiplier: 0.75,
   },
-  [AGENT_QUALITY_PROFILES.balanced]: {
+  [AGENT_GENERATION_BUDGETS.balanced]: {
     maximumInputTokens: 32_000,
     maximumCostUsd: 0.12,
     maximumLatencyMs: 90_000,
@@ -38,7 +38,7 @@ const AGENT_QUALITY_SAFETY_LIMITS = {
     structuredOutputTokens: 2_000,
     proseOutputMultiplier: 1,
   },
-  [AGENT_QUALITY_PROFILES.quality]: {
+  [AGENT_GENERATION_BUDGETS.expanded]: {
     maximumInputTokens: 64_000,
     maximumCostUsd: 0.35,
     maximumLatencyMs: 180_000,
@@ -47,10 +47,10 @@ const AGENT_QUALITY_SAFETY_LIMITS = {
     structuredOutputTokens: 3_000,
     proseOutputMultiplier: 1.5,
   },
-} satisfies Record<AgentQualityProfile, iAgentQualitySafetyLimits>;
+} satisfies Record<AgentGenerationBudget, iAgentGenerationSafetyLimits>;
 
 export interface iCreateAgentRoleProfilesOptions {
-  qualityProfile: AgentQualityProfile;
+  generationBudget: AgentGenerationBudget;
   providerKind: ProviderKind;
   modelId: string;
   allowedProviderSlug: string;
@@ -60,7 +60,7 @@ export interface iCreateAgentRoleProfilesOptions {
   roleAssignments?: Partial<Record<AgentRole, { modelId: string; allowedProviderSlug: string }>>;
 }
 
-function getRoleOutputTokens(role: AgentRole, maximumProseOutputTokens: number, limits: iAgentQualitySafetyLimits) {
+function getRoleOutputTokens(role: AgentRole, maximumProseOutputTokens: number, limits: iAgentGenerationSafetyLimits) {
   if (role === AGENT_ROLES['prose-worker']) {
     return Math.max(1, Math.floor(maximumProseOutputTokens * limits.proseOutputMultiplier));
   }
@@ -80,13 +80,13 @@ export function createAgentRoleProfiles(
   if (options.providerKind !== PROVIDER_KINDS.openrouter && options.providerKind !== PROVIDER_KINDS.koboldcpp) {
     throw new Error('Agent orchestration requires OpenRouter or local KoboldCpp.');
   }
-  const limits = AGENT_QUALITY_SAFETY_LIMITS[options.qualityProfile];
+  const limits = AGENT_GENERATION_SAFETY_LIMITS[options.generationBudget];
 
   return Object.fromEntries(
     Object.values(AGENT_ROLES).map((role) => [
       role,
       AGENT_ROLE_PROFILE_SCHEMA.parse({
-        id: `${options.qualityProfile}-${role}`,
+        id: `${options.generationBudget}-${role}`,
         role,
         providerKind: options.providerKind,
         modelId: options.roleAssignments?.[role]?.modelId ?? options.modelId,

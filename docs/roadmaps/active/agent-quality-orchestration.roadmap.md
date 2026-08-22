@@ -478,7 +478,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 - [ ] Include the current user-selected model and local KoboldCpp when they satisfy the role contract.
 - [ ] Compare single-model, two-model, and role-specialized configurations.
 - [ ] Score quality, refusal rate, schema/tool reliability, duplication, fidelity, latency, and total cost per successful run.
-- [ ] Define `Economy`, `Balanced`, and `Quality` profiles only when each has enough evidence; all share the same immutable privacy policy.
+- [x] Define `Economy`, `Balanced`, and `Expanded` as bounded generation budgets rather than quality claims; all share the same immutable privacy policy.
 
 **Exit criteria:**
 
@@ -726,6 +726,13 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Date:** 2026-08-23
 **Rationale:** The production API has one application-owned orchestration path. Offering “structured loop” and “tool calls” implied two live runtimes and could incorrectly block an otherwise eligible structured-output model for lacking tool calling.
 **Effect on roadmap:** The setting, preset field, request property, compatibility branch, and UI selector are removed. Tool capability remains in provider metadata only to support the frozen baseline comparison before legacy deletion.
+
+### Decision: Name resource controls as generation budgets
+
+**Status:** accepted
+**Date:** 2026-08-23
+**Rationale:** Internal `qualityProfile` naming preserved the misleading idea that more calls or tokens constitute an automatic quality decision.
+**Effect on roadmap:** Contracts, settings, eval profiles, UI identifiers, and role limits use `generationBudget` with `economy`, `balanced`, and `expanded` values. Model selection still requires eval evidence; these values only bound resources.
 
 ### Decision: Make field-call granularity explicit
 

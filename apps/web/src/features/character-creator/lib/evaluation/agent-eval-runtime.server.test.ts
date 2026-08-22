@@ -16,7 +16,7 @@ const PROFILE = {
   modelId: 'sao10k/l3.1-euryale-70b',
   allowedProviderSlug: 'deepinfra',
   localCapabilities: ['structured-output', 'tool-calling'],
-  qualityProfile: 'balanced',
+  generationBudget: 'balanced',
   maximumOutputTokens: 2_000,
   temperature: 0.8,
   topP: 1,

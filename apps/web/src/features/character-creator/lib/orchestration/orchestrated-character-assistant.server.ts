@@ -254,7 +254,7 @@ function createOrchestrationRun(
   const strictTemplates = getStrictTemplates(payload.templates);
   const requiredMacros = getRequiredMacros(requestedFieldKeys, currentFields, strictTemplates);
   const profiles = createAgentRoleProfiles({
-    qualityProfile: payload.agentQualityProfile,
+    generationBudget: payload.agentGenerationBudget,
     providerKind: getProviderKind(payload),
     modelId: payload.model,
     allowedProviderSlug: payload.openRouterProvider ?? '',

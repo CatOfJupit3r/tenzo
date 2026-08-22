@@ -4,8 +4,8 @@ import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_SCHEMA } from '../orch
 import type { FieldWritingStrategy } from '../orchestration/field-writing-strategy';
 import { CHARACTER_EDIT_FIELD_KEYS, CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
 import type { CharacterEditFieldKey } from '../proposals/character-edit-proposal';
-import { AGENT_QUALITY_PROFILES, AGENT_QUALITY_PROFILE_SCHEMA } from '../provider/agent-quality-profile';
-import type { AgentQualityProfile } from '../provider/agent-quality-profile';
+import { AGENT_GENERATION_BUDGETS, AGENT_GENERATION_BUDGET_SCHEMA } from '../provider/agent-generation-budget';
+import type { AgentGenerationBudget } from '../provider/agent-generation-budget';
 
 export const OUTPUT_FORMAT_SCHEMA = z.enum(['xml', 'json', 'none']);
 export const OUTPUT_FORMATS = OUTPUT_FORMAT_SCHEMA.enum;
@@ -75,7 +75,7 @@ export interface iCharacterGenerationConnectionSettings {
   maxTokens: number;
   outputFormat: OutputFormat;
   requestMode: RequestMode;
-  agentQualityProfile: AgentQualityProfile;
+  agentGenerationBudget: AgentGenerationBudget;
   fieldWritingStrategy: FieldWritingStrategy;
   temperature: number;
   topP: number;
@@ -110,7 +110,7 @@ export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerat
   maxTokens: DEFAULT_MAX_TOKENS,
   outputFormat: OUTPUT_FORMATS.xml,
   requestMode: REQUEST_MODES.proxy,
-  agentQualityProfile: AGENT_QUALITY_PROFILES.balanced,
+  agentGenerationBudget: AGENT_GENERATION_BUDGETS.balanced,
   fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
   temperature: 1,
   topP: 1,
@@ -176,7 +176,7 @@ const STORED_CHARACTER_GENERATION_CONNECTION_SETTINGS_SCHEMA = z
     maxTokens: z.number().finite().positive().transform(Math.floor).optional().catch(undefined),
     outputFormat: OUTPUT_FORMAT_SCHEMA.optional().catch(undefined),
     requestMode: REQUEST_MODE_SCHEMA.optional().catch(undefined),
-    agentQualityProfile: AGENT_QUALITY_PROFILE_SCHEMA.optional().catch(undefined),
+    agentGenerationBudget: AGENT_GENERATION_BUDGET_SCHEMA.optional().catch(undefined),
     fieldWritingStrategy: FIELD_WRITING_STRATEGY_SCHEMA.optional().catch(undefined),
     temperature: createClampedNumberSchema(TEMPERATURE_RANGE),
     topP: createClampedNumberSchema(TOP_P_RANGE),
@@ -226,8 +226,8 @@ export function sanitizeCharacterGenerationConnectionSettings(value: unknown): i
     maxTokens: candidate.maxTokens ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.maxTokens,
     outputFormat: candidate.outputFormat ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.outputFormat,
     requestMode: candidate.requestMode ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.requestMode,
-    agentQualityProfile:
-      candidate.agentQualityProfile ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.agentQualityProfile,
+    agentGenerationBudget:
+      candidate.agentGenerationBudget ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.agentGenerationBudget,
     fieldWritingStrategy:
       candidate.fieldWritingStrategy ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.fieldWritingStrategy,
     temperature: candidate.temperature ?? DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS.temperature,

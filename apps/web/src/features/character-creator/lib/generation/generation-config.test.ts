@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FIELD_WRITING_STRATEGIES } from '../orchestration/field-writing-strategy';
-import { AGENT_QUALITY_PROFILES } from '../provider/agent-quality-profile';
+import { AGENT_GENERATION_BUDGETS } from '../provider/agent-generation-budget';
 import {
   DEFAULT_CONTEXT_SIZE,
   GENERATION_PROVIDERS,
@@ -95,12 +95,12 @@ describe('sanitizeCharacterGenerationConnectionSettings', () => {
     });
   });
 
-  it('persists supported quality profiles and rejects unknown values', () => {
+  it('persists supported generation budgets and rejects unknown values', () => {
     expect(
-      sanitizeCharacterGenerationConnectionSettings({ agentQualityProfile: AGENT_QUALITY_PROFILES.quality }),
-    ).toMatchObject({ agentQualityProfile: AGENT_QUALITY_PROFILES.quality });
-    expect(sanitizeCharacterGenerationConnectionSettings({ agentQualityProfile: 'unbounded' })).toMatchObject({
-      agentQualityProfile: AGENT_QUALITY_PROFILES.balanced,
+      sanitizeCharacterGenerationConnectionSettings({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.expanded }),
+    ).toMatchObject({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.expanded });
+    expect(sanitizeCharacterGenerationConnectionSettings({ agentGenerationBudget: 'unbounded' })).toMatchObject({
+      agentGenerationBudget: AGENT_GENERATION_BUDGETS.balanced,
     });
   });
 

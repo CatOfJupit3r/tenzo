@@ -17,7 +17,7 @@ import {
 } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_LABELS } from '../lib/orchestration/field-writing-strategy';
-import { AGENT_QUALITY_PROFILE_LABELS, AGENT_QUALITY_PROFILES } from '../lib/provider/agent-quality-profile';
+import { AGENT_GENERATION_BUDGET_LABELS, AGENT_GENERATION_BUDGETS } from '../lib/provider/agent-generation-budget';
 import {
   getRequiredModelCapabilities,
   getModelCompatibilityStatus,
@@ -113,8 +113,8 @@ const providerOptions: iOptionType[] = [
   },
 ];
 
-const agentQualityProfileOptions: iOptionType[] = Object.values(AGENT_QUALITY_PROFILES).map((value) => ({
-  label: AGENT_QUALITY_PROFILE_LABELS[value],
+const agentGenerationBudgetOptions: iOptionType[] = Object.values(AGENT_GENERATION_BUDGETS).map((value) => ({
+  label: AGENT_GENERATION_BUDGET_LABELS[value],
   value,
 }));
 
@@ -253,15 +253,15 @@ export function ConnectionSettings({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="agent-quality-profile">Generation budget</Label>
+          <Label htmlFor="agent-generation-budget">Generation budget</Label>
           <SingleSelect
-            inputId="agent-quality-profile"
-            options={agentQualityProfileOptions}
-            value={generationSettings.agentQualityProfile}
+            inputId="agent-generation-budget"
+            options={agentGenerationBudgetOptions}
+            value={generationSettings.agentGenerationBudget}
             onValueChange={(value) => {
-              if (value && AGENT_QUALITY_PROFILES[value as keyof typeof AGENT_QUALITY_PROFILES]) {
+              if (value && AGENT_GENERATION_BUDGETS[value as keyof typeof AGENT_GENERATION_BUDGETS]) {
                 onSettingsChange({
-                  agentQualityProfile: value as iCharacterGenerationSettings['agentQualityProfile'],
+                  agentGenerationBudget: value as iCharacterGenerationSettings['agentGenerationBudget'],
                 });
               }
             }}

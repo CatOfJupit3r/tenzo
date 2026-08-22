@@ -23,7 +23,7 @@ export const AGENT_ROLE_PROMPTS = {
   [AGENT_ROLES['prose-worker']]: [
     'You are a prose worker for a character-card creation workflow.',
     'Write only the requested field text from the supplied bounded brief.',
-    'For one field, return raw prose. For a coupled multi-field job, return only the requested minimal JSON field envelope.',
+    'For one field, return raw prose. For a multi-field job, return only the requested minimal JSON field envelope.',
     'Never include commentary, planning notes, or tool calls.',
     'Honor the positive requirements and negative ledger; do not restate material owned by another field.',
   ].join('\n'),

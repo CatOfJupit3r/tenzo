@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
+import { FIELD_WRITING_STRATEGIES } from '../orchestration/field-writing-strategy';
+import { AGENT_GENERATION_BUDGETS } from '../provider/agent-generation-budget';
 import {
   DEFAULT_CONTEXT_SIZE,
   GENERATION_PROVIDERS,
@@ -94,20 +95,23 @@ describe('sanitizeCharacterGenerationConnectionSettings', () => {
     });
   });
 
-  it.each([
-    {
-      name: 'accepts the supported tool-call mode',
-      value: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
-      expected: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
-    },
-    {
-      name: 'falls back from an unsupported mode',
-      value: 'legacy-mode',
-      expected: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
-    },
-  ] as const)('$name', ({ value, expected }) => {
-    expect(sanitizeCharacterGenerationConnectionSettings({ assistantGenerationMode: value })).toMatchObject({
-      assistantGenerationMode: expected,
+  it('persists supported generation budgets and rejects unknown values', () => {
+    expect(
+      sanitizeCharacterGenerationConnectionSettings({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.expanded }),
+    ).toMatchObject({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.expanded });
+    expect(sanitizeCharacterGenerationConnectionSettings({ agentGenerationBudget: 'unbounded' })).toMatchObject({
+      agentGenerationBudget: AGENT_GENERATION_BUDGETS.balanced,
+    });
+  });
+
+  it('persists supported field writing strategies and rejects unknown values', () => {
+    expect(
+      sanitizeCharacterGenerationConnectionSettings({
+        fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'],
+      }),
+    ).toMatchObject({ fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'] });
+    expect(sanitizeCharacterGenerationConnectionSettings({ fieldWritingStrategy: 'automatic' })).toMatchObject({
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
     });
   });
 });

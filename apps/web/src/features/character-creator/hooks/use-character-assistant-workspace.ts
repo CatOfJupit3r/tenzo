@@ -1,6 +1,6 @@
 import { fetchServerSentEvents, useChat } from '@tanstack/ai-react';
 import { parseAsString, useQueryState } from 'nuqs';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastInfo } from '@~/components/toastifications/create-jsx-toasts';
 import { usePersistentCollection } from '@~/db/persistent-collection';
@@ -28,13 +28,20 @@ import type {
   iCharacterAssistantContextAttachment,
   iChatTemplateRef,
 } from '../lib/assistant/character-assistant-contracts';
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/assistant/character-assistant-generation-mode';
 import type { iCharacterAssistantSession } from '../lib/assistant/character-assistant-session';
 import { readNewRecordedCharacterConcept } from '../lib/assistant/recorded-character-concept';
 import type { CharacterCard } from '../lib/cards/card-schema';
 import { buildChatInputContentParts, readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
 import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import type { AgentProgressPhase, iQualityFinding } from '../lib/orchestration/agent-orchestration-contracts';
+import {
+  AGENT_ORCHESTRATION_ASSUMPTIONS_EVENT_SCHEMA,
+  AGENT_ORCHESTRATION_EVENT_NAMES,
+  AGENT_ORCHESTRATION_PHASE_EVENT_SCHEMA,
+  AGENT_ORCHESTRATION_QUALITY_EVENT_SCHEMA,
+  AGENT_ORCHESTRATION_RECOVERY_EVENT_SCHEMA,
+} from '../lib/orchestration/agent-orchestration-events';
 import type { iPromptExampleCharacter } from '../lib/prompt/generation-contracts';
 import {
   CHARACTER_EDIT_PROPOSAL_SCHEMA,
@@ -42,6 +49,7 @@ import {
   supersedeOverlappingCharacterEditProposals,
 } from '../lib/proposals/character-edit-proposal';
 import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
+import type { ModelCapability } from '../lib/provider/model-capabilities';
 import type { ProviderKind } from '../lib/provider/provider-health';
 import { useProposalActions } from './use-proposal-actions';
 
@@ -55,6 +63,7 @@ interface iUseCharacterAssistantWorkspaceOptions {
   updateGeneralCharacterIdea: (value: string) => unknown;
   shouldSendDisabledSamplers: boolean;
   providerKind: ProviderKind | null;
+  localCapabilities: readonly ModelCapability[];
   focus: CharacterAssistantFocus;
   contextAttachments: iCharacterAssistantContextAttachment[];
   exampleCharacters: iPromptExampleCharacter[];
@@ -108,6 +117,7 @@ export function useCharacterAssistantWorkspace({
   updateGeneralCharacterIdea,
   shouldSendDisabledSamplers,
   providerKind,
+  localCapabilities,
   focus,
   contextAttachments,
   exampleCharacters,
@@ -122,6 +132,10 @@ export function useCharacterAssistantWorkspace({
     [characterId, sessions],
   );
   const [selectedSessionId, setSelectedSessionId] = useQueryState('chat', parseAsString);
+  const [orchestrationPhase, setOrchestrationPhase] = useState<AgentProgressPhase | null>(null);
+  const [assumptionSummary, setAssumptionSummary] = useState<string[]>([]);
+  const [qualityFindings, setQualityFindings] = useState<iQualityFinding[]>([]);
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
   const session =
     characterSessions.find((candidate) => candidate.id === selectedSessionId) ?? characterSessions[0] ?? null;
   const sessionId = session?.id ?? characterId;
@@ -142,8 +156,10 @@ export function useCharacterAssistantWorkspace({
     topK: generationSettings.topK,
     minP: generationSettings.minP,
     shouldSendDisabledSamplers,
-    assistantGenerationMode: generationSettings.assistantGenerationMode,
+    agentGenerationBudget: generationSettings.agentGenerationBudget,
+    fieldWritingStrategy: generationSettings.fieldWritingStrategy,
     providerKind: providerKind ?? undefined,
+    localCapabilities,
     card,
     focus,
     globalCharacterInstruction: generationSettings.globalCharacterInstruction,
@@ -159,9 +175,33 @@ export function useCharacterAssistantWorkspace({
     initialMessages: session?.messages ?? [],
     connection: fetchServerSentEvents('/api/character-assistant'),
     forwardedProps,
-    ...(generationSettings.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output']
-      ? { outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA }
-      : {}),
+    outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA,
+    onCustomEvent: (eventName, data) => {
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.phase) {
+        const event = AGENT_ORCHESTRATION_PHASE_EVENT_SCHEMA.safeParse(data);
+        if (event.success) setOrchestrationPhase(event.data.phase);
+        return;
+      }
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.assumptions) {
+        const event = AGENT_ORCHESTRATION_ASSUMPTIONS_EVENT_SCHEMA.safeParse(data);
+        if (event.success) {
+          setAssumptionSummary([
+            ...event.data.assumptions.map((assumption) => assumption.statement),
+            ...event.data.creativeChoices.filter((choice) => choice.isSelected).map((choice) => choice.description),
+          ]);
+        }
+        return;
+      }
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.quality) {
+        const event = AGENT_ORCHESTRATION_QUALITY_EVENT_SCHEMA.safeParse(data);
+        if (event.success) setQualityFindings(event.data.findings.filter((finding) => !finding.isResolved));
+        return;
+      }
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.recovery) {
+        const event = AGENT_ORCHESTRATION_RECOVERY_EVENT_SCHEMA.safeParse(data);
+        if (event.success) setRecoveryMessage(event.data.message);
+      }
+    },
     devtools: { name: 'Character Assistant' },
   });
 
@@ -258,6 +298,10 @@ export function useCharacterAssistantWorkspace({
         ...focusTemplates.filter((template) => !mentionTemplates.some((mention) => mention.id === template.id)),
       ].slice(0, MAX_CHAT_TEMPLATE_REF_COUNT);
       try {
+        setOrchestrationPhase(null);
+        setAssumptionSummary([]);
+        setQualityFindings([]);
+        setRecoveryMessage(null);
         const attachments = options.attachments ?? [];
         await chat.sendMessage(
           attachments.length > 0 ? { content: buildChatInputContentParts(input, attachments) } : input,
@@ -363,6 +407,13 @@ export function useCharacterAssistantWorkspace({
     },
     [characterId, characterSessions, chat.isLoading, sessionId, setSelectedSessionId],
   );
+  let activityLabel: string | null = null;
+  if (chat.isLoading) {
+    activityLabel = orchestrationPhase
+      ? orchestrationPhase.charAt(0).toUpperCase() + orchestrationPhase.slice(1)
+      : 'Understanding your request';
+  }
+
   return {
     sessionId,
     sessions: characterSessions,
@@ -377,7 +428,11 @@ export function useCharacterAssistantWorkspace({
     ),
     isRunning: chat.isLoading,
     errorMessage: chat.error?.message ?? null,
-    activityLabel: chat.isLoading ? 'Working on your character' : null,
+    activityLabel,
+    orchestrationPhase,
+    assumptionSummary,
+    qualityFindings,
+    recoveryMessage,
     sendMessage,
     requestResponse: async () => {
       try {
@@ -398,6 +453,10 @@ export function useCharacterAssistantWorkspace({
     updateComposerDraft,
     cancelRun: () => {
       chat.stop();
+      setOrchestrationPhase(null);
+      setAssumptionSummary([]);
+      setQualityFindings([]);
+      setRecoveryMessage(null);
       toastInfo('Assistant stopped', 'The current assistant run was cancelled.');
     },
     ...proposalActions,

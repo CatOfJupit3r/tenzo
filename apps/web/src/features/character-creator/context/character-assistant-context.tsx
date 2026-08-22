@@ -17,6 +17,7 @@ import { resolveEffectiveFieldTemplateId } from '../lib/cards/field-template-res
 import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
 import { CHARACTER_EDIT_FIELD_KEYS } from '../lib/proposals/character-edit-proposal';
+import { MODEL_CAPABILITIES } from '../lib/provider/model-capabilities';
 import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import { CharacterAssistantContext } from './character-assistant-context.constants';
 import { useCharacterCreatorContext } from './character-creator-context/character-creator-context.hooks';
@@ -133,6 +134,10 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     generationSettings.fieldTemplateIds,
     generationSettings.shouldUseDefaultFieldTemplates,
   ]);
+  const selectedModelCapabilities = connectionHealth.modelCapabilities[generationSettings.model];
+  const localCapabilities = Object.values(MODEL_CAPABILITIES).filter(
+    (capability) => selectedModelCapabilities?.[capability],
+  );
   const workspace = useCharacterAssistantWorkspace({
     characterId: activeCharacterId,
     card,
@@ -143,6 +148,7 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     updateGeneralCharacterIdea,
     shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
     providerKind: connectionHealth.providerKind,
+    localCapabilities,
     focus: assistantFocus,
     contextAttachments,
     exampleCharacters: promptExampleCharacters,

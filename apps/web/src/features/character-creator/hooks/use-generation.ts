@@ -36,6 +36,7 @@ import type { iModelCapabilities, iModelProviderOption } from '../lib/provider/m
 import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider/provider-health-proxy';
+import type { iProviderPolicyCatalog } from '../lib/provider/provider-policy-resolver';
 import { useCharacterSession } from './use-character-session';
 
 const FIELD_GENERATION_LOGGER = loggerFactory.getLogger('character-creator.field-generation');
@@ -67,6 +68,7 @@ interface iConnectionHealthState {
   modelContextSizes: Record<string, number>;
   modelCapabilities: Record<string, iModelCapabilities>;
   modelProviders: iModelProviderOption[];
+  policyCatalog: iProviderPolicyCatalog | null;
 }
 
 const PROVIDER_HEALTH_QUERY_KEY = 'provider-health';
@@ -160,6 +162,7 @@ export function useGeneration() {
     modelContextSizes: {},
     modelCapabilities: {},
     modelProviders: [],
+    policyCatalog: null,
   });
   const abortControllersRef = useRef<Record<string, AbortController>>({});
 
@@ -399,6 +402,7 @@ export function useGeneration() {
         modelContextSizes: result.modelContextSizes,
         modelCapabilities: result.modelCapabilities,
         modelProviders: result.modelProviders,
+        policyCatalog: result.policyCatalog,
       });
 
       setGenerationSettings((prev) => ({

@@ -124,7 +124,7 @@ export function SamplingSettings({
         description: 'Let OpenRouter choose a provider that supports the request.',
       },
       ...availableModelProviders.map((provider) => {
-        const status = getModelCompatibilityStatus(provider.capabilities, generationSettings.assistantGenerationMode);
+        const status = getModelCompatibilityStatus(provider.capabilities);
         return {
           label: provider.name,
           value: provider.slug,
@@ -133,7 +133,7 @@ export function SamplingSettings({
         } satisfies iOptionType;
       }),
     ],
-    [availableModelProviders, generationSettings.assistantGenerationMode],
+    [availableModelProviders],
   );
   const modelOptions = useMemo<iOptionType[]>(() => availableModels, [availableModels]);
 

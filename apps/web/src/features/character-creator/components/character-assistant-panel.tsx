@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { LuFileText, LuRefreshCw, LuSparkles, LuX } from 'react-icons/lu';
 
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
+import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Button } from '@~/components/ui/button/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@~/components/ui/dialog';
 import { loggerFactory } from '@~/lib/logging/logger';
@@ -192,6 +193,29 @@ export function CharacterAssistantPanel({
             }
           }}
         />
+        {workspace.assumptionSummary.length > 0 ? (
+          <Alert className="mx-1 mt-1 w-auto">
+            <AlertTitle>Working assumptions</AlertTitle>
+            <AlertDescription>
+              {workspace.assumptionSummary.join(' ')}{' '}
+              <span className="text-muted-foreground">Stop and send a correction to revise them.</span>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {workspace.qualityFindings.length > 0 ? (
+          <Alert className="mx-1 mt-1 w-auto" variant="destructive">
+            <AlertTitle>Quality review warnings</AlertTitle>
+            <AlertDescription>
+              {workspace.qualityFindings.map((finding) => finding.explanation).join(' ')}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {workspace.recoveryMessage ? (
+          <Alert className="mx-1 mt-1 w-auto" variant="destructive">
+            <AlertTitle>Generation needs attention</AlertTitle>
+            <AlertDescription>{workspace.recoveryMessage}</AlertDescription>
+          </Alert>
+        ) : null}
         {workspace.focusTemplates.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1.5 px-1 pt-1" aria-label="Auto-attached templates">
             <span className="text-[11px] font-medium text-muted-foreground">Attached templates</span>

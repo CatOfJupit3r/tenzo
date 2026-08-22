@@ -9,7 +9,6 @@ import type { iOptionType } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
 import { cn } from '@~/lib/utils';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../lib/assistant/character-assistant-generation-mode';
 import {
   GENERATION_PROVIDER_DEFAULTS,
   GENERATION_PROVIDERS,
@@ -17,7 +16,10 @@ import {
   REQUEST_MODES,
 } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_LABELS } from '../lib/orchestration/field-writing-strategy';
+import { AGENT_GENERATION_BUDGET_LABELS, AGENT_GENERATION_BUDGETS } from '../lib/provider/agent-generation-budget';
 import {
+  getRequiredModelCapabilities,
   getModelCompatibilityStatus,
   MODEL_CAPABILITIES,
   MODEL_COMPATIBILITY_STATUSES,
@@ -30,6 +32,7 @@ import type {
 } from '../lib/provider/model-capabilities';
 import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
+import type { iProviderPolicyCatalog } from '../lib/provider/provider-policy-resolver';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
 export interface iConnectionHealthViewModel {
@@ -44,17 +47,14 @@ export interface iConnectionHealthViewModel {
   modelContextSizes: Record<string, number>;
   modelCapabilities: Record<string, iModelCapabilities>;
   modelProviders: iModelProviderOption[];
+  policyCatalog: iProviderPolicyCatalog | null;
 }
 
 const MODEL_CAPABILITY_LABELS = {
   [MODEL_CAPABILITIES['structured-output']]: 'Structured responses',
-  [MODEL_CAPABILITIES['tool-calling']]: 'Tool calling',
-} satisfies Record<ModelCapability, string>;
+} satisfies Partial<Record<ModelCapability, string>>;
 
-const DISPLAYED_MODEL_CAPABILITIES = [
-  MODEL_CAPABILITIES['structured-output'],
-  MODEL_CAPABILITIES['tool-calling'],
-] as const;
+const DISPLAYED_MODEL_CAPABILITIES = [MODEL_CAPABILITIES['structured-output']] as const;
 
 const MODEL_COMPATIBILITY_TITLES = {
   [MODEL_COMPATIBILITY_STATUSES.compatible]: 'Model meets project requirements',
@@ -113,18 +113,15 @@ const providerOptions: iOptionType[] = [
   },
 ];
 
-const assistantGenerationModeOptions: iOptionType[] = [
-  {
-    label: 'Structured agent loop',
-    value: CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'],
-    description: 'Bounded multi-round agent behavior for models without reliable native tool calls.',
-  },
-  {
-    label: 'Tool calls',
-    value: CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
-    description: 'Multi-step agent tools for models with reliable native function calling.',
-  },
-];
+const agentGenerationBudgetOptions: iOptionType[] = Object.values(AGENT_GENERATION_BUDGETS).map((value) => ({
+  label: AGENT_GENERATION_BUDGET_LABELS[value],
+  value,
+}));
+
+const fieldWritingStrategyOptions: iOptionType[] = Object.values(FIELD_WRITING_STRATEGIES).map((value) => ({
+  label: FIELD_WRITING_STRATEGY_LABELS[value],
+  value,
+}));
 
 export interface iConnectionSettingsProps {
   generationSettings: iCharacterGenerationSettings;
@@ -157,10 +154,21 @@ export function ConnectionSettings({
   if (generationSettings.openRouterProvider) {
     selectedModelCapabilities = selectedProvider?.capabilities ?? null;
   }
-  const compatibilityStatus = getModelCompatibilityStatus(
-    selectedModelCapabilities,
-    generationSettings.assistantGenerationMode,
-  );
+  const compatibilityStatus = getModelCompatibilityStatus(selectedModelCapabilities);
+  const policyModel = connectionHealth.policyCatalog?.models.find((model) => model.modelId === selectedModel);
+  const requiredCapabilities = getRequiredModelCapabilities();
+  const policyEndpoints =
+    policyModel?.endpoints.filter(
+      (endpoint) =>
+        (!generationSettings.openRouterProvider || endpoint.providerSlug === generationSettings.openRouterProvider) &&
+        endpoint.isZeroDataRetention &&
+        !endpoint.doesCollectData &&
+        endpoint.isAvailable &&
+        requiredCapabilities.every((capability) => endpoint.supportedCapabilities.includes(capability)),
+    ) ?? [];
+  const isCurrentProfileEligible = isUsingOpenRouter
+    ? Boolean(policyModel && !policyModel.isModerated && policyEndpoints.length > 0)
+    : compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.compatible;
 
   return (
     <div className="space-y-4">
@@ -245,21 +253,40 @@ export function ConnectionSettings({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="assistant-generation-mode">Character assistant mode</Label>
+          <Label htmlFor="agent-generation-budget">Generation budget</Label>
           <SingleSelect
-            inputId="assistant-generation-mode"
-            options={assistantGenerationModeOptions}
-            value={generationSettings.assistantGenerationMode}
+            inputId="agent-generation-budget"
+            options={agentGenerationBudgetOptions}
+            value={generationSettings.agentGenerationBudget}
             onValueChange={(value) => {
-              if (value) {
+              if (value && AGENT_GENERATION_BUDGETS[value as keyof typeof AGENT_GENERATION_BUDGETS]) {
                 onSettingsChange({
-                  assistantGenerationMode: value as iCharacterGenerationSettings['assistantGenerationMode'],
+                  agentGenerationBudget: value as iCharacterGenerationSettings['agentGenerationBudget'],
                 });
               }
             }}
           />
           <p className="text-sm text-muted-foreground">
-            The structured agent loop works without native tools. Tool calls use provider-native function calling.
+            Controls bounded drafting resources. You decide whether the result is good enough before applying it.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="field-writing-strategy">Field writing</Label>
+          <SingleSelect
+            inputId="field-writing-strategy"
+            options={fieldWritingStrategyOptions}
+            value={generationSettings.fieldWritingStrategy}
+            onValueChange={(value) => {
+              if (value && FIELD_WRITING_STRATEGIES[value as keyof typeof FIELD_WRITING_STRATEGIES]) {
+                onSettingsChange({
+                  fieldWritingStrategy: value as iCharacterGenerationSettings['fieldWritingStrategy'],
+                });
+              }
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Separate calls give each field full attention. A combined call uses fewer tokens and requests.
           </p>
         </div>
 
@@ -335,17 +362,44 @@ export function ConnectionSettings({
                 );
               })}
             </div>
-            {generationSettings.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'] ? (
-              <p>
-                One route supports both:{' '}
-                {selectedModelCapabilities
-                  ? getCapabilitySupportLabel(selectedModelCapabilities.hasJointStructuredOutputAndToolCalling)
-                  : 'Unknown'}
-              </p>
-            ) : null}
             {compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.unknown ? (
               <p>The provider did not publish capability metadata for this model.</p>
             ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {connectionHealth.hasCompletedCheck ? (
+        <Alert variant={isCurrentProfileEligible ? 'default' : 'destructive'}>
+          <AlertTitle>
+            {isCurrentProfileEligible
+              ? 'Current assistant profile is eligible'
+              : 'Current assistant profile is blocked'}
+          </AlertTitle>
+          <AlertDescription className="space-y-1">
+            {isUsingOpenRouter ? (
+              <>
+                <p>Zero data retention, denied provider data collection, and unmoderated routing are mandatory.</p>
+                {policyModel?.isModerated ? <p>The selected model is reported as moderated.</p> : null}
+                {!connectionHealth.policyCatalog ? <p>Live ZDR policy metadata is unavailable or stale.</p> : null}
+                {connectionHealth.policyCatalog && !policyModel ? (
+                  <p>The selected model is absent from the policy catalog.</p>
+                ) : null}
+                {policyModel && !policyModel.isModerated && policyEndpoints.length === 0 ? (
+                  <p>No available ZDR endpoint satisfies the selected provider and capability requirements.</p>
+                ) : null}
+                {policyEndpoints.length > 0 ? (
+                  <p>
+                    Eligible routing providers: {policyEndpoints.map((endpoint) => endpoint.providerSlug).join(', ')}.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p>
+                Local KoboldCpp does not require third-party ZDR certification. Capability requirements still apply and
+                no remote privacy claim is made.
+              </p>
+            )}
           </AlertDescription>
         </Alert>
       ) : null}

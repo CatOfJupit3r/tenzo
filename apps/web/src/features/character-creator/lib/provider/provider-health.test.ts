@@ -134,4 +134,81 @@ describe('provider health model metadata', () => {
     });
     expect(result.modelProviders).toHaveLength(2);
   });
+
+  it('intersects unmoderated model metadata with the live ZDR endpoint catalog', async () => {
+    const model = 'test/unmoderated';
+    const result = await probeProviderMetadataWithProxyFetcher(
+      {
+        endpoint: 'https://openrouter.ai/api/v1',
+        apiKey: 'test-key',
+        requestMode: REQUEST_MODES.proxy,
+        model,
+      },
+      async (url) => {
+        if (url.endsWith('/endpoints/zdr')) {
+          return {
+            isOk: true,
+            status: 200,
+            data: {
+              data: [
+                {
+                  model_id: model,
+                  tag: 'eligible/fp16',
+                  supported_parameters: ['structured_outputs', 'tools'],
+                  status: 0,
+                  pricing: { prompt: '0.000001', completion: '0.000002' },
+                },
+                {
+                  model_id: 'another/model',
+                  tag: 'other/fp16',
+                  supported_parameters: ['structured_outputs'],
+                  status: 0,
+                  pricing: { prompt: '0', completion: '0' },
+                },
+              ],
+            },
+          };
+        }
+
+        if (url.endsWith('/models')) {
+          return {
+            isOk: true,
+            status: 200,
+            data: {
+              data: [
+                {
+                  id: model,
+                  top_provider: { is_moderated: false },
+                  supported_parameters: ['structured_outputs', 'tools'],
+                },
+              ],
+            },
+          };
+        }
+
+        return { isOk: false, status: 404, data: null };
+      },
+    );
+
+    expect(result.policyCatalog).toEqual({
+      fetchedAt: expect.any(String),
+      models: [
+        {
+          modelId: model,
+          isModerated: false,
+          endpoints: [
+            {
+              providerSlug: 'eligible',
+              isZeroDataRetention: true,
+              doesCollectData: false,
+              isAvailable: true,
+              supportedCapabilities: [MODEL_CAPABILITIES['structured-output'], MODEL_CAPABILITIES['tool-calling']],
+              promptPricePerMillionUsd: 1,
+              completionPricePerMillionUsd: 2,
+            },
+          ],
+        },
+      ],
+    });
+  });
 });

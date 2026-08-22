@@ -25,7 +25,7 @@ archive_when:
 
 > Status: Active backlog
 > Last repo audit: 2026-08-20
-> Current summary: The live assistant route now uses a typed brief, ownership plan, tool-free prose jobs, deterministic and structured quality review, bounded repairs, and the existing reviewable proposal actions. Every remote role call refreshes or revalidates bounded ZDR/unmoderated policy metadata and fails closed. The frozen baseline capture, paid multi-model tournament, blinded review, evidence-backed defaults, and removal of the now-unused single-agent implementation remain open.
+> Current summary: The live assistant route now uses a typed brief, ownership plan, configurable separate or combined tool-free prose jobs, deterministic safeguards, bounded targeted repairs, and the existing user-reviewed proposal actions. Model calls are concurrency-paced and transient failures use bounded retry with backoff, jitter, cancellation, and retry accounting. Every remote role call refreshes or revalidates bounded ZDR/unmoderated policy metadata and fails closed. The frozen baseline capture, paid multi-model tournament, blinded review, evidence-backed defaults, and removal of the now-unused single-agent implementation remain open.
 
 ## 1. Executive Summary
 
@@ -33,8 +33,8 @@ Replace the one-model-does-everything generation path with a small, observable o
 
 1. a cheap structured **brief enricher** turns fragments into an explicit character brief while labeling assumptions and unresolved choices;
 2. a structured **orchestrator** creates a field plan, assigns each fact or dramatic beat to a primary field, and decides which prose jobs are needed;
-3. one or more **prose workers** write only the assigned fields from bounded briefs, without tool responsibilities;
-4. a deterministic and model-assisted **quality gate** checks depth, fidelity, coherence, and duplication, then requests targeted repairs only;
+3. one or more **prose workers** write the assigned fields from bounded briefs, either in isolated per-field calls or one combined call selected by the user, without tool responsibilities;
+4. a deterministic **safeguard gate** checks objective format, macro, completeness, and duplication rules, then requests targeted repairs only for blocking violations; subjective quality remains the user's decision at proposal review;
 5. the orchestrator converts accepted drafts into the existing reviewable proposal actions.
 
 The pipeline must fail closed on privacy and model-policy constraints. Every remote request must require OpenRouter Zero Data Retention (ZDR), deny provider data collection, and use an endpoint reported as unmoderated by the current provider catalog. No content call may silently fall back to a moderated or retaining endpoint. Local KoboldCpp remains eligible because no third-party retention is involved, but it must pass the same role capability and quality evals.
@@ -103,7 +103,7 @@ Model names are deployment profiles, not architecture. As of the audit date, the
 - `generation-config.ts` stores one endpoint, one model, one optional OpenRouter provider, one sampler profile, and one assistant generation mode for all assistant responsibilities.
 - `tanstack-ai-text-generation.ts` already adds `dataCollection: 'deny'` and `zdr: true` to OpenRouter requests. Tool and structured calls also require parameter support.
 - Connection health records model capabilities for structured responses and tool calling, but it does not validate the selected endpoint against an unmoderated-model policy.
-- The UI describes OpenRouter routing as ZDR and data-collection-denied. It does not expose distinct orchestrator, enricher, writer, or critic profiles.
+- The UI describes OpenRouter routing as ZDR and data-collection-denied. It does not expose distinct orchestrator, enricher, or writer profiles.
 - Local KoboldCpp is supported through an OpenAI-compatible endpoint.
 
 ### Quality controls and tests
@@ -193,7 +193,7 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Actor:** Quality gate
 **Goal:** Correct a weak result without restarting the whole run.
 **Current behavior:** Schema-valid proposals are surfaced even when semantically thin or repetitive.
-**Target behavior:** Deterministic checks and a structured critic return typed findings tied to fields and rubric dimensions; the orchestrator issues bounded repair jobs.
+**Target behavior:** Deterministic checks return typed findings tied to fields and objective rules; the orchestrator issues bounded repair jobs for blocking violations while the user judges subjective prose quality in the proposal UI.
 **Acceptance criteria:**
 
 - [x] Findings contain field, severity, evidence category, and repair instruction without chain-of-thought.
@@ -221,8 +221,8 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 - Keep tool authority centralized. Only the orchestrator may read projected state and commit drafts into the existing proposal action handlers.
 - Treat current card content, accepted proposals, templates, and user statements as facts with provenance. Treat generated enrichments as assumptions until accepted or used as reversible creative defaults.
 - Plan content ownership before drafting. Prompt-level instructions alone are not an anti-duplication system.
-- Use deterministic checks before paying for a critic call. Length bounds, empty sections, macro preservation, exact phrase overlap, normalized n-gram overlap, and template conformance do not require a model.
-- Use a critic for semantic redundancy, coherence, specificity, voice, and fidelity. The critic returns judgments, not rewritten prose.
+- Use deterministic checks for length bounds, empty sections, macro preservation, exact phrase overlap, normalized n-gram overlap, and template conformance without paying for another model call.
+- Keep subjective prose judgment with the user. Do not spend a mandatory model call grading every draft.
 - Repair locally. Never regenerate the full card because one field is weak unless the content plan itself is invalid.
 - Fail closed on provider policy. `zdr: true`, data collection denied, endpoint eligibility, and capability requirements are invariant and cannot be overridden by a role profile.
 - Treat `is_moderated: false` as a routing eligibility signal, not a safety guarantee or a quality score. Refresh it from the live catalog; do not freeze it in source as eternal truth.
@@ -260,8 +260,6 @@ User turn + projected card + focus + references
                               v
                  deterministic quality checks
                               |
-                    structured critic if needed
-                              |
                       bounded targeted repairs
                               |
                               v
@@ -278,10 +276,9 @@ User turn + projected card + focus + references
 | Intent router  | Choose advice, focused edit, multi-field edit, or creation path                 | Latest turn, focus, compact run state                                      | Typed route decision             | None                                                       | Cheap structured output                                   |
 | Brief enricher | Expand sparse input and expose assumptions/gaps                                 | User facts, selected references, requested scope                           | `iCharacterBrief`                | None                                                       | Cheap structured output, strong instruction following     |
 | Orchestrator   | Plan fields, allocate content, dispatch jobs, request repairs, submit proposals | Brief, projected card, constraints, quality findings                       | Typed plan and workflow commands | Read projected character; submit existing proposal actions | Reliable structured output and tools                      |
-| Prose worker   | Write one field or approved coupled field group                                 | Field brief, style guide, owned facts, forbidden repeats, relevant context | Raw field text                   | None                                                       | Creative prose, long-form coherence, low refusal behavior |
-| Critic         | Score and localize quality defects                                              | Brief, plan, drafts, deterministic findings                                | Typed rubric findings            | None                                                       | Structured output, comparative judgment                   |
+| Prose worker   | Write one isolated field or all requested fields, according to the user setting | Field brief, style guide, owned facts, forbidden repeats, relevant context | Raw field text or field envelope | None                                                       | Creative prose, long-form coherence, low refusal behavior |
 
-The default topology should use logical roles, not necessarily five different models. One eligible inexpensive model may serve router, enricher, and critic profiles if evals support it. The orchestrator may share that model or use a stronger tool-capable profile. The prose worker should be independently selectable.
+The default topology uses logical roles, not necessarily different models. One eligible inexpensive model may serve router and enricher profiles. The orchestrator may share that model or use a stronger structured-output profile. The prose worker remains independently selectable.
 
 ### Core contracts
 
@@ -294,7 +291,7 @@ The default topology should use logical roles, not necessarily five different mo
 
 ### Tool boundaries and human approval
 
-- Enricher, prose worker, and critic have no application tools.
+- Enricher and prose worker have no application tools.
 - Orchestrator can call the existing projected-card read and proposal actions only. It cannot accept its own proposals, mutate the live card, change provider policy, or modify saved settings.
 - High-impact unresolved choices pause before drafting only when proceeding would materially alter the character. The user sees concise options plus an open response path.
 - All generated edits continue through existing proposal review. User acceptance remains the only live-card mutation authority.
@@ -302,7 +299,7 @@ The default topology should use logical roles, not necessarily five different mo
 ### Persisted and transient state
 
 - Persist role profiles, user-selected quality/cost mode, saved generation settings, accepted card changes, and explicitly saved creative briefs in local storage/IndexedDB using existing local-first patterns.
-- Keep active orchestration plans, drafts, critic findings, and repair state transient for the run. Conversation messages and resulting proposals continue to follow existing session storage behavior.
+- Keep active orchestration plans, drafts, deterministic findings, and repair state transient for the run. Conversation messages and resulting proposals continue to follow existing session storage behavior.
 - Persist content-free eval results and operational summaries. Do not persist chain-of-thought or raw provider request/response bodies in telemetry.
 
 ### Stream and event model
@@ -449,8 +446,8 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Scope:**
 
-- [x] Run deterministic field and cross-field checks before critic inference.
-- [x] Add the structured critic rubric and localized findings contract.
+- [x] Run deterministic field and cross-field checks without mandatory critic inference.
+- [x] Keep subjective quality review user-owned through the existing proposal UI.
 - [x] Compare drafts against the brief, content plan, current card, templates, and other proposed fields.
 - [x] Add a maximum of two targeted repair passes per failing field group.
 - [x] Preserve passing fields and measure whether each repair actually improves the failed dimensions.
@@ -458,14 +455,14 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Exit criteria:**
 
-- [x] Known duplicated fixtures are caught by deterministic or critic checks.
+- [x] Known duplicated fixtures are caught by deterministic checks.
 - [x] Known concise-but-complete fixtures are not rejected solely for length.
 - [x] Repair cannot exceed configured call, token, latency, or cost budgets.
-- [x] A failed critic or repair has an explicit recoverable user state.
+- [x] A failed repair has an explicit recoverable user state.
 
 **Can run in parallel:**
 
-- Deterministic detectors and critic prompt/rubric evaluation can run independently against the fixed corpus.
+- Deterministic detectors and repair behavior can be evaluated independently against the fixed corpus.
 
 **Must not start until:**
 
@@ -478,7 +475,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 **Scope:**
 
 - [x] Refresh the live ZDR/unmoderated candidate set and record the catalog timestamp.
-- [ ] Evaluate at least three eligible structured candidates for router/enricher/orchestrator/critic duties and at least three eligible prose candidates.
+- [ ] Evaluate at least three eligible structured candidates for router/enricher/orchestrator duties and at least three eligible prose candidates.
 - [ ] Include the current user-selected model and local KoboldCpp when they satisfy the role contract.
 - [ ] Compare single-model, two-model, and role-specialized configurations.
 - [ ] Score quality, refusal rate, schema/tool reliability, duplication, fidelity, latency, and total cost per successful run.
@@ -566,7 +563,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 ### Observability
 
 - [x] One run ID correlates every role call, quality check, repair, and proposal action.
-- [x] Tokens, cost, latency, model, endpoint provider, retries, and content-free quality metrics are recorded per role.
+- [x] Tokens, cost, latency, model, endpoint provider, retries, and content-free deterministic findings are recorded per role/run.
 - [x] Privacy or moderation eligibility failures have distinct safe error categories.
 
 ### Documentation
@@ -589,7 +586,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 - Test the provider-policy resolver using frozen catalog fixtures for ZDR, moderation, capability, fallback, and stale-cache cases.
 - Test deterministic repetition rules on exact duplicates, paraphrases outside deterministic scope, intentional names/macros, and valid motif echoes.
 - Test budgets across role calls and repair passes.
-- Test the workflow state machine for success, advice fast path, clarification pause/resume, partial worker failure, critic failure, cancellation, and proposal-handler failure.
+- Test the workflow state machine for success, advice fast path, clarification pause/resume, partial worker failure, repair failure, cancellation, and proposal-handler failure.
 - Assert that only the orchestrator receives application tools and that proposal acceptance remains user-owned.
 
 ### AI evals
@@ -638,7 +635,7 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 3. Generate a multi-field card; verify progress phases, proposals, field depth, and low repetition.
 4. Cancel during drafting and confirm no proposal is submitted from discarded work.
 5. Force an ineligible provider route and confirm the run fails without fallback.
-6. Force one worker and one critic failure and verify targeted recovery states.
+6. Force one worker and one repair failure and verify targeted recovery states.
 7. Accept and reject proposals and confirm existing card/session behavior remains correct.
 
 ### Verification evidence: 2026-08-21 implementation checkpoint
@@ -653,12 +650,14 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Credentials are accepted only from `TENZO_AGENT_EVAL_API_KEY` and are excluded from output.
 - Schema-validated baseline and 12-case screening configurations pin the refreshed provider slugs and prices. The screening matrix covers the current Euryale model, three structured candidates, three prose candidates, and single-model, two-model, and role-specialized layouts. Local KoboldCpp was probed and omitted because no endpoint was available.
 - `pnpm --filter web run eval:agent:review -- prepare ...` creates separately stored randomized public ballots and a private identity key; the `score` mode enforces three distinct reviewers per comparison and aggregates blinded overall and per-dimension decisions.
-- Content-free metrics now correlate role calls, critic finding counts, targeted repairs, aggregate usage, and proposal submission under one run ID.
+- Content-free metrics now correlate role calls, deterministic finding counts, targeted repairs, aggregate usage, retry counts, and proposal submission under one run ID.
+- Users can persist `Separate call per field` (the default) or `One combined call`. Separate mode prevents larger fields from crowding out smaller ones; combined mode reduces requests and repeated context.
+- TanStack Pacer now caps model-call concurrency at two and retries only transient network, timeout, HTTP 408/409/425/429, and 5xx failures up to three attempts with exponential backoff, jitter, `Retry-After` support, cancellation, and aggregate usage accounting.
 - Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, and removal of the unused legacy runtime after acceptance.
 
 ### Trace expectations
 
-A successful edit trace contains: route decision, optional enrichment, content plan, prose jobs, deterministic check summary, optional critic and repair, proposal actions, final response, and aggregate usage. A trace contains hashes/counts and safe identifiers where needed, never raw content or hidden reasoning.
+A successful edit trace contains: route decision, optional enrichment, content plan, one or more prose jobs, deterministic check summary, optional repair, proposal actions, final response, and aggregate usage. A trace contains hashes/counts and safe identifiers where needed, never raw content or hidden reasoning.
 
 ## 12. Rollout And Migration
 
@@ -679,9 +678,8 @@ Provider model availability and prices are expected to change. Refresh eligible 
 | Extra stages amplify invented details            | Polished output drifts from the premise       | Provenance-tagged brief, high-impact clarification, fidelity rubric, user-visible assumptions                            | Prompt/eval owner     |
 | “Uncensored” is ambiguous or changes by provider | Policy expectation is violated                | Define an explicit catalog-backed eligibility rule, pin eligible providers per request, refresh at run time, fail closed | Provider-policy owner |
 | ZDR endpoint disappears mid-run                  | Partial pipeline failure                      | Resolve before each call, use only prevalidated eligible alternatives, preserve successful transient drafts              | Provider-policy owner |
-| Prose workers develop inconsistent voice         | Card fields feel authored by different models | Shared style bible, coupled-field jobs, coherence critic, one selected prose profile per run by default                  | Prose-quality owner   |
+| Prose workers develop inconsistent voice         | Card fields feel authored by different models | Shared style bible, user-selectable combined writing, and one selected prose profile per run                              | Prose-quality owner   |
 | Anti-duplication removes intentional motifs      | Voice and thematic cohesion weaken            | Allow named motifs/echoes in the content plan and exclude names/macros from naive metrics                                | Quality-gate owner    |
-| Critic rewrites instead of judging               | Hidden uncontrolled generation path           | Typed findings only; all rewriting goes back to a prose worker                                                           | Orchestration owner   |
 | Repair loops consume budget without improvement  | Run becomes costly or never completes         | Two-pass maximum, compare failed metrics after each repair, expose unresolved findings                                   | Orchestration owner   |
 | Model judge favors its own style                 | False quality confidence                      | Deterministic metrics, blinded human pairwise review, multiple judge challengers during selection                        | Eval owner            |
 | Catalog metadata is stale or incomplete          | Ineligible traffic is routed                  | Combine live catalog eligibility with per-request enforcement and provider allowlists; fail on uncertainty               | Provider-policy owner |
@@ -736,7 +734,7 @@ Provider model availability and prices are expected to change. Refresh eligible 
 
 **Status:** deferred
 **Date:** 2026-08-20
-**Rationale:** Deterministic overlap plus a structured critic can establish whether semantic embeddings add enough value to justify another model, dependency, and policy surface.
+**Rationale:** Deterministic overlap plus blinded human review can establish whether semantic embeddings add enough value to justify another model, dependency, and policy surface.
 **Effect on roadmap:** Add embeddings only in a follow-up if eval misses material paraphrased repetition.
 
 ### Deferral: Fine-tuning
@@ -761,4 +759,5 @@ Provider model availability and prices are expected to change. Refresh eligible 
 
 | Date       | Change                                                                                         |
 | ---------- | ---------------------------------------------------------------------------------------------- |
+| 2026-08-23 | Made field-call granularity user-selectable, removed mandatory model criticism, and added Pacer-based concurrency and transient retry controls. |
 | 2026-08-20 | Created the roadmap from a repository audit and current OpenRouter ZDR/model catalog research. |

@@ -298,6 +298,84 @@ function createPolicyError(profile: iAgentRoleProfile, resolution: ProviderPolic
   );
 }
 
+interface iAgentRoleExecutionContext {
+  profile: iAgentRoleProfile;
+  runId: string;
+  roleCallId: string;
+  startedAt: number;
+  catalog: iProviderPolicyCatalog | null;
+  providerId: string;
+  usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+  retryCount: number;
+}
+
+function createExecutionContext(options: iAgentRoleCallOptions, createUuid: () => string): iAgentRoleExecutionContext {
+  return {
+    profile: options.profile,
+    runId: options.runId ?? createUuid(),
+    roleCallId: options.roleCallId ?? createUuid(),
+    startedAt: performance.now(),
+    catalog: null,
+    providerId: options.profile.providerKind,
+    usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+    retryCount: 0,
+  };
+}
+
+function getExecutionUsage(context: iAgentRoleExecutionContext): iAgentRoleExecutionUsage {
+  return {
+    ...context.usage,
+    costUsd: estimateCost(context.usage, context.catalog, context.profile, context.providerId),
+    latencyMs: Math.max(0, Math.round(performance.now() - context.startedAt)),
+    retryCount: context.retryCount,
+  };
+}
+
+function recordExecution(
+  context: iAgentRoleExecutionContext,
+  logRoleCall: Required<Pick<iAgentRoleExecutorDependencies, 'logAgentRoleCall'>>['logAgentRoleCall'],
+  options: {
+    outcome: iAgentRoleCallEvent['outcome'];
+    repairCount: number;
+    policyFailureReason: ProviderPolicyFailureReason | null;
+  },
+) {
+  const usage = getExecutionUsage(context);
+  logRoleCall({
+    runId: context.runId,
+    roleCallId: context.roleCallId,
+    role: context.profile.role,
+    modelId: context.profile.modelId,
+    providerId: context.providerId,
+    outcome: options.outcome,
+    retryCount: context.retryCount,
+    inputTokens: context.usage.inputTokens,
+    outputTokens: context.usage.outputTokens,
+    costUsd: usage.costUsd,
+    latencyMs: usage.latencyMs,
+    qualityFindingCount: 0,
+    repairCount: options.repairCount,
+    policyFailureReason: options.policyFailureReason,
+  });
+  return usage;
+}
+
+function createExecutionResult<T>(
+  value: T,
+  context: iAgentRoleExecutionContext,
+  usage: iAgentRoleExecutionUsage,
+): iAgentRoleExecutionResult<T> {
+  return {
+    value,
+    runId: context.runId,
+    roleCallId: context.roleCallId,
+    role: context.profile.role,
+    modelId: context.profile.modelId,
+    providerId: context.providerId,
+    usage,
+  };
+}
+
 export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutorDependencies = {}): iAgentRoleExecutor {
   const defaults = createDefaultDependencies();
   const dependencies = {
@@ -361,6 +439,20 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
     return { catalog, resolution };
   };
 
+  const prepareCall = async (options: iAgentRoleCallOptions, context: iAgentRoleExecutionContext) => {
+    const { profile } = options;
+    const resolved = await resolveForCall(profile, options.endpoint, options.apiKey ?? '', options.localCapabilities);
+    context.catalog = resolved.catalog;
+    context.providerId = getProviderId(profile, resolved.resolution);
+    if (!resolved.resolution.isEligible) throw createPolicyError(profile, resolved.resolution);
+    const adapter = (dependencies.createAdapter ?? createCharacterTextAdapter)({
+      endpoint: options.endpoint,
+      apiKey: options.apiKey ?? '',
+      model: profile.modelId,
+    });
+    return { adapter, resolution: resolved.resolution };
+  };
+
   const executeStructured = async <T>(
     options: iStructuredAgentRoleCallOptions<T>,
   ): Promise<iAgentRoleExecutionResult<T>> => {
@@ -379,26 +471,9 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         modelId: profile.modelId,
       });
     }
-    const runId = options.runId ?? dependencies.generateUuid();
-    const roleCallId = options.roleCallId ?? dependencies.generateUuid();
-    const startedAt = performance.now();
-    let catalog: iProviderPolicyCatalog | null = null;
-    let providerId: string = profile.providerKind;
-    const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
-    let retryCount = 0;
-    let resolution: ProviderPolicyResolution | null = null;
+    const context = createExecutionContext(options, dependencies.generateUuid);
     try {
-      const resolved = await resolveForCall(profile, options.endpoint, options.apiKey ?? '', options.localCapabilities);
-      catalog = resolved.catalog;
-      resolution = resolved.resolution;
-      providerId = getProviderId(profile, resolution);
-      if (!resolution.isEligible) throw createPolicyError(profile, resolution);
-      const currentResolution = resolution;
-      const adapter = (dependencies.createAdapter ?? createCharacterTextAdapter)({
-        endpoint: options.endpoint,
-        apiKey: options.apiKey ?? '',
-        model: profile.modelId,
-      });
+      const { adapter, resolution } = await prepareCall(options, context);
       const paced = await dependencies.pacer.execute(async (abortSignal) => {
         let attemptUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
         try {
@@ -409,75 +484,33 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
             system: buildSystemPrompts(profile.role, options.systemPrompt).join('\n\n'),
             prompt: options.prompt,
             messages: options.messages,
-            modelOptions: createAgentRoleModelOptions(
-              options.endpoint,
-              buildGenerationSettings(profile),
-              currentResolution,
-            ),
+            modelOptions: createAgentRoleModelOptions(options.endpoint, buildGenerationSettings(profile), resolution),
             abortSignal,
             onUsage: (nextUsage) => {
               attemptUsage = readUsage(nextUsage);
             },
           });
         } finally {
-          addUsage(usage, attemptUsage);
+          addUsage(context.usage, attemptUsage);
         }
       }, options.abortSignal);
-      retryCount = paced.retryCount;
+      context.retryCount = paced.retryCount;
       const generatedValue = paced.value;
       const value = schema.parse(generatedValue);
-      const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
-      const executionUsage = {
-        ...usage,
-        costUsd: estimateCost(usage, catalog, profile, providerId),
-        latencyMs,
-        retryCount,
-      };
+      const executionUsage = getExecutionUsage(context);
       const budgetError = createBudgetError(profile, executionUsage);
       if (budgetError) throw budgetError;
-      dependencies.logAgentRoleCall({
-        runId,
-        roleCallId,
-        role: profile.role,
-        modelId: profile.modelId,
-        providerId,
+      recordExecution(context, dependencies.logAgentRoleCall, {
         outcome: 'completed',
-        retryCount,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        costUsd: executionUsage.costUsd,
-        latencyMs,
-        qualityFindingCount: 0,
         repairCount: 0,
         policyFailureReason: null,
       });
-      return {
-        value,
-        runId,
-        roleCallId,
-        role: profile.role,
-        modelId: profile.modelId,
-        providerId,
-        usage: executionUsage,
-      };
+      return createExecutionResult(value, context, executionUsage);
     } catch (error) {
-      const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
-      const policyFailureReason = toFailureReason(error);
-      dependencies.logAgentRoleCall({
-        runId,
-        roleCallId,
-        role: profile.role,
-        modelId: profile.modelId,
-        providerId,
+      recordExecution(context, dependencies.logAgentRoleCall, {
         outcome: isCancellation(error, options.abortSignal) ? 'cancelled' : 'failed',
-        retryCount,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        costUsd: estimateCost(usage, catalog, profile, providerId),
-        latencyMs,
-        qualityFindingCount: 0,
         repairCount: 0,
-        policyFailureReason,
+        policyFailureReason: toFailureReason(error),
       });
       if (error instanceof AgentRoleExecutionError) throw error;
       throw new AgentRoleExecutionError(`Agent role "${profile.role}" generation failed.`, {
@@ -498,23 +531,9 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         modelId: profile.modelId,
       });
     }
-    const runId = options.runId ?? dependencies.generateUuid();
-    const roleCallId = options.roleCallId ?? dependencies.generateUuid();
-    const startedAt = performance.now();
-    let catalog: iProviderPolicyCatalog | null = null;
-    let providerId: string = profile.providerKind;
-    const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
-    let retryCount = 0;
+    const context = createExecutionContext(options, dependencies.generateUuid);
     try {
-      const resolved = await resolveForCall(profile, options.endpoint, options.apiKey ?? '', options.localCapabilities);
-      catalog = resolved.catalog;
-      providerId = getProviderId(profile, resolved.resolution);
-      if (!resolved.resolution.isEligible) throw createPolicyError(profile, resolved.resolution);
-      const adapter = (dependencies.createAdapter ?? createCharacterTextAdapter)({
-        endpoint: options.endpoint,
-        apiKey: options.apiKey ?? '',
-        model: profile.modelId,
-      });
+      const { adapter, resolution } = await prepareCall(options, context);
       const paced = await dependencies.pacer.execute(async (abortSignal) => {
         const abortController = new AbortController();
         const abort = () => abortController.abort(abortSignal.reason);
@@ -524,11 +543,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
           adapter,
           messages: buildMessages(options.prompt, options.messages),
           systemPrompts: buildSystemPrompts(profile.role, options.systemPrompt),
-          modelOptions: createAgentRoleModelOptions(
-            options.endpoint,
-            buildGenerationSettings(profile),
-            resolved.resolution,
-          ),
+          modelOptions: createAgentRoleModelOptions(options.endpoint, buildGenerationSettings(profile), resolution),
           abortController,
           stream: true,
         });
@@ -542,19 +557,13 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
           }
           return value;
         } finally {
-          addUsage(usage, attemptUsage);
+          addUsage(context.usage, attemptUsage);
           abortSignal.removeEventListener('abort', abort);
         }
       }, options.abortSignal);
-      retryCount = paced.retryCount;
+      context.retryCount = paced.retryCount;
       const { value } = paced;
-      const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
-      const executionUsage = {
-        ...usage,
-        costUsd: estimateCost(usage, catalog, profile, providerId),
-        latencyMs,
-        retryCount,
-      };
+      const executionUsage = getExecutionUsage(context);
       if (!value.trim()) {
         throw new AgentRoleExecutionError(`Agent role "${profile.role}" returned empty prose.`, {
           code: 'generation-failed',
@@ -564,49 +573,17 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       }
       const budgetError = createBudgetError(profile, executionUsage);
       if (budgetError) throw budgetError;
-      dependencies.logAgentRoleCall({
-        runId,
-        roleCallId,
-        role: profile.role,
-        modelId: profile.modelId,
-        providerId,
+      recordExecution(context, dependencies.logAgentRoleCall, {
         outcome: 'completed',
-        retryCount,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        costUsd: executionUsage.costUsd,
-        latencyMs,
-        qualityFindingCount: 0,
         repairCount: options.isRepair === true ? 1 : 0,
         policyFailureReason: null,
       });
-      return {
-        value,
-        runId,
-        roleCallId,
-        role: profile.role,
-        modelId: profile.modelId,
-        providerId,
-        usage: executionUsage,
-      };
+      return createExecutionResult(value, context, executionUsage);
     } catch (error) {
-      const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
-      const policyFailureReason = toFailureReason(error);
-      dependencies.logAgentRoleCall({
-        runId,
-        roleCallId,
-        role: profile.role,
-        modelId: profile.modelId,
-        providerId,
+      recordExecution(context, dependencies.logAgentRoleCall, {
         outcome: isCancellation(error, options.abortSignal) ? 'cancelled' : 'failed',
-        retryCount,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        costUsd: estimateCost(usage, catalog, profile, providerId),
-        latencyMs,
-        qualityFindingCount: 0,
         repairCount: options.isRepair === true ? 1 : 0,
-        policyFailureReason,
+        policyFailureReason: toFailureReason(error),
       });
       if (error instanceof AgentRoleExecutionError) throw error;
       throw new AgentRoleExecutionError(`Agent role "${profile.role}" generation failed.`, {

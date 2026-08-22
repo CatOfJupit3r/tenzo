@@ -644,7 +644,7 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
 - Manual rendered-UI QA on the active character session confirmed `Economy`, `Balanced`, and `Expanded` generation-budget choices; `Separate call per field` selected by default; the `One combined call` alternative; immutable ZDR/data-collection-denied and key-handling copy; the field permission controls; and removal of the obsolete assistant execution-mode selector. The settings dialog opened and closed without browser warnings or errors. No live inference was triggered because doing so would transmit a locally stored API key and incur provider charges without action-time approval.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
-- `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Credentials are accepted only from `TENZO_AGENT_EVAL_API_KEY` and are excluded from output.
+- `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Remote runs require `TENZO_AGENT_EVAL_API_KEY` plus a positive `TENZO_AGENT_EVAL_MAX_COST_USD`; the runner checks recorded spend before every case, stops before starting another case once the limit is reached, and records whether the artifact is partial. One already-running provider call can finish above the declared limit. Credentials are excluded from output.
 - Schema-validated baseline and 12-case screening configurations pin the refreshed provider slugs and prices. The screening matrix covers the current Euryale model, three structured candidates, three prose candidates, and single-model, two-model, and role-specialized layouts. Local KoboldCpp was probed and omitted because no endpoint was available.
 - `pnpm --filter web run eval:agent:review -- prepare ...` creates separately stored randomized public ballots and a private identity key; the `score` mode enforces three distinct reviewers per comparison and aggregates blinded overall and per-dimension decisions.
 - Content-free metrics now correlate role calls, deterministic finding counts, targeted repairs, aggregate usage, retry counts, and proposal submission under one run ID.
@@ -745,6 +745,13 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Date:** 2026-08-23
 **Rationale:** Per-field requests can arrive in bursts and providers can respond with temporary network or rate-limit failures. Unbounded retries would amplify both spend and load.
 **Effect on roadmap:** Model calls share a concurrency limit of two. HTTP 408/409/425/429/5xx and recognized transient network failures receive at most three attempts with exponential backoff, jitter, bounded `Retry-After`, cancellation, content-free retry telemetry, and aggregate usage accounting. All other failures are attempted once.
+
+### Decision: Require an explicit paid-eval spend limit
+
+**Status:** accepted implementation safeguard
+**Date:** 2026-08-23
+**Rationale:** A tournament that only reports cost after all cases finish cannot enforce the roadmap's declared spend cap or support safe staged screening.
+**Effect on roadmap:** Every remote eval requires a positive `TENZO_AGENT_EVAL_MAX_COST_USD`. The artifact records the limit and whether execution stopped early. The runner checks accumulated recorded cost before each case; because providers report usage after completion, the final in-flight case may finish above the threshold, but no subsequent case starts.
 
 ### Decision: Use a fixed role pipeline, not autonomous agent spawning
 

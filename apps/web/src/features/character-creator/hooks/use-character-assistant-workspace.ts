@@ -158,6 +158,7 @@ export function useCharacterAssistantWorkspace({
     shouldSendDisabledSamplers,
     assistantGenerationMode: generationSettings.assistantGenerationMode,
     agentQualityProfile: generationSettings.agentQualityProfile,
+    fieldWritingStrategy: generationSettings.fieldWritingStrategy,
     providerKind: providerKind ?? undefined,
     localCapabilities,
     card,

@@ -115,7 +115,7 @@ export type iCharacterContentPlan = z.infer<typeof CHARACTER_CONTENT_PLAN_SCHEMA
 
 export const PROSE_JOB_SCHEMA = z.object({
   id: z.string().trim().min(1),
-  fieldKeys: z.array(CHARACTER_TEXT_FIELD_KEY_SCHEMA).min(1).max(2),
+  fieldKeys: z.array(CHARACTER_TEXT_FIELD_KEY_SCHEMA).min(1),
   purposes: z.array(z.string().trim().min(1)),
   ownedFacts: z.array(CHARACTER_BRIEF_FACT_SCHEMA),
   allowedEchoes: z.array(CHARACTER_BRIEF_FACT_SCHEMA),

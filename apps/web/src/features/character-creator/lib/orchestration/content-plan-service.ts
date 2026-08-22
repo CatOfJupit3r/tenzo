@@ -3,6 +3,8 @@ import { uniq } from 'lodash-es';
 import type { CharacterTextFieldKey } from '../cards/card-schema';
 import { CHARACTER_CONTENT_PLAN_SCHEMA, PROSE_JOB_SCHEMA } from './agent-orchestration-contracts';
 import type { iCharacterBrief, iCharacterContentPlan, iProseJob } from './agent-orchestration-contracts';
+import { FIELD_WRITING_STRATEGIES } from './field-writing-strategy';
+import type { FieldWritingStrategy } from './field-writing-strategy';
 
 export interface iContentPlanInput {
   brief: iCharacterBrief;
@@ -10,6 +12,7 @@ export interface iContentPlanInput {
   currentFields: Partial<Record<CharacterTextFieldKey, string>>;
   strictTemplates: Partial<Record<CharacterTextFieldKey, string>>;
   requiredMacros: Partial<Record<CharacterTextFieldKey, readonly string[]>>;
+  fieldWritingStrategy: FieldWritingStrategy;
 }
 
 export interface iContentPlanServiceDependencies {
@@ -92,11 +95,10 @@ function createJob(
 }
 
 export function createProseJobs(plan: iCharacterContentPlan, input: iContentPlanInput): iProseJob[] {
-  const groupedFields = new Set(plan.coupledFieldGroups.flat());
-  const groups = [
-    ...plan.coupledFieldGroups,
-    ...plan.entries.filter((entry) => !groupedFields.has(entry.fieldKey)).map((entry) => [entry.fieldKey]),
-  ];
+  if (input.fieldWritingStrategy === FIELD_WRITING_STRATEGIES['combined-fields']) {
+    return [createJob(input.requestedFieldKeys, plan, input)];
+  }
+  const groups = plan.entries.map((entry) => [entry.fieldKey]);
   return groups.map((fieldKeys) => createJob(fieldKeys, plan, input));
 }
 

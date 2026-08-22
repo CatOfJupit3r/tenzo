@@ -20,6 +20,7 @@ import { createAgentOrchestrationService } from './agent-orchestration-service';
 import type { iAgentOrchestrationInput } from './agent-orchestration-service';
 import { createCharacterBriefService } from './character-brief-service';
 import { createContentPlanService } from './content-plan-service';
+import { FIELD_WRITING_STRATEGIES } from './field-writing-strategy';
 import { createQualityGateService, MAX_QUALITY_REPAIR_PASSES } from './quality-gate-service';
 
 const ZERO_USAGE = { inputTokens: 0, outputTokens: 0, costUsd: 0, latencyMs: 0 };
@@ -137,6 +138,7 @@ function createInput(): iAgentOrchestrationInput {
     currentFields: { description: '' },
     strictTemplates: {},
     requiredMacros: {},
+    fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
     writerBudget: RUN_BUDGET,
     qualityBudget: RUN_BUDGET,
   };
@@ -193,7 +195,7 @@ describe('character brief service', () => {
 });
 
 describe('content plan service', () => {
-  it('allocates every fact once and builds coupled tool-free prose jobs', async () => {
+  it('allocates every fact once and builds separate tool-free prose jobs by default', async () => {
     const plan = {
       ...createPlan(['description', 'personality']),
       coupledFieldGroups: [['description', 'personality']],
@@ -206,11 +208,30 @@ describe('content plan service', () => {
       currentFields: {},
       strictTemplates: {},
       requiredMacros: {},
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+    });
+
+    expect(result.jobs).toHaveLength(2);
+    expect(result.jobs.map((job) => job.fieldKeys)).toEqual([['description'], ['personality']]);
+    expect(result.jobs[0]).not.toHaveProperty('tools');
+  });
+
+  it('builds one combined prose job when requested', async () => {
+    const service = createContentPlanService({
+      planContent: vi.fn().mockResolvedValue(createPlan(['description', 'personality'])),
+    });
+
+    const result = await service.createPlan({
+      brief: createBrief(['description', 'personality']),
+      requestedFieldKeys: ['description', 'personality'],
+      currentFields: {},
+      strictTemplates: {},
+      requiredMacros: {},
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'],
     });
 
     expect(result.jobs).toHaveLength(1);
     expect(result.jobs[0].fieldKeys).toEqual(['description', 'personality']);
-    expect(result.jobs[0]).not.toHaveProperty('tools');
   });
 
   it('rejects plans that omit primary fact ownership or change strict templates', async () => {
@@ -223,6 +244,7 @@ describe('content plan service', () => {
         currentFields: {},
         strictTemplates: {},
         requiredMacros: {},
+        fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
       }),
     ).rejects.toThrow('exactly one primary field');
 
@@ -233,6 +255,7 @@ describe('content plan service', () => {
         currentFields: {},
         strictTemplates: { description: '**Identity:** {{gen:identity}}' },
         requiredMacros: {},
+        fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
       }),
     ).rejects.toThrow('changed the strict template');
   });

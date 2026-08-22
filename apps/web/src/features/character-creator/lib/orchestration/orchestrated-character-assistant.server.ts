@@ -451,6 +451,7 @@ function createOrchestrationRun(
       currentFields,
       strictTemplates,
       requiredMacros,
+      fieldWritingStrategy: payload.fieldWritingStrategy,
       ...budgets,
       abortSignal: options.abortSignal,
       onPhaseChange: (phase) => emitPhase(queue, runId, phase),

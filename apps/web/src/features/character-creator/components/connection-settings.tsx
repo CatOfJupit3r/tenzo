@@ -17,6 +17,7 @@ import {
   REQUEST_MODES,
 } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_LABELS } from '../lib/orchestration/field-writing-strategy';
 import { AGENT_QUALITY_PROFILE_LABELS, AGENT_QUALITY_PROFILES } from '../lib/provider/agent-quality-profile';
 import {
   getRequiredModelCapabilities,
@@ -132,6 +133,11 @@ const assistantGenerationModeOptions: iOptionType[] = [
 
 const agentQualityProfileOptions: iOptionType[] = Object.values(AGENT_QUALITY_PROFILES).map((value) => ({
   label: AGENT_QUALITY_PROFILE_LABELS[value],
+  value,
+}));
+
+const fieldWritingStrategyOptions: iOptionType[] = Object.values(FIELD_WRITING_STRATEGIES).map((value) => ({
+  label: FIELD_WRITING_STRATEGY_LABELS[value],
   value,
 }));
 
@@ -301,7 +307,26 @@ export function ConnectionSettings({
             }}
           />
           <p className="text-sm text-muted-foreground">
-            Controls bounded drafting and review effort. Privacy requirements remain mandatory for every profile.
+            Controls bounded drafting resources. You decide whether the result is good enough before applying it.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="field-writing-strategy">Field writing</Label>
+          <SingleSelect
+            inputId="field-writing-strategy"
+            options={fieldWritingStrategyOptions}
+            value={generationSettings.fieldWritingStrategy}
+            onValueChange={(value) => {
+              if (value && FIELD_WRITING_STRATEGIES[value as keyof typeof FIELD_WRITING_STRATEGIES]) {
+                onSettingsChange({
+                  fieldWritingStrategy: value as iCharacterGenerationSettings['fieldWritingStrategy'],
+                });
+              }
+            }}
+          />
+          <p className="text-sm text-muted-foreground">
+            Separate calls give each field full attention. A combined call uses fewer tokens and requests.
           </p>
         </div>
 

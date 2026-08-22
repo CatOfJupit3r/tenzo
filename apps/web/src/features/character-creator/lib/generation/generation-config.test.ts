@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
+import { FIELD_WRITING_STRATEGIES } from '../orchestration/field-writing-strategy';
 import { AGENT_QUALITY_PROFILES } from '../provider/agent-quality-profile';
 import {
   DEFAULT_CONTEXT_SIZE,
@@ -118,6 +119,17 @@ describe('sanitizeCharacterGenerationConnectionSettings', () => {
     ).toMatchObject({ agentQualityProfile: AGENT_QUALITY_PROFILES.quality });
     expect(sanitizeCharacterGenerationConnectionSettings({ agentQualityProfile: 'unbounded' })).toMatchObject({
       agentQualityProfile: AGENT_QUALITY_PROFILES.balanced,
+    });
+  });
+
+  it('persists supported field writing strategies and rejects unknown values', () => {
+    expect(
+      sanitizeCharacterGenerationConnectionSettings({
+        fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'],
+      }),
+    ).toMatchObject({ fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'] });
+    expect(sanitizeCharacterGenerationConnectionSettings({ fieldWritingStrategy: 'automatic' })).toMatchObject({
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
     });
   });
 });

@@ -18,6 +18,7 @@ import type { iAgentCallUsage, iAgentRunBudgetLimits } from './agent-run-budget'
 import { createAgentRunBudget } from './agent-run-budget';
 import type { iCharacterBriefInput, iCharacterBriefResult } from './character-brief-service';
 import type { iContentPlanInput } from './content-plan-service';
+import type { FieldWritingStrategy } from './field-writing-strategy';
 import type { iQualityGateInput, iQualityGateResult } from './quality-gate-service';
 
 export interface iAgentOrchestrationInput extends iCharacterBriefInput {
@@ -25,6 +26,7 @@ export interface iAgentOrchestrationInput extends iCharacterBriefInput {
   currentFields: Partial<Record<CharacterTextFieldKey, string>>;
   strictTemplates: Partial<Record<CharacterTextFieldKey, string>>;
   requiredMacros: Partial<Record<CharacterTextFieldKey, readonly string[]>>;
+  fieldWritingStrategy: FieldWritingStrategy;
   writerBudget: iAgentRunBudgetLimits;
   qualityBudget: iAgentRunBudgetLimits;
   abortSignal?: AbortSignal;
@@ -170,6 +172,7 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
           currentFields: input.currentFields,
           strictTemplates: input.strictTemplates,
           requiredMacros: input.requiredMacros,
+          fieldWritingStrategy: input.fieldWritingStrategy,
         } satisfies iContentPlanInput;
         const { plan, jobs } = await dependencies.createPlan(planInput, input.abortSignal);
         result.plan = plan;

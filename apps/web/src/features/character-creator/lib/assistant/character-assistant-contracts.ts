@@ -8,6 +8,7 @@ import {
   DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
 } from '../generation/generation-config';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '../generation/generation-stream-contracts';
+import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_SCHEMA } from '../orchestration/field-writing-strategy';
 import { PROMPT_EXAMPLE_CHARACTER_SCHEMA } from '../prompt/generation-contracts';
 import { CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
 import { AGENT_QUALITY_PROFILES, AGENT_QUALITY_PROFILE_SCHEMA } from '../provider/agent-quality-profile';
@@ -162,6 +163,7 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   ),
   providerKind: PROVIDER_KIND_SCHEMA.optional().default(PROVIDER_KINDS.unknown),
   agentQualityProfile: AGENT_QUALITY_PROFILE_SCHEMA.optional().default(AGENT_QUALITY_PROFILES.balanced),
+  fieldWritingStrategy: FIELD_WRITING_STRATEGY_SCHEMA.optional().default(FIELD_WRITING_STRATEGIES['separate-fields']),
   localCapabilities: z.array(MODEL_CAPABILITY_SCHEMA).optional().default([]),
   fieldShouldAllowAssistantEditing: CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA.optional().default(
     DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,

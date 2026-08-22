@@ -35,7 +35,7 @@ Replace the one-model-does-everything generation path with a small, observable o
 2. a structured **content planner** creates a field plan, assigns each fact or dramatic beat to a primary field, and decides which prose jobs are needed;
 3. one or more **prose workers** write the assigned fields from bounded briefs, either in isolated per-field calls or one combined call selected by the user, without tool responsibilities;
 4. a deterministic **safeguard gate** checks objective format, macro, completeness, and duplication rules, then requests targeted repairs only for blocking violations; subjective quality remains the user's decision at proposal review;
-5. the orchestrator converts accepted drafts into the existing reviewable proposal actions.
+5. application-owned orchestration converts validated drafts into the existing reviewable proposal actions.
 
 The pipeline must fail closed on privacy and model-policy constraints. Every remote request must require OpenRouter Zero Data Retention (ZDR), deny provider data collection, and use an endpoint reported as unmoderated by the current provider catalog. No content call may silently fall back to a moderated or retaining endpoint. Local KoboldCpp remains eligible because no third-party retention is involved, but it must pass the same role capability and quality evals.
 
@@ -85,11 +85,9 @@ Model names are deployment profiles, not architecture. As of the audit date, the
 
 ### Assistant runtime
 
-- `character-assistant-runtime.server.ts` builds one large system prompt and sends the conversation to one selected model.
-- Native-tool mode gives that model the proposal tools and a bounded `maxIterations()` loop.
-- Structured-output mode in `character-assistant-structured.server.ts` asks the same model for conversational text plus typed actions across bounded rounds.
-- The prompt already tells the model to produce complete, rich field values and keep conversational prose brief. This instruction is necessary but has no measurable semantic quality gate.
-- Existing safety middleware bounds tool iterations and tool-call behavior. Existing proposals remain reviewable and do not mutate the live card without user acceptance.
+- Production assistant requests use the application-owned orchestration service: intent routing, optional enrichment, content planning, separate or combined tool-free writing, deterministic safeguards, bounded targeted repair, and proposal submission.
+- `character-assistant-runtime.server.ts` and `character-assistant-structured.server.ts` are frozen baseline-eval implementations only. Production routes do not import them, and they remain temporarily so the paid comparison can measure the replaced behavior before deletion.
+- No model role receives application tools. Existing proposals remain reviewable and do not mutate the live card without user acceptance.
 
 ### Context and prompt inputs
 
@@ -103,7 +101,7 @@ Model names are deployment profiles, not architecture. As of the audit date, the
 - `generation-config.ts` stores one endpoint, one model, one optional OpenRouter provider, samplers, a generation-budget profile, and the field-call strategy. The obsolete live structured-loop/tool-call selector has been removed.
 - `tanstack-ai-text-generation.ts` already adds `dataCollection: 'deny'` and `zdr: true` to OpenRouter requests. Tool and structured calls also require parameter support.
 - Connection health records model capabilities for structured responses and tool calling, but it does not validate the selected endpoint against an unmoderated-model policy.
-- The UI describes OpenRouter routing as ZDR and data-collection-denied. It does not expose distinct orchestrator, enricher, or writer profiles.
+- The UI describes OpenRouter routing as ZDR and data-collection-denied. It exposes resource budgets and field-call granularity without exposing internal content-planner, enricher, or writer profiles.
 - Local KoboldCpp is supported through an OpenAI-compatible endpoint.
 
 ### Quality controls and tests
@@ -155,7 +153,7 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Actor:** Character creator
 **Goal:** Generate a coherent card whose fields contribute different value.
 **Current behavior:** Each field may restate the same premise, trait list, or backstory.
-**Target behavior:** The orchestrator creates a content-ownership map before drafting and prose workers receive both their assigned content and a negative ledger of material owned elsewhere.
+**Target behavior:** The content planner creates a content-ownership map before drafting and prose workers receive both their assigned content and a negative ledger of material owned elsewhere.
 **Acceptance criteria:**
 
 - [x] Every major fact or beat has a primary field and optional allowed echoes.
@@ -168,7 +166,7 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Actor:** Character creator
 **Goal:** Improve one focused field without paying for a whole-card pipeline.
 **Current behavior:** The single assistant receives broad card context even for a focused edit.
-**Target behavior:** The orchestrator selects a reduced path: normalize intent, plan the focused field against the current card, draft once, run focused quality checks, and propose that field only.
+**Target behavior:** Application-owned routing selects a reduced path: normalize intent, plan the focused field against the current card, draft once, run focused quality checks, and propose that field only.
 **Acceptance criteria:**
 
 - [x] No unrelated field is proposed.
@@ -193,7 +191,7 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 **Actor:** Quality gate
 **Goal:** Correct a weak result without restarting the whole run.
 **Current behavior:** Schema-valid proposals are surfaced even when semantically thin or repetitive.
-**Target behavior:** Deterministic checks return typed findings tied to fields and objective rules; the orchestrator issues bounded repair jobs for blocking violations while the user judges subjective prose quality in the proposal UI.
+**Target behavior:** Deterministic checks return typed findings tied to fields and objective rules; the application issues bounded repair jobs for blocking violations while the user judges subjective prose quality in the proposal UI.
 **Acceptance criteria:**
 
 - [x] Findings contain field, severity, evidence category, and repair instruction without chain-of-thought.
@@ -215,10 +213,10 @@ Catalog capability flags establish eligibility, not suitability. The implementat
 
 ## 7. Design Principles And Constraints
 
-- Use a fixed, application-owned workflow. Agents may select among declared steps and tools but may not spawn arbitrary subagents or recurse.
+- Use a fixed, application-owned workflow. Model roles return bounded structured data or prose and may not spawn arbitrary subagents, recurse, or call application tools.
 - Keep contracts first: all control-plane outputs use zod schemas and schema-derived TypeScript types.
 - Let prose be prose. Prose workers return raw field text or a minimal field-key envelope and do not receive proposal tools.
-- Keep tool authority centralized. Only the orchestrator may read projected state and commit drafts into the existing proposal action handlers.
+- Keep proposal authority in deterministic application code. Model roles receive projected context but cannot mutate state or invoke proposal handlers.
 - Treat current card content, accepted proposals, templates, and user statements as facts with provenance. Treat generated enrichments as assumptions until accepted or used as reversible creative defaults.
 - Plan content ownership before drafting. Prompt-level instructions alone are not an anti-duplication system.
 - Use deterministic checks for length bounds, empty sections, macro preservation, exact phrase overlap, normalized n-gram overlap, and template conformance without paying for another model call.
@@ -246,7 +244,7 @@ User turn + projected card + focus + references
                       typed character brief
                               |
                               v
-                       orchestrator/planner
+                         content planner
                   field plan + ownership ledger
                               |
             +-----------------+-----------------+
@@ -637,14 +635,14 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 6. Force one worker and one repair failure and verify targeted recovery states.
 7. Accept and reject proposals and confirm existing card/session behavior remains correct.
 
-### Verification evidence: 2026-08-21 implementation checkpoint
+### Verification evidence: 2026-08-23 implementation checkpoint
 
 - Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
 - Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
 - Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
 - Root `pnpm run test` passed 73 files and 331 tests, including separate/combined field writing, transient-only retries, retry exhaustion, cancellation, and aggregate retry usage accounting.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
-- Manual rendered-UI QA confirmed the generation-budget selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
+- Manual rendered-UI QA on the active character session confirmed `Economy`, `Balanced`, and `Expanded` generation-budget choices; `Separate call per field` selected by default; the `One combined call` alternative; immutable ZDR/data-collection-denied and key-handling copy; the field permission controls; and removal of the obsolete assistant execution-mode selector. The settings dialog opened and closed without browser warnings or errors. No live inference was triggered because doing so would transmit a locally stored API key and incur provider charges without action-time approval.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
 - `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Credentials are accepted only from `TENZO_AGENT_EVAL_API_KEY` and are excluded from output.
 - Schema-validated baseline and 12-case screening configurations pin the refreshed provider slugs and prices. The screening matrix covers the current Euryale model, three structured candidates, three prose candidates, and single-model, two-model, and role-specialized layouts. Local KoboldCpp was probed and omitted because no endpoint was available.

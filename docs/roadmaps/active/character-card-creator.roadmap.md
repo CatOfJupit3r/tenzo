@@ -5,8 +5,8 @@ status: "Active backlog"
 roadmap_type: "feature-epic"
 priority: "P1"
 created: "2026-07-05"
-updated: "2026-07-05"
-last_repo_audit: "2026-07-05"
+updated: "2026-08-23"
+last_repo_audit: "2026-08-23"
 source_of_truth: true
 related_docs:
   - "docs/roadmaps/active/agent-quality-orchestration.roadmap.md"
@@ -26,8 +26,8 @@ archive_when:
 # Character Card Creator Web App
 
 > Status: Active backlog
-> Last repo audit: 2026-07-05
-> Current summary: A standalone character card creation tool built within `apps/web` using TanStack Start, allowing users to create V2-spec character cards with AI-assisted field generation, custom fields, example-based prompting, and PNG image export with embedded JSON metadata. The repo's existing `achievements`/`badges`/`user`/`auth`/`dev-tools` features and the `apps/server` + `packages/shared` layers were scaffolding placeholders with no product behind them; this roadmap removes them so the repo becomes the character card creator, not a multi-feature app that happens to also have one.
+> Last repo audit: 2026-08-23
+> Current summary: A standalone character card creation tool built within `apps/web` using TanStack Start, allowing users to create V2-spec character cards with AI-assisted field generation, custom fields, example-based prompting, and PNG image export with embedded JSON metadata. Agent-assisted editing now uses the application-owned flow specified in the related agent-quality roadmap: optional enrichment, content planning, user-selectable separate or combined field writing, deterministic safeguards, targeted repair, and user-reviewed proposals. Subjective prose quality remains the user's decision.
 
 ## 1. Executive Summary
 
@@ -584,6 +584,7 @@ Since Phase 0 removes the docker-based Mongo/Valkey dependency, local dev setup 
 
 | Date | Change |
 | --- | --- |
+| 2026-08-23 | Linked the implemented agent-quality flow and recorded the simplified runtime scope: no mandatory model critic, no model tools, user-selectable field-call granularity, bounded provider pacing/retries, and user-owned proposal quality review. |
 | 2026-07-05 | Created roadmap. |
 | 2026-07-05 | Audit pass: added extensions-preservation requirements (spec MUST), chara/ccv3 chunk-replacement behavior, hybrid V1+V2 export decision, output-format parsing, IndexedDB for binary storage, CORS proxy as default path, deferrals for revise sessions and prompt presets. |
 | 2026-07-05 | Added Phase 0 (remove `apps/server`, `packages/shared`, and placeholder `apps/web` features — confirmed placeholders with no real product). Character creator becomes the root route. Updated goals, non-goals, current repo state, rollout, risks, and decisions accordingly. |

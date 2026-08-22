@@ -503,7 +503,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 **Scope:**
 
 - [x] Add phase progress, cancellation, assumption review, quality-warning, and partial-failure presentation to the assistant UI.
-- [x] Add a simple quality/cost profile selector without exposing internal graph complexity by default.
+- [x] Add a simple generation-budget profile selector without exposing internal graph complexity by default.
 - [ ] Run the new pipeline behind a temporary development-only comparison switch.
 - [ ] Complete manual QA and eval acceptance gates.
 - [ ] Replace the old assistant runtime and remove the temporary comparison switch, obsolete mode branches, prompts, and tests.
@@ -645,7 +645,7 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
 - Root `pnpm run test` passed 72 files and 324 tests.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
-- Manual rendered-UI QA confirmed the quality/cost selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
+- Manual rendered-UI QA confirmed the generation-budget selector, immutable privacy copy, assistant cancellation control, and unchanged editor/proposal surfaces. No live inference was triggered because doing so would transmit the locally stored API key and incur provider charges without action-time approval.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
 - `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Credentials are accepted only from `TENZO_AGENT_EVAL_API_KEY` and are excluded from output.
 - Schema-validated baseline and 12-case screening configurations pin the refreshed provider slugs and prices. The screening matrix covers the current Euryale model, three structured candidates, three prose candidates, and single-model, two-model, and role-specialized layouts. Local KoboldCpp was probed and omitted because no endpoint was available.

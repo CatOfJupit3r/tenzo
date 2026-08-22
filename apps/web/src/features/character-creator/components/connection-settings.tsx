@@ -293,7 +293,7 @@ export function ConnectionSettings({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="agent-quality-profile">Quality and cost</Label>
+          <Label htmlFor="agent-quality-profile">Generation budget</Label>
           <SingleSelect
             inputId="agent-quality-profile"
             options={agentQualityProfileOptions}

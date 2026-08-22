@@ -7,5 +7,5 @@ export type AgentQualityProfile = z.infer<typeof AGENT_QUALITY_PROFILE_SCHEMA>;
 export const AGENT_QUALITY_PROFILE_LABELS = {
   [AGENT_QUALITY_PROFILES.economy]: 'Economy',
   [AGENT_QUALITY_PROFILES.balanced]: 'Balanced',
-  [AGENT_QUALITY_PROFILES.quality]: 'Quality',
+  [AGENT_QUALITY_PROFILES.quality]: 'Expanded',
 } satisfies Record<AgentQualityProfile, string>;

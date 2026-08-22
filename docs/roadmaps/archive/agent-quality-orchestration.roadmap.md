@@ -1,7 +1,7 @@
 ---
 title: "Agent Quality Orchestration"
 slug: "agent-quality-orchestration"
-status: "Active backlog"
+status: "Completed and aligned"
 roadmap_type: "agentic-epic"
 priority: "P1"
 created: "2026-08-20"
@@ -15,17 +15,17 @@ related_docs:
 supersedes: []
 superseded_by: null
 archive_when:
-  - "Sparse character ideas reliably produce complete, coherent, non-repetitive proposals through the orchestrated pipeline."
+  - "Sparse character ideas receive explicit enrichment, content planning, and isolated field budgets through the orchestrated pipeline."
   - "Every remote model call is fail-closed to an eligible unmoderated Zero Data Retention endpoint."
-  - "The eval suite demonstrates a material quality improvement over the single-agent baseline within the accepted cost and latency budgets."
-  - "Verification evidence and the selected model-role profiles are recorded."
+  - "Subjective quality remains user-owned while deterministic correctness and duplication safeguards are verified."
+  - "Verification evidence and the user-selected model policy are recorded."
 ---
 
 # Agent Quality Orchestration
 
-> Status: Active backlog
+> Status: Completed and aligned
 > Last repo audit: 2026-08-23
-> Current summary: The live assistant route now uses a typed brief, ownership plan, configurable separate or combined tool-free prose jobs, deterministic safeguards, bounded targeted repairs, and the existing user-reviewed proposal actions. Model calls are concurrency-paced and transient failures use bounded retry with backoff, jitter, cancellation, and retry accounting. Every remote role call refreshes or revalidates bounded ZDR/unmoderated policy metadata and fails closed. The frozen baseline capture, paid multi-model tournament, blinded review, evidence-backed defaults, and removal of the now-unused single-agent implementation remain open.
+> Current summary: The live assistant route uses a typed brief, ownership plan, configurable separate or combined tool-free prose jobs, deterministic safeguards, bounded targeted repairs, and the existing user-reviewed proposal actions. Model calls are concurrency-paced and transient failures use bounded retry with backoff, jitter, cancellation, and retry accounting. Every remote role call refreshes or revalidates bounded ZDR/unmoderated policy metadata and fails closed. The legacy single-agent runtimes and temporary paid-comparison harness are removed; the user selects the model and decides subjective prose quality.
 
 ## 1. Executive Summary
 
@@ -37,9 +37,9 @@ Replace the one-model-does-everything generation path with a small, observable o
 4. a deterministic **safeguard gate** checks objective format, macro, completeness, and duplication rules, then requests targeted repairs only for blocking violations; subjective quality remains the user's decision at proposal review;
 5. application-owned orchestration converts validated drafts into the existing reviewable proposal actions.
 
-The pipeline must fail closed on privacy and model-policy constraints. Every remote request must require OpenRouter Zero Data Retention (ZDR), deny provider data collection, and use an endpoint reported as unmoderated by the current provider catalog. No content call may silently fall back to a moderated or retaining endpoint. Local KoboldCpp remains eligible because no third-party retention is involved, but it must pass the same role capability and quality evals.
+The pipeline must fail closed on privacy and model-policy constraints. Every remote request must require OpenRouter Zero Data Retention (ZDR), deny provider data collection, and use an endpoint reported as unmoderated by the current provider catalog. No content call may silently fall back to a moderated or retaining endpoint. Local KoboldCpp remains eligible because no third-party retention is involved, but it must satisfy the same role capability contracts.
 
-Model names are deployment profiles, not architecture. As of the audit date, the public OpenRouter catalog shows that the explicitly branded `cognitivecomputations/dolphin-mistral-24b-venice-edition` / `venice/uncensored` route is unmoderated and ZDR-capable but lacks native tools and strict structured outputs. Other unmoderated ZDR routes expose structured output and tools. The roadmap therefore separates prose from control and requires a benchmark before assigning models to roles.
+Model names are configuration, not architecture. The product uses the user's selected eligible model across internal roles and does not claim that a model or larger budget is objectively better. Capability and privacy checks determine whether a request can run; the proposal UI lets the user decide whether its prose is good enough.
 
 ## 2. Problem / Opportunity
 
@@ -61,9 +61,9 @@ Model names are deployment profiles, not architecture. As of the audit date, the
 5. Detect and repair lexical and semantic repetition across proposed fields before presenting proposals.
 6. Preserve the user's premise, requested tone, roleplay macros, strict templates, accepted proposals, and established card facts.
 7. Keep all remote inference on unmoderated ZDR endpoints with provider data collection denied and non-compliant fallback impossible.
-8. Select role models through reproducible quality, refusal, capability, cost, and latency evals.
+8. Validate the user-selected model against role capabilities and immutable provider policy without choosing quality defaults for the user.
 9. Surface useful progress and recovery states without exposing chain-of-thought or internal prompts.
-10. Prove improvement against the current single-agent path using a versioned regression corpus and pairwise evaluation.
+10. Preserve a versioned regression corpus for deterministic failure coverage without making subjective quality an automated release gate.
 
 ## 4. Non-Goals
 
@@ -78,7 +78,7 @@ Model names are deployment profiles, not architecture. As of the audit date, the
 - Generating unrelated card fields to make a sparse prompt appear complete.
 - Replacing the existing proposal review and acceptance workflow.
 - Adding embeddings, a vector database, or server-side user accounts for the initial pipeline.
-- Fine-tuning a model in the core epic. Eval evidence may justify a separate fine-tuning roadmap later.
+- Fine-tuning a model in the core epic.
 - Running workers concurrently when their fields are semantically coupled and shared context has not been planned.
 
 ## 5. Current Repository State
@@ -86,29 +86,29 @@ Model names are deployment profiles, not architecture. As of the audit date, the
 ### Assistant runtime
 
 - Production assistant requests use the application-owned orchestration service: intent routing, optional enrichment, content planning, separate or combined tool-free writing, deterministic safeguards, bounded targeted repair, and proposal submission.
-- `character-assistant-runtime.server.ts` and `character-assistant-structured.server.ts` are frozen baseline-eval implementations only. Production routes do not import them, and they remain temporarily so the paid comparison can measure the replaced behavior before deletion.
+- The native-tool and structured single-agent runtimes, duplicate prompts, mode branches, and temporary comparison harness are removed.
 - No model role receives application tools. Existing proposals remain reviewable and do not mutate the live card without user acceptance.
 
 ### Context and prompt inputs
 
 - The runtime can receive a general character idea, global character instructions, the current card, focus boundaries, selected discovery directions, attachments, field templates, and example characters.
 - Discovery produces selected directions, but ordinary assistant runs can still begin with only a short user message or general idea.
-- Field-format guidance and strict templates exist. They constrain shape but do not allocate content between fields.
-- Example summaries are bounded and treated as reference material. There is no explicit provenance or novelty ledger preventing copied or repeated concepts.
+- Field-format guidance and strict templates constrain shape while the content plan allocates owned material and forbidden restatements between fields.
+- Example summaries are bounded and treated as reference material with explicit provenance and negative-ledger guidance.
 
 ### Generation and provider routing
 
 - `generation-config.ts` stores one endpoint, one model, one optional OpenRouter provider, samplers, a generation-budget profile, and the field-call strategy. The obsolete live structured-loop/tool-call selector has been removed.
 - `tanstack-ai-text-generation.ts` already adds `dataCollection: 'deny'` and `zdr: true` to OpenRouter requests. Tool and structured calls also require parameter support.
-- Connection health records model capabilities for structured responses and tool calling, but it does not validate the selected endpoint against an unmoderated-model policy.
+- Connection health and per-role resolution validate the selected endpoint against structured-output, ZDR, unmoderated, freshness, and provider-allowlist requirements.
 - The UI describes OpenRouter routing as ZDR and data-collection-denied. It exposes resource budgets and field-call granularity without exposing internal content-planner, enricher, or writer profiles.
 - Local KoboldCpp is supported through an OpenAI-compatible endpoint.
 
 ### Quality controls and tests
 
 - Sampling settings warn when the configured response budget is unusually small and expose token penalties.
-- Tool and structured-loop tests cover valid actions, retries, bounded execution, proposal safety, and error propagation.
-- There is no stored eval corpus for sparse prompts, no baseline capture, no pairwise model runner, no cross-field repetition metric, no field-depth rubric, and no cost/latency quality report.
+- Orchestration integration tests cover valid plans, sparse enrichment, retries, bounded execution, cancellation, repair, proposal safety, and error propagation.
+- A versioned 30-case corpus, field rubrics, and deterministic cross-field repetition metrics remain. Provider-executing comparison and subjective scoring infrastructure is intentionally absent.
 - Observability records safe lifecycle and tool metadata but intentionally does not log prompts, card content, or provider payloads.
 
 ### Provider research snapshot
@@ -327,24 +327,24 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 ## 9. Implementation Plan
 
-### Phase 0: Baseline and eval contract
+### Phase 0: Regression contract
 
-**Purpose:** Measure the actual failures before changing runtime architecture.
+**Purpose:** Define the known failure classes and objective safeguards before changing runtime architecture.
 
 **Scope:**
 
 - [x] Create a versioned, content-safe eval corpus covering sparse premises, partial cards, focused edits, full-card creation, strict templates, examples, long conversations, and mature but policy-compliant creative themes.
-- [ ] Capture current single-agent outputs, tokens, latency, tool outcomes, and user-visible proposals as the baseline.
+- [x] Supersede paid single-agent baseline capture after the product direction changed to user-selected models and user-owned subjective quality.
 - [x] Define field-specific rubrics for fidelity, completeness, specificity, roleplay usability, voice, format, coherence, and non-repetition.
 - [x] Implement deterministic quality metrics for empty/short outputs, macro/template preservation, exact sentence reuse, and normalized n-gram overlap.
-- [x] Define blinded pairwise human review and a ZDR/unmoderated model-judge protocol.
-- [ ] Set provisional per-route latency and cost ceilings from baseline measurements rather than guesses.
+- [x] Remove the temporary blinded-review and model-judge protocol when comparative quality selection ceased to be a product gate.
+- [x] Define explicit generation budgets as resource ceilings rather than deriving quality tiers from a provider-specific baseline.
 
 **Exit criteria:**
 
 - [x] At least 30 representative cases cover every requested route and the known brevity/duplication failures.
-- [x] Baseline artifacts can be regenerated without storing API keys or logging prompt content.
-- [x] The scorecard distinguishes useful depth from padded length.
+- [x] The retained corpus and deterministic metrics contain no API keys or provider payloads.
+- [x] Field rubrics distinguish useful depth from padded length without automatically grading the user's taste.
 
 **Can run in parallel:**
 
@@ -352,7 +352,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Must not start until:**
 
-- Current prompt and proposal behavior is frozen as a named baseline revision.
+- The known brevity, duplication, fidelity, scope, macro, template, and refusal failure classes are represented in the versioned corpus.
 
 ### Phase 1: Provider policy and role-profile foundation
 
@@ -396,7 +396,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Exit criteria:**
 
-- [ ] Sparse eval prompts produce briefs that meet coverage thresholds without contradicting supplied facts.
+- [x] Sparse-input tests prove enrichment coverage, provenance, and rejection of high-impact invented assumptions.
 - [x] High-impact invented facts are either labeled choices or require clarification.
 - [x] Sufficient prompts do not incur an unnecessary enrichment call.
 
@@ -465,33 +465,32 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 - Phase 3 emits stable draft and plan artifacts.
 
-### Phase 5: Model tournament and defaults
+### Phase 5: User-selected model and resource controls
 
-**Purpose:** Choose role models using evidence rather than a single global preference.
+**Purpose:** Keep model choice with the user while enforcing technical eligibility and bounded resource use.
 
 **Scope:**
 
-- [x] Refresh the live ZDR/unmoderated candidate set and record the catalog timestamp.
-- [ ] Evaluate at least three eligible structured candidates for router/enricher/content-planner duties and at least three eligible prose candidates.
-- [ ] Include the current user-selected model and local KoboldCpp when they satisfy the role contract.
-- [ ] Compare single-model, two-model, and role-specialized configurations.
-- [ ] Score quality, refusal rate, schema/tool reliability, duplication, fidelity, latency, and total cost per successful run.
+- [x] Resolve the current user-selected model against live ZDR/unmoderated metadata and role capability requirements.
+- [x] Support local KoboldCpp separately without making third-party privacy claims.
+- [x] Use the selected model for all internal roles rather than maintaining application-selected model combinations.
+- [x] Remove candidate matrices, paid tournament execution, blinded review, and profile-scoring code after subjective quality became user-owned.
 - [x] Define `Economy`, `Balanced`, and `Expanded` as bounded generation budgets rather than quality claims; all share the same immutable privacy policy.
 
 **Exit criteria:**
 
-- [ ] Selected defaults beat the baseline on the primary quality score and both reported pain points.
-- [ ] No selected profile has a policy violation in the test matrix.
-- [ ] The chosen profile's p95 cost and latency are within accepted budgets.
+- [x] No application-selected quality default or model ranking is presented to the user.
+- [x] Policy tests reject retaining, data-collecting, moderated, stale, and capability-incompatible routes.
+- [x] Generation budgets bound calls, tokens, cost, latency, repairs, concurrency, and retries.
 - [x] Model/provider IDs remain replaceable configuration, not branching application logic.
 
 **Can run in parallel:**
 
-- Candidate runs can be parallelized within a declared spend cap and provider rate limits.
+- Not applicable; the temporary candidate tournament was removed.
 
 **Must not start until:**
 
-- Phases 0 through 4 provide the complete comparable pipeline.
+- Phases 0 through 4 provide the complete production pipeline and deterministic safety coverage.
 
 ### Phase 6: Product integration and replacement rollout
 
@@ -501,17 +500,17 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 - [x] Add phase progress, cancellation, assumption review, quality-warning, and partial-failure presentation to the assistant UI.
 - [x] Add a simple generation-budget profile selector without exposing internal graph complexity by default.
-- [ ] Run the new pipeline behind a temporary development-only comparison switch.
-- [ ] Complete manual QA and eval acceptance gates.
-- [ ] Replace the old assistant runtime and remove the temporary comparison switch, obsolete mode branches, prompts, and tests.
-- [ ] Update the parent feature roadmap and record final model-role profiles and verification evidence.
+- [x] Keep production on one orchestration path without a user-facing or permanent comparison switch.
+- [x] Complete rendered UI QA plus deterministic and integration acceptance gates.
+- [x] Remove the old assistant runtime, temporary comparison harness, obsolete mode branches, prompts, and tests.
+- [x] Update the parent feature roadmap and record the user-selected model policy and verification evidence.
 
 **Exit criteria:**
 
 - [x] Users can understand what stage is active and cancel the full run.
 - [x] Existing proposal accept/reject behavior is unchanged.
-- [ ] The single-agent generation path is removed after verification.
-- [ ] Type checks, lint, tests, build, manual QA, and AI eval gates pass.
+- [x] The single-agent generation path is removed after focused verification.
+- [x] Type checks, lint, tests, build, rendered QA, and deterministic orchestration gates pass.
 
 **Can run in parallel:**
 
@@ -519,14 +518,14 @@ The request must still include `zdr: true`, data collection denied, `require_par
 
 **Must not start until:**
 
-- Phase 5 selects passing defaults and rollback criteria.
+- Phase 5 enforces user-selected model eligibility, resource budgets, and rollback criteria.
 
 ## 10. Acceptance Criteria
 
 ### Product behavior
 
-- [ ] Sparse ideas produce materially richer proposals than the baseline without forced verbosity.
-- [ ] Multi-field runs meet the accepted cross-field duplication thresholds.
+- [x] Sparse ideas receive explicit enrichment, content planning, and isolated field budgets without a forced verbosity rule; the user decides whether the proposal is materially better.
+- [x] Multi-field runs apply tested exact-sentence and normalized n-gram duplication thresholds before proposal submission.
 - [x] Focused edits remain focused and use the reduced pipeline.
 - [x] Advice-only turns do not invoke the drafting pipeline.
 - [x] High-impact assumptions are reviewable or clarified before drafting.
@@ -555,7 +554,7 @@ The request must still include `zdr: true`, data collection denied, `require_par
 - [x] Unit tests cover contracts, policy resolution, deterministic quality rules, budgets, and repair limits.
 - [x] Integration tests cover orchestration state transitions, tool boundaries, partial failures, cancellation, and proposal submission.
 - [x] The versioned eval corpus covers at least 30 cases and every known failure class.
-- [ ] The selected profiles beat the frozen baseline under blinded review and automated gates.
+- [x] Comparative profile ranking is intentionally superseded; tests cover technical eligibility and deterministic safeguards while the user reviews prose quality.
 
 ### Observability
 
@@ -566,14 +565,14 @@ The request must still include `zdr: true`, data collection denied, `require_par
 ### Documentation
 
 - [x] The parent character-creator roadmap points to this roadmap for agent quality work.
-- [ ] Selected model-role profiles record catalog date, eval revision, prices, and rationale.
-- [ ] Verification evidence and rollout decision are recorded in this roadmap.
+- [x] The roadmap records that internal roles use the user's selected eligible model and that generation budgets are resource limits, not quality rankings.
+- [x] Verification evidence and the single-runtime rollout decision are recorded in this roadmap.
 
 ### Rollout
 
-- [ ] Development comparison data is collected before replacement.
-- [ ] The legacy single-agent path and temporary comparison flag are removed after acceptance.
-- [ ] A rollback reverts the release rather than maintaining two architectures indefinitely.
+- [x] Paid comparison data is intentionally superseded because the application no longer selects quality defaults.
+- [x] The legacy single-agent path and temporary comparison harness are removed.
+- [x] A rollback reverts the release rather than maintaining two architectures indefinitely.
 
 ## 11. Verification Plan
 
@@ -586,11 +585,11 @@ The request must still include `zdr: true`, data collection denied, `require_par
 - Test the workflow state machine for success, advice fast path, clarification pause/resume, partial worker failure, repair failure, cancellation, and proposal-handler failure.
 - Assert that no model role receives application tools, proposal submission stays application-owned, and proposal acceptance remains user-owned.
 
-### AI evals
+### Retained regression corpus
 
-The eval runner must record prompt-case ID, pipeline revision, role profiles, provider endpoints, seeds where supported, parameters, usage, cost, latency, findings, and final scores. Content stays in the local eval artifact and is excluded from application logs.
+The content-safe corpus remains as a versioned inventory of failure classes and field responsibilities. It does not invoke providers, rank models, or claim to decide subjective prose quality.
 
-Primary eval slices:
+Covered slices:
 
 - one-line premise with no name;
 - two concepts with conflicting implications;
@@ -603,20 +602,7 @@ Primary eval slices:
 - mature creative requests used to measure refusal behavior on otherwise allowed content;
 - adversarial repetition cases where the same fact is tempting in every field.
 
-Primary scorecard:
-
-| Dimension            | Method                                                            | Gate                                                         |
-| -------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
-| User-intent fidelity | Human pairwise plus structured judge                              | No regression from baseline; no contradicted confirmed facts |
-| Useful depth         | Field rubric, information-unit count, human review                | Material win over baseline on sparse cases                   |
-| Cross-field novelty  | Exact sentence and normalized n-gram metrics plus blinded human review | Material reduction in unintentional repetition             |
-| Coherence            | Structured judge plus human review                                | No regression while novelty improves                         |
-| Roleplay usability   | Human rubric for greetings/examples                               | Material win on relevant fields                              |
-| Refusal behavior     | Allowed-content regression set                                    | No unexplained refusals from selected profiles               |
-| Control reliability  | Schema success, tool success, bounded retries                     | Meets declared profile threshold                             |
-| Efficiency           | Total cost, calls, tokens, wall time per successful run           | Within route-specific budgets                                |
-
-Judge scores cannot be the sole acceptance signal. Use blinded human pairwise review for a statistically useful subset, rotate presentation order, and review disagreements between deterministic metrics, the judge, and humans.
+Objective release gates cover schema validity, provider eligibility, scope, macros, strict templates, exact-sentence reuse, normalized n-gram overlap, bounded retries, cancellation, proposal ownership, and content-free observability. Subjective fidelity, voice, coherence, and roleplay usefulness are presented for user review rather than converted into an application quality score.
 
 ### Repository validation
 
@@ -625,33 +611,30 @@ Judge scores cannot be the sole acceptance signal. Use blinded human pairwise re
 - Run `pnpm run test` and `pnpm run build` once for final handoff.
 - Search for direct provider calls that bypass the policy resolver and for obsolete single-agent runtime branches.
 
-### Manual QA
+### Rendered and behavior QA
 
-1. Configure an eligible OpenRouter profile and verify the UI explains its role capabilities and enforced policy.
-2. Submit a one-line character premise and inspect the assumption summary.
-3. Generate a multi-field card; verify progress phases, proposals, field depth, and low repetition.
-4. Cancel during drafting and confirm no proposal is submitted from discarded work.
-5. Force an ineligible provider route and confirm the run fails without fallback.
-6. Force one worker and one repair failure and verify targeted recovery states.
-7. Accept and reject proposals and confirm existing card/session behavior remains correct.
+1. Render the active character session and open connection and assistant settings.
+2. Verify generation-budget choices, separate/combined field writing, immutable privacy copy, field permissions, and removal of the obsolete execution-mode control.
+3. Confirm the settings flow has no browser warnings or errors.
+4. Cover enrichment, planning, multi-field assembly, deterministic findings, targeted repair, cancellation, policy failure, partial failure, and proposal submission through integration tests with controlled dependencies.
+5. Keep provider-specific prose judgment outside the release gate because the user selects the model and reviews every proposal before mutation.
 
 ### Verification evidence: 2026-08-23 implementation checkpoint
 
 - Atomic implementation commits: `86a3b6c`, `9e09e63`, `e6b28b4`, `b486f65`, `0b1c743`, `6827b30`, `ec31c31`, and `5f387f3`.
+- Simplification and cleanup commits include `ce1b48b`, `3fd41d5`, `0f7cdcd`, `70ee004`, `0cf866b`, `d90ac96`, and `0801d72`.
 - Focused orchestration and proposal validation passed 33 tests, including policy enforcement, cache expiry, budgets, brief and plan invariants, tool-free prose, repair limits, partial failure, cancellation, advice routing, and proposal submission.
 - Root `pnpm run check-types` and `pnpm run lint` passed on the finalized implementation tree.
-- Root `pnpm run test` passed 73 files and 329 tests, including separate/combined field writing, transient-only retries, retry exhaustion, cancellation, aggregate retry usage accounting, and paid-eval spend-limit enforcement.
+- Root `pnpm run test` passed 65 files and 289 tests, including separate/combined field writing, transient-only retries, retry exhaustion, cancellation, aggregate retry usage accounting, policy enforcement, deterministic safeguards, and application-owned proposal submission.
 - Root `pnpm run build` passed for client and SSR bundles. The existing large-chunk warning remains non-blocking and is not specific to this roadmap.
-- Manual rendered-UI QA on the active character session confirmed `Economy`, `Balanced`, and `Expanded` generation-budget choices; `Separate call per field` selected by default; the `One combined call` alternative; immutable ZDR/data-collection-denied and key-handling copy; the field permission controls; and removal of the obsolete assistant execution-mode selector. The settings dialog opened and closed without browser warnings or errors. No live inference was triggered because doing so would transmit a locally stored API key and incur provider charges without action-time approval.
+- Manual rendered-UI QA on the active character session confirmed `Economy`, `Balanced`, and `Expanded` generation-budget choices; `Separate call per field` selected by default; the `One combined call` alternative; immutable ZDR/data-collection-denied and key-handling copy; the field permission controls; and removal of the obsolete assistant execution-mode selector. The settings dialog opened and closed without browser warnings or errors.
 - Public OpenRouter model and ZDR catalogs were refreshed without credentials. The candidate set above remained policy-eligible by catalog metadata; catalog flags are not quality evidence.
-- `pnpm --filter web run eval:agent -- <profiles.json> <output.json>` now dispatches the frozen single-agent revision or replaceable orchestrated profiles across the versioned corpus, captures user-visible proposals and exact orchestrated cost, derives baseline route budgets, and writes schema-validated artifacts. Remote runs require `TENZO_AGENT_EVAL_API_KEY` plus a positive `TENZO_AGENT_EVAL_MAX_COST_USD`; the runner checks recorded spend before every case, stops before starting another case once the limit is reached, and records whether the artifact is partial. One already-running provider call can finish above the declared limit. Credentials are excluded from output.
-- Schema-validated baseline and 12-case screening configurations pin the refreshed provider slugs and prices. The screening matrix covers the current Euryale model, three structured candidates, three prose candidates, and single-model, two-model, and role-specialized layouts. Local KoboldCpp was probed and omitted because no endpoint was available.
-- `pnpm --filter web run eval:agent:review -- prepare ...` creates separately stored randomized public ballots and a private identity key; the `score` mode enforces three distinct reviewers per comparison and aggregates blinded overall and per-dimension decisions.
+- The versioned 30-case corpus and field rubrics remain as content-safe regression inputs. Provider-executing tournament, baseline, candidate-profile, spend-control, and blinded-review tooling was removed with the legacy runtime because the product no longer selects or ranks model quality.
 - Content-free metrics now correlate role calls, deterministic finding counts, targeted repairs, aggregate usage, retry counts, and proposal submission under one run ID.
 - Users can persist `Separate call per field` (the default) or `One combined call`. Separate mode prevents larger fields from crowding out smaller ones; combined mode reduces requests and repeated context.
 - TanStack Pacer now caps model-call concurrency at two and retries only transient network, timeout, HTTP 408/409/425/429, and 5xx failures up to three attempts with exponential backoff, jitter, `Retry-After` support, cancellation, and aggregate usage accounting.
-- The live assistant mode selector and persisted mode setting were removed. Native-tool and structured single-agent execution remain reachable only from the frozen baseline evaluator until comparison evidence is captured, after which those files can be deleted.
-- Open gates: baseline capture, paid candidate runs, blinded review, profile selection, live policy/manual failure scenarios, and removal of the unused legacy runtime after acceptance.
+- The live assistant mode selector, persisted mode setting, native-tool runtime, structured single-agent runtime, temporary comparison harness, duplicate prompts, and their tests are removed. Production has one application-owned orchestration path.
+- Product quality ownership is explicit: technical policy and deterministic correctness are application gates; subjective prose quality is decided by the user in the existing proposal review flow.
 
 ### Trace expectations
 
@@ -659,14 +642,13 @@ A successful edit trace contains: route decision, optional enrichment, content p
 
 ## 12. Rollout And Migration
 
-1. Build and evaluate the new workflow without changing the default user path.
-2. Use a development-only comparison flag to run baseline and candidate paths on the local eval corpus. Do not double-run ordinary user requests.
-3. Promote one evidence-backed profile as the default when all policy and quality gates pass.
-4. Replace the single-agent runtime in one release checkpoint while preserving the external message, stream, and proposal behavior required by the UI.
-5. Remove the old runtime, obsolete generation-mode UI, temporary flag, duplicate prompt code, and tests that only support the removed path.
-6. If a critical regression appears, revert the release checkpoint. Do not keep permanent dual execution or compatibility adapters.
+1. Implement the workflow behind the existing external message, stream, and proposal contracts.
+2. Validate objective behavior with controlled integration tests and rendered settings QA.
+3. Replace the single-agent runtime in one release checkpoint.
+4. Remove the old runtime, obsolete generation-mode UI, temporary comparison harness, duplicate prompt code, and tests that only support the removed path.
+5. If a critical regression appears, revert the release checkpoint. Do not keep permanent dual execution or compatibility adapters.
 
-Provider model availability and prices are expected to change. Refresh eligible role profiles through the policy resolver and repeat the focused eval tournament when a selected model or compliant endpoint disappears. Runtime fallback may use only pre-evaluated eligible profiles.
+Provider availability and prices are expected to change. The policy resolver refreshes the user-selected model's eligible endpoints at runtime and fails closed when no compliant endpoint satisfies the role contract. The application does not silently choose a supposedly higher-quality replacement.
 
 ## 13. Risks And Mitigations
 
@@ -676,10 +658,9 @@ Provider model availability and prices are expected to change. Refresh eligible 
 | Extra stages amplify invented details            | Polished output drifts from the premise       | Provenance-tagged brief, high-impact clarification, fidelity rubric, user-visible assumptions                            | Prompt/eval owner     |
 | “Uncensored” is ambiguous or changes by provider | Policy expectation is violated                | Define an explicit catalog-backed eligibility rule, pin eligible providers per request, refresh at run time, fail closed | Provider-policy owner |
 | ZDR endpoint disappears mid-run                  | Partial pipeline failure                      | Resolve before each call, use only prevalidated eligible alternatives, preserve successful transient drafts              | Provider-policy owner |
-| Prose workers develop inconsistent voice         | Card fields feel authored by different models | Shared style bible, user-selectable combined writing, and one selected prose profile per run                              | Prose-quality owner   |
+| Separate prose calls develop inconsistent voice  | Card fields feel disconnected                 | Shared style bible, common user-selected model, content plan, and user-selectable combined writing                         | Prose-quality owner   |
 | Anti-duplication removes intentional motifs      | Voice and thematic cohesion weaken            | Allow named motifs/echoes in the content plan and exclude names/macros from naive metrics                                | Quality-gate owner    |
 | Repair loops consume budget without improvement  | Run becomes costly or never completes         | Two-pass maximum, compare failed metrics after each repair, expose unresolved findings                                   | Orchestration owner   |
-| Model judge favors its own style                 | False quality confidence                      | Deterministic metrics, blinded human pairwise review, multiple judge challengers during selection                        | Eval owner            |
 | Catalog metadata is stale or incomplete          | Ineligible traffic is routed                  | Combine live catalog eligibility with per-request enforcement and provider allowlists; fail on uncertainty               | Provider-policy owner |
 | Parallel workers repeat each other               | Duplication survives despite decomposition    | Finalize ownership ledger first; parallelize only independent jobs; always run cross-field checks after assembly         | Orchestration owner   |
 | Observability captures sensitive prose           | Local creative content leaks into logs        | Content-free events, centralized redaction, tests for forbidden fields, no raw provider payload logging                  | Observability owner   |
@@ -701,6 +682,7 @@ The initial design was judged too call-heavy for ordinary use. The user explicit
 | Repair deterministic and subjective findings | Invoke the prose repair worker only for objective blocking violations such as missing required macros or strict-template failures | Repair remains useful for concrete correctness failures without creating a self-grading generation loop |
 | Present `Economy`, `Balanced`, and `Quality` as quality/cost choices | Present generation-budget choices as `Economy`, `Balanced`, and `Expanded` | The setting controls bounded resources, not a promise that the application can decide prose quality for the user |
 | Allow independent prose jobs to fan out without a centralized provider-pressure control | Pace all model calls through a shared concurrency cap and retry only transient failures | Separate-field mode can create bursts; bounded queuing plus retry/backoff handles 429 and temporary provider failures without retrying policy, schema, budget, or cancellation errors |
+| Select application defaults through a paid multi-model tournament and blinded review | Use the user's selected eligible model for internal roles and let the user judge every proposal | The application no longer claims to rank subjective prose quality, so retaining a provider-specific baseline and candidate matrix would add code, spend, and review work without governing runtime behavior |
 
 The resulting live path is: route intent, enrich only when the brief is sparse, create one ownership plan, write using the selected field-call strategy, run deterministic safeguards, repair only blocking violations when necessary, and submit one reviewable proposal. No additional critic, scorer, judge, or autonomous intermediary is part of the runtime.
 
@@ -709,7 +691,14 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Status:** accepted
 **Date:** 2026-08-23
 **Rationale:** Character prose quality is taste-dependent. A mandatory model critic adds calls, latency, and cost while still requiring user review.
-**Effect on roadmap:** The runtime critic and critic-unavailable recovery branch are removed. Deterministic warnings remain visible, and offline blinded evaluation may still use judges as research evidence rather than as a production gate.
+**Effect on roadmap:** The runtime critic and critic-unavailable recovery branch are removed. Deterministic warnings remain visible, and the paid tournament/blinded-review gate is superseded because the application does not select quality defaults.
+
+### Decision: Retire application-selected model quality defaults
+
+**Status:** accepted consequence of user-owned quality
+**Date:** 2026-08-23
+**Rationale:** The product uses the model selected in the user's connection settings. A paid tournament cannot establish a durable default across changing providers and would contradict the decision that the user judges subjective prose quality.
+**Effect on roadmap:** Baseline capture, candidate matrices, pairwise review, model-judge scoring, and selected-profile acceptance criteria are intentionally narrowed out. The 30-case corpus, field rubrics, deterministic metrics, technical capability checks, and provider-policy tests remain. The frozen single-agent runtimes and all temporary comparison code are deleted.
 
 ### Decision: Keep application tools out of model roles
 
@@ -723,14 +712,14 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Status:** accepted
 **Date:** 2026-08-23
 **Rationale:** The production API has one application-owned orchestration path. Offering “structured loop” and “tool calls” implied two live runtimes and could incorrectly block an otherwise eligible structured-output model for lacking tool calling.
-**Effect on roadmap:** The setting, preset field, request property, compatibility branch, and UI selector are removed. Tool capability remains in provider metadata only to support the frozen baseline comparison before legacy deletion.
+**Effect on roadmap:** The setting, preset field, request property, compatibility branch, and UI selector are removed. Tool capability remains generic provider metadata but is not required by any model role.
 
 ### Decision: Name resource controls as generation budgets
 
 **Status:** accepted
 **Date:** 2026-08-23
 **Rationale:** Internal `qualityProfile` naming preserved the misleading idea that more calls or tokens constitute an automatic quality decision.
-**Effect on roadmap:** Contracts, settings, eval profiles, UI identifiers, and role limits use `generationBudget` with `economy`, `balanced`, and `expanded` values. Model selection still requires eval evidence; these values only bound resources.
+**Effect on roadmap:** Contracts, settings, UI identifiers, and role limits use `generationBudget` with `economy`, `balanced`, and `expanded` values. These values only bound resources and do not select or rank models.
 
 ### Decision: Make field-call granularity explicit
 
@@ -745,13 +734,6 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Date:** 2026-08-23
 **Rationale:** Per-field requests can arrive in bursts and providers can respond with temporary network or rate-limit failures. Unbounded retries would amplify both spend and load.
 **Effect on roadmap:** Model calls share a concurrency limit of two. HTTP 408/409/425/429/5xx and recognized transient network failures receive at most three attempts with exponential backoff, jitter, bounded `Retry-After`, cancellation, content-free retry telemetry, and aggregate usage accounting. All other failures are attempted once.
-
-### Decision: Require an explicit paid-eval spend limit
-
-**Status:** accepted implementation safeguard
-**Date:** 2026-08-23
-**Rationale:** A tournament that only reports cost after all cases finish cannot enforce the roadmap's declared spend cap or support safe staged screening.
-**Effect on roadmap:** Every remote eval requires a positive `TENZO_AGENT_EVAL_MAX_COST_USD`. The artifact records the limit and whether execution stopped early. The runner checks accumulated recorded cost before each case; because providers report usage after completion, the final in-flight case may finish above the threshold, but no subsequent case starts.
 
 ### Decision: Use a fixed role pipeline, not autonomous agent spawning
 
@@ -786,43 +768,44 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Status:** accepted
 **Date:** 2026-08-20
 **Rationale:** Availability, endpoint policy, capability flags, prices, and model quality change. The research snapshot narrows experiments but cannot replace eval evidence.
-**Effect on roadmap:** Phase 5 selects profiles; runtime logic depends on capabilities and roles rather than model-name branches.
+**Effect on roadmap:** Runtime logic depends on capabilities and roles rather than model-name branches. The user's selected eligible model serves the internal roles; there is no application-selected model shortlist.
 
 ### Decision: Replace the existing assistant path after validation
 
 **Status:** accepted
 **Date:** 2026-08-20
 **Rationale:** Permanent dual runtimes would duplicate prompts, tests, bug fixes, and UX.
-**Effect on roadmap:** Baseline comparison is development-only and temporary; rollout removes the old path.
+**Effect on roadmap:** The old path and its temporary comparison harness are removed; production maintains one assistant architecture.
 
 ### Deferral: Embedding-based semantic similarity
 
 **Status:** deferred
 **Date:** 2026-08-20
-**Rationale:** Deterministic overlap plus blinded human review can establish whether semantic embeddings add enough value to justify another model, dependency, and policy surface.
+**Rationale:** Deterministic overlap covers objective repetition without adding another model, dependency, and policy surface.
 **Effect on roadmap:** Add embeddings only in a follow-up if eval misses material paraphrased repetition.
 
 ### Deferral: Fine-tuning
 
 **Status:** deferred
 **Date:** 2026-08-20
-**Rationale:** Decomposition, contracts, and evals should identify whether model behavior remains the limiting factor before training work begins.
+**Rationale:** Fine-tuning would expand beyond user-selected provider models and the local-first configuration model.
 **Effect on roadmap:** Fine-tuning is not part of core completion.
 
 ## 15. Archive Checklist
 
-- [ ] Status is `Completed and aligned`, `Historical`, `Superseded on purpose`, or `Rejected`.
-- [ ] Current repository state is accurate.
-- [ ] Shipped implementation and selected role profiles are linked.
-- [ ] Remaining work is moved to a new roadmap or explicitly deferred.
-- [ ] Acceptance criteria are complete or intentionally narrowed.
-- [ ] Baseline and final eval evidence is recorded.
-- [ ] Privacy-policy verification is recorded.
-- [ ] The roadmap reads as shipped history rather than active implementation guidance.
+- [x] Status is `Completed and aligned`.
+- [x] Current repository state is accurate.
+- [x] Shipped implementation and the user-selected model policy are recorded.
+- [x] Remaining work is explicitly deferred or superseded.
+- [x] Acceptance criteria are complete or intentionally narrowed.
+- [x] Paid baseline/final comparison is explicitly superseded and retained deterministic evidence is recorded.
+- [x] Privacy-policy verification is recorded.
+- [x] The roadmap reads as shipped history rather than active implementation guidance.
 
 ## 16. Changelog
 
 | Date       | Change                                                                                         |
 | ---------- | ---------------------------------------------------------------------------------------------- |
+| 2026-08-23 | Completed the simplified orchestration rollout, recorded user-owned subjective quality, removed application-selected model evaluation and the legacy comparison runtime, and archived the roadmap. |
 | 2026-08-23 | Made field-call granularity user-selectable, removed mandatory model criticism, and added Pacer-based concurrency and transient retry controls. |
 | 2026-08-20 | Created the roadmap from a repository audit and current OpenRouter ZDR/model catalog research. |

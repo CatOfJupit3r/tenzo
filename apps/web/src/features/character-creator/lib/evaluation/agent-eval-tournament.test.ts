@@ -99,6 +99,27 @@ describe('agent eval tournament', () => {
     ]);
     expect(artifact.baselineBudgets).toHaveLength(1);
     expect(artifact.baselineBudgets[0]).toMatchObject({ sourceArtifactCount: 2, maximumOutputTokens: 50 });
+    expect(artifact.isSpendLimitReached).toBe(false);
+    expect(artifact.maximumCostUsd).toBeNull();
     expect(serializeAgentEvalTournament(artifact)).not.toContain('secret-key');
+  });
+
+  it('stops before starting another case after the declared spend limit is reached', async () => {
+    const runCase = vi.fn(async (options: iAgentEvalRuntimeOptions) => createRunResult(options));
+
+    const artifact = await runAgentEvalTournament(
+      {
+        cases: AGENT_EVAL_CORPUS.slice(0, 3),
+        profiles: [BASE_PROFILE],
+        apiKey: 'secret-key',
+        maximumCostUsd: 0.0003,
+      },
+      { runCase, now: () => new Date('2026-08-21T00:00:00.000Z') },
+    );
+
+    expect(runCase).toHaveBeenCalledTimes(2);
+    expect(artifact.runs).toHaveLength(2);
+    expect(artifact.maximumCostUsd).toBe(0.0003);
+    expect(artifact.isSpendLimitReached).toBe(true);
   });
 });

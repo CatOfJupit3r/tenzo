@@ -31,19 +31,31 @@ async function main() {
 
   const hasRemoteProfile = profileFile.profiles.some((profile) => profile.providerKind === 'openrouter');
   const configuredApiKey = process.env.TENZO_AGENT_EVAL_API_KEY?.trim();
+  const configuredMaximumCostUsd = process.env.TENZO_AGENT_EVAL_MAX_COST_USD?.trim();
   let apiKey = configuredApiKey ?? '';
   if (!apiKey && !hasRemoteProfile) apiKey = 'local-eval';
   if (!apiKey) {
     throw new Error('Set TENZO_AGENT_EVAL_API_KEY in the process environment for remote evaluation.');
   }
+  const maximumCostUsd = configuredMaximumCostUsd
+    ? z.coerce.number().positive().parse(configuredMaximumCostUsd)
+    : undefined;
+  if (hasRemoteProfile && maximumCostUsd === undefined) {
+    throw new Error('Set TENZO_AGENT_EVAL_MAX_COST_USD to a positive spend limit for remote evaluation.');
+  }
 
-  const artifact = await runAgentEvalTournament({ cases, profiles: profileFile.profiles, apiKey });
+  const artifact = await runAgentEvalTournament({
+    cases,
+    profiles: profileFile.profiles,
+    apiKey,
+    maximumCostUsd,
+  });
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${serializeAgentEvalTournament(artifact)}\n`, 'utf8');
 
   const totalCostUsd = artifact.runs.reduce((total, run) => total + run.usage.costUsd, 0);
   process.stdout.write(
-    `Wrote ${artifact.runs.length} content-safe eval artifacts to ${outputPath}; total recorded cost $${totalCostUsd.toFixed(4)}.\n`,
+    `Wrote ${artifact.runs.length} content-safe eval artifacts to ${outputPath}; total recorded cost $${totalCostUsd.toFixed(4)}${artifact.isSpendLimitReached ? '; spend limit reached' : ''}.\n`,
   );
 }
 

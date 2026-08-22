@@ -24,6 +24,8 @@ export const AGENT_EVAL_TOURNAMENT_ARTIFACT_SCHEMA = z.object({
   profiles: z.array(AGENT_EVAL_EXECUTION_PROFILE_SCHEMA),
   runs: z.array(AGENT_EVAL_RUN_ARTIFACT_SCHEMA),
   baselineBudgets: z.array(AGENT_EVAL_ROUTE_BUDGET_SCHEMA),
+  maximumCostUsd: z.number().positive().nullable(),
+  isSpendLimitReached: z.boolean(),
 });
 export type iAgentEvalTournamentArtifact = z.infer<typeof AGENT_EVAL_TOURNAMENT_ARTIFACT_SCHEMA>;
 
@@ -32,6 +34,7 @@ export interface iAgentEvalTournamentOptions {
   profiles: readonly iAgentEvalExecutionProfile[];
   apiKey: string;
   abortSignal?: AbortSignal;
+  maximumCostUsd?: number;
 }
 
 export interface iAgentEvalTournamentDependencies {
@@ -54,27 +57,40 @@ export async function runAgentEvalTournament(
 ): Promise<iAgentEvalTournamentArtifact> {
   const profiles = options.profiles.map((profile) => AGENT_EVAL_EXECUTION_PROFILE_SCHEMA.parse(profile));
   const runs: iAgentEvalRunArtifact[] = [];
+  const maximumCostUsd =
+    options.maximumCostUsd === undefined ? null : z.number().positive().parse(options.maximumCostUsd);
+  let totalCostUsd = 0;
+  let isSpendLimitReached = false;
 
   for (const profile of profiles) {
+    if (isSpendLimitReached) break;
     options.abortSignal?.throwIfAborted();
-    const profileRuns = await runAgentEvalCases(
-      {
-        cases: options.cases,
-        pipelineRevision: getPipelineRevision(profile),
-        abortSignal: options.abortSignal,
-      },
-      {
-        now: dependencies.now,
-        runCase: async (evalCase) =>
-          dependencies.runCase({
-            evalCase,
-            profile,
-            apiKey: options.apiKey,
-            abortSignal: options.abortSignal,
-          }),
-      },
-    );
-    runs.push(...profileRuns);
+    for (const evalCase of options.cases) {
+      if (maximumCostUsd !== null && totalCostUsd >= maximumCostUsd) {
+        isSpendLimitReached = true;
+        break;
+      }
+      const [run] = await runAgentEvalCases(
+        {
+          cases: [evalCase],
+          pipelineRevision: getPipelineRevision(profile),
+          abortSignal: options.abortSignal,
+        },
+        {
+          now: dependencies.now,
+          runCase: async (selectedCase) =>
+            dependencies.runCase({
+              evalCase: selectedCase,
+              profile,
+              apiKey: options.apiKey,
+              abortSignal: options.abortSignal,
+            }),
+        },
+      );
+      if (!run) throw new Error('The eval runner returned no artifact for a selected case.');
+      runs.push(run);
+      totalCostUsd += run.usage.costUsd;
+    }
   }
 
   const baselineRuns = runs.filter((run) => run.pipelineRevision === SINGLE_AGENT_BASELINE_REVISION);
@@ -84,6 +100,8 @@ export async function runAgentEvalTournament(
     profiles,
     runs,
     baselineBudgets: deriveProvisionalRouteBudgets(baselineRuns),
+    maximumCostUsd,
+    isSpendLimitReached,
   });
 }
 

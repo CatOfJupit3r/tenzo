@@ -6,6 +6,7 @@ import { generateUuid } from '@~/utils/uuid';
 
 import { logAgentRoleCall } from '../evaluation/agent-run-observability';
 import type { iAgentRoleCallEvent } from '../evaluation/agent-run-observability';
+import { describeGenerationError } from '../generation/generation-error';
 import type { iGenerateValidatedObject } from '../generation/structured-output.server';
 import { generateValidatedObject } from '../generation/structured-output.server';
 import { createAgentRoleModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
@@ -217,11 +218,12 @@ function createBudgetError(
   profile: iAgentRoleProfile,
   usage: iAgentRoleExecutionUsage,
 ): AgentRoleExecutionError | null {
+  const attemptCount = usage.retryCount + 1;
   const violations = [
-    ...(usage.inputTokens > profile.budget.maximumInputTokens ? ['input token budget'] : []),
-    ...(usage.outputTokens > profile.budget.maximumOutputTokens ? ['output token budget'] : []),
+    ...(usage.inputTokens > profile.budget.maximumInputTokens * attemptCount ? ['input token budget'] : []),
+    ...(usage.outputTokens > profile.budget.maximumOutputTokens * attemptCount ? ['output token budget'] : []),
     ...(usage.costUsd > profile.budget.maximumCostUsd ? ['cost budget'] : []),
-    ...(usage.latencyMs > profile.budget.maximumLatencyMs ? ['latency budget'] : []),
+    ...(usage.latencyMs > profile.budget.maximumLatencyMs * attemptCount ? ['latency budget'] : []),
   ];
   if (violations.length === 0) return null;
   return new AgentRoleExecutionError(
@@ -457,13 +459,6 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
     options: iStructuredAgentRoleCallOptions<T>,
   ): Promise<iAgentRoleExecutionResult<T>> => {
     const { profile, schema } = options;
-    if (profile.role === AGENT_ROLES['prose-worker']) {
-      throw new AgentRoleExecutionError('Prose workers must use raw prose execution.', {
-        code: 'invalid-request',
-        role: profile.role,
-        modelId: profile.modelId,
-      });
-    }
     if (!schema) {
       throw new AgentRoleExecutionError('Structured agent roles require an explicit output schema.', {
         code: 'invalid-request',
@@ -513,12 +508,15 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         policyFailureReason: toFailureReason(error),
       });
       if (error instanceof AgentRoleExecutionError) throw error;
-      throw new AgentRoleExecutionError(`Agent role "${profile.role}" generation failed.`, {
-        code: 'generation-failed',
-        role: profile.role,
-        modelId: profile.modelId,
-        cause: error,
-      });
+      throw new AgentRoleExecutionError(
+        `Agent role "${profile.role}" generation failed: ${describeGenerationError(error)}`,
+        {
+          code: 'generation-failed',
+          role: profile.role,
+          modelId: profile.modelId,
+          cause: error,
+        },
+      );
     }
   };
 
@@ -586,12 +584,15 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
         policyFailureReason: toFailureReason(error),
       });
       if (error instanceof AgentRoleExecutionError) throw error;
-      throw new AgentRoleExecutionError(`Agent role "${profile.role}" generation failed.`, {
-        code: 'generation-failed',
-        role: profile.role,
-        modelId: profile.modelId,
-        cause: error,
-      });
+      throw new AgentRoleExecutionError(
+        `Agent role "${profile.role}" generation failed: ${describeGenerationError(error)}`,
+        {
+          code: 'generation-failed',
+          role: profile.role,
+          modelId: profile.modelId,
+          cause: error,
+        },
+      );
     }
   };
 

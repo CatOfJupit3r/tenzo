@@ -22,6 +22,7 @@ describe('agent role profile service', () => {
     expect(profiles[AGENT_ROLES['brief-enricher']].requiredCapabilities).toContain(
       MODEL_CAPABILITIES['structured-output'],
     );
+    expect(profiles[AGENT_ROLES['content-planner']].budget.maximumOutputTokens).toBe(4_000);
     expect(profiles[AGENT_ROLES['prose-worker']]).toMatchObject({
       modelId: 'test/model',
       allowedProviderSlugs: ['test-provider'],

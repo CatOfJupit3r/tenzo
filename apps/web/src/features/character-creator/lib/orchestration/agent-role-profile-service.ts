@@ -65,6 +65,7 @@ function getRoleOutputTokens(role: AgentRole, maximumProseOutputTokens: number, 
     return Math.max(1, Math.floor(maximumProseOutputTokens * limits.proseOutputMultiplier));
   }
   if (role === AGENT_ROLES['intent-router']) return Math.min(400, limits.structuredOutputTokens);
+  if (role === AGENT_ROLES['content-planner']) return limits.structuredOutputTokens * 2;
   return limits.structuredOutputTokens;
 }
 

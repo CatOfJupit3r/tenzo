@@ -86,7 +86,6 @@ function createPlan(fieldKeys: Array<'description' | 'personality'> = ['descript
       depth: { minimumInformationUnits: 2, maximumOutputTokens: 300 },
       dependsOnFieldKeys: [],
     })),
-    coupledFieldGroups: [],
     styleBible: ['Use concrete detail.'],
   };
 }
@@ -161,7 +160,14 @@ describe('character brief service', () => {
     const service = createCharacterBriefService({ enrichBrief: vi.fn().mockResolvedValue(validBrief) });
 
     await expect(service.createBrief({ ...createInput(), prompt: 'Guarded archivist.' })).resolves.toEqual(
-      expect.objectContaining({ isEnrichmentCallUsed: true }),
+      expect.objectContaining({
+        isEnrichmentCallUsed: true,
+        brief: expect.objectContaining({
+          confirmedFacts: expect.arrayContaining([
+            expect.objectContaining({ id: 'user-prompt', statement: 'Guarded archivist.' }),
+          ]),
+        }),
+      }),
     );
 
     const invalidService = createCharacterBriefService({
@@ -178,23 +184,38 @@ describe('character brief service', () => {
 
 describe('content plan service', () => {
   it('allocates every fact once and builds separate tool-free prose jobs by default', async () => {
-    const plan = {
-      ...createPlan(['description', 'personality']),
-      coupledFieldGroups: [['description', 'personality']],
-    };
+    const plan = createPlan(['description', 'personality']);
+    const brief = createBrief(['description', 'personality']);
+    brief.creativeChoices = [
+      {
+        id: 'identity',
+        description: 'Her name is Ilyra Fen and she uses she/her pronouns.',
+        impact: AGENT_GAP_IMPACTS.low,
+        isSelected: true,
+      },
+    ];
     const service = createContentPlanService({ planContent: vi.fn().mockResolvedValue(plan) });
 
     const result = await service.createPlan({
-      brief: createBrief(['description', 'personality']),
+      brief,
       requestedFieldKeys: ['description', 'personality'],
       currentFields: {},
       strictTemplates: {},
+      promptTemplates: { personality: 'Personality(core traits; likes; dislikes; quirks)' },
       requiredMacros: {},
       fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
     });
 
     expect(result.jobs).toHaveLength(2);
     expect(result.jobs.map((job) => job.fieldKeys)).toEqual([['description'], ['personality']]);
+    expect(
+      result.jobs.every((job) =>
+        job.relevantContext.includes('Canonical creative choice: Her name is Ilyra Fen and she uses she/her pronouns.'),
+      ),
+    ).toBe(true);
+    expect(result.jobs[1].relevantContext).toContain(
+      'Field template guidance:\nPersonality(core traits; likes; dislikes; quirks)',
+    );
     expect(result.jobs[0]).not.toHaveProperty('tools');
   });
 
@@ -216,7 +237,30 @@ describe('content plan service', () => {
     expect(result.jobs[0].fieldKeys).toEqual(['description', 'personality']);
   });
 
-  it('rejects plans that omit primary fact ownership or change strict templates', async () => {
+  it('keeps the global user prompt available without assigning it to multiple primary fields', async () => {
+    const brief = createBrief(['description', 'personality']);
+    brief.confirmedFacts[0].id = 'user-prompt';
+    const plan = createPlan(['description', 'personality']);
+    plan.entries[0].ownedFactIds = ['user-prompt'];
+    plan.entries[1].ownedFactIds = ['user-prompt', 'invented-fact'];
+    plan.entries[1].allowedEchoFactIds = ['invented-echo'];
+
+    const result = await createContentPlanService({ planContent: vi.fn().mockResolvedValue(plan) }).createPlan({
+      brief,
+      requestedFieldKeys: ['description', 'personality'],
+      currentFields: {},
+      strictTemplates: {},
+      requiredMacros: {},
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+    });
+
+    expect(result.plan.entries[0].ownedFactIds).toEqual(['user-prompt']);
+    expect(result.plan.entries[1].ownedFactIds).toEqual([]);
+    expect(result.plan.entries[1].allowedEchoFactIds).toEqual(['user-prompt']);
+    expect(result.jobs[1].allowedEchoes).toEqual([brief.confirmedFacts[0]]);
+  });
+
+  it('rejects plans that omit primary fact ownership', async () => {
     const missingOwnership = createPlan();
     missingOwnership.entries[0].ownedFactIds = [];
     await expect(
@@ -229,17 +273,28 @@ describe('content plan service', () => {
         fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
       }),
     ).rejects.toThrow('exactly one primary field');
+  });
 
-    await expect(
-      createContentPlanService({ planContent: vi.fn().mockResolvedValue(createPlan()) }).createPlan({
-        brief: createBrief(),
-        requestedFieldKeys: ['description'],
-        currentFields: {},
-        strictTemplates: { description: '**Identity:** {{gen:identity}}' },
-        requiredMacros: {},
-        fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
-      }),
-    ).rejects.toThrow('changed the strict template');
+  it('uses app-owned templates and macros instead of planner-authored constraints', async () => {
+    const plan = createPlan(['description', 'personality']);
+    plan.entries[0].strictTemplate = 'Planner replacement';
+    plan.entries[0].requiredMacros = ['{{invented}}'];
+    plan.entries[1].requiredMacros = ['{{also_invented}}'];
+
+    const result = await createContentPlanService({ planContent: vi.fn().mockResolvedValue(plan) }).createPlan({
+      brief: createBrief(['description', 'personality']),
+      requestedFieldKeys: ['description', 'personality'],
+      currentFields: {},
+      strictTemplates: { description: '**Identity:** {{gen:identity}}' },
+      requiredMacros: { description: ['{{char}}'] },
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+    });
+
+    expect(result.plan.entries[0]).toMatchObject({
+      strictTemplate: '**Identity:** {{gen:identity}}',
+      requiredMacros: ['{{char}}'],
+    });
+    expect(result.plan.entries[1]).toMatchObject({ strictTemplate: null, requiredMacros: [] });
   });
 });
 
@@ -278,7 +333,7 @@ describe('quality gate service', () => {
     expect(result.drafts.personality).toBe(passingPersonality);
   });
 
-  it('stops targeted repair when deterministic errors do not improve', async () => {
+  it('retains incremental deterministic repair progress across bounded passes', async () => {
     const plan = createPlan();
     plan.entries[0].requiredMacros = ['{{char}}', '{{user}}'];
     const repair = vi
@@ -305,9 +360,9 @@ describe('quality gate service', () => {
       RUN_BUDGET,
     );
 
-    expect(repair).toHaveBeenCalledTimes(1);
-    expect(result.repairCount).toBe(1);
-    expect(result.findings.some((finding) => finding.severity === QUALITY_FINDING_SEVERITIES.error)).toBe(true);
+    expect(repair).toHaveBeenCalledTimes(2);
+    expect(result.repairCount).toBe(2);
+    expect(result.findings.some((finding) => finding.severity === QUALITY_FINDING_SEVERITIES.error)).toBe(false);
   });
 
   it('returns an explicit recoverable state when a targeted repair fails', async () => {
@@ -433,6 +488,7 @@ describe('agent orchestration service', () => {
     const result = await createAgentOrchestrationService(dependencies).run(createInput());
 
     expect(result.recovery).toBe(AGENT_ORCHESTRATION_RECOVERIES['partial-draft']);
+    expect(result.answer).toContain('Writer unavailable.');
     expect(dependencies.submitProposal).not.toHaveBeenCalled();
   });
 });

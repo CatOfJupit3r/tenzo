@@ -24,6 +24,16 @@ describe('agent call pacer', () => {
     expect(operation).toHaveBeenCalledTimes(1);
   });
 
+  it('retries truncated structured model responses', async () => {
+    const operation = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('Failed to parse structured output as JSON. Unexpected end of JSON input.'))
+      .mockResolvedValue('completed');
+
+    await expect(createAgentCallPacer().execute(operation)).resolves.toEqual({ value: 'completed', retryCount: 1 });
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+
   it('stops after the bounded maximum attempt count', async () => {
     const operation = vi.fn<() => Promise<string>>().mockRejectedValue(createHttpError(503));
 

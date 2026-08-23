@@ -21,6 +21,17 @@ export interface iCharacterBriefResult {
   isEnrichmentCallUsed: boolean;
 }
 
+function createUserPromptFact(prompt: string) {
+  return {
+    id: 'user-prompt',
+    statement: prompt.trim(),
+    provenance: AGENT_FACT_PROVENANCES.user,
+    sourceId: null,
+    impact: AGENT_GAP_IMPACTS.high,
+    isReversibleDefault: false,
+  } as const;
+}
+
 function countWords(value: string): number {
   return value.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -35,14 +46,7 @@ export function isCharacterBriefSufficient(input: iCharacterBriefInput): boolean
 
 export function createCharacterBriefFromSufficientInput(input: iCharacterBriefInput): iCharacterBrief {
   const confirmedFacts = [
-    {
-      id: 'user-prompt',
-      statement: input.prompt.trim(),
-      provenance: AGENT_FACT_PROVENANCES.user,
-      sourceId: null,
-      impact: AGENT_GAP_IMPACTS.high,
-      isReversibleDefault: false,
-    },
+    createUserPromptFact(input.prompt),
     ...input.requestedFieldKeys.flatMap((fieldKey) => {
       const value = input.card.data[fieldKey].trim();
       return value
@@ -104,7 +108,14 @@ export function createCharacterBriefService(dependencies: iCharacterBriefService
         return { brief: createCharacterBriefFromSufficientInput(input), isEnrichmentCallUsed: false };
       }
 
-      const brief = CHARACTER_BRIEF_SCHEMA.parse(await dependencies.enrichBrief(input, abortSignal));
+      const enrichedBrief = CHARACTER_BRIEF_SCHEMA.parse(await dependencies.enrichBrief(input, abortSignal));
+      const brief = CHARACTER_BRIEF_SCHEMA.parse({
+        ...enrichedBrief,
+        confirmedFacts: [
+          createUserPromptFact(input.prompt),
+          ...enrichedBrief.confirmedFacts.filter((fact) => fact.id !== 'user-prompt'),
+        ],
+      });
       assertBriefScope(brief, input.requestedFieldKeys);
       return { brief, isEnrichmentCallUsed: true };
     },

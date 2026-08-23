@@ -106,9 +106,22 @@ export const CHARACTER_CONTENT_PLAN_ENTRY_SCHEMA = z.object({
   dependsOnFieldKeys: z.array(CHARACTER_TEXT_FIELD_KEY_SCHEMA),
 });
 
+export const CHARACTER_CONTENT_PLAN_DRAFT_ENTRY_SCHEMA = CHARACTER_CONTENT_PLAN_ENTRY_SCHEMA.pick({
+  fieldKey: true,
+  purpose: true,
+  ownedFactIds: true,
+  allowedEchoFactIds: true,
+  forbiddenRestatements: true,
+  relevantContext: true,
+});
+
+export const CHARACTER_CONTENT_PLAN_DRAFT_SCHEMA = z.object({
+  entries: z.array(CHARACTER_CONTENT_PLAN_DRAFT_ENTRY_SCHEMA).min(1),
+  styleBible: z.array(z.string().trim().min(1).max(300)).max(12),
+});
+
 export const CHARACTER_CONTENT_PLAN_SCHEMA = z.object({
   entries: z.array(CHARACTER_CONTENT_PLAN_ENTRY_SCHEMA).min(1),
-  coupledFieldGroups: z.array(z.array(CHARACTER_TEXT_FIELD_KEY_SCHEMA).min(1).max(2)),
   styleBible: z.array(z.string().trim().min(1).max(300)).max(12),
 });
 export type iCharacterContentPlan = z.infer<typeof CHARACTER_CONTENT_PLAN_SCHEMA>;

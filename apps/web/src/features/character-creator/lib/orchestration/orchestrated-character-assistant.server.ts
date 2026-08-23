@@ -1,6 +1,6 @@
 import { EventType } from '@tanstack/ai';
 import type { ModelMessage, StreamChunk, TokenUsage, UIMessage } from '@tanstack/ai';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { generateUuid } from '@~/utils/uuid';
 
@@ -13,26 +13,30 @@ import {
 import type { iCharacterAssistantProposalStore } from '../assistant/character-assistant-tools';
 import { CHARACTER_TEXT_FIELD_KEYS, CHARACTER_TEXT_FIELD_KEY_SCHEMA } from '../cards/card-schema';
 import type { CharacterTextFieldKey } from '../cards/card-schema';
-import { TEMPLATE_MODES } from '../cards/field-templates';
+import { doesValueMatchStrictFieldTemplate } from '../cards/field-template-enforcement';
+import { normalizeTemplateSlotLabel, parseTemplateSlots, TEMPLATE_MODES } from '../cards/field-templates';
 import { parseRepairedJson } from '../generation/json-repair';
+import { parseSlotResponse, renderStrictTemplate } from '../generation/strict-template-renderer';
 import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import type { AgentRole } from '../provider/agent-role-contracts';
+import { MODEL_CAPABILITIES } from '../provider/model-capabilities';
 import { PROVIDER_KINDS } from '../provider/provider-health';
 import {
   AGENT_PROGRESS_PHASES,
+  AGENT_ROUTES,
   AGENT_ROUTE_DECISION_SCHEMA,
   CHARACTER_BRIEF_SCHEMA,
-  CHARACTER_CONTENT_PLAN_SCHEMA,
+  CHARACTER_CONTENT_PLAN_DRAFT_SCHEMA,
   PROSE_JOB_RESULT_SCHEMA,
 } from './agent-orchestration-contracts';
-import type { AgentProgressPhase, iProseJob } from './agent-orchestration-contracts';
+import type { AgentProgressPhase, AgentRoute, iProseJob } from './agent-orchestration-contracts';
 import {
   AGENT_ORCHESTRATION_EVENT_NAMES,
   AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA,
   AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA,
 } from './agent-orchestration-events';
 import { createAgentOrchestrationService } from './agent-orchestration-service';
-import type { iAgentOrchestrationCallResult } from './agent-orchestration-service';
+import type { iAgentOrchestrationCallResult, iAgentOrchestrationInput } from './agent-orchestration-service';
 import { createAgentRoleExecutor } from './agent-role-executor.server';
 import type { iAgentRoleExecutionResult, iAgentRoleExecutor } from './agent-role-executor.server';
 import { createAgentRoleProfiles } from './agent-role-profile-service';
@@ -67,6 +71,28 @@ const DEFAULT_DEPENDENCIES: iOrchestratedCharacterAssistantDependencies = {
   executor: createAgentRoleExecutor(),
   generateUuid,
 };
+
+const DRAFTING_REQUEST_PATTERN =
+  /\b(?:add|build|change|complete|create|define|discover|draft|edit|expand|generate|make|propose|revise|rewrite|write)\b/i;
+const ADVICE_LEAD_PATTERN = /^\s*(?:how|what|when|where|which|why|should)\b/i;
+
+export function shouldUseModelIntentRouter(prompt: string): boolean {
+  if (ADVICE_LEAD_PATTERN.test(prompt)) return true;
+  return !DRAFTING_REQUEST_PATTERN.test(prompt) && prompt.includes('?');
+}
+
+function createDeterministicDraftRoute(input: iAgentOrchestrationInput) {
+  const hasExistingRequestedContent = input.requestedFieldKeys.some((fieldKey) =>
+    input.currentFields[fieldKey]?.trim(),
+  );
+  let route: AgentRoute = AGENT_ROUTES['full-card'];
+  if (input.requestedFieldKeys.length === 1) route = AGENT_ROUTES['focused-edit'];
+  else if (hasExistingRequestedContent) route = AGENT_ROUTES['multi-field-edit'];
+  return {
+    output: { route, answer: null },
+    usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, latencyMs: 0 },
+  } satisfies iAgentOrchestrationCallResult<unknown>;
+}
 
 function createStreamEventQueue(): iStreamEventQueue {
   const chunks: StreamChunk[] = [];
@@ -165,8 +191,19 @@ function getStrictTemplates(templates: readonly iChatTemplateRef[]) {
   ) as Partial<Record<CharacterTextFieldKey, string>>;
 }
 
-function readRequiredMacros(value: string) {
-  return [...new Set(value.match(/\{\{[^{}]+\}\}/g) ?? [])];
+function getPromptTemplates(templates: readonly iChatTemplateRef[]) {
+  return Object.fromEntries(
+    templates.flatMap((template) => {
+      if (template.mode !== TEMPLATE_MODES.prompt) return [];
+      return template.fieldKeys.flatMap((fieldKey) =>
+        CHARACTER_TEXT_FIELD_KEY_SCHEMA.safeParse(fieldKey).success ? [[fieldKey, template.content]] : [],
+      );
+    }),
+  ) as Partial<Record<CharacterTextFieldKey, string>>;
+}
+
+export function readRequiredMacros(value: string) {
+  return [...new Set((value.match(/\{\{[^{}]+\}\}/g) ?? []).filter((macro) => !/^\{\{\s*gen:/i.test(macro)))];
 }
 
 function getRequiredMacros(
@@ -186,13 +223,109 @@ function stringifyRoleInput(value: unknown) {
   return JSON.stringify(value);
 }
 
-function parseProseResult(job: iProseJob, value: string) {
+function unwrapUnexpectedSlotMarkup(value: string) {
+  const match = /^\s*\[?\s*<slot\s+name\s*=\s*["'][^"']+["']\s*>([\s\S]*?)<\/slot>\s*\]?\s*$/i.exec(value);
+  return match?.[1]?.trim() ?? value;
+}
+
+function normalizeSingleFieldProse(fieldKey: CharacterTextFieldKey, value: string) {
+  const trimmedValue = value.trim();
+
+  if (trimmedValue.startsWith('{') || trimmedValue.startsWith('"')) {
+    try {
+      const parsedValue: unknown = JSON.parse(trimmedValue);
+      if (typeof parsedValue === 'string') return parsedValue.trim();
+      const parsedRecord = z.record(z.string(), z.unknown()).safeParse(parsedValue);
+      if (parsedRecord.success) {
+        const fieldValue = parsedRecord.data[fieldKey];
+        if (typeof fieldValue === 'string') return fieldValue.trim();
+      }
+    } catch {
+      // Keep malformed or ordinary prose unchanged; provider repair belongs to structured calls.
+    }
+  }
+
+  return trimmedValue;
+}
+
+export function parseProseResult(
+  job: iProseJob,
+  value: string,
+  currentDrafts: Partial<Record<CharacterTextFieldKey, string>> = {},
+) {
+  let result;
   if (job.fieldKeys.length === 1) {
     const fieldKey = job.fieldKeys[0];
     if (!fieldKey) throw new Error(`Prose job ${job.id} has no field.`);
-    return PROSE_JOB_RESULT_SCHEMA.parse({ jobId: job.id, fields: { [fieldKey]: value.trim() } });
+    result = PROSE_JOB_RESULT_SCHEMA.parse({
+      jobId: job.id,
+      fields: { [fieldKey]: normalizeSingleFieldProse(fieldKey, value) },
+    });
+  } else {
+    result = parseRepairedJson(value, PROSE_JOB_RESULT_SCHEMA);
   }
-  return parseRepairedJson(value, PROSE_JOB_RESULT_SCHEMA);
+
+  return {
+    ...result,
+    fields: Object.fromEntries(
+      Object.entries(result.fields).map(([fieldKey, fieldValue]) => {
+        const parsedFieldKey = CHARACTER_TEXT_FIELD_KEY_SCHEMA.parse(fieldKey);
+        const strictTemplate = job.strictTemplates[parsedFieldKey];
+        const renderBase = currentDrafts[parsedFieldKey] ?? strictTemplate;
+        const slotValues = parseSlotResponse(fieldValue);
+        const requestedSlots = strictTemplate ? parseTemplateSlots(strictTemplate) : [];
+        const hasParsedSlots = Object.keys(slotValues).length > 0;
+        const hasUnresolvedGenerationSlots = /\{\{\s*gen:/i.test(fieldValue);
+        const fullStrictTemplate =
+          strictTemplate === undefined ? undefined : (currentDrafts[parsedFieldKey] ?? strictTemplate);
+
+        if (
+          !hasParsedSlots &&
+          fullStrictTemplate !== undefined &&
+          !hasUnresolvedGenerationSlots &&
+          doesValueMatchStrictFieldTemplate(fullStrictTemplate, fieldValue.trim())
+        ) {
+          return [fieldKey, fieldValue.trim()];
+        }
+
+        if (!hasParsedSlots && requestedSlots.length === 1) {
+          const requestedSlot = requestedSlots[0];
+          if (requestedSlot) slotValues[normalizeTemplateSlotLabel(requestedSlot.label)] = fieldValue.trim();
+        }
+        return [
+          fieldKey,
+          renderBase ? renderStrictTemplate(renderBase, slotValues) : unwrapUnexpectedSlotMarkup(fieldValue),
+        ];
+      }),
+    ),
+  };
+}
+
+export function createTargetedRepairJob(
+  job: iProseJob,
+  currentDrafts: Partial<Record<CharacterTextFieldKey, string>>,
+): iProseJob {
+  return {
+    ...job,
+    strictTemplates: Object.fromEntries(
+      Object.entries(job.strictTemplates).map(([fieldKey, strictTemplate]) => {
+        const parsedFieldKey = CHARACTER_TEXT_FIELD_KEY_SCHEMA.parse(fieldKey);
+        const unresolvedSlots = parseTemplateSlots(currentDrafts[parsedFieldKey] ?? '');
+        if (unresolvedSlots.length === 0) return [fieldKey, strictTemplate];
+        return [
+          fieldKey,
+          unresolvedSlots.map(({ label, hint }) => `{{gen:${label}${hint ? `:${hint}` : ''}}}`).join('\n'),
+        ];
+      }),
+    ),
+  };
+}
+
+export function createStrictSlotResultSchema(strictTemplate: string) {
+  const requiredLabels = parseTemplateSlots(strictTemplate).map(({ label }) => normalizeTemplateSlotLabel(label));
+  const slotShape = Object.fromEntries(requiredLabels.map((label) => [label, z.string().trim().min(1)]));
+
+  return z.object(slotShape);
 }
 
 function createRunBudgets(maximumOutputTokens: number): {
@@ -252,6 +385,7 @@ function createOrchestrationRun(
     CHARACTER_TEXT_FIELD_KEYS.map((fieldKey) => [fieldKey, payload.card.data[fieldKey]]),
   ) as Record<CharacterTextFieldKey, string>;
   const strictTemplates = getStrictTemplates(payload.templates);
+  const promptTemplates = getPromptTemplates(payload.templates);
   const requiredMacros = getRequiredMacros(requestedFieldKeys, currentFields, strictTemplates);
   const profiles = createAgentRoleProfiles({
     generationBudget: payload.agentGenerationBudget,
@@ -286,7 +420,46 @@ function createOrchestrationRun(
     addRoleMetrics(metrics, execution);
     return { output: execution.value, usage: toCallUsage(execution) };
   };
-  const executeProse = async (job: iProseJob, extraInput: unknown = {}, isRepair = false) => {
+  const executeProse = async (
+    job: iProseJob,
+    extraInput: {
+      drafts?: Partial<Record<CharacterTextFieldKey, string>>;
+      findings?: unknown;
+      isTargetedRepair?: boolean;
+    } = {},
+    isRepair = false,
+  ) => {
+    const strictFieldKey = job.fieldKeys.length === 1 ? job.fieldKeys[0] : undefined;
+    const strictTemplate = strictFieldKey ? job.strictTemplates[strictFieldKey] : undefined;
+
+    if (strictFieldKey && strictTemplate && parseTemplateSlots(strictTemplate).length > 0) {
+      metrics.roleCallCount += 1;
+      const execution = await dependencies.executor.executeStructured({
+        profile: {
+          ...profiles[AGENT_ROLES['prose-worker']],
+          requiredCapabilities: [MODEL_CAPABILITIES['structured-output']],
+        },
+        endpoint: payload.endpoint,
+        apiKey: payload.apiKey,
+        runId,
+        prompt: stringifyRoleInput({ job, ...(extraInput as object) }),
+        schema: createStrictSlotResultSchema(strictTemplate),
+        schemaDescription: 'Values for every requested strict-template slot, keyed by slot label.',
+        localCapabilities: payload.localCapabilities,
+        abortSignal: options.abortSignal,
+      });
+      addTokenUsage(usage, execution);
+      addRoleMetrics(metrics, execution);
+      const renderBase = extraInput.drafts?.[strictFieldKey] ?? strictTemplate;
+      return {
+        output: PROSE_JOB_RESULT_SCHEMA.parse({
+          jobId: job.id,
+          fields: { [strictFieldKey]: renderStrictTemplate(renderBase, execution.value) },
+        }),
+        usage: toCallUsage(execution),
+      };
+    }
+
     metrics.roleCallCount += 1;
     const execution = await dependencies.executor.executeProse({
       profile: profiles[AGENT_ROLES['prose-worker']],
@@ -300,7 +473,7 @@ function createOrchestrationRun(
     });
     addTokenUsage(usage, execution);
     addRoleMetrics(metrics, execution);
-    return { output: parseProseResult(job, execution.value), usage: toCallUsage(execution) };
+    return { output: parseProseResult(job, execution.value, extraInput.drafts), usage: toCallUsage(execution) };
   };
   const briefService = createCharacterBriefService({
     enrichBrief: async (input, abortSignal) => {
@@ -318,7 +491,7 @@ function createOrchestrationRun(
     planContent: async (input, abortSignal) => {
       const result = await executeStructured(
         AGENT_ROLES['content-planner'],
-        CHARACTER_CONTENT_PLAN_SCHEMA,
+        CHARACTER_CONTENT_PLAN_DRAFT_SCHEMA,
         input,
         'Field ownership and content plan.',
       );
@@ -328,19 +501,22 @@ function createOrchestrationRun(
   });
   const qualityService = createQualityGateService({
     repair: async (job, drafts, findings, abortSignal) => {
-      const result = await executeProse(job, { drafts, findings, isTargetedRepair: true }, true);
+      const repairJob = createTargetedRepairJob(job, drafts);
+      const result = await executeProse(repairJob, { drafts, findings, isTargetedRepair: true }, true);
       abortSignal?.throwIfAborted();
       return result;
     },
   });
   const service = createAgentOrchestrationService({
-    routeIntent: async (input) =>
-      executeStructured(
+    routeIntent: async (input) => {
+      if (!shouldUseModelIntentRouter(input.prompt)) return createDeterministicDraftRoute(input);
+      return executeStructured(
         AGENT_ROLES['intent-router'],
         AGENT_ROUTE_DECISION_SCHEMA,
         { prompt: input.prompt, requestedFieldKeys: input.requestedFieldKeys },
         'Advice or drafting route decision.',
-      ),
+      );
+    },
     createBrief: async (input, abortSignal) => {
       const result = await briefService.createBrief(input, abortSignal);
       queue.push({
@@ -439,6 +615,7 @@ function createOrchestrationRun(
       runId,
       currentFields,
       strictTemplates,
+      promptTemplates,
       requiredMacros,
       fieldWritingStrategy: payload.fieldWritingStrategy,
       ...budgets,

@@ -25,6 +25,7 @@ export interface iAgentOrchestrationInput extends iCharacterBriefInput {
   runId: string;
   currentFields: Partial<Record<CharacterTextFieldKey, string>>;
   strictTemplates: Partial<Record<CharacterTextFieldKey, string>>;
+  promptTemplates?: Partial<Record<CharacterTextFieldKey, string>>;
   requiredMacros: Partial<Record<CharacterTextFieldKey, readonly string[]>>;
   fieldWritingStrategy: FieldWritingStrategy;
   writerBudget: iAgentRunBudgetLimits;
@@ -118,7 +119,12 @@ async function runProseJobs(
     );
     for (const result of results) {
       if (result.status === 'rejected') {
-        return { drafts, isComplete: false, isBudgetExhausted: budget.getSnapshot().isExhausted };
+        return {
+          drafts,
+          isComplete: false,
+          isBudgetExhausted: budget.getSnapshot().isExhausted,
+          failureMessage: result.reason instanceof Error ? result.reason.message : 'A prose job failed.',
+        };
       }
       if (!budget.recordCall(result.value.result.usage)) {
         return { drafts, isComplete: false, isBudgetExhausted: true };
@@ -171,6 +177,7 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
           requestedFieldKeys: input.requestedFieldKeys,
           currentFields: input.currentFields,
           strictTemplates: input.strictTemplates,
+          promptTemplates: input.promptTemplates ?? {},
           requiredMacros: input.requiredMacros,
           fieldWritingStrategy: input.fieldWritingStrategy,
         } satisfies iContentPlanInput;
@@ -185,7 +192,9 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
           result.recovery = prose.isBudgetExhausted
             ? AGENT_ORCHESTRATION_RECOVERIES['repair-budget-exhausted']
             : AGENT_ORCHESTRATION_RECOVERIES['partial-draft'];
-          result.answer = 'Some drafts could not be completed. No proposal was created.';
+          result.answer = prose.failureMessage
+            ? `${prose.failureMessage} No proposal was created.`
+            : 'Some drafts could not be completed. No proposal was created.';
           emitPhase(input, result.phase);
           return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
         }

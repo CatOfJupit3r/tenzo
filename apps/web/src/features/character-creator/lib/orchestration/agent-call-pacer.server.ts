@@ -52,7 +52,9 @@ export function isTransientAgentCallError(error: unknown): boolean {
   const code = getErrorCode(error);
   if (['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT'].includes(code)) return true;
   const message = getErrorMessage(error);
-  return /\b(408|409|425|429|5\d\d)\b|rate.?limit|temporar|timed?\s*out|network|fetch failed/.test(message);
+  return /\b(408|409|425|429|5\d\d)\b|rate.?limit|temporar|timed?\s*out|network|fetch failed|failed to parse structured output as json|unexpected end of json|unterminated string/.test(
+    message,
+  );
 }
 
 function getRetryAfterMs(error: unknown): number | null {

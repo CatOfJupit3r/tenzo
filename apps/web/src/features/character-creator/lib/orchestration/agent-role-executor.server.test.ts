@@ -142,6 +142,24 @@ describe('agent role executor', () => {
     expect(JSON.stringify(harness.logs)).not.toContain('bounded role input');
   });
 
+  it('allows prose workers to use structured execution for strict-template slots', async () => {
+    const harness = createDependencies(createCatalog());
+    const executor = createAgentRoleExecutor(harness.dependencies);
+
+    const result = await executor.executeStructured({
+      ...callOptions(
+        createProfile({
+          role: AGENT_ROLES['prose-worker'],
+          requiredCapabilities: [MODEL_CAPABILITIES['structured-output']],
+        }),
+      ),
+      schema: z.object({ accepted: z.boolean() }),
+    });
+
+    expect(result.value).toEqual({ accepted: true });
+    expect(harness.generationCalls).toHaveLength(1);
+  });
+
   it('fails closed for an ineligible remote endpoint before generation', async () => {
     const harness = createDependencies(createCatalog({ doesCollectData: true }));
     const executor = createAgentRoleExecutor(harness.dependencies);
@@ -237,6 +255,20 @@ describe('agent role executor', () => {
     ).rejects.toThrow();
   });
 
+  it('surfaces the sanitized structured-generation failure reason', async () => {
+    const harness = createDependencies(createCatalog(), {
+      generateValidatedObject: vi.fn().mockRejectedValue(new Error('Response did not match the requested schema.')),
+    });
+    const executor = createAgentRoleExecutor(harness.dependencies);
+
+    await expect(
+      executor.executeStructured({
+        ...callOptions(createProfile()),
+        schema: z.object({ accepted: z.boolean() }),
+      }),
+    ).rejects.toThrow('generation failed: Response did not match the requested schema.');
+  });
+
   it('retries transient provider failures and records the retry count', async () => {
     let attempt = 0;
     const generate = vi.fn(async (options: iGenerateValidatedObjectOptions<{ accepted: boolean }>) => {
@@ -255,9 +287,18 @@ describe('agent role executor', () => {
       generateValidatedObject: generate as iGenerateValidatedObject,
     });
     const executor = createAgentRoleExecutor(harness.dependencies);
+    const baseProfile = createProfile();
 
     const result = await executor.executeStructured({
-      ...callOptions(createProfile()),
+      ...callOptions(
+        createProfile({
+          budget: {
+            ...baseProfile.budget,
+            maximumInputTokens: 4,
+            maximumOutputTokens: 3,
+          },
+        }),
+      ),
       schema: z.object({ accepted: z.boolean() }),
     });
 

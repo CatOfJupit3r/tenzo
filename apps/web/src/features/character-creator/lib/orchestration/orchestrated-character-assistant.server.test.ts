@@ -12,13 +12,21 @@ import { createCharacterEditProposal } from '../proposals/character-edit-proposa
 import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import { PROVIDER_KINDS } from '../provider/provider-health';
 import { AGENT_ROUTES } from './agent-orchestration-contracts';
+import type { iProseJob } from './agent-orchestration-contracts';
 import {
   AGENT_ORCHESTRATION_EVENT_NAMES,
   AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA,
   AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA,
 } from './agent-orchestration-events';
 import type { iAgentRoleExecutionUsage, iAgentRoleExecutor } from './agent-role-executor.server';
-import { createOrchestratedCharacterAssistantService } from './orchestrated-character-assistant.server';
+import {
+  createOrchestratedCharacterAssistantService,
+  createStrictSlotResultSchema,
+  createTargetedRepairJob,
+  parseProseResult,
+  readRequiredMacros,
+  shouldUseModelIntentRouter,
+} from './orchestrated-character-assistant.server';
 
 const PROSE = [
   'Mira is a meticulous railway cartographer whose charcoal coat always carries a trace of brass dust.',
@@ -82,6 +90,155 @@ async function collect(stream: AsyncIterable<StreamChunk>) {
 }
 
 describe('orchestrated character assistant stream', () => {
+  it('requires persistent card macros without preserving fillable generation slots', () => {
+    expect(
+      readRequiredMacros('# {{char}}\n{{gen:identity:one line}}\nRelationship to {{ user }}: {{GEN:bond}}'),
+    ).toEqual(['{{char}}', '{{ user }}']);
+  });
+
+  it('uses model intent routing only for advice-like prompts', () => {
+    expect(shouldUseModelIntentRouter('Haunted botanical archivist trading memories for impossible seeds.')).toBe(
+      false,
+    );
+    expect(shouldUseModelIntentRouter('Create a haunted botanical archivist.')).toBe(false);
+    expect(shouldUseModelIntentRouter('How can I make the greeting more inviting?')).toBe(true);
+  });
+
+  it('renders strict prose slots into the app-owned template skeleton', () => {
+    const job: iProseJob = {
+      id: 'prose-description',
+      fieldKeys: ['description'],
+      purposes: ['Describe the character.'],
+      ownedFacts: [],
+      allowedEchoes: [],
+      forbiddenRestatements: [],
+      relevantContext: [],
+      styleBible: [],
+      requiredMacros: ['{{char}}', '{{user}}'],
+      strictTemplates: {
+        description: '# {{char}}\nIdentity: {{gen:identity}}\nRelationship: {{gen:relationship}} with {{user}}',
+      },
+      maximumOutputTokens: 400,
+      dependsOnJobIds: [],
+    };
+
+    expect(
+      parseProseResult(
+        job,
+        '<slot name="identity">A haunted botanical archivist.</slot>\n<slot name="relationship">Trades memories</slot>',
+      ).fields.description,
+    ).toBe('# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: Trades memories with {{user}}');
+
+    expect(
+      parseProseResult(job, '<slot name="relationship">Trades memories</slot>', {
+        description:
+          '# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: {{gen:relationship}} with {{user}}',
+      }).fields.description,
+    ).toBe('# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: Trades memories with {{user}}');
+
+    expect(
+      createTargetedRepairJob(job, {
+        description: '# {{char}}\nIdentity: {{gen:identity}}\nRelationship: {{gen:relationship}} with {{user}}',
+      }).strictTemplates.description,
+    ).toBe('{{gen:identity}}\n{{gen:relationship}}');
+
+    const repairJob = createTargetedRepairJob(job, {
+      description:
+        '# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: {{gen:relationship}} with {{user}}',
+    });
+    expect(
+      parseProseResult(repairJob, 'Trades memories', {
+        description:
+          '# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: {{gen:relationship}} with {{user}}',
+      }).fields.description,
+    ).toBe('# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: Trades memories with {{user}}');
+
+    expect(
+      parseProseResult(
+        repairJob,
+        '# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: Trades memories with {{user}}',
+        {
+          description: '# {{char}}\nIdentity: {{gen:identity}}\nRelationship: {{gen:relationship}} with {{user}}',
+        },
+      ).fields.description,
+    ).toBe('# {{char}}\nIdentity: A haunted botanical archivist.\nRelationship: Trades memories with {{user}}');
+
+    expect(
+      parseProseResult(
+        createTargetedRepairJob(job, {
+          description: '# {{char}}\nIdentity: {{gen:identity}}\nRelationship: {{gen:relationship}} with {{user}}',
+        }),
+        'A complete response without the strict skeleton',
+        {
+          description: '# {{char}}\nIdentity: {{gen:identity}}\nRelationship: {{gen:relationship}} with {{user}}',
+        },
+      ).fields.description,
+    ).toBe('# {{char}}\nIdentity: {{gen:identity}}\nRelationship: {{gen:relationship}} with {{user}}');
+  });
+
+  it('does not assign raw prose to a multi-slot strict repair', () => {
+    const job: iProseJob = {
+      id: 'prose-description',
+      fieldKeys: ['description'],
+      purposes: ['Describe the character.'],
+      ownedFacts: [],
+      allowedEchoes: [],
+      forbiddenRestatements: [],
+      relevantContext: [],
+      styleBible: [],
+      requiredMacros: [],
+      strictTemplates: {
+        description: 'Identity: {{gen:identity}}\nRelationship: {{gen:relationship}}',
+      },
+      maximumOutputTokens: 400,
+      dependsOnJobIds: [],
+    };
+
+    expect(
+      parseProseResult(
+        createTargetedRepairJob(job, {
+          description: 'Identity: {{gen:identity}}\nRelationship: {{gen:relationship}}',
+        }),
+        'Ambiguous prose for two slots',
+        { description: 'Identity: {{gen:identity}}\nRelationship: {{gen:relationship}}' },
+      ).fields.description,
+    ).toBe('Identity: {{gen:identity}}\nRelationship: {{gen:relationship}}');
+  });
+
+  it('requires and normalizes every key in a structured strict-slot result', () => {
+    const schema = createStrictSlotResultSchema('{{gen:Identity}}\n{{gen:relationship:how they regard the user}}');
+
+    expect(schema.parse({ identity: 'An archivist.', relationship: 'A wary client.' })).toEqual({
+      identity: 'An archivist.',
+      relationship: 'A wary client.',
+    });
+    expect(schema.safeParse({ identity: 'An archivist.' }).success).toBe(false);
+  });
+
+  it('unwraps accidental slot markup from a field without a strict template', () => {
+    const job: iProseJob = {
+      id: 'prose-personality',
+      fieldKeys: ['personality'],
+      purposes: ['Define personality.'],
+      ownedFacts: [],
+      allowedEchoes: [],
+      forbiddenRestatements: [],
+      relevantContext: [],
+      styleBible: [],
+      requiredMacros: [],
+      strictTemplates: {},
+      maximumOutputTokens: 400,
+      dependsOnJobIds: [],
+    };
+
+    expect(
+      parseProseResult(job, '[<slot name="personality">Quiet, exacting, and curious.</slot>]').fields.personality,
+    ).toBe('Quiet, exacting, and curious.');
+    expect(parseProseResult(job, '{"personality":"Quiet, exacting, and curious."}').fields.personality).toBe(
+      'Quiet, exacting, and curious.',
+    );
+  });
+
   it('answers advice with exactly one role call and no proposal', async () => {
     const executeStructured = vi
       .fn()
@@ -132,11 +289,6 @@ describe('orchestrated character assistant stream', () => {
     const roles: string[] = [];
     const executeStructured: iAgentRoleExecutor['executeStructured'] = async (options) => {
       roles.push(options.profile.role);
-      if (options.profile.role === AGENT_ROLES['intent-router']) {
-        return createExecution({ route: AGENT_ROUTES['focused-edit'], answer: null }, 'intent-router', {
-          costUsd: 0.01,
-        }) as never;
-      }
       if (options.profile.role === AGENT_ROLES['content-planner']) {
         return createExecution(
           {
@@ -154,7 +306,6 @@ describe('orchestrated character assistant stream', () => {
                 dependsOnFieldKeys: [],
               },
             ],
-            coupledFieldGroups: [],
             styleBible: ['Specific, grounded prose.'],
           },
           'content-planner',
@@ -187,7 +338,7 @@ describe('orchestrated character assistant stream', () => {
       }),
     );
 
-    expect(roles).toEqual([AGENT_ROLES['intent-router'], AGENT_ROLES['content-planner']]);
+    expect(roles).toEqual([AGENT_ROLES['content-planner']]);
     expect(appendProposedCard).toHaveBeenCalledTimes(1);
     expect(projectedCard.data.description).toBe(PROSE);
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_END)).toBe(true);
@@ -206,11 +357,11 @@ describe('orchestrated character assistant stream', () => {
     if (metricsChunk?.type !== EventType.CUSTOM) throw new Error('Metrics event was not emitted.');
     expect(AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metricsChunk.value)).toEqual({
       runId: 'run-1',
-      roleCallCount: 3,
-      inputTokens: 30,
-      outputTokens: 30,
-      costUsd: 0.06,
-      latencyMs: 30,
+      roleCallCount: 2,
+      inputTokens: 20,
+      outputTokens: 20,
+      costUsd: 0.05,
+      latencyMs: 20,
     });
     expect(JSON.stringify(metricsChunk)).not.toContain('Mira');
     expect(JSON.stringify(metricsChunk)).not.toContain('apiKey');

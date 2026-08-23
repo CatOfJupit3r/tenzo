@@ -436,6 +436,10 @@ export function useCharacterAssistantWorkspace({
     sendMessage,
     requestResponse: async () => {
       try {
+        setOrchestrationPhase(null);
+        setAssumptionSummary([]);
+        setQualityFindings([]);
+        setRecoveryMessage(null);
         await chat.reload();
         return true;
       } catch (error) {

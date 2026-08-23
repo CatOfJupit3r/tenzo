@@ -16,7 +16,7 @@ import type {
 import type { iAgentCallUsage } from './agent-run-budget';
 import { createAgentRunBudget } from './agent-run-budget';
 
-export const MAX_QUALITY_REPAIR_PASSES = 2;
+export const MAX_QUALITY_REPAIR_PASSES = 5;
 
 export interface iQualityGateInput {
   brief: iCharacterBrief;
@@ -136,7 +136,15 @@ export function createQualityGateService(dependencies: iQualityGateDependencies)
           }
 
           const candidateFindings = runDeterministicChecks({ ...input, drafts: candidateDrafts });
-          if (countBlockingFindings(candidateFindings) >= countBlockingFindings(findings)) break;
+          if (countBlockingFindings(candidateFindings) > countBlockingFindings(findings)) break;
+          let hasDraftChanged = false;
+          for (const fieldKey of job.fieldKeys) {
+            if (candidateDrafts[fieldKey] !== drafts[fieldKey]) {
+              hasDraftChanged = true;
+              break;
+            }
+          }
+          if (!hasDraftChanged) break;
           drafts = candidateDrafts;
           findings = candidateFindings;
         }

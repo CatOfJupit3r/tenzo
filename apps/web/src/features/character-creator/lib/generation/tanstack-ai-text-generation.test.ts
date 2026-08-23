@@ -7,6 +7,7 @@ import { GENERATION_PROVIDERS } from './generation-config';
 import { createOpenRouterErrorPreservingHttpClient } from './openrouter-stream-error';
 import {
   createCharacterModelOptions,
+  createAgentRoleModelOptions,
   createCharacterStructuredModelOptions,
   createCharacterTextGenerationService,
   createCharacterToolModelOptions,
@@ -244,6 +245,49 @@ describe('TanStack AI text generation', () => {
     ).toMatchObject({
       provider: { dataCollection: 'deny', zdr: true, only: ['parasail'] },
     });
+  });
+
+  it('builds role calls only from a resolved eligible endpoint set', () => {
+    const generationSettings = {
+      maxTokens: 400,
+      temperature: 0.8,
+      topP: 0.9,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+      topK: 0,
+      minP: 0,
+    };
+
+    expect(
+      createAgentRoleModelOptions('https://openrouter.ai/api', generationSettings, {
+        isEligible: true,
+        isLocal: false,
+        routing: {
+          only: ['eligible-provider'],
+          allowFallbacks: false,
+          dataCollection: 'deny',
+          zdr: true,
+          requireParameters: true,
+        },
+        failures: [],
+      }),
+    ).toMatchObject({
+      provider: {
+        only: ['eligible-provider'],
+        allowFallbacks: false,
+        dataCollection: 'deny',
+        zdr: true,
+        requireParameters: true,
+      },
+    });
+    expect(() =>
+      createAgentRoleModelOptions('https://openrouter.ai/api', generationSettings, {
+        isEligible: false,
+        isLocal: false,
+        routing: null,
+        failures: [{ reason: 'model-moderated', providerSlug: null }],
+      }),
+    ).toThrow('model-moderated');
   });
 
   it('passes compatible-provider samplers using native wire names', () => {

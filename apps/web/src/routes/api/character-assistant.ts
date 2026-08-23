@@ -3,16 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { ZodError } from 'zod';
 
 import { CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '@~/features/character-creator/lib/assistant/character-assistant-generation-mode';
-import { streamCharacterAssistant } from '@~/features/character-creator/lib/assistant/character-assistant-runtime.server';
-import { generateStructuredCharacterAssistantStream } from '@~/features/character-creator/lib/assistant/character-assistant-structured.server';
 import { generateCharacterDiscoveryDirections } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
-import {
-  createNativeToolRouteKey,
-  fallbackFromUnsupportedNativeTools,
-  isNativeToolRouteUnsupported,
-  markNativeToolRouteUnsupported,
-} from '@~/features/character-creator/lib/assistant/native-tool-fallback';
 import {
   suppressGenerationAbort,
   toAbortSafeServerSentEventsResponse,
@@ -22,6 +13,7 @@ import {
   describeGenerationError,
   logGenerationError,
 } from '@~/features/character-creator/lib/generation/generation-error';
+import { streamOrchestratedCharacterAssistant } from '@~/features/character-creator/lib/orchestration/orchestrated-character-assistant.server';
 import {
   createCharacterEditProposal,
   preserveAssistantProtectedFields,
@@ -93,38 +85,12 @@ export const Route = createFileRoute('/api/character-assistant')({
               }),
             payload.fieldShouldAllowAssistantEditing,
           );
-          const commonOptions = {
-            card: payload.card,
-            focus: payload.focus,
-            contextAttachments: payload.contextAttachments,
-            apiKey: payload.apiKey,
-            generationSettings: payload,
-            shouldSendDisabledSamplers: payload.shouldSendDisabledSamplers,
-            globalCharacterInstruction: payload.globalCharacterInstruction,
-            generalCharacterIdea: payload.generalCharacterIdea,
-            discoveryContext: payload.discoveryContext,
-            templates: payload.templates,
-            exampleCharacters: payload.exampleCharacters,
-            maxExampleContextCharacters: payload.maxExampleContextCharacters,
-            fieldShouldAllowAssistantEditing: payload.fieldShouldAllowAssistantEditing,
-            store,
+          const stream = streamOrchestratedCharacterAssistant({
+            payload,
             messages: chatParams.messages,
+            store,
             abortSignal: request.signal,
-          };
-          const nativeToolRouteKey = createNativeToolRouteKey(
-            payload.endpoint,
-            payload.model,
-            payload.openRouterProvider,
-          );
-          const shouldUseStructuredActions =
-            payload.assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'] ||
-            isNativeToolRouteUnsupported(nativeToolRouteKey);
-          const stream = shouldUseStructuredActions
-            ? generateStructuredCharacterAssistantStream(commonOptions)
-            : fallbackFromUnsupportedNativeTools(streamCharacterAssistant({ ...commonOptions, maxSteps: 8 }), () => {
-                markNativeToolRouteUnsupported(nativeToolRouteKey);
-                return generateStructuredCharacterAssistantStream(commonOptions);
-              });
+          });
 
           const abortController = new AbortController();
           request.signal.addEventListener('abort', () => abortController.abort(request.signal.reason), { once: true });

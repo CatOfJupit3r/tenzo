@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
 import {
   getModelCompatibilityStatus,
   MODEL_CAPABILITIES,
@@ -22,22 +21,17 @@ describe('model capabilities', () => {
     });
   });
 
-  it('requires structured output and native tools for tool-call mode', () => {
+  it('requires structured output for the content-planning pipeline', () => {
     expect(
-      getModelCompatibilityStatus(
-        {
-          [MODEL_CAPABILITIES['structured-output']]: true,
-          [MODEL_CAPABILITIES['tool-calling']]: false,
-          hasJointStructuredOutputAndToolCalling: false,
-        },
-        CHARACTER_ASSISTANT_GENERATION_MODES['tool-call'],
-      ),
+      getModelCompatibilityStatus({
+        [MODEL_CAPABILITIES['structured-output']]: false,
+        [MODEL_CAPABILITIES['tool-calling']]: true,
+        hasJointStructuredOutputAndToolCalling: false,
+      }),
     ).toBe(MODEL_COMPATIBILITY_STATUSES.incompatible);
   });
 
   it('reports unknown when the provider does not publish capability metadata', () => {
-    expect(getModelCompatibilityStatus(null, CHARACTER_ASSISTANT_GENERATION_MODES['structured-output'])).toBe(
-      MODEL_COMPATIBILITY_STATUSES.unknown,
-    );
+    expect(getModelCompatibilityStatus(null)).toBe(MODEL_COMPATIBILITY_STATUSES.unknown);
   });
 });

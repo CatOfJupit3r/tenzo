@@ -1,8 +1,5 @@
 import { z } from 'zod';
 
-import { CHARACTER_ASSISTANT_GENERATION_MODES } from '../assistant/character-assistant-generation-mode';
-import type { CharacterAssistantGenerationMode } from '../assistant/character-assistant-generation-mode';
-
 export const MODEL_CAPABILITY_SCHEMA = z.enum(['structured-output', 'tool-calling']);
 export const MODEL_CAPABILITIES = MODEL_CAPABILITY_SCHEMA.enum;
 export type ModelCapability = z.infer<typeof MODEL_CAPABILITY_SCHEMA>;
@@ -73,26 +70,16 @@ export function mergeModelCapabilities(values: readonly iModelCapabilities[]): i
   };
 }
 
-export function getRequiredModelCapabilities(
-  assistantGenerationMode: CharacterAssistantGenerationMode,
-): ModelCapability[] {
-  return assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['tool-call']
-    ? [MODEL_CAPABILITIES['structured-output'], MODEL_CAPABILITIES['tool-calling']]
-    : [MODEL_CAPABILITIES['structured-output']];
+export function getRequiredModelCapabilities(): ModelCapability[] {
+  return [MODEL_CAPABILITIES['structured-output']];
 }
 
-export function getModelCompatibilityStatus(
-  capabilities: iModelCapabilities | null,
-  assistantGenerationMode: CharacterAssistantGenerationMode,
-): ModelCompatibilityStatus {
+export function getModelCompatibilityStatus(capabilities: iModelCapabilities | null): ModelCompatibilityStatus {
   if (!capabilities) {
     return MODEL_COMPATIBILITY_STATUSES.unknown;
   }
 
-  const hasRequiredCapabilities =
-    assistantGenerationMode === CHARACTER_ASSISTANT_GENERATION_MODES['tool-call']
-      ? capabilities.hasJointStructuredOutputAndToolCalling
-      : getRequiredModelCapabilities(assistantGenerationMode).every((capability) => capabilities[capability]);
+  const hasRequiredCapabilities = getRequiredModelCapabilities().every((capability) => capabilities[capability]);
 
   return hasRequiredCapabilities ? MODEL_COMPATIBILITY_STATUSES.compatible : MODEL_COMPATIBILITY_STATUSES.incompatible;
 }

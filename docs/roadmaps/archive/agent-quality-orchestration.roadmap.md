@@ -792,7 +792,20 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 **Rationale:** Fine-tuning would expand beyond user-selected provider models and the local-first configuration model.
 **Effect on roadmap:** Fine-tuning is not part of core completion.
 
-## 15. Archive Checklist
+## 15. Live Verification Follow-up
+
+The 2026-08-23 watched browser check used OpenRouter, the balanced generation budget, and separate calls per field against empty characters. Reviewer-relevant product decisions from the session are:
+
+- Keep the brief enricher and content planner, but remove avoidable model calls and planner-owned runtime machinery between them and the writers. Obvious drafting requests now route deterministically; advice can still use the model router. Planner output is a compact ownership/context draft, while dependency-free jobs, depth budgets, macros, strict templates, and field purposes are app-owned.
+- Leave subjective prose quality to the user at proposal review. Deterministic review remains responsible only for objective blockers such as empty fields, required macros, unresolved strict-template slots, and structural drift. The repair worker is retained for those blockers.
+- Keep field-call granularity as the existing user toggle. Separate calls protect field depth and context; combined calls remain available to reduce requests. Pacer supplies bounded concurrency, retry delay, and retry-after handling for transient rate limits and truncated structured JSON.
+- Treat templates as app-owned constraints. Strict `{{gen:...}}` slots are generated as an exact structured slot map and rendered into the immutable skeleton; generation slots are not persistent macros. Prompt-guidance templates and app-owned field rubrics are forwarded to the relevant writer job without becoming hard quality gates.
+
+The live iterations also fixed stale warning state on regeneration, surfaced sanitized role failures, expanded retry-aware role budgets, preserved one primary owner for the global prompt, discarded planner-invented fact IDs, and guaranteed that the exact user prompt remains an app-owned confirmed fact after sparse-prompt enrichment. Selected concrete creative choices, motifs, boundaries, tone, and template guidance now reach every per-field writer, preventing independent calls from inventing conflicting identities. Single-field JSON or accidental slot wrappers are normalized without changing ordinary prose.
+
+The original `sao10k/l3.1-euryale-70b` route completed structurally after these fixes but produced corrupted and inconsistent prose, so no proposal from that model was applied. The watched acceptance run switched only the browser's user-selected model to `deepseek/deepseek-chat`; the health check confirmed structured-output support and an eligible zero-retention, data-collection-denied route. From the eight-word prompt `Haunted botanical archivist trading memories for impossible seeds.`, the flow completed Understanding, Planning, Drafting, Reviewing, and Proposing. The reviewed six-field proposal consistently used Elowen Thorne, preserved the strict description skeleton, produced an actionable user-facing scenario and first message, and included multi-turn example dialogue. `Apply all` saved all six changes and renamed the character to Elowen Thorne.
+
+## 16. Archive Checklist
 
 - [x] Status is `Completed and aligned`.
 - [x] Current repository state is accurate.
@@ -803,10 +816,11 @@ The resulting live path is: route intent, enrich only when the brief is sparse, 
 - [x] Privacy-policy verification is recorded.
 - [x] The roadmap reads as shipped history rather than active implementation guidance.
 
-## 16. Changelog
+## 17. Changelog
 
 | Date       | Change                                                                                         |
 | ---------- | ---------------------------------------------------------------------------------------------- |
+| 2026-08-23 | Completed watched short-prompt verification, recorded the session simplifications, fixed deterministic routing, retry diagnostics, app-owned planning constraints, strict-slot rendering, shared enriched context, prompt-template forwarding, and applied the reviewed six-field Elowen Thorne character. |
 | 2026-08-23 | Completed the simplified orchestration rollout, recorded user-owned subjective quality, removed application-selected model evaluation and the legacy comparison runtime, and archived the roadmap. |
 | 2026-08-23 | Made field-call granularity user-selectable, removed mandatory model criticism, and added Pacer-based concurrency and transient retry controls. |
 | 2026-08-20 | Created the roadmap from a repository audit and current OpenRouter ZDR/model catalog research. |

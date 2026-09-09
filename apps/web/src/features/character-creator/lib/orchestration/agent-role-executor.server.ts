@@ -469,6 +469,32 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
     return { adapter, resolution: resolved.resolution };
   };
 
+  const failExecution = (
+    error: unknown,
+    context: iAgentRoleExecutionContext,
+    repairCount: number,
+    abortSignal?: AbortSignal,
+  ): never => {
+    recordExecution(context, dependencies.logAgentRoleCall, {
+      outcome: isCancellation(error, abortSignal)
+        ? AGENT_ROLE_CALL_OUTCOMES.CANCELLED
+        : AGENT_ROLE_CALL_OUTCOMES.FAILED,
+      repairCount,
+      policyFailureReason: toFailureReason(error),
+    });
+    if (error instanceof AgentRoleExecutionError) throw error;
+    const { profile } = context;
+    throw new AgentRoleExecutionError(
+      `Agent role "${profile.role}" generation failed: ${describeGenerationError(error)}`,
+      {
+        code: AGENT_ROLE_EXECUTION_ERROR_CODES.GENERATION_FAILED,
+        role: profile.role,
+        modelId: profile.modelId,
+        cause: error,
+      },
+    );
+  };
+
   const executeStructured = async <T>(
     options: iStructuredAgentRoleCallOptions<T>,
   ): Promise<iAgentRoleExecutionResult<T>> => {
@@ -516,23 +542,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       });
       return createExecutionResult(value, context, executionUsage);
     } catch (error) {
-      recordExecution(context, dependencies.logAgentRoleCall, {
-        outcome: isCancellation(error, options.abortSignal)
-          ? AGENT_ROLE_CALL_OUTCOMES.CANCELLED
-          : AGENT_ROLE_CALL_OUTCOMES.FAILED,
-        repairCount: 0,
-        policyFailureReason: toFailureReason(error),
-      });
-      if (error instanceof AgentRoleExecutionError) throw error;
-      throw new AgentRoleExecutionError(
-        `Agent role "${profile.role}" generation failed: ${describeGenerationError(error)}`,
-        {
-          code: AGENT_ROLE_EXECUTION_ERROR_CODES.GENERATION_FAILED,
-          role: profile.role,
-          modelId: profile.modelId,
-          cause: error,
-        },
-      );
+      return failExecution(error, context, 0, options.abortSignal);
     }
   };
 
@@ -594,23 +604,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       });
       return createExecutionResult(value, context, executionUsage);
     } catch (error) {
-      recordExecution(context, dependencies.logAgentRoleCall, {
-        outcome: isCancellation(error, options.abortSignal)
-          ? AGENT_ROLE_CALL_OUTCOMES.CANCELLED
-          : AGENT_ROLE_CALL_OUTCOMES.FAILED,
-        repairCount: options.isRepair === true ? 1 : 0,
-        policyFailureReason: toFailureReason(error),
-      });
-      if (error instanceof AgentRoleExecutionError) throw error;
-      throw new AgentRoleExecutionError(
-        `Agent role "${profile.role}" generation failed: ${describeGenerationError(error)}`,
-        {
-          code: AGENT_ROLE_EXECUTION_ERROR_CODES.GENERATION_FAILED,
-          role: profile.role,
-          modelId: profile.modelId,
-          cause: error,
-        },
-      );
+      return failExecution(error, context, options.isRepair === true ? 1 : 0, options.abortSignal);
     }
   };
 

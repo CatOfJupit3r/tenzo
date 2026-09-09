@@ -13,6 +13,7 @@ import {
 
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from '../lib/assistant/character-assistant-contracts';
+import type { iCharacterEditProposal } from '../lib/proposals/character-edit-proposal';
 import { createCharacterEditProposal } from '../lib/proposals/character-edit-proposal';
 import type { iCharacterAssistantConversationProps } from './character-assistant-conversation';
 import { CharacterAssistantConversation } from './character-assistant-conversation';
@@ -35,6 +36,26 @@ function getConversationProps(overrides: Partial<iCharacterAssistantConversation
 
 function renderConversation(overrides: Partial<iCharacterAssistantConversationProps> = {}) {
   return render(<CharacterAssistantConversation {...getConversationProps(overrides)} />);
+}
+
+function createProposalMessages(proposal: iCharacterEditProposal): UIMessage[] {
+  return [
+    {
+      id: 'assistant-message',
+      role: MESSAGE_ROLES.ASSISTANT,
+      createdAt: new Date('2026-08-14T00:00:00.000Z'),
+      parts: [
+        {
+          type: MESSAGE_PART_TYPES_CASES.TOOL_CALL,
+          id: 'tool-call',
+          name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
+          arguments: '{}',
+          state: TOOL_CALL_STATES.COMPLETE,
+          output: { proposal },
+        },
+      ],
+    },
+  ];
 }
 
 describe('CharacterAssistantConversation', () => {
@@ -139,23 +160,7 @@ describe('CharacterAssistantConversation', () => {
       toolCallId: 'tool-call',
       summary: 'Coordinate the character details.',
     });
-    const messages: UIMessage[] = [
-      {
-        id: 'assistant-message',
-        role: MESSAGE_ROLES.ASSISTANT,
-        createdAt: new Date('2026-08-14T00:00:00.000Z'),
-        parts: [
-          {
-            type: MESSAGE_PART_TYPES_CASES.TOOL_CALL,
-            id: 'tool-call',
-            name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
-            arguments: '{}',
-            state: TOOL_CALL_STATES.COMPLETE,
-            output: { proposal },
-          },
-        ],
-      },
-    ];
+    const messages = createProposalMessages(proposal);
     const onApply = vi.fn();
     const onReject = vi.fn();
     const onJumpToField = vi.fn();
@@ -187,23 +192,7 @@ describe('CharacterAssistantConversation', () => {
       proposedCard,
       toolCallId: 'tool-call',
     });
-    const messages: UIMessage[] = [
-      {
-        id: 'assistant-message',
-        role: MESSAGE_ROLES.ASSISTANT,
-        createdAt: new Date('2026-08-14T00:00:00.000Z'),
-        parts: [
-          {
-            type: MESSAGE_PART_TYPES_CASES.TOOL_CALL,
-            id: 'tool-call',
-            name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
-            arguments: '{}',
-            state: TOOL_CALL_STATES.COMPLETE,
-            output: { proposal },
-          },
-        ],
-      },
-    ];
+    const messages = createProposalMessages(proposal);
 
     renderConversation({ messages });
 

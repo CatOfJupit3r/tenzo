@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CharacterCard } from '../cards/card-schema';
+import {
+  CHARACTER_CARD_SPECS,
+  CHARACTER_CARD_SPEC_VERSIONS,
+} from '@~/features/character-creator/lib/cards/card-file-enums';
+import { CHARACTER_TEXT_FIELD_KEY } from '@~/features/character-creator/lib/cards/card-schema';
+
+import type { CharacterCard, CharacterTextFieldKey } from '../cards/card-schema';
+import type { iCharacterBrief, iCharacterContentPlan, iProseJob } from './agent-orchestration-contracts';
 import {
   AGENT_FACT_PROVENANCES,
   AGENT_GAP_IMPACTS,
@@ -9,9 +16,8 @@ import {
   AGENT_ROUTES,
   QUALITY_FINDING_SEVERITIES,
 } from './agent-orchestration-contracts';
-import type { iCharacterBrief, iCharacterContentPlan, iProseJob } from './agent-orchestration-contracts';
-import { createAgentOrchestrationService } from './agent-orchestration-service';
 import type { iAgentOrchestrationInput } from './agent-orchestration-service';
+import { createAgentOrchestrationService } from './agent-orchestration-service';
 import { createCharacterBriefService } from './character-brief-service';
 import { createContentPlanService } from './content-plan-service';
 import { FIELD_WRITING_STRATEGIES } from './field-writing-strategy';
@@ -28,8 +34,8 @@ const RUN_BUDGET = {
 
 function createCard(): CharacterCard {
   return {
-    spec: 'chara_card_v2',
-    spec_version: '2.0',
+    spec: CHARACTER_CARD_SPECS.CHARA_CARD_V2,
+    spec_version: CHARACTER_CARD_SPEC_VERSIONS.VALUE_2_0,
     data: {
       name: 'Mira',
       description: '',
@@ -49,15 +55,15 @@ function createCard(): CharacterCard {
   };
 }
 
-function createBrief(fieldKeys: Array<'description' | 'personality'> = ['description']): iCharacterBrief {
+function createBrief(fieldKeys: CharacterTextFieldKey[] = ['description']): iCharacterBrief {
   return {
     confirmedFacts: [
       {
         id: 'fact-1',
         statement: 'Mira is a guarded archivist.',
-        provenance: AGENT_FACT_PROVENANCES.user,
+        provenance: AGENT_FACT_PROVENANCES.USER,
         sourceId: null,
-        impact: AGENT_GAP_IMPACTS.high,
+        impact: AGENT_GAP_IMPACTS.HIGH,
         isReversibleDefault: false,
       },
     ],
@@ -72,7 +78,7 @@ function createBrief(fieldKeys: Array<'description' | 'personality'> = ['descrip
   };
 }
 
-function createPlan(fieldKeys: Array<'description' | 'personality'> = ['description']): iCharacterContentPlan {
+function createPlan(fieldKeys: CharacterTextFieldKey[] = ['description']): iCharacterContentPlan {
   return {
     entries: fieldKeys.map((fieldKey, index) => ({
       fieldKey,
@@ -90,7 +96,7 @@ function createPlan(fieldKeys: Array<'description' | 'personality'> = ['descript
   };
 }
 
-function createJob(fieldKeys: Array<'description' | 'personality'> = ['description']): iProseJob {
+function createJob(fieldKeys: CharacterTextFieldKey[] = ['description']): iProseJob {
   return {
     id: `prose-${fieldKeys.join('-')}`,
     fieldKeys,
@@ -112,14 +118,14 @@ function createInput(): iAgentOrchestrationInput {
     runId: 'run-1',
     prompt: 'Make Mira a guarded archivist with dry humor and a precise physical presence.',
     card: createCard(),
-    requestedFieldKeys: ['description'],
+    requestedFieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION],
     referenceSummaries: [],
     toneAndStyle: [],
     boundaries: [],
     currentFields: { description: '' },
     strictTemplates: {},
     requiredMacros: {},
-    fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+    fieldWritingStrategy: FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS,
     writerBudget: RUN_BUDGET,
     qualityBudget: RUN_BUDGET,
   };
@@ -137,7 +143,7 @@ describe('character brief service', () => {
 
     expect(result.isEnrichmentCallUsed).toBe(false);
     expect(result.brief.confirmedFacts[0]).toEqual(
-      expect.objectContaining({ provenance: AGENT_FACT_PROVENANCES.user }),
+      expect.objectContaining({ provenance: AGENT_FACT_PROVENANCES.USER }),
     );
     expect(enrichBrief).not.toHaveBeenCalled();
   });
@@ -150,9 +156,9 @@ describe('character brief service', () => {
         {
           id: 'assumption-1',
           statement: 'Keeps a reversible paper-catalog habit.',
-          provenance: AGENT_FACT_PROVENANCES['model-assumption'],
+          provenance: AGENT_FACT_PROVENANCES.MODEL_ASSUMPTION,
           sourceId: null,
-          impact: AGENT_GAP_IMPACTS.low,
+          impact: AGENT_GAP_IMPACTS.LOW,
           isReversibleDefault: true,
         },
       ],
@@ -173,7 +179,7 @@ describe('character brief service', () => {
     const invalidService = createCharacterBriefService({
       enrichBrief: vi.fn().mockResolvedValue({
         ...validBrief,
-        assumptions: [{ ...validBrief.assumptions[0], impact: AGENT_GAP_IMPACTS.high }],
+        assumptions: [{ ...validBrief.assumptions[0], impact: AGENT_GAP_IMPACTS.HIGH }],
       }),
     });
     await expect(invalidService.createBrief({ ...createInput(), prompt: 'Guarded archivist.' })).rejects.toThrow(
@@ -190,7 +196,7 @@ describe('content plan service', () => {
       {
         id: 'identity',
         description: 'Her name is Ilyra Fen and she uses she/her pronouns.',
-        impact: AGENT_GAP_IMPACTS.low,
+        impact: AGENT_GAP_IMPACTS.LOW,
         isSelected: true,
       },
     ];
@@ -198,12 +204,12 @@ describe('content plan service', () => {
 
     const result = await service.createPlan({
       brief,
-      requestedFieldKeys: ['description', 'personality'],
+      requestedFieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION, CHARACTER_TEXT_FIELD_KEY.PERSONALITY],
       currentFields: {},
       strictTemplates: {},
       promptTemplates: { personality: 'Personality(core traits; likes; dislikes; quirks)' },
       requiredMacros: {},
-      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS,
     });
 
     expect(result.jobs).toHaveLength(2);
@@ -226,11 +232,11 @@ describe('content plan service', () => {
 
     const result = await service.createPlan({
       brief: createBrief(['description', 'personality']),
-      requestedFieldKeys: ['description', 'personality'],
+      requestedFieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION, CHARACTER_TEXT_FIELD_KEY.PERSONALITY],
       currentFields: {},
       strictTemplates: {},
       requiredMacros: {},
-      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'],
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES.COMBINED_FIELDS,
     });
 
     expect(result.jobs).toHaveLength(1);
@@ -247,11 +253,11 @@ describe('content plan service', () => {
 
     const result = await createContentPlanService({ planContent: vi.fn().mockResolvedValue(plan) }).createPlan({
       brief,
-      requestedFieldKeys: ['description', 'personality'],
+      requestedFieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION, CHARACTER_TEXT_FIELD_KEY.PERSONALITY],
       currentFields: {},
       strictTemplates: {},
       requiredMacros: {},
-      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS,
     });
 
     expect(result.plan.entries[0].ownedFactIds).toEqual(['user-prompt']);
@@ -266,11 +272,11 @@ describe('content plan service', () => {
     await expect(
       createContentPlanService({ planContent: vi.fn().mockResolvedValue(missingOwnership) }).createPlan({
         brief: createBrief(),
-        requestedFieldKeys: ['description'],
+        requestedFieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION],
         currentFields: {},
         strictTemplates: {},
         requiredMacros: {},
-        fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+        fieldWritingStrategy: FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS,
       }),
     ).rejects.toThrow('exactly one primary field');
   });
@@ -283,11 +289,11 @@ describe('content plan service', () => {
 
     const result = await createContentPlanService({ planContent: vi.fn().mockResolvedValue(plan) }).createPlan({
       brief: createBrief(['description', 'personality']),
-      requestedFieldKeys: ['description', 'personality'],
+      requestedFieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION, CHARACTER_TEXT_FIELD_KEY.PERSONALITY],
       currentFields: {},
       strictTemplates: { description: '**Identity:** {{gen:identity}}' },
       requiredMacros: { description: ['{{char}}'] },
-      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS,
     });
 
     expect(result.plan.entries[0]).toMatchObject({
@@ -362,7 +368,7 @@ describe('quality gate service', () => {
 
     expect(repair).toHaveBeenCalledTimes(2);
     expect(result.repairCount).toBe(2);
-    expect(result.findings.some((finding) => finding.severity === QUALITY_FINDING_SEVERITIES.error)).toBe(false);
+    expect(result.findings.some((finding) => finding.severity === QUALITY_FINDING_SEVERITIES.ERROR)).toBe(false);
   });
 
   it('returns an explicit recoverable state when a targeted repair fails', async () => {
@@ -392,7 +398,7 @@ describe('agent orchestration service', () => {
     const submitProposal = vi.fn().mockResolvedValue({ proposalId: 'proposal-1' });
     return {
       routeIntent: vi.fn().mockResolvedValue({
-        output: { route: AGENT_ROUTES['focused-edit'], answer: null },
+        output: { route: AGENT_ROUTES.FOCUSED_EDIT, answer: null },
         usage: ZERO_USAGE,
       }),
       createBrief: vi.fn().mockResolvedValue({ brief: createBrief(), isEnrichmentCallUsed: false }),
@@ -415,14 +421,14 @@ describe('agent orchestration service', () => {
   it('answers advice in one role call without invoking drafting or proposals', async () => {
     const dependencies = createDependencies();
     dependencies.routeIntent.mockResolvedValue({
-      output: { route: AGENT_ROUTES.advice, answer: 'Use an actionable hook and preserve user agency.' },
+      output: { route: AGENT_ROUTES.ADVICE, answer: 'Use an actionable hook and preserve user agency.' },
       usage: ZERO_USAGE,
     });
 
     const result = await createAgentOrchestrationService(dependencies).run(createInput());
 
     expect(result).toEqual(
-      expect.objectContaining({ route: AGENT_ROUTES.advice, phase: AGENT_PROGRESS_PHASES.completed, proposalId: null }),
+      expect.objectContaining({ route: AGENT_ROUTES.ADVICE, phase: AGENT_PROGRESS_PHASES.COMPLETED, proposalId: null }),
     );
     expect(dependencies.routeIntent).toHaveBeenCalledTimes(1);
     expect(dependencies.createBrief).not.toHaveBeenCalled();
@@ -440,20 +446,20 @@ describe('agent orchestration service', () => {
 
     expect(result).toEqual(
       expect.objectContaining({
-        route: AGENT_ROUTES['focused-edit'],
-        phase: AGENT_PROGRESS_PHASES.completed,
+        route: AGENT_ROUTES.FOCUSED_EDIT,
+        phase: AGENT_PROGRESS_PHASES.COMPLETED,
         drafts: { description: 'A complete focused description.' },
         proposalId: 'proposal-1',
       }),
     );
     expect(dependencies.submitProposal).toHaveBeenCalledAfter(dependencies.reviewQuality);
     expect(phases).toEqual([
-      AGENT_PROGRESS_PHASES.understanding,
-      AGENT_PROGRESS_PHASES.planning,
-      AGENT_PROGRESS_PHASES.drafting,
-      AGENT_PROGRESS_PHASES.reviewing,
-      AGENT_PROGRESS_PHASES.proposing,
-      AGENT_PROGRESS_PHASES.completed,
+      AGENT_PROGRESS_PHASES.UNDERSTANDING,
+      AGENT_PROGRESS_PHASES.PLANNING,
+      AGENT_PROGRESS_PHASES.DRAFTING,
+      AGENT_PROGRESS_PHASES.REVIEWING,
+      AGENT_PROGRESS_PHASES.PROPOSING,
+      AGENT_PROGRESS_PHASES.COMPLETED,
     ]);
   });
 
@@ -466,7 +472,7 @@ describe('agent orchestration service', () => {
           {
             id: 'question-1',
             question: 'Should the relationship be romantic or platonic?',
-            impact: AGENT_GAP_IMPACTS.high,
+            impact: AGENT_GAP_IMPACTS.HIGH,
             options: ['Romantic', 'Platonic'],
           },
         ],
@@ -476,7 +482,7 @@ describe('agent orchestration service', () => {
 
     const result = await createAgentOrchestrationService(dependencies).run(createInput());
 
-    expect(result.recovery).toBe(AGENT_ORCHESTRATION_RECOVERIES['clarification-required']);
+    expect(result.recovery).toBe(AGENT_ORCHESTRATION_RECOVERIES.CLARIFICATION_REQUIRED);
     expect(dependencies.createPlan).not.toHaveBeenCalled();
     expect(dependencies.submitProposal).not.toHaveBeenCalled();
   });
@@ -487,7 +493,7 @@ describe('agent orchestration service', () => {
 
     const result = await createAgentOrchestrationService(dependencies).run(createInput());
 
-    expect(result.recovery).toBe(AGENT_ORCHESTRATION_RECOVERIES['partial-draft']);
+    expect(result.recovery).toBe(AGENT_ORCHESTRATION_RECOVERIES.PARTIAL_DRAFT);
     expect(result.answer).toContain('Writer unavailable.');
     expect(dependencies.submitProposal).not.toHaveBeenCalled();
   });

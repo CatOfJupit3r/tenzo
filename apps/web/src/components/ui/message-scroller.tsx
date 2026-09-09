@@ -2,6 +2,7 @@ import { MessageScroller as MessageScrollerPrimitive } from '@shadcn/react/messa
 import type { ComponentProps } from 'react';
 import { LuArrowDown } from 'react-icons/lu';
 
+import { BUTTON_SIZES, BUTTON_VARIANTS, MESSAGE_ALIGNMENTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 import { Button } from './button';
@@ -59,12 +60,12 @@ function MessageScrollerItem({
 }
 
 function MessageScrollerButton({
-  direction = 'end',
+  direction = MESSAGE_ALIGNMENTS.END,
   className,
   children,
   render,
-  variant = 'secondary',
-  size = 'sm',
+  variant = BUTTON_VARIANTS.SECONDARY,
+  size = BUTTON_SIZES.SM,
   ...props
 }: ComponentProps<typeof MessageScrollerPrimitive.Button> & Pick<ComponentProps<typeof Button>, 'variant' | 'size'>) {
   return (
@@ -84,7 +85,7 @@ function MessageScrollerButton({
       {children ?? (
         <>
           <LuArrowDown />
-          <span className="sr-only">{direction === 'end' ? 'Scroll to end' : 'Scroll to start'}</span>
+          <span className="sr-only">{direction === MESSAGE_ALIGNMENTS.END ? 'Scroll to end' : 'Scroll to start'}</span>
         </>
       )}
     </MessageScrollerPrimitive.Button>
@@ -92,10 +93,10 @@ function MessageScrollerButton({
 }
 
 export {
-  MessageScrollerProvider,
   MessageScroller,
-  MessageScrollerViewport,
+  MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerItem,
-  MessageScrollerButton,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
 };

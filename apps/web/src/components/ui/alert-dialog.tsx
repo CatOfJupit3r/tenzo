@@ -2,6 +2,7 @@ import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 
 import { buttonVariants } from '@~/components/ui/button';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 function AlertDialog({ ...props }: ComponentProps<typeof AlertDialogPrimitive.Root>) {
@@ -90,19 +91,24 @@ function AlertDialogAction({ className, ...props }: ComponentProps<typeof AlertD
 }
 
 function AlertDialogCancel({ className, ...props }: ComponentProps<typeof AlertDialogPrimitive.Cancel>) {
-  return <AlertDialogPrimitive.Cancel className={cn(buttonVariants({ variant: 'outline' }), className)} {...props} />;
+  return (
+    <AlertDialogPrimitive.Cancel
+      className={cn(buttonVariants({ variant: BUTTON_VARIANTS.OUTLINE }), className)}
+      {...props}
+    />
+  );
 }
 
 export {
   AlertDialog,
-  AlertDialogPortal,
-  AlertDialogOverlay,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 };

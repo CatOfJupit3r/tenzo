@@ -1,3 +1,4 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import { loggerFactory } from '@~/lib/logging/logger';
@@ -6,8 +7,9 @@ import type { iLogger } from '@~/lib/logging/logging-contracts';
 import { AGENT_ROLE_SCHEMA } from '../provider/agent-role-contracts';
 import { PROVIDER_POLICY_FAILURE_REASON_SCHEMA } from '../provider/provider-policy-resolver';
 
-export const AGENT_ROLE_CALL_OUTCOME_SCHEMA = z.enum(['completed', 'failed', 'cancelled']);
-export const AGENT_ROLE_CALL_OUTCOMES = AGENT_ROLE_CALL_OUTCOME_SCHEMA.enum;
+export const AGENT_ROLE_CALL_OUTCOME_ENUM = em(['COMPLETED', 'FAILED', 'CANCELLED']);
+export const AGENT_ROLE_CALL_OUTCOMES = AGENT_ROLE_CALL_OUTCOME_ENUM.enum;
+export const AGENT_ROLE_CALL_OUTCOME_SCHEMA = z.enum(AGENT_ROLE_CALL_OUTCOMES);
 
 export const AGENT_ROLE_CALL_EVENT_SCHEMA = z.object({
   runId: z.string().trim().min(1),
@@ -33,7 +35,7 @@ export function logAgentRoleCall(event: iAgentRoleCallEvent, logger: iLogger = A
   const parsedEvent = AGENT_ROLE_CALL_EVENT_SCHEMA.parse(event);
   const context = { event: 'character-assistant-agent-role', ...parsedEvent };
 
-  if (parsedEvent.outcome === AGENT_ROLE_CALL_OUTCOMES.failed) {
+  if (parsedEvent.outcome === AGENT_ROLE_CALL_OUTCOMES.FAILED) {
     logger.error('Agent role call', new Error(parsedEvent.policyFailureReason ?? 'Agent role call failed.'), context);
     return;
   }

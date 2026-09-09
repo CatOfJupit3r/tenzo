@@ -6,8 +6,11 @@ import { createElement } from 'react';
 import { LuFileText } from 'react-icons/lu';
 import { z } from 'zod';
 
-import { STORED_FIELD_TEMPLATE_SCHEMA } from '../cards/field-templates';
+import { EDITOR_NODE_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
+import { KEYBOARD_KEYS } from '@~/lib/keyboard-enums';
+
 import type { iFieldTemplateViewModel } from '../cards/field-templates';
+import { STORED_FIELD_TEMPLATE_SCHEMA } from '../cards/field-templates';
 
 type iChatTemplateSuggestionProps = SuggestionProps<iFieldTemplateViewModel, iFieldTemplateViewModel>;
 const CHAT_TEMPLATE_VIEW_MODEL_SCHEMA = STORED_FIELD_TEMPLATE_SCHEMA.extend({ isBuiltIn: z.boolean() });
@@ -79,25 +82,25 @@ function createSuggestionRenderer() {
         return false;
       }
 
-      if (props.event.key === 'ArrowDown') {
+      if (props.event.key === KEYBOARD_KEYS.ARROW_DOWN) {
         selectedIndex = (selectedIndex + 1) % latestProps.items.length;
         renderer?.updateProps({ ...latestProps, selectedIndex });
         return true;
       }
 
-      if (props.event.key === 'ArrowUp') {
+      if (props.event.key === KEYBOARD_KEYS.ARROW_UP) {
         selectedIndex = (selectedIndex - 1 + latestProps.items.length) % latestProps.items.length;
         renderer?.updateProps({ ...latestProps, selectedIndex });
         return true;
       }
 
-      if (props.event.key === 'Enter') {
+      if (props.event.key === KEYBOARD_KEYS.ENTER) {
         props.event.preventDefault();
         latestProps.command(latestProps.items[selectedIndex]);
         return true;
       }
 
-      if (props.event.key === 'Escape') {
+      if (props.event.key === KEYBOARD_KEYS.ESCAPE) {
         renderer?.destroy();
         renderer = null;
         return true;
@@ -172,7 +175,7 @@ export function buildChatTemplateMentionExtension({
           .chain()
           .focus()
           .insertContentAt(range, {
-            type: 'mention',
+            type: EDITOR_NODE_TYPES.MENTION,
             attrs: { id: template.id, label: template.name },
           })
           .run();
@@ -183,7 +186,7 @@ export function buildChatTemplateMentionExtension({
     renderHTML: ({ options, node }) => [
       'span',
       mergeAttributes(options.HTMLAttributes, {
-        'data-type': 'mention',
+        'data-type': EDITOR_NODE_TYPES.MENTION,
         title: `Template: ${node.attrs.label ?? 'Untitled template'}`,
       }),
       `▣ /${node.attrs.label ?? ''}`,

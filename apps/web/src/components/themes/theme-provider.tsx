@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+
+import { appThemeEnum, USER_THEME } from '@~/components/themes/constants';
 
 import type { UserTheme } from './constants';
 import { ThemeContext } from './context';
@@ -16,13 +18,13 @@ export function ThemeProvider({ children, initialTheme }: iThemeProviderProps) {
   useEffect(() => {
     handleThemeChange(userTheme);
 
-    if (userTheme === 'system') {
+    if (userTheme === USER_THEME.SYSTEM) {
       return setupPreferredListener();
     }
     return undefined;
   }, [userTheme]);
 
-  const appTheme = userTheme === 'system' ? getSystemTheme() : userTheme;
+  const appTheme = userTheme === USER_THEME.SYSTEM ? getSystemTheme() : appThemeEnum.parse(userTheme);
 
   const setTheme = (newUserTheme: UserTheme) => {
     setUserTheme(newUserTheme);

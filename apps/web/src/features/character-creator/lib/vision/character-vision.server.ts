@@ -1,14 +1,20 @@
 import type { AnyTextAdapter, ModelMessage } from '@tanstack/ai';
 import { z } from 'zod';
 
-import { generateValidatedObject } from '../generation/structured-output.server';
+import {
+  CONTENT_SOURCE_TYPES_CASES,
+  MESSAGE_PART_TYPES_CASES,
+  MESSAGE_ROLES,
+} from '@~/features/character-creator/lib/generation/message-enums';
+
 import type { iGenerateValidatedObject } from '../generation/structured-output.server';
+import { generateValidatedObject } from '../generation/structured-output.server';
 import {
   createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
 } from '../generation/tanstack-ai-text-generation';
-import { CHARACTER_IMAGE_ANALYSIS_SCHEMA, CHARACTER_VISION_REQUEST_SCHEMA } from './character-vision-contracts';
 import type { iCharacterImageAnalysis, iCharacterVisionRequest } from './character-vision-contracts';
+import { CHARACTER_IMAGE_ANALYSIS_SCHEMA, CHARACTER_VISION_REQUEST_SCHEMA } from './character-vision-contracts';
 
 const VISION_SYSTEM_PROMPT =
   'You describe character reference images for a character card editor. Describe only what is visible; put uncertainty in warnings and lower confidence. Do not invent story details.';
@@ -24,10 +30,12 @@ const CLAMPED_CHARACTER_IMAGE_ANALYSIS_SCHEMA = CHARACTER_IMAGE_ANALYSIS_SCHEMA.
 function buildVisionMessages(imageDataUrl: string, userHint?: string): ModelMessage[] {
   return [
     {
-      role: 'user' as const,
+      role: MESSAGE_ROLES.USER,
       content: [
-        { type: 'image' as const, source: { type: 'url' as const, value: imageDataUrl } },
-        ...(userHint?.trim() ? [{ type: 'text' as const, content: `User hint: ${userHint.trim()}` }] : []),
+        { type: MESSAGE_PART_TYPES_CASES.IMAGE, source: { type: CONTENT_SOURCE_TYPES_CASES.URL, value: imageDataUrl } },
+        ...(userHint?.trim()
+          ? [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: `User hint: ${userHint.trim()}` }]
+          : []),
       ],
     },
   ];

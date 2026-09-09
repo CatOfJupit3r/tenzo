@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MESSAGE_PART_TYPES_CASES, MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
+
 import type { iCharacterAssistantSession } from '../../lib/assistant/character-assistant-session';
 import { CharacterAssistantConversationMenu } from './character-assistant-conversation-menu';
 
@@ -8,7 +10,15 @@ function createSession(id: string, message: string, updatedAt: string): iCharact
   return {
     id,
     characterId: 'character-1',
-    messages: message ? [{ id: `${id}-message`, role: 'user', parts: [{ type: 'text', content: message }] }] : [],
+    messages: message
+      ? [
+          {
+            id: `${id}-message`,
+            role: MESSAGE_ROLES.USER,
+            parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: message }],
+          },
+        ]
+      : [],
     proposals: [],
     lastRecordedConceptToolCallId: null,
     createdAt: updatedAt,

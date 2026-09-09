@@ -1,6 +1,8 @@
-import { EventType } from '@tanstack/ai';
 import type { StreamChunk } from '@tanstack/ai';
+import { EventType } from '@tanstack/ai';
 import { z } from 'zod';
+
+import { ABORT_ERROR_NAMES, GENERATION_ABORT_CODES_CASES } from '@~/lib/abort-error-enums';
 
 import { describeGenerationError, getGenerationErrorHint, logGenerationError } from './generation-error';
 
@@ -11,13 +13,14 @@ interface iAbortSafeResponseOptions {
 
 const ABORT_RUN_ERROR_CHUNK_SCHEMA = z.object({
   type: z.literal(EventType.RUN_ERROR),
-  code: z.literal('aborted'),
+  code: z.literal(GENERATION_ABORT_CODES_CASES.ABORTED),
 });
 
 export function isGenerationAbort(error: unknown, signal?: AbortSignal) {
   return (
     signal?.aborted === true ||
-    (error instanceof Error && (error.name === 'AbortError' || error.name === 'RequestAbortedError'))
+    (error instanceof Error &&
+      (error.name === ABORT_ERROR_NAMES.ABORT_ERROR || error.name === ABORT_ERROR_NAMES.REQUEST_ABORTED_ERROR))
   );
 }
 

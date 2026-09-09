@@ -7,7 +7,7 @@ export function Logo({ className }: { className?: string }) {
   const { userTheme } = useTheme();
   return (
     <img
-      src={`/favicon/favicon${userTheme === USER_THEME.light ? '.dark' : ''}.svg`}
+      src={`/favicon/favicon${userTheme === USER_THEME.LIGHT ? '.dark' : ''}.svg`}
       className={cn('size-32', className)}
       alt="startname Logo"
     />

@@ -4,35 +4,42 @@ import { z } from 'zod';
 import { JSON_VALUE_SCHEMA } from '@~/lib/json-value';
 import { generateUuid } from '@~/utils/uuid';
 
+import {
+  CONTENT_SOURCE_TYPES_CASES,
+  MESSAGE_PART_STATUSES,
+  MESSAGE_PART_TYPES_CASES,
+  MESSAGE_ROLES,
+  TOOL_CALL_STATES,
+} from '../generation/message-enums';
 import { CHARACTER_EDIT_PROPOSAL_SCHEMA } from '../proposals/character-edit-proposal';
 
 const CONTENT_PART_SOURCE_SCHEMA = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('data'), value: z.string(), mimeType: z.string() }),
-  z.object({ type: z.literal('url'), value: z.string(), mimeType: z.string().optional() }),
+  z.object({ type: z.literal(CONTENT_SOURCE_TYPES_CASES.DATA), value: z.string(), mimeType: z.string() }),
+  z.object({ type: z.literal(CONTENT_SOURCE_TYPES_CASES.URL), value: z.string(), mimeType: z.string().optional() }),
 ]);
 
 const TEXT_CONTENT_PART_SCHEMA = z.object({
-  type: z.literal('text'),
+  type: z.literal(MESSAGE_PART_TYPES_CASES.TEXT),
   content: z.string(),
   metadata: JSON_VALUE_SCHEMA.optional(),
 });
 const IMAGE_CONTENT_PART_SCHEMA = z.object({
-  type: z.literal('image'),
+  type: z.literal(MESSAGE_PART_TYPES_CASES.IMAGE),
   source: CONTENT_PART_SOURCE_SCHEMA,
   metadata: JSON_VALUE_SCHEMA.optional(),
 });
 const AUDIO_CONTENT_PART_SCHEMA = z.object({
-  type: z.literal('audio'),
+  type: z.literal(MESSAGE_PART_TYPES_CASES.AUDIO),
   source: CONTENT_PART_SOURCE_SCHEMA,
   metadata: JSON_VALUE_SCHEMA.optional(),
 });
 const VIDEO_CONTENT_PART_SCHEMA = z.object({
-  type: z.literal('video'),
+  type: z.literal(MESSAGE_PART_TYPES_CASES.VIDEO),
   source: CONTENT_PART_SOURCE_SCHEMA,
   metadata: JSON_VALUE_SCHEMA.optional(),
 });
 const DOCUMENT_CONTENT_PART_SCHEMA = z.object({
-  type: z.literal('document'),
+  type: z.literal(MESSAGE_PART_TYPES_CASES.DOCUMENT),
   source: CONTENT_PART_SOURCE_SCHEMA,
   metadata: JSON_VALUE_SCHEMA.optional(),
 });
@@ -50,20 +57,12 @@ const CONTENT_PART_SCHEMA = z.union(CONTENT_PART_SCHEMAS);
 const UI_MESSAGE_PART_SCHEMA: z.ZodType<UIMessage['parts'][number]> = z.union([
   ...CONTENT_PART_SCHEMAS,
   z.object({
-    type: z.literal('tool-call'),
+    type: z.literal(MESSAGE_PART_TYPES_CASES.TOOL_CALL),
     id: z.string(),
     name: z.string(),
     arguments: z.string(),
     input: JSON_VALUE_SCHEMA.optional(),
-    state: z.enum([
-      'awaiting-input',
-      'input-streaming',
-      'input-complete',
-      'approval-requested',
-      'approval-responded',
-      'complete',
-      'error',
-    ]),
+    state: z.enum(TOOL_CALL_STATES),
     approval: z
       .object({
         id: z.string(),
@@ -75,21 +74,21 @@ const UI_MESSAGE_PART_SCHEMA: z.ZodType<UIMessage['parts'][number]> = z.union([
     metadata: JSON_VALUE_SCHEMA.optional(),
   }),
   z.object({
-    type: z.literal('tool-result'),
+    type: z.literal(MESSAGE_PART_TYPES_CASES.TOOL_RESULT),
     toolCallId: z.string(),
     content: z.union([z.string(), z.array(CONTENT_PART_SCHEMA)]),
-    state: z.enum(['streaming', 'complete', 'error']),
+    state: z.enum(MESSAGE_PART_STATUSES),
     error: z.string().optional(),
   }),
   z.object({
-    type: z.literal('thinking'),
+    type: z.literal(MESSAGE_PART_TYPES_CASES.THINKING),
     content: z.string(),
     stepId: z.string().optional(),
     signature: z.string().optional(),
   }),
   z.object({
-    type: z.literal('structured-output'),
-    status: z.enum(['streaming', 'complete', 'error']),
+    type: z.literal(MESSAGE_PART_TYPES_CASES.STRUCTURED_OUTPUT),
+    status: z.enum(MESSAGE_PART_STATUSES),
     partial: JSON_VALUE_SCHEMA.optional(),
     data: JSON_VALUE_SCHEMA.optional(),
     raw: z.string(),
@@ -97,7 +96,7 @@ const UI_MESSAGE_PART_SCHEMA: z.ZodType<UIMessage['parts'][number]> = z.union([
     errorMessage: z.string().optional(),
   }),
   z.object({
-    type: z.literal('ui-resource'),
+    type: z.literal(MESSAGE_PART_TYPES_CASES.UI_RESOURCE),
     resource: z.object({
       uri: z.string(),
       mimeType: z.string(),
@@ -113,7 +112,7 @@ const UI_MESSAGE_PART_SCHEMA: z.ZodType<UIMessage['parts'][number]> = z.union([
 
 const UI_MESSAGE_SCHEMA: z.ZodType<UIMessage> = z.object({
   id: z.string(),
-  role: z.enum(['system', 'user', 'assistant']),
+  role: z.enum(MESSAGE_ROLES),
   parts: z.array(UI_MESSAGE_PART_SCHEMA),
   createdAt: z
     .union([

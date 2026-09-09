@@ -1,24 +1,25 @@
 import { z } from 'zod';
 
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 import { generateUuid } from '@~/utils/uuid';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
 import {
-  CHARACTER_GENERATION_PROMPT_SETTINGS_STORAGE_SCHEMA,
   CHARACTER_GENERATION_PROMPT_SETTINGS_SCHEMA,
+  CHARACTER_GENERATION_PROMPT_SETTINGS_STORAGE_SCHEMA,
   DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   sanitizeCharacterGenerationPromptSettings,
 } from '../generation/generation-config';
-import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
-import {
-  PORTRAIT_CROP_RECT_INPUT_SCHEMA,
-  sanitizeStoredPortraitCropRect,
-} from '../portrait/portrait-focal-point';
+import { PORTRAIT_CROP_RECT_INPUT_SCHEMA, sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
+import { IMPORTED_CARD_SOURCE_KIND_ENUM } from './card-file-enums';
 import type { CharacterCard } from './card-schema';
 import { CHARACTER_CARD_SCHEMA } from './card-schema';
 
-export const CHARACTER_LIBRARY_SOURCE_SCHEMA = z.enum(['manual', 'json', 'png']);
-export const CHARACTER_LIBRARY_SOURCES = CHARACTER_LIBRARY_SOURCE_SCHEMA.enum;
+export const CHARACTER_LIBRARY_SOURCE_ENUM = IMPORTED_CARD_SOURCE_KIND_ENUM.extend(['MANUAL']);
+export const CHARACTER_LIBRARY_SOURCES = CHARACTER_LIBRARY_SOURCE_ENUM.enum;
+export const CHARACTER_LIBRARY_SOURCE_SCHEMA = z.enum(CHARACTER_LIBRARY_SOURCES);
+
 export type CharacterLibrarySource = z.infer<typeof CHARACTER_LIBRARY_SOURCE_SCHEMA>;
 
 export const DEFAULT_CHARACTER_LIBRARY_ITEM_ID = 'draft-character';
@@ -60,14 +61,14 @@ const PORTRAIT_REFERENCE_INPUT_SCHEMA = z
   .object({
     assetId: z.string().catch(''),
     fileName: z.string().catch(''),
-    mimeType: z.string().catch('application/octet-stream'),
+    mimeType: z.string().catch(MEDIA_TYPES.OCTET_STREAM),
     cropRect: PORTRAIT_CROP_RECT_INPUT_SCHEMA,
     thumbnailDataUrl: z.string().catch(''),
   })
   .catch({
     assetId: '',
     fileName: '',
-    mimeType: 'application/octet-stream',
+    mimeType: MEDIA_TYPES.OCTET_STREAM,
     cropRect: null,
     thumbnailDataUrl: '',
   })
@@ -91,7 +92,7 @@ function createStoredCharacterLibraryItemSchema(fallbackTimestamp: string) {
     card: CHARACTER_CARD_SCHEMA.optional().catch(undefined),
     promptSettings: CHARACTER_GENERATION_PROMPT_SETTINGS_STORAGE_SCHEMA,
     portrait: PORTRAIT_REFERENCE_INPUT_SCHEMA.nullable().catch(null),
-    source: CHARACTER_LIBRARY_SOURCE_SCHEMA.catch(CHARACTER_LIBRARY_SOURCES.manual),
+    source: CHARACTER_LIBRARY_SOURCE_SCHEMA.catch(CHARACTER_LIBRARY_SOURCES.MANUAL),
     createdAt: z
       .string()
       .refine((value) => value.trim() !== '')
@@ -112,7 +113,7 @@ export function createCharacterLibraryItem({
   card,
   promptSettings = DEFAULT_CHARACTER_GENERATION_PROMPT_SETTINGS,
   portrait = null,
-  source = CHARACTER_LIBRARY_SOURCES.manual,
+  source = CHARACTER_LIBRARY_SOURCES.MANUAL,
 }: {
   id?: string;
   card?: CharacterCard;

@@ -13,6 +13,8 @@ import {
 } from '@~/components/ui/alert-dialog';
 import { Button } from '@~/components/ui/button/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@~/components/ui/popover';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import { MESSAGE_PART_TYPES_CASES, MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
 import { cn } from '@~/lib/utils';
 
 import type { iCharacterAssistantSession } from '../../lib/assistant/character-assistant-session';
@@ -27,9 +29,11 @@ interface iCharacterAssistantConversationMenuProps {
 }
 
 function getConversationTitle(session: iCharacterAssistantSession) {
-  const firstUserMessage = session.messages.find((message) => message.role === 'user');
+  const firstUserMessage = session.messages.find((message) => message.role === MESSAGE_ROLES.USER);
   const text = firstUserMessage?.parts
-    .flatMap((part) => (part.type === 'text' && typeof part.content === 'string' ? [part.content] : []))
+    .flatMap((part) =>
+      part.type === MESSAGE_PART_TYPES_CASES.TEXT && typeof part.content === 'string' ? [part.content] : [],
+    )
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -70,7 +74,7 @@ export function CharacterAssistantConversationMenu({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="ghost"
+            variant={BUTTON_VARIANTS.GHOST}
             className="h-auto min-w-0 max-w-full justify-start gap-2 px-2 py-1 text-left"
             disabled={isDisabled}
             aria-label="Manage conversations"
@@ -89,8 +93,8 @@ export function CharacterAssistantConversationMenu({
             </div>
             <Button
               type="button"
-              size="sm"
-              variant="outline"
+              size={BUTTON_SIZES.SM}
+              variant={BUTTON_VARIANTS.OUTLINE}
               onClick={() => {
                 setIsOpen(false);
                 void onCreate();
@@ -133,8 +137,8 @@ export function CharacterAssistantConversationMenu({
                   </button>
                   <Button
                     type="button"
-                    size="sm"
-                    variant="ghost"
+                    size={BUTTON_SIZES.SM}
+                    variant={BUTTON_VARIANTS.GHOST}
                     className="size-8 shrink-0 p-0 text-muted-foreground opacity-70 hover:text-destructive group-hover:opacity-100"
                     aria-label={`Delete ${sessionTitles.get(session.id)}`}
                     onClick={() => {

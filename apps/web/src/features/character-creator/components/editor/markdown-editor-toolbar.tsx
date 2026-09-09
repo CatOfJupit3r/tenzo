@@ -20,6 +20,7 @@ import {
 import { Button } from '@~/components/ui/button';
 import { Separator } from '@~/components/ui/separator';
 import { Toggle } from '@~/components/ui/toggle';
+import { BUTTON_SIZES, BUTTON_VARIANTS, TOGGLE_SIZES } from '@~/components/ui/ui-enums';
 
 export interface iMarkdownEditorToolbarProps {
   editor: Editor | null;
@@ -38,7 +39,7 @@ function ToolbarToggle({ label, icon: Icon, isActive, isDisabled, onToggle }: iT
   return (
     <Toggle
       aria-label={label}
-      size="sm"
+      size={TOGGLE_SIZES.SM}
       className="size-8 min-w-8 p-0"
       pressed={isActive}
       disabled={isDisabled}
@@ -162,8 +163,8 @@ export function MarkdownEditorToolbar({ editor, isDisabled = false }: iMarkdownE
       <Separator orientation="vertical" className="mx-0.5 h-5" />
       <Button
         type="button"
-        variant="ghost"
-        size="icon"
+        variant={BUTTON_VARIANTS.GHOST}
+        size={BUTTON_SIZES.ICON}
         className="size-8"
         aria-label="Undo"
         disabled={isDisabled || !toolbarState.canUndo}
@@ -173,8 +174,8 @@ export function MarkdownEditorToolbar({ editor, isDisabled = false }: iMarkdownE
       </Button>
       <Button
         type="button"
-        variant="ghost"
-        size="icon"
+        variant={BUTTON_VARIANTS.GHOST}
+        size={BUTTON_SIZES.ICON}
         className="size-8"
         aria-label="Redo"
         disabled={isDisabled || !toolbarState.canRedo}

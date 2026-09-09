@@ -1,6 +1,11 @@
+import {
+  CHARACTER_TEXT_FIELD_KEY,
+  CHARACTER_TEXT_FIELD_KEY_ENUM,
+} from '@~/features/character-creator/lib/cards/card-schema';
+
 import type { CharacterTextFieldKey } from '../cards/card-schema';
-import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { GenerationMode, iFieldGenerationTarget } from './generation-contracts';
+import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { SeededRandom } from './seeded-random';
 
 export const VARIATION_DIRECTIVES: readonly string[] = [
@@ -19,11 +24,11 @@ export const VARIATION_DIRECTIVES: readonly string[] = [
 ];
 
 const META_FIELD_KEYS: CharacterTextFieldKey[] = [
-  'creator',
-  'character_version',
-  'creator_notes',
-  'system_prompt',
-  'post_history_instructions',
+  CHARACTER_TEXT_FIELD_KEY.CREATOR,
+  CHARACTER_TEXT_FIELD_KEY.CHARACTER_VERSION,
+  CHARACTER_TEXT_FIELD_KEY.CREATOR_NOTES,
+  CHARACTER_TEXT_FIELD_KEY.SYSTEM_PROMPT,
+  CHARACTER_TEXT_FIELD_KEY.POST_HISTORY_INSTRUCTIONS,
 ];
 
 export interface iBuildVariationSectionOptions {
@@ -55,19 +60,19 @@ export class VariationService {
   }
 
   private isEligible(target: iFieldGenerationTarget, mode: GenerationMode) {
-    if (mode === GENERATION_MODES.continue) {
+    if (mode === GENERATION_MODES.CONTINUE) {
       return false;
     }
 
-    if (target.kind === GENERATION_TARGET_KINDS['general-character-idea']) {
+    if (target.kind === GENERATION_TARGET_KINDS.GENERAL_CHARACTER_IDEA) {
       return false;
     }
 
-    if (target.kind !== GENERATION_TARGET_KINDS.field) {
+    if (target.kind !== GENERATION_TARGET_KINDS.FIELD) {
       return true;
     }
 
-    const fieldKey = target.key.replace(/^field:/, '') as CharacterTextFieldKey;
+    const fieldKey = CHARACTER_TEXT_FIELD_KEY_ENUM.parse(target.key.replace(/^field:/, ''));
     return !META_FIELD_KEYS.includes(fieldKey);
   }
 }

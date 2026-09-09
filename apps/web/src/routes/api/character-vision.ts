@@ -7,6 +7,7 @@ import {
   CHARACTER_VISION_RESPONSE_SCHEMA,
 } from '@~/features/character-creator/lib/vision/character-vision-contracts';
 import { analyzeCharacterImage } from '@~/features/character-creator/lib/vision/character-vision.server';
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
 import { loggerFactory } from '@~/lib/logging/logger';
 
 const MAX_VISION_REQUEST_BYTES = 3_000_000;
@@ -18,7 +19,7 @@ export const Route = createFileRoute('/api/character-vision')({
       POST: async ({ request }) => {
         let requestContext: Record<string, unknown> = {
           operation: 'character-vision',
-          requestMode: REQUEST_MODES.proxy,
+          requestMode: REQUEST_MODES.PROXY,
         };
 
         try {
@@ -48,7 +49,8 @@ export const Route = createFileRoute('/api/character-vision')({
         } catch (error) {
           const isAbortError =
             request.signal.aborted ||
-            (error instanceof Error && (error.name === 'AbortError' || error.name === 'RequestAbortedError'));
+            (error instanceof Error &&
+              (error.name === ABORT_ERROR_NAMES.ABORT_ERROR || error.name === ABORT_ERROR_NAMES.REQUEST_ABORTED_ERROR));
           if (!(error instanceof ZodError) && !(error instanceof SyntaxError) && !isAbortError) {
             CHARACTER_VISION_ROUTE_LOGGER.error('Character vision request failed', error, requestContext);
           }

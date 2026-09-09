@@ -4,22 +4,22 @@ import { MES_EXAMPLE_LINE_KINDS, classifyMesExampleLine, getSpeakerPrefixLength 
 
 describe('classifyMesExampleLine', () => {
   it('classifies START separators case-insensitively', () => {
-    expect(classifyMesExampleLine('<START>')).toBe(MES_EXAMPLE_LINE_KINDS.start);
-    expect(classifyMesExampleLine('<start>')).toBe(MES_EXAMPLE_LINE_KINDS.start);
-    expect(classifyMesExampleLine('  <START>  ')).toBe(MES_EXAMPLE_LINE_KINDS.start);
+    expect(classifyMesExampleLine('<START>')).toBe(MES_EXAMPLE_LINE_KINDS.START);
+    expect(classifyMesExampleLine('<start>')).toBe(MES_EXAMPLE_LINE_KINDS.START);
+    expect(classifyMesExampleLine('  <START>  ')).toBe(MES_EXAMPLE_LINE_KINDS.START);
   });
 
   it('classifies speaker turns', () => {
-    expect(classifyMesExampleLine('{{char}}: Hello there.')).toBe(MES_EXAMPLE_LINE_KINDS.charTurn);
-    expect(classifyMesExampleLine('{{user}}: Hi!')).toBe(MES_EXAMPLE_LINE_KINDS.userTurn);
-    expect(classifyMesExampleLine('{{CHAR}}: shouting')).toBe(MES_EXAMPLE_LINE_KINDS.charTurn);
+    expect(classifyMesExampleLine('{{char}}: Hello there.')).toBe(MES_EXAMPLE_LINE_KINDS.CHAR_TURN);
+    expect(classifyMesExampleLine('{{user}}: Hi!')).toBe(MES_EXAMPLE_LINE_KINDS.USER_TURN);
+    expect(classifyMesExampleLine('{{CHAR}}: shouting')).toBe(MES_EXAMPLE_LINE_KINDS.CHAR_TURN);
   });
 
   it('classifies everything else as plain', () => {
-    expect(classifyMesExampleLine('')).toBe(MES_EXAMPLE_LINE_KINDS.plain);
-    expect(classifyMesExampleLine('narrative continues here')).toBe(MES_EXAMPLE_LINE_KINDS.plain);
-    expect(classifyMesExampleLine('<START> of something')).toBe(MES_EXAMPLE_LINE_KINDS.plain);
-    expect(classifyMesExampleLine('{{other}}: nope')).toBe(MES_EXAMPLE_LINE_KINDS.plain);
+    expect(classifyMesExampleLine('')).toBe(MES_EXAMPLE_LINE_KINDS.PLAIN);
+    expect(classifyMesExampleLine('narrative continues here')).toBe(MES_EXAMPLE_LINE_KINDS.PLAIN);
+    expect(classifyMesExampleLine('<START> of something')).toBe(MES_EXAMPLE_LINE_KINDS.PLAIN);
+    expect(classifyMesExampleLine('{{other}}: nope')).toBe(MES_EXAMPLE_LINE_KINDS.PLAIN);
   });
 });
 

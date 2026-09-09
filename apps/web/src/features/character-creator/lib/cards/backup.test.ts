@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { IMPORTED_CARD_SOURCE_KINDS } from '@~/features/character-creator/lib/cards/card-file-enums';
+import { EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY } from '@~/features/character-creator/lib/cards/example-characters';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
+
 import { DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS } from '../generation/generation-config';
-import { readArchiveBytes, createArchiveBytes } from './archive';
+import { createArchiveBytes, readArchiveBytes } from './archive';
 import { buildFullBackupFiles, findBackupManifest, parseFullBackup, TENZO_BACKUP_FORMAT } from './backup';
 import { createCharacterLibraryItem } from './character-library';
 import type { iStoredExampleCharacter } from './example-characters';
@@ -13,7 +17,7 @@ function createSampleCharacter() {
   character.portrait = {
     assetId: 'asset-1',
     fileName: 'fire-keeper.png',
-    mimeType: 'image/png',
+    mimeType: MEDIA_TYPES.PNG,
     cropRect: { x: 0, y: 0, width: 100, height: 150 },
     thumbnailDataUrl: null,
   };
@@ -24,9 +28,9 @@ function createSampleExampleCharacter(): iStoredExampleCharacter {
   return {
     id: 'example-1',
     fileName: 'example.json',
-    sourceKind: 'json',
+    sourceKind: IMPORTED_CARD_SOURCE_KINDS.JSON,
     card: createCharacterLibraryItem().card,
-    includedFieldKeys: ['name', 'description'],
+    includedFieldKeys: [EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.NAME, EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.DESCRIPTION],
   };
 }
 
@@ -41,10 +45,10 @@ describe('backup', () => {
         model: 'custom-model',
         apiKeyCiphertext: 'super-secret',
       },
-      assets: [{ assetId: 'asset-1', mimeType: 'image/png', bytes: new Uint8Array([1, 2, 3, 4]) }],
+      assets: [{ assetId: 'asset-1', mimeType: MEDIA_TYPES.PNG, bytes: new Uint8Array([1, 2, 3, 4]) }],
     });
 
-    const archiveBytes = createArchiveBytes(files, ARCHIVE_FORMATS.zip);
+    const archiveBytes = createArchiveBytes(files, ARCHIVE_FORMATS.ZIP);
     const backup = parseFullBackup(readArchiveBytes(archiveBytes));
 
     expect(backup.manifest.format).toBe(TENZO_BACKUP_FORMAT);
@@ -55,7 +59,7 @@ describe('backup', () => {
     expect(backup.connectionSettings?.model).toBe('custom-model');
     expect(backup.assets).toHaveLength(1);
     expect(backup.assets[0].assetId).toBe('asset-1');
-    expect(backup.assets[0].mimeType).toBe('image/png');
+    expect(backup.assets[0].mimeType).toBe(MEDIA_TYPES.PNG);
     expect(Array.from(backup.assets[0].bytes)).toEqual([1, 2, 3, 4]);
   });
 

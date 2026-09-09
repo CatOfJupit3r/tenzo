@@ -1,6 +1,6 @@
 import type { iTemplateSlot } from '../lib/cards/field-templates';
-import { OUTPUT_FORMATS } from '../lib/generation/generation-config';
 import type { OutputFormat } from '../lib/generation/generation-config';
+import { OUTPUT_FORMATS } from '../lib/generation/generation-config';
 
 export const DEFAULT_CHARACTER_CARD_WRITING_GUIDE = `You are an expert character card writing assistant.
 
@@ -33,11 +33,11 @@ export const DEFAULT_POST_HISTORY_INSTRUCTIONS = '';
 
 export function getFormatInstructions(outputFormat: OutputFormat) {
   switch (outputFormat) {
-    case OUTPUT_FORMATS.xml:
+    case OUTPUT_FORMATS.XML:
       return DEFAULT_XML_FORMAT_INSTRUCTIONS;
-    case OUTPUT_FORMATS.json:
+    case OUTPUT_FORMATS.JSON:
       return DEFAULT_JSON_FORMAT_INSTRUCTIONS;
-    case OUTPUT_FORMATS.none:
+    case OUTPUT_FORMATS.NONE:
       return DEFAULT_NONE_FORMAT_INSTRUCTIONS;
     default:
       return DEFAULT_XML_FORMAT_INSTRUCTIONS;
@@ -77,11 +77,11 @@ Write only the remaining text that comes next, as a direct, seamless continuatio
 
 export function getContinuationFormatInstructions(outputFormat: OutputFormat) {
   switch (outputFormat) {
-    case OUTPUT_FORMATS.xml:
+    case OUTPUT_FORMATS.XML:
       return DEFAULT_XML_CONTINUATION_INSTRUCTIONS;
-    case OUTPUT_FORMATS.json:
+    case OUTPUT_FORMATS.JSON:
       return DEFAULT_JSON_CONTINUATION_INSTRUCTIONS;
-    case OUTPUT_FORMATS.none:
+    case OUTPUT_FORMATS.NONE:
       return DEFAULT_NONE_CONTINUATION_INSTRUCTIONS;
     default:
       return DEFAULT_XML_CONTINUATION_INSTRUCTIONS;

@@ -2,16 +2,17 @@ import { useCallback, useRef, useState } from 'react';
 import { ZodError } from 'zod';
 
 import { loggerFactory } from '@~/lib/logging/logger';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 
 import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
 import { isGenerationAbort } from '../lib/generation/abort-safe-stream';
-import { REQUEST_MODES } from '../lib/generation/generation-config';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
+import { REQUEST_MODES } from '../lib/generation/generation-config';
 import { streamCharacterText } from '../lib/generation/tanstack-ai-text-generation';
 import { buildGenerationErrorMessage, readTextResponseStream } from '../lib/generation/text-response-stream';
 import type { iPromptExampleCharacter } from '../lib/prompt/generation-contracts';
-import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { ProviderKind } from '../lib/provider/provider-health';
+import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import {
   buildTemplateEnhancementMessages,
   normalizeTemplateEnhancementResponse,
@@ -85,17 +86,17 @@ export function useTemplateEnhancement({ generationSettings, apiKey, providerKin
           presencePenalty: generationSettings.presencePenalty,
           topK: generationSettings.topK,
           minP: generationSettings.minP,
-          shouldSendDisabledSamplers: providerKind === PROVIDER_KINDS.koboldcpp,
+          shouldSendDisabledSamplers: providerKind === PROVIDER_KINDS.KOBOLDCPP,
           messages: buildTemplateEnhancementMessages(options),
         };
         let generatedContent = '';
 
         TEMPLATE_ENHANCEMENT_LOGGER.debug('Template enhancement branch selected', {
           ...operationContext,
-          branch: generationSettings.requestMode === REQUEST_MODES.browser ? 'browser' : 'proxy',
+          branch: generationSettings.requestMode === REQUEST_MODES.BROWSER ? 'browser' : 'proxy',
         });
 
-        if (generationSettings.requestMode === REQUEST_MODES.browser) {
+        if (generationSettings.requestMode === REQUEST_MODES.BROWSER) {
           const result = streamCharacterText({ ...requestData, signal: abortController.signal });
 
           for await (const content of result.textStream) {
@@ -105,7 +106,7 @@ export function useTemplateEnhancement({ generationSettings, apiKey, providerKin
           const response = await fetch('/api/character-generate', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': MEDIA_TYPES.JSON,
             },
             body: JSON.stringify(requestData),
             signal: abortController.signal,

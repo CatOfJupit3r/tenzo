@@ -6,11 +6,13 @@ import { ZodError } from 'zod';
 
 import { INTERVALS } from '@~/constants/dates';
 import { loggerFactory } from '@~/lib/logging/logger';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
 import type { CharacterCard } from '../lib/cards/card-schema';
 import { TEMPLATE_MODES } from '../lib/cards/field-templates';
 import { isGenerationAbort } from '../lib/generation/abort-safe-stream';
+import type { iCharacterGenerationConnectionSettings } from '../lib/generation/generation-config';
 import {
   decodeStoredSecret,
   encodeStoredSecret,
@@ -18,23 +20,22 @@ import {
   sanitizeCharacterGenerationConnectionSettings,
   sanitizeCharacterGenerationSettings,
 } from '../lib/generation/generation-config';
-import type { iCharacterGenerationConnectionSettings } from '../lib/generation/generation-config';
 import { getPrefilled, parseResponse } from '../lib/generation/response-parser';
 import { parseSlotResponse, renderStrictTemplate } from '../lib/generation/strict-template-renderer';
 import { streamCharacterText } from '../lib/generation/tanstack-ai-text-generation';
 import { buildGenerationErrorMessage, readTextResponseStream } from '../lib/generation/text-response-stream';
-import { GENERATION_MODES, GENERATION_TARGET_KINDS, getGenerationTargetKey } from '../lib/prompt/generation-contracts';
 import type {
   GenerationMode,
   iFieldGenerationTarget,
   iPromptExampleCharacter,
   iPromptFieldTemplate,
 } from '../lib/prompt/generation-contracts';
+import { GENERATION_MODES, GENERATION_TARGET_KINDS, getGenerationTargetKey } from '../lib/prompt/generation-contracts';
 import { characterPromptPipeline } from '../lib/prompt/prompt-pipeline';
 import { SeededRandom } from '../lib/prompt/seeded-random';
 import type { iModelCapabilities, iModelProviderOption } from '../lib/provider/model-capabilities';
-import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
+import { probeProviderMetadata, PROVIDER_KINDS } from '../lib/provider/provider-health';
 import { requestProviderHealthProxy } from '../lib/provider/provider-health-proxy';
 import type { iProviderPolicyCatalog } from '../lib/provider/provider-policy-resolver';
 import { useCharacterSession } from './use-character-session';
@@ -376,7 +377,7 @@ export function useGeneration() {
           getCredentialCacheKey(apiKey),
         ],
         queryFn: async () =>
-          connectionSettings.requestMode === REQUEST_MODES.browser
+          connectionSettings.requestMode === REQUEST_MODES.BROWSER
             ? probeProviderMetadata(requestData)
             : requestProviderHealth({ data: requestData }),
         staleTime: INTERVALS.FIVE_MINUTES,
@@ -437,7 +438,7 @@ export function useGeneration() {
       card,
       target,
       onValueChange,
-      mode = GENERATION_MODES.generate,
+      mode = GENERATION_MODES.GENERATE,
       fieldTemplate = null,
       exampleCharacters = [],
       maxExampleContextCharacters,
@@ -459,8 +460,8 @@ export function useGeneration() {
       abortControllersRef.current[fieldKey] = abortController;
       setFieldRuntimeState(fieldKey, { isGenerating: true, errorMessage: null });
 
-      const isContinuation = mode === GENERATION_MODES.continue;
-      const strictTemplate = !isContinuation && fieldTemplate?.mode === TEMPLATE_MODES.strict ? fieldTemplate : null;
+      const isContinuation = mode === GENERATION_MODES.CONTINUE;
+      const strictTemplate = !isContinuation && fieldTemplate?.mode === TEMPLATE_MODES.STRICT ? fieldTemplate : null;
       const operationContext = {
         operation: 'field-generation',
         fieldKey,
@@ -503,8 +504,7 @@ export function useGeneration() {
           globalCharacterInstruction: connectionSettings.globalCharacterInstruction,
           generalCharacterIdea: promptSettings.generalCharacterIdea,
           shouldUseGeneralCharacterIdea:
-            target.kind !== GENERATION_TARGET_KINDS['general-character-idea'] &&
-            shouldUseGeneralCharacterIdea(fieldKey),
+            target.kind !== GENERATION_TARGET_KINDS.GENERAL_CHARACTER_IDEA && shouldUseGeneralCharacterIdea(fieldKey),
           userInstructions: getFieldInstruction(fieldKey),
           fieldTemplate,
           exampleCharacters,
@@ -523,17 +523,17 @@ export function useGeneration() {
           presencePenalty: connectionSettings.presencePenalty,
           topK: connectionSettings.topK,
           minP: connectionSettings.minP,
-          shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
+          shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.KOBOLDCPP,
           messages: promptResult.messages,
         };
 
         FIELD_GENERATION_LOGGER.debug('Field generation branch selected', {
           ...operationContext,
           branch:
-            connectionSettings.requestMode === REQUEST_MODES.browser ? REQUEST_MODES.browser : REQUEST_MODES.proxy,
+            connectionSettings.requestMode === REQUEST_MODES.BROWSER ? REQUEST_MODES.BROWSER : REQUEST_MODES.PROXY,
         });
 
-        if (connectionSettings.requestMode === REQUEST_MODES.browser) {
+        if (connectionSettings.requestMode === REQUEST_MODES.BROWSER) {
           const result = streamCharacterText({
             ...requestData,
             signal: abortController.signal,
@@ -556,7 +556,7 @@ export function useGeneration() {
           const response = await fetch('/api/character-generate', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': MEDIA_TYPES.JSON,
             },
             body: JSON.stringify(requestData),
             signal: abortController.signal,

@@ -2,9 +2,11 @@ import type { Content, Editor, Extensions } from '@tiptap/core';
 import { useEditor } from '@tiptap/react';
 import { useEffect, useRef } from 'react';
 
+import type { EditorContentType } from '../lib/editor/editor-enums';
+
 export interface iSyncedEditorContent {
   content: Content;
-  contentType: 'json' | 'markdown';
+  contentType: EditorContentType;
 }
 
 export interface iUseSyncedFieldEditorOptions {

@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { Badge } from '@~/components/ui/badge';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
+import { BADGE_VARIANTS } from '@~/components/ui/ui-enums';
 
 import type { FieldEditorVariant } from '../constants/field-config';
 import { FIELD_EDITOR_VARIANTS } from '../constants/field-config';
@@ -11,8 +12,8 @@ import type {
   iFieldTemplateViewModel,
   TemplateFieldKey,
 } from '../lib/cards/field-templates';
+import type { CHARACTER_EDIT_PATCH_KINDS_CASES, iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
 import { CHARACTER_EDIT_PATCH_STATUSES } from '../lib/proposals/character-edit-proposal';
-import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { MesExampleEditor } from './editor/mes-example-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
@@ -52,7 +53,7 @@ export interface iCharacterFieldProps {
   onAcceptRewrite?: () => void;
   onResolveRewriteReview?: (mergedValue: string) => void;
   onCancel?: () => void;
-  assistantPatch?: Extract<iCharacterEditPatch, { kind: 'text' }> | null;
+  assistantPatch?: Extract<iCharacterEditPatch, { kind: typeof CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT }> | null;
   onApplyAssistantProposal?: (resolvedValue?: string) => void;
   onRejectAssistantProposal?: () => void;
 }
@@ -97,7 +98,7 @@ export function CharacterField({
 }: iCharacterFieldProps) {
   const hasGenerationControls = onInstructionChange && onGenerate && onContinue && onRewrite && onCancel;
 
-  const resolvedVariant = editorVariant ?? (rows <= 1 ? FIELD_EDITOR_VARIANTS.plain : FIELD_EDITOR_VARIANTS.markdown);
+  const resolvedVariant = editorVariant ?? (rows <= 1 ? FIELD_EDITOR_VARIANTS.PLAIN : FIELD_EDITOR_VARIANTS.MARKDOWN);
   const labelId = `${fieldId}-label`;
   const hintId = hint ? `${fieldId}-hint` : undefined;
   const shouldShowRewriteReview =
@@ -111,8 +112,8 @@ export function CharacterField({
         <div className="grid gap-3">
           <div className="flex items-center gap-2">
             <Badge>AI proposal</Badge>
-            {assistantPatch.status === CHARACTER_EDIT_PATCH_STATUSES.conflict ? (
-              <Badge variant="destructive">Needs review</Badge>
+            {assistantPatch.status === CHARACTER_EDIT_PATCH_STATUSES.CONFLICT ? (
+              <Badge variant={BADGE_VARIANTS.DESTRUCTIVE}>Needs review</Badge>
             ) : null}
           </div>
           <RewriteDiffReview
@@ -137,7 +138,7 @@ export function CharacterField({
         />
       );
     }
-    if (resolvedVariant === FIELD_EDITOR_VARIANTS.plain || rows <= 1) {
+    if (resolvedVariant === FIELD_EDITOR_VARIANTS.PLAIN || rows <= 1) {
       return (
         <Input
           id={fieldId}
@@ -147,7 +148,7 @@ export function CharacterField({
         />
       );
     }
-    if (resolvedVariant === FIELD_EDITOR_VARIANTS.mesExample) {
+    if (resolvedVariant === FIELD_EDITOR_VARIANTS.MES_EXAMPLE) {
       return (
         <MesExampleEditor
           fieldId={fieldId}

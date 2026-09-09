@@ -4,9 +4,10 @@ import { LuFocus, LuImagePlus, LuRefreshCw, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@~/components/ui/dialog';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
-import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait/portrait-focal-point';
 import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait/portrait-focal-point';
+import { SILLY_TAVERN_PORTRAIT_ASPECT_RATIO } from '../lib/portrait/portrait-focal-point';
 import { PortraitAvatarPreview } from './portrait-avatar-preview';
 import { PortraitFocalPointEditor } from './portrait-focal-point-editor';
 import { PortraitPreviewSurface } from './portrait-preview-surface';
@@ -78,13 +79,13 @@ export function ImageUpload({
             style={{ aspectRatio: SILLY_TAVERN_PORTRAIT_ASPECT_RATIO }}
           />
           <div className="absolute inset-0 flex w-full items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-            <Button type="button" variant="outline" onClick={() => setIsEditorOpen(true)}>
+            <Button type="button" variant={BUTTON_VARIANTS.OUTLINE} onClick={() => setIsEditorOpen(true)}>
               <LuFocus className="size-4" />
             </Button>
-            <Button variant="outline">
+            <Button variant={BUTTON_VARIANTS.OUTLINE}>
               <LuRefreshCw className="size-4" />
             </Button>
-            <Button type="button" variant="destructive" onClick={handleClear}>
+            <Button type="button" variant={BUTTON_VARIANTS.DESTRUCTIVE} onClick={handleClear}>
               <LuTrash2 className="size-4" />
             </Button>
           </div>

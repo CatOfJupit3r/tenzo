@@ -1,20 +1,22 @@
-import { cva } from 'class-variance-authority';
 import type { VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import { Slot } from 'radix-ui';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type {
   ComponentProps,
   ComponentRef,
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  TouchEvent as ReactTouchEvent,
   RefObject,
   SyntheticEvent,
-  KeyboardEvent as ReactKeyboardEvent,
-  TouchEvent as ReactTouchEvent,
-  MouseEvent as ReactMouseEvent,
 } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 
+import { CROPPER_OBJECT_FITS, CROPPER_SHAPES } from '@~/components/ui/ui-enums';
 import { useComposedRefs } from '@~/hooks/use-compose-refs';
 import { useIsomorphicLayoutEffect } from '@~/hooks/use-isomorphic-layout-effect';
 import { useLazyRef } from '@~/hooks/use-lazy-ref';
+import { KEYBOARD_KEY_ENUM, KEYBOARD_KEYS } from '@~/lib/keyboard-enums';
 import { cn } from '@~/lib/utils';
 import { isOnClient } from '@~/utils/ssr-helpers';
 
@@ -55,8 +57,8 @@ export interface iMediaSize {
   naturalHeight: number;
 }
 
-type Shape = 'rectangle' | 'circle';
-type ObjectFit = 'contain' | 'cover' | 'horizontal-cover' | 'vertical-cover';
+type Shape = (typeof CROPPER_SHAPES)[keyof typeof CROPPER_SHAPES];
+type ObjectFit = (typeof CROPPER_OBJECT_FITS)[keyof typeof CROPPER_OBJECT_FITS];
 
 interface iDivProps extends ComponentProps<'div'> {
   asChild?: boolean;
@@ -407,8 +409,8 @@ export function Cropper(props: iCropperProps) {
     rotation = 0,
     keyboardStep = 1,
     aspectRatio = 4 / 3,
-    shape = 'rectangle',
-    objectFit = 'contain',
+    shape = CROPPER_SHAPES.RECTANGLE,
+    objectFit = CROPPER_OBJECT_FITS.CONTAIN,
     shouldAllowOverflow = false,
     shouldPreventScrollZoom = false,
     shouldHaveGrid = false,
@@ -1056,9 +1058,14 @@ function CropperImpl(props: iCropperImplProps) {
       propsRef.current.onKeyUp?.(event);
       if (event.defaultPrevented) return;
 
-      const arrowKeys = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+      const arrowKeys = KEYBOARD_KEY_ENUM.pick([
+        KEYBOARD_KEYS.ARROW_UP,
+        KEYBOARD_KEYS.ARROW_DOWN,
+        KEYBOARD_KEYS.ARROW_LEFT,
+        KEYBOARD_KEYS.ARROW_RIGHT,
+      ]);
 
-      if (arrowKeys.has(event.key)) {
+      if (arrowKeys.is(event.key)) {
         event.preventDefault();
         store.setState('isDragging', false);
       }
@@ -1205,14 +1212,14 @@ function CropperImpl(props: iCropperImplProps) {
 const cropperMediaVariants = cva('will-change-transform', {
   variants: {
     objectFit: {
-      contain: 'absolute inset-0 m-auto max-h-full max-w-full',
-      cover: 'h-auto w-full',
-      'horizontal-cover': 'h-auto w-full',
-      'vertical-cover': 'h-full w-auto',
+      [CROPPER_OBJECT_FITS.CONTAIN]: 'absolute inset-0 m-auto max-h-full max-w-full',
+      [CROPPER_OBJECT_FITS.COVER]: 'h-auto w-full',
+      [CROPPER_OBJECT_FITS.HORIZONTAL_COVER]: 'h-auto w-full',
+      [CROPPER_OBJECT_FITS.VERTICAL_COVER]: 'h-full w-auto',
     },
   },
   defaultVariants: {
-    objectFit: 'contain',
+    objectFit: CROPPER_OBJECT_FITS.CONTAIN,
   },
 });
 
@@ -1598,8 +1605,8 @@ const cropperAreaVariants = cva(
   {
     variants: {
       shape: {
-        rectangle: '',
-        circle: 'rounded-full',
+        [CROPPER_SHAPES.RECTANGLE]: '',
+        [CROPPER_SHAPES.CIRCLE]: 'rounded-full',
       },
       shouldHaveGrid: {
         true: "before:absolute before:inset-x-1/3 before:inset-y-0 before:box-border before:border before:border-y-0 before:border-white/50 before:content-[''] after:absolute after:inset-x-0 after:inset-y-1/3 after:box-border after:border after:border-x-0 after:border-white/50 after:content-['']",
@@ -1607,7 +1614,7 @@ const cropperAreaVariants = cva(
       },
     },
     defaultVariants: {
-      shape: 'rectangle',
+      shape: CROPPER_SHAPES.RECTANGLE,
       shouldHaveGrid: false,
     },
   },

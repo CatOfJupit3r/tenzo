@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { IMPORTED_CARD_SOURCE_KINDS } from '@~/features/character-creator/lib/cards/card-file-enums';
+import {
+  EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY,
+  toPromptExampleCharacter,
+} from '@~/features/character-creator/lib/cards/example-characters';
+
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
-import { toPromptExampleCharacter } from './example-characters';
 
 describe('example-characters', () => {
   it('maps only the selected fields into prompt context', () => {
@@ -14,9 +19,12 @@ describe('example-characters', () => {
     const promptExample = toPromptExampleCharacter({
       id: 'example-1',
       fileName: 'ash-walker.json',
-      sourceKind: 'json',
+      sourceKind: IMPORTED_CARD_SOURCE_KINDS.JSON,
       card,
-      includedFieldKeys: ['name', 'alternate_greetings'],
+      includedFieldKeys: [
+        EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.NAME,
+        EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.ALTERNATE_GREETINGS,
+      ],
     });
 
     expect(promptExample.name).toBe('Ash Walker');

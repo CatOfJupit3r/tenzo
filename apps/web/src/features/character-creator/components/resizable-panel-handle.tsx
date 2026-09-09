@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { LuGripVertical } from 'react-icons/lu';
 
+import { KEYBOARD_KEYS } from '@~/lib/keyboard-enums';
 import { cn } from '@~/lib/utils';
 
 interface iResizablePanelHandleProps {
@@ -68,19 +69,19 @@ export function ResizablePanelHandle({
       }}
       onKeyDown={(event) => {
         const step = event.shiftKey ? 24 : 8;
-        if (event.key === 'ArrowLeft') {
+        if (event.key === KEYBOARD_KEYS.ARROW_LEFT) {
           event.preventDefault();
           onWidthChange(width - step * direction);
         }
-        if (event.key === 'ArrowRight') {
+        if (event.key === KEYBOARD_KEYS.ARROW_RIGHT) {
           event.preventDefault();
           onWidthChange(width + step * direction);
         }
-        if (event.key === 'Home') {
+        if (event.key === KEYBOARD_KEYS.HOME) {
           event.preventDefault();
           onWidthChange(minWidth);
         }
-        if (event.key === 'End') {
+        if (event.key === KEYBOARD_KEYS.END) {
           event.preventDefault();
           onWidthChange(maxWidth);
         }

@@ -1,9 +1,14 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import { CHARACTER_TEXT_FIELD_KEY_SCHEMA } from '../cards/card-schema';
 
-export const AGENT_ROUTE_SCHEMA = z.enum(['advice', 'focused-edit', 'multi-field-edit', 'full-card']);
-export const AGENT_ROUTES = AGENT_ROUTE_SCHEMA.enum;
+export const USER_PROMPT_FACT_ID = 'user-prompt';
+
+export const AGENT_ROUTE_ENUM = em(['ADVICE', 'FOCUSED_EDIT', 'MULTI_FIELD_EDIT', 'FULL_CARD']);
+export const AGENT_ROUTES = AGENT_ROUTE_ENUM.enum;
+export const AGENT_ROUTE_SCHEMA = z.enum(AGENT_ROUTES);
+
 export type AgentRoute = z.infer<typeof AGENT_ROUTE_SCHEMA>;
 
 export const AGENT_ROUTE_DECISION_SCHEMA = z
@@ -12,10 +17,10 @@ export const AGENT_ROUTE_DECISION_SCHEMA = z
     answer: z.string().trim().max(2_000).nullable(),
   })
   .superRefine((decision, context) => {
-    if (decision.route === AGENT_ROUTES.advice && !decision.answer) {
+    if (decision.route === AGENT_ROUTES.ADVICE && !decision.answer) {
       context.addIssue({ code: 'custom', path: ['answer'], message: 'Advice routes require an answer.' });
     }
-    if (decision.route !== AGENT_ROUTES.advice && decision.answer) {
+    if (decision.route !== AGENT_ROUTES.ADVICE && decision.answer) {
       context.addIssue({
         code: 'custom',
         path: ['answer'],
@@ -25,26 +30,32 @@ export const AGENT_ROUTE_DECISION_SCHEMA = z
   });
 export type iAgentRouteDecision = z.infer<typeof AGENT_ROUTE_DECISION_SCHEMA>;
 
-export const AGENT_PROGRESS_PHASE_SCHEMA = z.enum([
-  'understanding',
-  'planning',
-  'drafting',
-  'reviewing',
-  'repairing',
-  'proposing',
-  'completed',
-  'failed',
-  'cancelled',
+export const AGENT_PROGRESS_PHASE_ENUM = em([
+  'UNDERSTANDING',
+  'PLANNING',
+  'DRAFTING',
+  'REVIEWING',
+  'REPAIRING',
+  'PROPOSING',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
 ]);
-export const AGENT_PROGRESS_PHASES = AGENT_PROGRESS_PHASE_SCHEMA.enum;
+export const AGENT_PROGRESS_PHASES = AGENT_PROGRESS_PHASE_ENUM.enum;
+export const AGENT_PROGRESS_PHASE_SCHEMA = z.enum(AGENT_PROGRESS_PHASES);
+
 export type AgentProgressPhase = z.infer<typeof AGENT_PROGRESS_PHASE_SCHEMA>;
 
-export const AGENT_FACT_PROVENANCE_SCHEMA = z.enum(['user', 'card', 'reference-inspiration', 'model-assumption']);
-export const AGENT_FACT_PROVENANCES = AGENT_FACT_PROVENANCE_SCHEMA.enum;
+export const AGENT_FACT_PROVENANCE_ENUM = em(['USER', 'CARD', 'REFERENCE_INSPIRATION', 'MODEL_ASSUMPTION']);
+export const AGENT_FACT_PROVENANCES = AGENT_FACT_PROVENANCE_ENUM.enum;
+export const AGENT_FACT_PROVENANCE_SCHEMA = z.enum(AGENT_FACT_PROVENANCES);
+
 export type AgentFactProvenance = z.infer<typeof AGENT_FACT_PROVENANCE_SCHEMA>;
 
-export const AGENT_GAP_IMPACT_SCHEMA = z.enum(['low', 'high']);
-export const AGENT_GAP_IMPACTS = AGENT_GAP_IMPACT_SCHEMA.enum;
+export const AGENT_GAP_IMPACT_ENUM = em(['LOW', 'HIGH']);
+export const AGENT_GAP_IMPACTS = AGENT_GAP_IMPACT_ENUM.enum;
+export const AGENT_GAP_IMPACT_SCHEMA = z.enum(AGENT_GAP_IMPACTS);
+
 export type AgentGapImpact = z.infer<typeof AGENT_GAP_IMPACT_SCHEMA>;
 
 export const CHARACTER_BRIEF_FACT_SCHEMA = z.object({
@@ -66,7 +77,7 @@ export const CHARACTER_BRIEF_CHOICE_SCHEMA = z.object({
 export const CHARACTER_BRIEF_QUESTION_SCHEMA = z.object({
   id: z.string().trim().min(1),
   question: z.string().trim().min(1).max(300),
-  impact: z.literal(AGENT_GAP_IMPACTS.high),
+  impact: z.literal(AGENT_GAP_IMPACTS.HIGH),
   options: z.array(z.string().trim().min(1).max(160)).max(3),
 });
 
@@ -148,10 +159,13 @@ export const PROSE_JOB_RESULT_SCHEMA = z.object({
 });
 export type iProseJobResult = z.infer<typeof PROSE_JOB_RESULT_SCHEMA>;
 
-export const QUALITY_FINDING_SEVERITY_SCHEMA = z.enum(['warning', 'error']);
-export const QUALITY_FINDING_SEVERITIES = QUALITY_FINDING_SEVERITY_SCHEMA.enum;
-export const QUALITY_FINDING_EVIDENCE_SCHEMA = z.enum(['deterministic']);
-export const QUALITY_FINDING_EVIDENCE = QUALITY_FINDING_EVIDENCE_SCHEMA.enum;
+export const QUALITY_FINDING_SEVERITY_ENUM = em(['WARNING', 'ERROR']);
+export const QUALITY_FINDING_SEVERITIES = QUALITY_FINDING_SEVERITY_ENUM.enum;
+export const QUALITY_FINDING_SEVERITY_SCHEMA = z.enum(QUALITY_FINDING_SEVERITIES);
+
+export const QUALITY_FINDING_EVIDENCE_ENUM = em(['DETERMINISTIC']);
+export const QUALITY_FINDING_EVIDENCE = QUALITY_FINDING_EVIDENCE_ENUM.enum;
+export const QUALITY_FINDING_EVIDENCE_SCHEMA = z.enum(QUALITY_FINDING_EVIDENCE);
 
 export const QUALITY_FINDING_SCHEMA = z.object({
   ruleId: z.string().trim().min(1),
@@ -164,15 +178,16 @@ export const QUALITY_FINDING_SCHEMA = z.object({
 });
 export type iQualityFinding = z.infer<typeof QUALITY_FINDING_SCHEMA>;
 
-export const AGENT_ORCHESTRATION_RECOVERY_SCHEMA = z.enum([
-  'clarification-required',
-  'profile-ineligible',
-  'repair-unavailable',
-  'repair-budget-exhausted',
-  'partial-draft',
-  'cancelled',
+export const AGENT_ORCHESTRATION_RECOVERY_ENUM = em([
+  'CLARIFICATION_REQUIRED',
+  'PROFILE_INELIGIBLE',
+  'REPAIR_UNAVAILABLE',
+  'REPAIR_BUDGET_EXHAUSTED',
+  'PARTIAL_DRAFT',
+  'CANCELLED',
 ]);
-export const AGENT_ORCHESTRATION_RECOVERIES = AGENT_ORCHESTRATION_RECOVERY_SCHEMA.enum;
+export const AGENT_ORCHESTRATION_RECOVERIES = AGENT_ORCHESTRATION_RECOVERY_ENUM.enum;
+export const AGENT_ORCHESTRATION_RECOVERY_SCHEMA = z.enum(AGENT_ORCHESTRATION_RECOVERIES);
 
 export const AGENT_ORCHESTRATION_RESULT_SCHEMA = z.object({
   runId: z.string().trim().min(1),

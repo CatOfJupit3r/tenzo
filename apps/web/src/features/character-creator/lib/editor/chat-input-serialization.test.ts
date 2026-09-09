@@ -1,21 +1,23 @@
 import { describe, expect, it } from 'vitest';
 
+import { EDITOR_MARK_TYPES, EDITOR_NODE_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
+
 import { serializeChatInput } from './chat-input-serialization';
 
 describe('chat input serialization', () => {
   it('renders mentions and collects template ids in document order', () => {
     expect(
       serializeChatInput({
-        type: 'doc',
+        type: EDITOR_NODE_TYPES.DOC,
         content: [
           {
-            type: 'paragraph',
+            type: EDITOR_NODE_TYPES.PARAGRAPH,
             content: [
-              { type: 'text', text: 'Use ' },
-              { type: 'mention', attrs: { id: 'description', label: 'description-template' } },
-              { type: 'text', text: ' and ' },
-              { type: 'mention', attrs: { id: 'voice', label: 'voice-template' } },
-              { type: 'mention', attrs: { id: 'description', label: 'description-template' } },
+              { type: EDITOR_NODE_TYPES.TEXT, text: 'Use ' },
+              { type: EDITOR_NODE_TYPES.MENTION, attrs: { id: 'description', label: 'description-template' } },
+              { type: EDITOR_NODE_TYPES.TEXT, text: ' and ' },
+              { type: EDITOR_NODE_TYPES.MENTION, attrs: { id: 'voice', label: 'voice-template' } },
+              { type: EDITOR_NODE_TYPES.MENTION, attrs: { id: 'description', label: 'description-template' } },
             ],
           },
         ],
@@ -29,12 +31,12 @@ describe('chat input serialization', () => {
   it('caps references at four unique templates', () => {
     expect(
       serializeChatInput({
-        type: 'doc',
+        type: EDITOR_NODE_TYPES.DOC,
         content: [
           {
-            type: 'paragraph',
+            type: EDITOR_NODE_TYPES.PARAGRAPH,
             content: Array.from({ length: 5 }, (_, index) => ({
-              type: 'mention',
+              type: EDITOR_NODE_TYPES.MENTION,
               attrs: { id: `template-${index}`, label: `template-${index}` },
             })),
           },
@@ -46,14 +48,14 @@ describe('chat input serialization', () => {
   it('serializes supported text styles as markdown for the assistant', () => {
     expect(
       serializeChatInput({
-        type: 'doc',
+        type: EDITOR_NODE_TYPES.DOC,
         content: [
           {
-            type: 'paragraph',
+            type: EDITOR_NODE_TYPES.PARAGRAPH,
             content: [
-              { type: 'text', text: 'bold', marks: [{ type: 'bold' }] },
-              { type: 'text', text: ' italic', marks: [{ type: 'italic' }] },
-              { type: 'text', text: ' gone', marks: [{ type: 'strike' }] },
+              { type: EDITOR_NODE_TYPES.TEXT, text: EDITOR_MARK_TYPES.BOLD, marks: [{ type: EDITOR_MARK_TYPES.BOLD }] },
+              { type: EDITOR_NODE_TYPES.TEXT, text: ' italic', marks: [{ type: EDITOR_MARK_TYPES.ITALIC }] },
+              { type: EDITOR_NODE_TYPES.TEXT, text: ' gone', marks: [{ type: EDITOR_MARK_TYPES.STRIKE }] },
             ],
           },
         ],

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-import { OUTPUT_FORMATS } from './generation-config';
 import type { OutputFormat } from './generation-config';
+import { OUTPUT_FORMATS } from './generation-config';
 
 const PARSED_RESPONSE_VALUE_SCHEMA = z.union([
   z.string(),
@@ -88,11 +88,11 @@ export function parseResponse(content: string, format: OutputFormat): string {
     return '';
   }
 
-  if (format === OUTPUT_FORMATS.none) {
+  if (format === OUTPUT_FORMATS.NONE) {
     return cleanedContent;
   }
 
-  if (format === OUTPUT_FORMATS.xml) {
+  if (format === OUTPUT_FORMATS.XML) {
     const closedMatch = /<response>([\s\S]*?)<\/response>/i.exec(cleanedContent);
     if (closedMatch?.[1] !== undefined) {
       return closedMatch[1].trim();
@@ -122,11 +122,11 @@ export function getPrefilled(content: string, format: OutputFormat) {
   const trimmedContent = content.trim();
 
   switch (format) {
-    case OUTPUT_FORMATS.xml:
+    case OUTPUT_FORMATS.XML:
       return `<response>${trimmedContent}`;
-    case OUTPUT_FORMATS.json:
+    case OUTPUT_FORMATS.JSON:
       return `{"response":"${trimmedContent.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}`;
-    case OUTPUT_FORMATS.none:
+    case OUTPUT_FORMATS.NONE:
       return trimmedContent;
     default:
       return trimmedContent;

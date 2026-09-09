@@ -2,6 +2,8 @@ import { EditorContent } from '@tiptap/react';
 import { LuPlus } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button/button';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import { EDITOR_NODE_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
 import { cn } from '@~/lib/utils';
 
 import { useMesExampleEditor } from '../../hooks/use-mes-example-editor';
@@ -51,9 +53,9 @@ export function MesExampleEditor({
       .chain()
       .focus('end')
       .insertContent([
-        { type: 'paragraph', content: [{ type: 'text', text: '<START>' }] },
-        { type: 'paragraph', content: [{ type: 'text', text: '{{user}}: ' }] },
-        { type: 'paragraph', content: [{ type: 'text', text: '{{char}}: ' }] },
+        { type: EDITOR_NODE_TYPES.PARAGRAPH, content: [{ type: EDITOR_NODE_TYPES.TEXT, text: '<START>' }] },
+        { type: EDITOR_NODE_TYPES.PARAGRAPH, content: [{ type: EDITOR_NODE_TYPES.TEXT, text: '{{user}}: ' }] },
+        { type: EDITOR_NODE_TYPES.PARAGRAPH, content: [{ type: EDITOR_NODE_TYPES.TEXT, text: '{{char}}: ' }] },
       ])
       .run();
   };
@@ -69,8 +71,8 @@ export function MesExampleEditor({
         <span className="text-xs text-muted-foreground">Dialogue blocks separated by &lt;START&gt; lines</span>
         <Button
           type="button"
-          variant="ghost"
-          size="sm"
+          variant={BUTTON_VARIANTS.GHOST}
+          size={BUTTON_SIZES.SM}
           className="h-7 px-2 text-xs"
           disabled={isReadOnly}
           onClick={insertStartBlock}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { Button } from '@~/components/ui/button/button';
+import { BUTTON_SIZES } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 import type { iCharacterAssistantDiscoveryDirectionCard } from '../../lib/assistant/character-assistant-contracts';
@@ -66,7 +67,7 @@ export function DiscoveryCardGrid({
       </div>
       <Button
         type="button"
-        size="sm"
+        size={BUTTON_SIZES.SM}
         disabled={selectedCards.length === 0}
         onClick={() => onUseDirections(formatDiscoverySelectionMessage(selectedCards))}
       >

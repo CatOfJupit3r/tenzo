@@ -3,15 +3,19 @@ import { useMemo, useState } from 'react';
 import { LuCheck, LuUndo2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
-import { cn } from '@~/lib/utils';
-
-import type { RewriteHunkDecision, iRewriteDiffHunk } from '../../lib/editor/rewrite-diff';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import type { RewriteSide } from '@~/features/character-creator/lib/editor/editor-enums';
+import { REWRITE_SIDES } from '@~/features/character-creator/lib/editor/editor-enums';
 import {
   REWRITE_HUNK_DECISIONS,
   computeRewriteDiffHunks,
   getHunkLines,
   mergeRewriteDiffHunks,
-} from '../../lib/editor/rewrite-diff';
+  rewriteHunkDecisionEnum,
+} from '@~/features/character-creator/lib/editor/rewrite-diff';
+import { cn } from '@~/lib/utils';
+
+import type { RewriteHunkDecision, iRewriteDiffHunk } from '../../lib/editor/rewrite-diff';
 
 export interface iRewriteDiffReviewProps {
   oldValue: string;
@@ -24,20 +28,20 @@ export interface iRewriteDiffReviewProps {
 const CONTEXT_PREVIEW_LINES = 2;
 
 const REWRITE_HUNK_DECISION_VALUES = [
-  REWRITE_HUNK_DECISIONS.keepNew,
-  REWRITE_HUNK_DECISIONS.keepOld,
-  REWRITE_HUNK_DECISIONS.keepBoth,
+  REWRITE_HUNK_DECISIONS.KEEP_NEW,
+  REWRITE_HUNK_DECISIONS.KEEP_OLD,
+  REWRITE_HUNK_DECISIONS.KEEP_BOTH,
 ] as const;
 
-const DECISION_LABELS = {
-  [REWRITE_HUNK_DECISIONS.keepNew]: 'New',
-  [REWRITE_HUNK_DECISIONS.keepOld]: 'Old',
-  [REWRITE_HUNK_DECISIONS.keepBoth]: 'Both',
-} satisfies Record<RewriteHunkDecision, string>;
+const DECISION_LABELS = rewriteHunkDecisionEnum.derive<string>()(
+  [REWRITE_HUNK_DECISIONS.KEEP_NEW, 'New'],
+  [REWRITE_HUNK_DECISIONS.KEEP_OLD, 'Old'],
+  [REWRITE_HUNK_DECISIONS.KEEP_BOTH, 'Both'],
+);
 
 interface iWordDiffTextProps {
   hunk: iRewriteDiffHunk;
-  side: 'old' | 'new';
+  side: RewriteSide;
 }
 
 function WordDiffText({ hunk, side }: iWordDiffTextProps) {
@@ -45,10 +49,10 @@ function WordDiffText({ hunk, side }: iWordDiffTextProps) {
   return (
     <>
       {parts.map((part, index) => {
-        if (side === 'old' && part.added) {
+        if (side === REWRITE_SIDES.OLD && part.added) {
           return null;
         }
-        if (side === 'new' && part.removed) {
+        if (side === REWRITE_SIDES.NEW && part.removed) {
           return null;
         }
         const isEmphasized = part.added || part.removed;
@@ -57,8 +61,8 @@ function WordDiffText({ hunk, side }: iWordDiffTextProps) {
             // eslint-disable-next-line react/no-array-index-key
             key={index}
             className={cn(
-              isEmphasized && side === 'old' && 'bg-destructive/25',
-              isEmphasized && side === 'new' && 'bg-chart-2/25',
+              isEmphasized && side === REWRITE_SIDES.OLD && 'bg-destructive/25',
+              isEmphasized && side === REWRITE_SIDES.NEW && 'bg-chart-2/25',
             )}
           >
             {part.value}
@@ -121,8 +125,8 @@ interface iChangedHunkProps {
 }
 
 function ChangedHunk({ hunk, decision, onDecisionChange }: iChangedHunkProps) {
-  const isKeepingOld = decision !== REWRITE_HUNK_DECISIONS.keepNew;
-  const isKeepingNew = decision !== REWRITE_HUNK_DECISIONS.keepOld;
+  const isKeepingOld = decision !== REWRITE_HUNK_DECISIONS.KEEP_NEW;
+  const isKeepingNew = decision !== REWRITE_HUNK_DECISIONS.KEEP_OLD;
 
   return (
     <div className="border-y border-border/60">
@@ -139,21 +143,21 @@ function ChangedHunk({ hunk, decision, onDecisionChange }: iChangedHunkProps) {
             )}
             onClick={() => onDecisionChange(value)}
           >
-            {DECISION_LABELS[value]}
+            {DECISION_LABELS.get(value)}
           </button>
         ))}
       </div>
       {hunk.oldText.length > 0 ? (
         <div className={cn('bg-destructive/10 px-3 py-1', !isKeepingOld && 'line-through opacity-45')}>
           <div className="whitespace-pre-wrap">
-            <WordDiffText hunk={hunk} side="old" />
+            <WordDiffText hunk={hunk} side={REWRITE_SIDES.OLD} />
           </div>
         </div>
       ) : null}
       {hunk.newText.length > 0 ? (
         <div className={cn('bg-chart-2/10 px-3 py-1', !isKeepingNew && 'line-through opacity-45')}>
           <div className="whitespace-pre-wrap">
-            <WordDiffText hunk={hunk} side="new" />
+            <WordDiffText hunk={hunk} side={REWRITE_SIDES.NEW} />
           </div>
         </div>
       ) : null}
@@ -171,21 +175,27 @@ export function RewriteDiffReview({
   const hunks = useMemo(() => computeRewriteDiffHunks(oldValue, newValue), [oldValue, newValue]);
   const [decisions, setDecisions] = useState<Record<number, RewriteHunkDecision>>({});
 
-  const hasCustomDecisions = Object.values(decisions).some((decision) => decision !== REWRITE_HUNK_DECISIONS.keepNew);
+  const hasCustomDecisions = Object.values(decisions).some((decision) => decision !== REWRITE_HUNK_DECISIONS.KEEP_NEW);
 
   return (
     <div className="w-full rounded-md border border-input shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-input bg-muted/40 px-3 py-1.5">
         <span className="text-xs font-medium text-muted-foreground">Review rewrite</span>
         <div className="flex items-center gap-1">
-          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onRevertAll}>
+          <Button
+            type="button"
+            variant={BUTTON_VARIANTS.GHOST}
+            size={BUTTON_SIZES.SM}
+            className="h-7 px-2 text-xs"
+            onClick={onRevertAll}
+          >
             <LuUndo2 className="size-3.5" />
             Revert all
           </Button>
           {hasCustomDecisions ? (
             <Button
               type="button"
-              size="sm"
+              size={BUTTON_SIZES.SM}
               className="h-7 px-2 text-xs"
               onClick={() => onResolve(mergeRewriteDiffHunks(hunks, decisions))}
             >
@@ -193,7 +203,7 @@ export function RewriteDiffReview({
               Apply choices
             </Button>
           ) : (
-            <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={onAcceptAll}>
+            <Button type="button" size={BUTTON_SIZES.SM} className="h-7 px-2 text-xs" onClick={onAcceptAll}>
               <LuCheck className="size-3.5" />
               Accept all
             </Button>
@@ -206,7 +216,7 @@ export function RewriteDiffReview({
             <ChangedHunk
               key={hunk.id}
               hunk={hunk}
-              decision={decisions[hunk.id] ?? REWRITE_HUNK_DECISIONS.keepNew}
+              decision={decisions[hunk.id] ?? REWRITE_HUNK_DECISIONS.KEEP_NEW}
               onDecisionChange={(decision) => setDecisions((prev) => ({ ...prev, [hunk.id]: decision }))}
             />
           ) : (

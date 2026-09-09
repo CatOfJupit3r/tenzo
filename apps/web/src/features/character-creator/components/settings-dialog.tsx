@@ -10,8 +10,8 @@ import { ConnectionSettings } from './connection-settings';
 import { ExampleCharacters } from './example-characters';
 import { FieldTemplatesPanel } from './field-templates-panel';
 import { SamplingSettings } from './sampling-settings';
-import { SETTINGS_DIALOG_TABS, settingsDialogTabSchema } from './settings-dialog-tabs';
 import type { SettingsDialogTab } from './settings-dialog-tabs';
+import { SETTINGS_DIALOG_TABS, settingsDialogTabSchema } from './settings-dialog-tabs';
 
 const SETTINGS_TAB_CONTENT_CLASS_NAME =
   'scroll-fade-y min-h-0 overflow-y-auto overscroll-contain py-4 pr-1 [scrollbar-gutter:stable]';
@@ -82,16 +82,16 @@ export function SettingsDialog({
           }}
         >
           <TabsList className="w-full">
-            <TabsTrigger value={SETTINGS_DIALOG_TABS.connection}>Connection</TabsTrigger>
-            <TabsTrigger value={SETTINGS_DIALOG_TABS.sampling}>Sampling</TabsTrigger>
-            <TabsTrigger value={SETTINGS_DIALOG_TABS.assistant}>Assistant</TabsTrigger>
-            <TabsTrigger value={SETTINGS_DIALOG_TABS.templates}>Templates</TabsTrigger>
-            <TabsTrigger value={SETTINGS_DIALOG_TABS.examples}>
+            <TabsTrigger value={SETTINGS_DIALOG_TABS.CONNECTION}>Connection</TabsTrigger>
+            <TabsTrigger value={SETTINGS_DIALOG_TABS.SAMPLING}>Sampling</TabsTrigger>
+            <TabsTrigger value={SETTINGS_DIALOG_TABS.ASSISTANT}>Assistant</TabsTrigger>
+            <TabsTrigger value={SETTINGS_DIALOG_TABS.TEMPLATES}>Templates</TabsTrigger>
+            <TabsTrigger value={SETTINGS_DIALOG_TABS.EXAMPLES}>
               Reference Examples {exampleCharacters.length}/{MAX_EXAMPLE_CHARACTER_COUNT}
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.connection} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
+          <TabsContent value={SETTINGS_DIALOG_TABS.CONNECTION} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <ConnectionSettings
               generationSettings={generationSettings}
               apiKey={apiKey}
@@ -102,7 +102,7 @@ export function SettingsDialog({
             />
           </TabsContent>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.sampling} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
+          <TabsContent value={SETTINGS_DIALOG_TABS.SAMPLING} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <SamplingSettings
               generationSettings={generationSettings}
               availableModels={connectionHealth.availableModels}
@@ -114,7 +114,7 @@ export function SettingsDialog({
             />
           </TabsContent>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.assistant} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
+          <TabsContent value={SETTINGS_DIALOG_TABS.ASSISTANT} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <AssistantEditingSettings
               fieldShouldAllowAssistantEditing={generationSettings.fieldShouldAllowAssistantEditing}
               onChange={(fieldKey, shouldAllowEditing) => {
@@ -129,7 +129,7 @@ export function SettingsDialog({
             />
           </TabsContent>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.templates} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
+          <TabsContent value={SETTINGS_DIALOG_TABS.TEMPLATES} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border px-3 py-2">
               <div className="space-y-1">
                 <p className="text-sm font-medium">Use default field templates</p>
@@ -157,7 +157,7 @@ export function SettingsDialog({
             />
           </TabsContent>
 
-          <TabsContent value={SETTINGS_DIALOG_TABS.examples} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
+          <TabsContent value={SETTINGS_DIALOG_TABS.EXAMPLES} className={SETTINGS_TAB_CONTENT_CLASS_NAME}>
             <ExampleCharacters
               exampleCharacters={exampleCharacters}
               contextSummary={exampleContextSummary}

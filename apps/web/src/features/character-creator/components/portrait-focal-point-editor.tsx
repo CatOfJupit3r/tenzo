@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LuLocateFixed } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
-import { Cropper, CropperArea, CropperImage } from '@~/components/ui/cropper';
 import type { iArea, iMediaSize, iPoint, iSize } from '@~/components/ui/cropper';
+import { Cropper, CropperArea, CropperImage } from '@~/components/ui/cropper';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
+import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait/portrait-focal-point';
 import {
   arePortraitCropRectsEqual,
   getDefaultPortraitCropRect,
@@ -16,7 +18,6 @@ import {
   MIN_PORTRAIT_EDITOR_ZOOM,
   SILLY_TAVERN_PORTRAIT_ASPECT_RATIO,
 } from '../lib/portrait/portrait-focal-point';
-import type { iPortraitCropRect, iPortraitDimensions } from '../lib/portrait/portrait-focal-point';
 
 export interface iPortraitFocalPointEditorProps {
   cropRect: iPortraitCropRect;
@@ -117,7 +118,7 @@ export function PortraitFocalPointEditor({
           <p className="text-sm font-medium">Portrait crop</p>
         </div>
 
-        <Button disabled={isDefaultCrop} type="button" variant="outline" onClick={handleResetCrop}>
+        <Button disabled={isDefaultCrop} type="button" variant={BUTTON_VARIANTS.OUTLINE} onClick={handleResetCrop}>
           <LuLocateFixed className="size-4" />
           Reset
         </Button>

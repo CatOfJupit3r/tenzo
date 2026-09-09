@@ -1,5 +1,7 @@
 import { AsyncQueuer, AsyncRetryer } from '@tanstack/pacer';
 
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
+
 export const AGENT_CALL_MAXIMUM_ATTEMPTS = 3;
 export const AGENT_CALL_RETRY_BASE_WAIT_MS = 500;
 export const AGENT_CALL_RETRY_MAXIMUM_WAIT_MS = 10_000;
@@ -44,7 +46,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function isTransientAgentCallError(error: unknown): boolean {
-  if (error instanceof DOMException && error.name === 'AbortError') return false;
+  if (error instanceof DOMException && error.name === ABORT_ERROR_NAMES.ABORT_ERROR) return false;
   const status = getErrorStatus(error);
   if (status === 408 || status === 409 || status === 425 || status === 429 || (status !== null && status >= 500)) {
     return true;
@@ -93,7 +95,8 @@ async function runWithRetry<T>(
       try {
         return { isSuccessful: true as const, value: await operation(retrySignal) };
       } catch (error) {
-        if (abortSignal?.aborted || retrySignal.aborted) throw new DOMException('Aborted', 'AbortError');
+        if (abortSignal?.aborted || retrySignal.aborted)
+          throw new DOMException('Aborted', ABORT_ERROR_NAMES.ABORT_ERROR);
         if (isTransientAgentCallError(error)) throw error;
         return { isSuccessful: false as const, error };
       }

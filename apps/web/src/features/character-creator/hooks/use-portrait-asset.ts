@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
+import type { iPortraitAssetEntry } from '../lib/portrait/portrait-asset-cache';
 import {
   EMPTY_PORTRAIT_ASSET_ENTRY,
   ensurePortraitAssetLoaded,
@@ -7,7 +8,6 @@ import {
   PORTRAIT_ASSET_STATUSES,
   subscribeToPortraitAssets,
 } from '../lib/portrait/portrait-asset-cache';
-import type { iPortraitAssetEntry } from '../lib/portrait/portrait-asset-cache';
 
 /**
  * Subscribes to the shared portrait asset cache for a single asset. Returns the
@@ -34,5 +34,5 @@ export function usePortraitAsset(assetId: string | null): iPortraitAssetEntry {
 }
 
 export function isPortraitAssetHydrating(entry: iPortraitAssetEntry) {
-  return entry.status === PORTRAIT_ASSET_STATUSES.loading;
+  return entry.status === PORTRAIT_ASSET_STATUSES.LOADING;
 }

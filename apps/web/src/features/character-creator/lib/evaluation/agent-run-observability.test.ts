@@ -22,10 +22,10 @@ describe('agent role observability', () => {
       {
         runId: 'run-1',
         roleCallId: 'call-1',
-        role: AGENT_ROLES['content-planner'],
+        role: AGENT_ROLES.CONTENT_PLANNER,
         modelId: 'model-1',
         providerId: 'provider-1',
-        outcome: AGENT_ROLE_CALL_OUTCOMES.failed,
+        outcome: AGENT_ROLE_CALL_OUTCOMES.FAILED,
         retryCount: 1,
         inputTokens: 100,
         outputTokens: 20,
@@ -33,7 +33,7 @@ describe('agent role observability', () => {
         latencyMs: 500,
         qualityFindingCount: 0,
         repairCount: 0,
-        policyFailureReason: PROVIDER_POLICY_FAILURE_REASONS['model-moderated'],
+        policyFailureReason: PROVIDER_POLICY_FAILURE_REASONS.MODEL_MODERATED,
       },
       logger,
     );
@@ -41,8 +41,8 @@ describe('agent role observability', () => {
     expect(logs).toEqual([
       expect.objectContaining({
         runId: 'run-1',
-        role: AGENT_ROLES['content-planner'],
-        policyFailureReason: PROVIDER_POLICY_FAILURE_REASONS['model-moderated'],
+        role: AGENT_ROLES.CONTENT_PLANNER,
+        policyFailureReason: PROVIDER_POLICY_FAILURE_REASONS.MODEL_MODERATED,
       }),
     ]);
     expect(Object.keys(logs[0] ?? {})).not.toEqual(expect.arrayContaining(['prompt', 'content', 'drafts']));

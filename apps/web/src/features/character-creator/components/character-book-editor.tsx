@@ -4,6 +4,7 @@ import { Button } from '@~/components/ui/button';
 import { Checkbox } from '@~/components/ui/checkbox';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
 import type { CharacterBook, CharacterBookEntry } from '../lib/cards/card-schema';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
@@ -64,7 +65,7 @@ export function CharacterBookEditor({
           <h3 className="text-sm font-semibold">Entries</h3>
           <p className="text-sm text-muted-foreground">Keys are comma-separated activation terms.</p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={onAddEntry}>
+        <Button type="button" variant={BUTTON_VARIANTS.OUTLINE} size={BUTTON_SIZES.SM} onClick={onAddEntry}>
           <LuPlus className="size-4" />
           Add entry
         </Button>
@@ -90,8 +91,8 @@ export function CharacterBookEditor({
                   <div className="flex gap-1">
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
+                      variant={BUTTON_VARIANTS.GHOST}
+                      size={BUTTON_SIZES.ICON}
                       aria-label="Move entry up"
                       disabled={index === 0}
                       tooltip="Move entry up"
@@ -101,8 +102,8 @@ export function CharacterBookEditor({
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
+                      variant={BUTTON_VARIANTS.GHOST}
+                      size={BUTTON_SIZES.ICON}
                       aria-label="Move entry down"
                       disabled={index === characterBook.entries.length - 1}
                       tooltip="Move entry down"
@@ -112,8 +113,8 @@ export function CharacterBookEditor({
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
+                      variant={BUTTON_VARIANTS.GHOST}
+                      size={BUTTON_SIZES.ICON}
                       aria-label="Remove entry"
                       tooltip="Remove entry"
                       onClick={() => onRemoveEntry(index)}

@@ -1,3 +1,4 @@
+import { em } from 'enumwaii';
 import { useMemo, useState } from 'react';
 import { LuTriangleAlert } from 'react-icons/lu';
 import { z } from 'zod';
@@ -10,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs'
 import { Textarea } from '@~/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@~/components/ui/tooltip';
 
+import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import {
   FREQUENCY_PENALTY_RANGE,
   GENERATION_PROVIDERS,
@@ -21,35 +23,38 @@ import {
   TOP_K_RANGE,
   TOP_P_RANGE,
 } from '../lib/generation/generation-config';
-import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
-import {
-  getModelCompatibilityStatus,
-  MODEL_CAPABILITIES,
-  MODEL_COMPATIBILITY_STATUSES,
-} from '../lib/provider/model-capabilities';
 import type { iModelProviderOption } from '../lib/provider/model-capabilities';
+import { getModelCompatibilityStatus, MODEL_COMPATIBILITY_STATUSES } from '../lib/provider/model-capabilities';
 import type { iProviderModelOption } from '../lib/provider/provider-health';
 import { GenerationPresets } from './generation-presets';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
-const MODEL_ROLE_SCHEMA = z.enum(['text', 'vision']);
-const MODEL_ROLES = MODEL_ROLE_SCHEMA.enum;
+const MODEL_SETTING_KEYS_ENUM = em({
+  MODEL: 'model',
+  VISION_MODEL: 'visionModel',
+});
+const MODEL_SETTING_KEYS = MODEL_SETTING_KEYS_ENUM.rawEnum;
+
+const MODEL_ROLE_ENUM = em(['TEXT', 'VISION']);
+const MODEL_ROLES = MODEL_ROLE_ENUM.enum;
+const MODEL_ROLE_SCHEMA = z.enum(MODEL_ROLES);
+
 type ModelRole = z.infer<typeof MODEL_ROLE_SCHEMA>;
 const EMPTY_MODEL_PROVIDERS: iModelProviderOption[] = [];
 
 const MODEL_ROLE_CONFIG = [
   {
-    role: MODEL_ROLES.text,
+    role: MODEL_ROLES.TEXT,
     label: 'Text',
-    modelKey: 'model',
+    modelKey: MODEL_SETTING_KEYS.MODEL,
     inputId: 'api-model',
     placeholder: 'Select or enter a text model ID',
     helperText: 'Used for field generation and the character assistant.',
   },
   {
-    role: MODEL_ROLES.vision,
+    role: MODEL_ROLES.VISION,
     label: 'Vision',
-    modelKey: 'visionModel',
+    modelKey: MODEL_SETTING_KEYS.VISION_MODEL,
     inputId: 'vision-model',
     placeholder: 'Select or enter a vision model ID',
     helperText: 'Optional. Leave blank to use the text model for reference-image analysis.',
@@ -57,7 +62,7 @@ const MODEL_ROLE_CONFIG = [
 ] satisfies Array<{
   role: ModelRole;
   label: string;
-  modelKey: 'model' | 'visionModel';
+  modelKey: (typeof MODEL_SETTING_KEYS)[keyof typeof MODEL_SETTING_KEYS];
   inputId: string;
   placeholder: string;
   helperText: string;
@@ -87,11 +92,11 @@ function SettingWarning({ message }: { message: string }) {
 }
 
 function getProviderStatusLabel(status: ReturnType<typeof getModelCompatibilityStatus>) {
-  if (status === MODEL_COMPATIBILITY_STATUSES.compatible) {
+  if (status === MODEL_COMPATIBILITY_STATUSES.COMPATIBLE) {
     return 'Compatible';
   }
 
-  if (status === MODEL_COMPATIBILITY_STATUSES.incompatible) {
+  if (status === MODEL_COMPATIBILITY_STATUSES.INCOMPATIBLE) {
     return 'Missing support';
   }
 
@@ -107,13 +112,13 @@ export function SamplingSettings({
   modelProviders,
   onSettingsChange,
 }: iSamplingSettingsProps) {
-  const [activeModelRole, setActiveModelRole] = useState<ModelRole>(MODEL_ROLES.text);
+  const [activeModelRole, setActiveModelRole] = useState<ModelRole>(MODEL_ROLES.TEXT);
   const recommendedContextSize =
     modelContextSizes[generationSettings.model] ?? detectedContextSize ?? RECOMMENDED_MINIMUM_CONTEXT_SIZE;
   const hasSmallContext = generationSettings.contextSize < recommendedContextSize;
   const hasSmallResponse = generationSettings.maxTokens < RECOMMENDED_MINIMUM_MAX_TOKENS;
   const hasDetectedContext = Boolean(modelContextSizes[generationSettings.model] ?? detectedContextSize);
-  const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.openrouter;
+  const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.OPENROUTER;
   const availableModelProviders =
     generationSettings.model.trim() === detectedModel ? modelProviders : EMPTY_MODEL_PROVIDERS;
   const providerOptions = useMemo<iOptionType[]>(
@@ -128,7 +133,7 @@ export function SamplingSettings({
         return {
           label: provider.name,
           value: provider.slug,
-          description: `Structured: ${provider.capabilities[MODEL_CAPABILITIES['structured-output']] ? 'Yes' : 'No'} · Tools: ${provider.capabilities[MODEL_CAPABILITIES['tool-calling']] ? 'Yes' : 'No'}`,
+          description: `Structured: ${provider.capabilities.hasStructuredOutput ? 'Yes' : 'No'} · Tools: ${provider.capabilities.hasToolCalling ? 'Yes' : 'No'}`,
           meta: getProviderStatusLabel(status),
         } satisfies iOptionType;
       }),
@@ -183,7 +188,7 @@ export function SamplingSettings({
                 onValueChange={(value) =>
                   onSettingsChange({
                     [config.modelKey]: value ?? '',
-                    ...(config.modelKey === 'model' ? { openRouterProvider: '' } : {}),
+                    ...(config.modelKey === MODEL_SETTING_KEYS.MODEL ? { openRouterProvider: '' } : {}),
                   })
                 }
               />
@@ -192,7 +197,7 @@ export function SamplingSettings({
                   ? `${availableModels.length} model IDs detected. Type any custom model ID or choose a detected one.`
                   : `${config.helperText} Run the connection health check to load provider model IDs.`}
               </p>
-              {config.modelKey === 'model' && isUsingOpenRouter ? (
+              {config.modelKey === MODEL_SETTING_KEYS.MODEL && isUsingOpenRouter ? (
                 <div className="space-y-1.5 pt-2">
                   <Label htmlFor="openrouter-provider">OpenRouter routing provider</Label>
                   <SingleSelect

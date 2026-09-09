@@ -23,6 +23,16 @@ import {
 } from '@~/components/ui/alert-dialog';
 import { Button } from '@~/components/ui/button/button';
 import { Textarea } from '@~/components/ui/textarea';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import type { RewriteSide } from '@~/features/character-creator/lib/editor/editor-enums';
+import { REWRITE_SIDES } from '@~/features/character-creator/lib/editor/editor-enums';
+import {
+  CONTENT_SOURCE_TYPES_CASES,
+  MESSAGE_PART_STATUSES,
+  MESSAGE_PART_TYPES_CASES,
+  MESSAGE_ROLES,
+  TOOL_CALL_STATES,
+} from '@~/features/character-creator/lib/generation/message-enums';
 import { cn } from '@~/lib/utils';
 
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
@@ -32,15 +42,16 @@ import { groupCharacterAssistantConversationMessages } from '../lib/assistant/co
 import { ASSISTANT_TOOL_RENDERER_KINDS, getAssistantToolRendererKind } from '../lib/assistant/tool-part-renderers';
 import { readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
 import { computeRewriteDiffHunks } from '../lib/editor/rewrite-diff';
-import {
-  CHARACTER_EDIT_PATCH_STATUSES,
-  CHARACTER_EDIT_PROPOSAL_SCHEMA,
-  isCharacterEditPatchUnresolved,
-} from '../lib/proposals/character-edit-proposal';
 import type {
   CharacterEditFieldKey,
   iCharacterEditPatch,
   iCharacterEditProposal,
+} from '../lib/proposals/character-edit-proposal';
+import {
+  CHARACTER_EDIT_PATCH_STATUS_LABELS,
+  CHARACTER_EDIT_PATCH_STATUSES,
+  CHARACTER_EDIT_PROPOSAL_SCHEMA,
+  isCharacterEditPatchUnresolved,
 } from '../lib/proposals/character-edit-proposal';
 import { CharacterAssistantMessageText } from './assistant/character-assistant-message-text';
 import { DiscoveryCardGrid } from './assistant/discovery-card-grid';
@@ -73,7 +84,8 @@ function readToolCallError(output: unknown) {
 function readEditableMessageText(message: UIMessage) {
   const text = message.parts
     .flatMap((part) => {
-      if (part.type !== 'text' || readChatAttachmentMetadata(readMessagePartMetadata(part))) return [];
+      if (part.type !== MESSAGE_PART_TYPES_CASES.TEXT || readChatAttachmentMetadata(readMessagePartMetadata(part)))
+        return [];
       return [part.content];
     })
     .join('\n')
@@ -81,14 +93,18 @@ function readEditableMessageText(message: UIMessage) {
   return text || null;
 }
 
-function stringifyPatchValue(patch: iCharacterEditPatch, side: 'old' | 'new') {
-  const value = side === 'old' ? patch.oldValue : patch.newValue;
+function stringifyPatchValue(patch: iCharacterEditPatch, side: RewriteSide) {
+  const value = side === REWRITE_SIDES.OLD ? patch.oldValue : patch.newValue;
   return typeof value === 'string' ? value : JSON.stringify(value ?? null, null, 2);
 }
 
 function CompactPatchDiff({ patch }: { patch: iCharacterEditPatch }) {
   const hunks = useMemo(
-    () => computeRewriteDiffHunks(stringifyPatchValue(patch, 'old'), stringifyPatchValue(patch, 'new')),
+    () =>
+      computeRewriteDiffHunks(
+        stringifyPatchValue(patch, REWRITE_SIDES.OLD),
+        stringifyPatchValue(patch, REWRITE_SIDES.NEW),
+      ),
     [patch],
   );
   return (
@@ -141,31 +157,33 @@ function ProposalCard({ proposal, onApply, onReject, onJumpToField }: iProposalC
               >
                 <LuChevronDown className={cn('size-4 shrink-0 transition-transform', isExpanded && 'rotate-180')} />
                 <span className="truncate">{formatFieldLabel(patch.fieldKey)}</span>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{patch.status}</span>
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                  {CHARACTER_EDIT_PATCH_STATUS_LABELS.get(patch.status)}
+                </span>
               </button>
               <div className="flex shrink-0 gap-1">
                 {onJumpToField ? (
                   <Button
                     type="button"
-                    size="sm"
-                    variant="ghost"
+                    size={BUTTON_SIZES.SM}
+                    variant={BUTTON_VARIANTS.GHOST}
                     aria-label={`Jump to ${formatFieldLabel(patch.fieldKey)}`}
                     onClick={() => onJumpToField(patch.fieldKey)}
                   >
                     <LuExternalLink className="size-3.5" />
                   </Button>
                 ) : null}
-                {patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed ? (
+                {patch.status === CHARACTER_EDIT_PATCH_STATUSES.PROPOSED ? (
                   <>
                     <Button
                       type="button"
-                      size="sm"
-                      variant="ghost"
+                      size={BUTTON_SIZES.SM}
+                      variant={BUTTON_VARIANTS.GHOST}
                       onClick={() => onReject(proposal.id, [patch.fieldKey])}
                     >
                       Reject
                     </Button>
-                    <Button type="button" size="sm" onClick={() => onApply(proposal.id, [patch.fieldKey])}>
+                    <Button type="button" size={BUTTON_SIZES.SM} onClick={() => onApply(proposal.id, [patch.fieldKey])}>
                       Apply
                     </Button>
                   </>
@@ -221,7 +239,7 @@ export function CharacterAssistantConversation({
   const proposalsById = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   const proposedPatchCount = proposals.reduce(
     (count, proposal) =>
-      count + proposal.patches.filter((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed).length,
+      count + proposal.patches.filter((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.PROPOSED).length,
     0,
   );
   const unresolvedPatchCount = proposals.reduce(
@@ -229,7 +247,7 @@ export function CharacterAssistantConversation({
     0,
   );
   const conversationMessages = useMemo(() => groupCharacterAssistantConversationMessages(messages), [messages]);
-  const lastUserMessageId = conversationMessages.findLast((message) => message.role === 'user')?.id ?? null;
+  const lastUserMessageId = conversationMessages.findLast((message) => message.role === MESSAGE_ROLES.USER)?.id ?? null;
   const deletionStartIndex = messagePendingDeletion
     ? conversationMessages.findIndex((message) => message.id === messagePendingDeletion.id)
     : -1;
@@ -245,15 +263,15 @@ export function CharacterAssistantConversation({
         <div
           key={message.id}
           data-conversation-message
-          aria-label={message.role === 'user' ? 'User message' : 'Assistant message'}
-          className={cn('group grid max-w-[92%] gap-1', message.role === 'user' ? 'ml-auto' : 'mr-auto')}
+          aria-label={message.role === MESSAGE_ROLES.USER ? 'User message' : 'Assistant message'}
+          className={cn('group grid max-w-[92%] gap-1', message.role === MESSAGE_ROLES.USER ? 'ml-auto' : 'mr-auto')}
           style={editingMessageId === message.id && editingMessageWidth ? { width: editingMessageWidth } : undefined}
         >
           <div
             className={cn(
               'grid gap-2 rounded-2xl text-sm leading-relaxed',
               editingMessageId === message.id ? 'p-1.5' : 'px-0.5 py-0.25',
-              message.role === 'user'
+              message.role === MESSAGE_ROLES.USER
                 ? 'rounded-br-md bg-secondary text-secondary-foreground'
                 : 'rounded-bl-md border bg-card',
             )}
@@ -286,8 +304,8 @@ export function CharacterAssistantConversation({
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     type="button"
-                    size="sm"
-                    variant="outline"
+                    size={BUTTON_SIZES.SM}
+                    variant={BUTTON_VARIANTS.OUTLINE}
                     disabled={isUpdatingMessages}
                     onClick={() => {
                       setEditingMessageId(null);
@@ -296,7 +314,7 @@ export function CharacterAssistantConversation({
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" size="sm" disabled={isUpdatingMessages || !editedMessage.trim()}>
+                  <Button type="submit" size={BUTTON_SIZES.SM} disabled={isUpdatingMessages || !editedMessage.trim()}>
                     Save and resend
                   </Button>
                 </div>
@@ -304,9 +322,9 @@ export function CharacterAssistantConversation({
             ) : (
               message.parts.map((part, partIndex) => {
                 let partKey = `${part.type}-${partIndex}`;
-                if (part.type === 'tool-call') partKey = part.id;
-                if (part.type === 'text') partKey = `text-${partIndex}`;
-                if (part.type === 'text') {
+                if (part.type === MESSAGE_PART_TYPES_CASES.TOOL_CALL) partKey = part.id;
+                if (part.type === MESSAGE_PART_TYPES_CASES.TEXT) partKey = `text-${partIndex}`;
+                if (part.type === MESSAGE_PART_TYPES_CASES.TEXT) {
                   const attachment = readChatAttachmentMetadata(readMessagePartMetadata(part));
                   if (attachment)
                     return (
@@ -321,10 +339,10 @@ export function CharacterAssistantConversation({
                     );
                   return <CharacterAssistantMessageText key={partKey} content={part.content} />;
                 }
-                if (part.type === 'image') {
+                if (part.type === MESSAGE_PART_TYPES_CASES.IMAGE) {
                   const attachment = readChatAttachmentMetadata(part.metadata);
                   const source =
-                    part.source.type === 'data'
+                    part.source.type === CONTENT_SOURCE_TYPES_CASES.DATA
                       ? `data:${part.source.mimeType};base64,${part.source.value}`
                       : part.source.value;
                   return (
@@ -342,9 +360,13 @@ export function CharacterAssistantConversation({
                     </figure>
                   );
                 }
-                if (part.type === 'structured-output' && part.status === 'complete') {
+                if (
+                  part.type === MESSAGE_PART_TYPES_CASES.STRUCTURED_OUTPUT &&
+                  part.status === MESSAGE_PART_STATUSES.COMPLETE
+                ) {
                   const hasStreamedText = message.parts.some(
-                    (messagePart) => messagePart.type === 'text' && messagePart.content.trim().length > 0,
+                    (messagePart) =>
+                      messagePart.type === MESSAGE_PART_TYPES_CASES.TEXT && messagePart.content.trim().length > 0,
                   );
                   if (hasStreamedText) return null;
                   const result = ASSISTANT_FINAL_RESPONSE_SCHEMA.safeParse(part.data);
@@ -352,7 +374,7 @@ export function CharacterAssistantConversation({
                     <CharacterAssistantMessageText key={partKey} content={result.data.assistantMessage} />
                   ) : null;
                 }
-                if (part.type === 'tool-call' && part.state === 'error') {
+                if (part.type === MESSAGE_PART_TYPES_CASES.TOOL_CALL && part.state === TOOL_CALL_STATES.ERROR) {
                   const toolError = readToolCallError(part.output);
                   return (
                     <div
@@ -365,13 +387,13 @@ export function CharacterAssistantConversation({
                     </div>
                   );
                 }
-                if (part.type !== 'tool-call' || !part.output) return null;
+                if (part.type !== MESSAGE_PART_TYPES_CASES.TOOL_CALL || !part.output) return null;
                 const rendererKind = getAssistantToolRendererKind(part.name);
-                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.proposal) {
+                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.PROPOSAL) {
                   const toolResult = PROPOSAL_TOOL_RESULT_SCHEMA.safeParse(part.output);
                   if (toolResult.success && toolResult.data.isNoOp) {
                     const hasEarlierNoOp = message.parts.slice(0, partIndex).some((messagePart) => {
-                      if (messagePart.type !== 'tool-call') return false;
+                      if (messagePart.type !== MESSAGE_PART_TYPES_CASES.TOOL_CALL) return false;
                       const earlierResult = PROPOSAL_TOOL_RESULT_SCHEMA.safeParse(messagePart.output);
                       return earlierResult.success && earlierResult.data.isNoOp;
                     });
@@ -399,10 +421,10 @@ export function CharacterAssistantConversation({
                     />
                   );
                 }
-                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.concept) {
+                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.CONCEPT) {
                   return null;
                 }
-                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.discovery && onSendMessage) {
+                if (rendererKind === ASSISTANT_TOOL_RENDERER_KINDS.DISCOVERY && onSendMessage) {
                   const result = z
                     .array(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA)
                     .safeParse((part.output as { cards?: unknown }).cards);
@@ -418,14 +440,14 @@ export function CharacterAssistantConversation({
             <div
               className={cn(
                 'flex items-center gap-0.5 px-1 text-muted-foreground opacity-75 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100',
-                message.role === 'user' ? 'justify-end' : 'justify-start',
+                message.role === MESSAGE_ROLES.USER ? 'justify-end' : 'justify-start',
               )}
             >
               {message.id === lastUserMessageId && onEditLastUserMessage && readEditableMessageText(message) ? (
                 <Button
                   type="button"
-                  size="sm"
-                  variant="ghost"
+                  size={BUTTON_SIZES.SM}
+                  variant={BUTTON_VARIANTS.GHOST}
                   className="size-6 p-0 hover:text-foreground"
                   aria-label="Edit latest message"
                   disabled={isUpdatingMessages}
@@ -442,8 +464,8 @@ export function CharacterAssistantConversation({
               {onDeleteFromMessage ? (
                 <Button
                   type="button"
-                  size="sm"
-                  variant="ghost"
+                  size={BUTTON_SIZES.SM}
+                  variant={BUTTON_VARIANTS.GHOST}
                   className="size-6 p-0 hover:text-destructive"
                   aria-label="Delete from this message"
                   disabled={isUpdatingMessages}
@@ -494,12 +516,12 @@ export function CharacterAssistantConversation({
       {proposedPatchCount > 1 || unresolvedPatchCount > 1 ? (
         <div className="flex justify-end gap-2">
           {unresolvedPatchCount > 1 ? (
-            <Button type="button" size="sm" variant="outline" onClick={onRejectAll}>
+            <Button type="button" size={BUTTON_SIZES.SM} variant={BUTTON_VARIANTS.OUTLINE} onClick={onRejectAll}>
               Reject all
             </Button>
           ) : null}
           {proposedPatchCount > 1 ? (
-            <Button type="button" size="sm" onClick={onApplyAll}>
+            <Button type="button" size={BUTTON_SIZES.SM} onClick={onApplyAll}>
               Apply all
             </Button>
           ) : null}

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { LuCheck, LuCopy } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
 import { toastError, toastSuccess } from './toastifications';
 
@@ -51,7 +52,13 @@ export function CopyButton({
   }, [isShowingFeedback]);
 
   return (
-    <Button variant="outline" size="icon" onClick={handleCopy} disabled={disabled} aria-label={ariaLabel}>
+    <Button
+      variant={BUTTON_VARIANTS.OUTLINE}
+      size={BUTTON_SIZES.ICON}
+      onClick={handleCopy}
+      disabled={disabled}
+      aria-label={ariaLabel}
+    >
       {isCopied ? <LuCheck className="size-4" /> : <LuCopy className="size-4" />}
     </Button>
   );

@@ -1,6 +1,8 @@
+import { CHARACTER_TEXT_FIELD_KEY } from '@~/features/character-creator/lib/cards/card-schema';
+
 import type { CharacterCard, CharacterTextFieldKey } from '../cards/card-schema';
-import { GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { iFieldGenerationTarget } from './generation-contracts';
+import { GENERATION_TARGET_KINDS } from './generation-contracts';
 import { PromptFormatter } from './prompt-formatting';
 
 export const STANDARD_FIELD_LABELS = {
@@ -18,15 +20,15 @@ export const STANDARD_FIELD_LABELS = {
 } satisfies Record<CharacterTextFieldKey, string>;
 
 const CORE_CONTEXT_KEYS: CharacterTextFieldKey[] = [
-  'name',
-  'description',
-  'personality',
-  'scenario',
-  'first_mes',
-  'mes_example',
-  'creator_notes',
-  'creator',
-  'character_version',
+  CHARACTER_TEXT_FIELD_KEY.NAME,
+  CHARACTER_TEXT_FIELD_KEY.DESCRIPTION,
+  CHARACTER_TEXT_FIELD_KEY.PERSONALITY,
+  CHARACTER_TEXT_FIELD_KEY.SCENARIO,
+  CHARACTER_TEXT_FIELD_KEY.FIRST_MES,
+  CHARACTER_TEXT_FIELD_KEY.MES_EXAMPLE,
+  CHARACTER_TEXT_FIELD_KEY.CREATOR_NOTES,
+  CHARACTER_TEXT_FIELD_KEY.CREATOR,
+  CHARACTER_TEXT_FIELD_KEY.CHARACTER_VERSION,
 ];
 
 export class CardContextService {
@@ -56,8 +58,7 @@ export class CardContextService {
         }
 
         const isTargetGreeting =
-          target.kind === GENERATION_TARGET_KINDS['alternate-greeting'] &&
-          target.key === `alternate_greetings:${index}`;
+          target.kind === GENERATION_TARGET_KINDS.ALTERNATE_GREETING && target.key === `alternate_greetings:${index}`;
         lines.push(`Alternate Greeting ${index + 1}${isTargetGreeting ? ' (target)' : ''}: ${greeting.trim()}`);
       });
     }
@@ -69,7 +70,7 @@ export class CardContextService {
         }
 
         const isTargetCustomField =
-          target.kind === GENERATION_TARGET_KINDS['custom-field'] && target.key === `custom:${field.id}`;
+          target.kind === GENERATION_TARGET_KINDS.CUSTOM_FIELD && target.key === `custom:${field.id}`;
         lines.push(
           `Custom Field ${field.label.trim() !== '' ? field.label.trim() : 'Untitled'}${isTargetCustomField ? ' (target)' : ''}: ${field.value.trim() !== '' ? field.value.trim() : '(empty)'}`,
         );

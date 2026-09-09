@@ -1,19 +1,20 @@
 import { z } from 'zod';
 
-import { generateValidatedObject } from '../generation/structured-output.server';
+import {
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_ENUM,
+} from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+
 import type { iGenerateValidatedObject } from '../generation/structured-output.server';
+import { generateValidatedObject } from '../generation/structured-output.server';
 import {
   createCharacterStructuredModelOptions,
   createCharacterTextAdapter,
 } from '../generation/tanstack-ai-text-generation';
-import {
-  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
-  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES,
-} from './character-assistant-contracts';
 import type {
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
   iCharacterAssistantDiscoveryDirectionCard,
   iCharacterAssistantStreamRequest,
-  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
 } from './character-assistant-contracts';
 
 const GENERATED_CARD_SCHEMA = z.object({
@@ -129,7 +130,7 @@ export function createCharacterDiscoveryDirectionsService(
     generationSettings,
     abortSignal,
   }: iCharacterDiscoveryDirectionsRequest) {
-    const categories = Object.values(CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES);
+    const categories = CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_ENUM.values;
     const cards = (
       await Promise.all(
         categories.map(async (category) =>

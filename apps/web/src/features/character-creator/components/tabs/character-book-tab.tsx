@@ -2,10 +2,14 @@ import { LuBookOpen, LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { Button } from '@~/components/ui/button';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import {
+  CHARACTER_EDIT_FIELD_KEYS,
+  CHARACTER_EDIT_PATCH_KINDS_CASES,
+} from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 
 import { useCharacterAssistant } from '../../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
-import { CHARACTER_EDIT_FIELD_KEYS } from '../../lib/proposals/character-edit-proposal';
 import { CharacterAssistantStructuredReview } from '../character-assistant-structured-review';
 import { CharacterBookEditor } from '../character-book-editor';
 import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
@@ -23,7 +27,7 @@ export function CharacterBookTab() {
     reorderCharacterBookEntries,
   } = useCharacterCreatorContext();
   const assistantPatchView = workspace.activePatches.find(
-    (patchView) => patchView.patch.fieldKey === CHARACTER_EDIT_FIELD_KEYS.character_book,
+    (patchView) => patchView.patch.fieldKey === CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK,
   );
   const reportAssistantError = (error: unknown) =>
     toastError('Assistant proposal was not updated', error instanceof Error ? error.message : 'The action failed.');
@@ -37,12 +41,22 @@ export function CharacterBookTab() {
         </div>
         <div className="flex flex-wrap gap-2">
           {data.character_book ? (
-            <Button type="button" variant="outline" size="sm" onClick={removeCharacterBook}>
+            <Button
+              type="button"
+              variant={BUTTON_VARIANTS.OUTLINE}
+              size={BUTTON_SIZES.SM}
+              onClick={removeCharacterBook}
+            >
               <LuTrash2 className="size-4" />
               Remove book
             </Button>
           ) : (
-            <Button type="button" variant="outline" size="sm" onClick={createCharacterBook}>
+            <Button
+              type="button"
+              variant={BUTTON_VARIANTS.OUTLINE}
+              size={BUTTON_SIZES.SM}
+              onClick={createCharacterBook}
+            >
               <LuPlus className="size-4" />
               Create book
             </Button>
@@ -50,18 +64,18 @@ export function CharacterBookTab() {
         </div>
       </div>
 
-      {assistantPatchView?.patch.kind === 'character-book' ? (
+      {assistantPatchView?.patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.CHARACTER_BOOK ? (
         <div className="mb-4">
           <CharacterAssistantStructuredReview
             patch={assistantPatchView.patch}
             onApply={() => {
               void workspace
-                .applyProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.character_book])
+                .applyProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK])
                 .catch(reportAssistantError);
             }}
             onReject={() => {
               void workspace
-                .rejectProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.character_book])
+                .rejectProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK])
                 .catch(reportAssistantError);
             }}
           />

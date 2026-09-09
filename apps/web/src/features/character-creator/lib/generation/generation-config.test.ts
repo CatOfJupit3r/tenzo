@@ -63,11 +63,11 @@ describe('sanitizeCharacterGenerationPromptSettings', () => {
 describe('sanitizeCharacterGenerationConnectionSettings', () => {
   it('clamps malformed sampling settings while preserving supported connection values', () => {
     const result = sanitizeCharacterGenerationConnectionSettings({
-      provider: GENERATION_PROVIDERS.openrouter,
+      provider: GENERATION_PROVIDERS.OPENROUTER,
       endpoint: 'https://example.test/v1',
       model: 'example-model',
-      outputFormat: OUTPUT_FORMATS.json,
-      requestMode: REQUEST_MODES.browser,
+      outputFormat: OUTPUT_FORMATS.JSON,
+      requestMode: REQUEST_MODES.BROWSER,
       contextSize: 0,
       maxTokens: 4_096.8,
       temperature: 99,
@@ -79,11 +79,11 @@ describe('sanitizeCharacterGenerationConnectionSettings', () => {
     });
 
     expect(result).toMatchObject({
-      provider: GENERATION_PROVIDERS.openrouter,
+      provider: GENERATION_PROVIDERS.OPENROUTER,
       endpoint: 'https://example.test/v1',
       model: 'example-model',
-      outputFormat: OUTPUT_FORMATS.json,
-      requestMode: REQUEST_MODES.browser,
+      outputFormat: OUTPUT_FORMATS.JSON,
+      requestMode: REQUEST_MODES.BROWSER,
       contextSize: DEFAULT_CONTEXT_SIZE,
       maxTokens: 4_096,
       temperature: TEMPERATURE_RANGE.max,
@@ -97,21 +97,21 @@ describe('sanitizeCharacterGenerationConnectionSettings', () => {
 
   it('persists supported generation budgets and rejects unknown values', () => {
     expect(
-      sanitizeCharacterGenerationConnectionSettings({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.expanded }),
-    ).toMatchObject({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.expanded });
+      sanitizeCharacterGenerationConnectionSettings({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.EXPANDED }),
+    ).toMatchObject({ agentGenerationBudget: AGENT_GENERATION_BUDGETS.EXPANDED });
     expect(sanitizeCharacterGenerationConnectionSettings({ agentGenerationBudget: 'unbounded' })).toMatchObject({
-      agentGenerationBudget: AGENT_GENERATION_BUDGETS.balanced,
+      agentGenerationBudget: AGENT_GENERATION_BUDGETS.BALANCED,
     });
   });
 
   it('persists supported field writing strategies and rejects unknown values', () => {
     expect(
       sanitizeCharacterGenerationConnectionSettings({
-        fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'],
+        fieldWritingStrategy: FIELD_WRITING_STRATEGIES.COMBINED_FIELDS,
       }),
-    ).toMatchObject({ fieldWritingStrategy: FIELD_WRITING_STRATEGIES['combined-fields'] });
+    ).toMatchObject({ fieldWritingStrategy: FIELD_WRITING_STRATEGIES.COMBINED_FIELDS });
     expect(sanitizeCharacterGenerationConnectionSettings({ fieldWritingStrategy: 'automatic' })).toMatchObject({
-      fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+      fieldWritingStrategy: FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS,
     });
   });
 });

@@ -12,6 +12,7 @@ import {
   AlertDialogTrigger,
 } from '@~/components/ui/alert-dialog';
 import { Button } from '@~/components/ui/button/button';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
 export interface iCharacterDeleteDialogProps {
   displayName: string;
@@ -25,8 +26,8 @@ export function CharacterDeleteDialog({ displayName, onRemove, className }: iCha
       <AlertDialogTrigger asChild>
         <Button
           type="button"
-          size="icon"
-          variant="ghost"
+          size={BUTTON_SIZES.ICON}
+          variant={BUTTON_VARIANTS.GHOST}
           className={className}
           aria-label={`Delete ${displayName}`}
           title="Delete"

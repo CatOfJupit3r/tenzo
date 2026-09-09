@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
+
 import { AGENT_CALL_MAXIMUM_ATTEMPTS, createAgentCallPacer } from './agent-call-pacer.server';
 
 function createHttpError(status: number) {
@@ -49,7 +51,7 @@ describe('agent call pacer', () => {
     });
 
     await expect(createAgentCallPacer().execute(operation, abortController.signal)).rejects.toMatchObject({
-      name: 'AbortError',
+      name: ABORT_ERROR_NAMES.ABORT_ERROR,
     });
     expect(operation).toHaveBeenCalledTimes(1);
   });

@@ -54,6 +54,7 @@
     "date-fns": "4.1.0",
     "dexie": "^4.4.4",
     "diff": "9.0.0",
+    "enumwaii": "1.1.0",
     "fflate": "^0.8.3",
     "idb-keyval": "^6.2.6",
     "jotai": "2.16.1",

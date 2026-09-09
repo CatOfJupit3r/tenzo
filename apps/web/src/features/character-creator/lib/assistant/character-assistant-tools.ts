@@ -3,33 +3,34 @@ import { z } from 'zod';
 
 import { generateUuid } from '@~/utils/uuid';
 
+import type { CharacterCard, CustomField } from '../cards/card-schema';
 import {
-  CHARACTER_BOOK_SCHEMA,
   CHARACTER_BOOK_ENTRY_SCHEMA,
+  CHARACTER_BOOK_SCHEMA,
   CHARACTER_CARD_SCHEMA,
-  CHARACTER_TEXT_FIELD_KEYS,
+  CHARACTER_TEXT_FIELD_KEY_ENUM,
   CHARACTER_TEXT_FIELD_KEY_SCHEMA,
+  CHARACTER_TEXT_FIELD_KEYS,
   CUSTOM_FIELD_SCHEMA,
 } from '../cards/card-schema';
-import type { CharacterCard, CustomField, CharacterTextFieldKey } from '../cards/card-schema';
 import { doesValueMatchStrictFieldTemplate } from '../cards/field-template-enforcement';
-import { getTemplateFieldKeyForTargetKey, TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
 import type { TemplateFieldKey } from '../cards/field-templates';
+import { getTemplateFieldKeyForTargetKey, TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
 import type { CharacterAssistantFieldEditing } from '../generation/generation-config';
-import { CHARACTER_EDIT_FIELD_KEYS } from '../proposals/character-edit-proposal';
 import type { iCharacterEditProposal } from '../proposals/character-edit-proposal';
-import {
-  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
-  CHARACTER_ASSISTANT_FOCUS_KINDS,
-  CHARACTER_ASSISTANT_TOOL_NAMES,
-  CHARACTER_CONCEPT_SCHEMA,
-} from './character-assistant-contracts';
+import { CHARACTER_EDIT_FIELD_KEYS } from '../proposals/character-edit-proposal';
 import type {
   CharacterAssistantFocus,
   CharacterAssistantToolName,
   iCharacterAssistantDiscoveryDirectionCard,
   iCharacterConcept,
   iChatTemplateRef,
+} from './character-assistant-contracts';
+import {
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA,
+  CHARACTER_ASSISTANT_FOCUS_KINDS_CASES,
+  CHARACTER_ASSISTANT_TOOL_NAMES,
+  CHARACTER_CONCEPT_SCHEMA,
 } from './character-assistant-contracts';
 import { PROPOSAL_TOOL_RESULT_SCHEMA } from './character-assistant-tool-results';
 
@@ -63,8 +64,8 @@ export const PROPOSE_CHARACTER_FIELDS_INPUT_SCHEMA = z.object({
 });
 
 function doesFocusAllowField(focus: CharacterAssistantFocus | undefined, fieldKey: string) {
-  if (!focus || focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.card) return true;
-  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field) return focus.fieldKey === fieldKey;
+  if (!focus || focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD) return true;
+  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD) return focus.fieldKey === fieldKey;
   return focus.fieldKeys.some((focusedFieldKey) => focusedFieldKey === fieldKey);
 }
 
@@ -81,10 +82,15 @@ export function createProposeCharacterFieldsInputSchema(
   fieldShouldAllowAssistantEditing?: Readonly<CharacterAssistantFieldEditing>,
   focus?: CharacterAssistantFocus,
 ) {
-  const enabledFieldKeys = getAllowedCharacterAssistantTextFieldKeys(fieldShouldAllowAssistantEditing, focus);
-  if (enabledFieldKeys.length === 0) return null;
+  const [firstFieldKey, ...remainingFieldKeys] = getAllowedCharacterAssistantTextFieldKeys(
+    fieldShouldAllowAssistantEditing,
+    focus,
+  ).map((fieldKey) => CHARACTER_TEXT_FIELD_KEY_ENUM.parse(fieldKey));
+  if (!firstFieldKey) return null;
 
-  const enabledFieldKeySchema = z.enum(enabledFieldKeys as [CharacterTextFieldKey, ...CharacterTextFieldKey[]]);
+  const enabledFieldKeyEnum = CHARACTER_TEXT_FIELD_KEY_ENUM.pick([firstFieldKey, ...remainingFieldKeys]);
+  const ENABLED_FIELD_KEYS = enabledFieldKeyEnum.enum;
+  const enabledFieldKeySchema = z.enum(ENABLED_FIELD_KEYS);
   return z.object({
     changes: z.array(z.object({ fieldKey: enabledFieldKeySchema, value: z.string() })).min(1),
     summary: TOOL_SUMMARY_SCHEMA,
@@ -96,36 +102,36 @@ export function getAllowedCharacterAssistantToolNames(
   focus?: CharacterAssistantFocus,
 ): CharacterAssistantToolName[] {
   const toolNames: CharacterAssistantToolName[] = [
-    CHARACTER_ASSISTANT_TOOL_NAMES.read_character,
-    CHARACTER_ASSISTANT_TOOL_NAMES.record_concept,
-    CHARACTER_ASSISTANT_TOOL_NAMES.suggest_character_directions,
+    CHARACTER_ASSISTANT_TOOL_NAMES.READ_CHARACTER,
+    CHARACTER_ASSISTANT_TOOL_NAMES.RECORD_CONCEPT,
+    CHARACTER_ASSISTANT_TOOL_NAMES.SUGGEST_CHARACTER_DIRECTIONS,
   ];
   if (getAllowedCharacterAssistantTextFieldKeys(fieldShouldAllowAssistantEditing, focus).length > 0) {
-    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields);
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS);
   }
   if (
-    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.tags] !== false &&
-    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.tags)
+    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.TAGS] !== false &&
+    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.TAGS)
   ) {
-    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags);
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_TAGS);
   }
   if (
-    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.alternate_greetings] !== false &&
-    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.alternate_greetings)
+    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS] !== false &&
+    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS)
   ) {
-    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings);
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_ALTERNATE_GREETINGS);
   }
   if (
-    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.custom_fields] !== false &&
-    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.custom_fields)
+    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.CUSTOM_FIELDS] !== false &&
+    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.CUSTOM_FIELDS)
   ) {
-    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields);
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CUSTOM_FIELDS);
   }
   if (
-    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.character_book] !== false &&
-    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.character_book)
+    fieldShouldAllowAssistantEditing?.[CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK] !== false &&
+    doesFocusAllowField(focus, CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK)
   ) {
-    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book);
+    toolNames.push(CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_BOOK);
   }
   return toolNames;
 }
@@ -167,15 +173,15 @@ function normalizeCustomField(field: Partial<CustomField> & Pick<CustomField, 'l
 }
 
 function assertFocusAllowsField(focus: CharacterAssistantFocus, fieldKey: string) {
-  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field && focus.fieldKey !== fieldKey)
+  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD && focus.fieldKey !== fieldKey)
     throw new Error(`This run is focused on ${focus.fieldKey}; proposing changes to ${fieldKey} is not allowed.`);
-  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.fields && !focus.fieldKeys.includes(fieldKey as never))
+  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELDS && !focus.fieldKeys.includes(fieldKey as never))
     throw new Error(`This run does not allow proposing changes to ${fieldKey}.`);
 }
 
 function getTemplateFieldKeyForProposalField(fieldKey: string): TemplateFieldKey | null {
-  if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings) {
-    return TEMPLATE_FIELD_KEYS.alternate_greeting;
+  if (fieldKey === CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS) {
+    return TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING;
   }
 
   return getTemplateFieldKeyForTargetKey(`field:${fieldKey}`);
@@ -197,14 +203,14 @@ function assertStrictTemplateCompliance({
     }
 
     const strictTemplate = templates.find(
-      (template) => template.mode === TEMPLATE_MODES.strict && template.fieldKeys.includes(templateFieldKey),
+      (template) => template.mode === TEMPLATE_MODES.STRICT && template.fieldKeys.includes(templateFieldKey),
     );
     if (!strictTemplate) {
       return;
     }
 
     const proposedValues =
-      fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings
+      fieldKey === CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS
         ? proposedCard.data.alternate_greetings
         : [proposedCard.data[templateFieldKey as keyof typeof proposedCard.data]];
     const isCompliant = proposedValues.every(
@@ -356,22 +362,22 @@ export function createCharacterAssistantTools({
   const handlers = createCharacterAssistantActionHandlers({ focus, store, templates });
   const characterFieldsInputSchema = createProposeCharacterFieldsInputSchema(fieldShouldAllowAssistantEditing, focus);
   const allTools = {
-    [CHARACTER_ASSISTANT_TOOL_NAMES.read_character]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.read_character,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.READ_CHARACTER]: toolDefinition({
+      name: CHARACTER_ASSISTANT_TOOL_NAMES.READ_CHARACTER,
       description: 'Read the current projected character card.',
       inputSchema: z.object({}),
       outputSchema: z.object({ card: CHARACTER_CARD_SCHEMA }),
     }).server(async () => handlers.readCharacter()),
-    [CHARACTER_ASSISTANT_TOOL_NAMES.record_concept]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.record_concept,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.RECORD_CONCEPT]: toolDefinition({
+      name: CHARACTER_ASSISTANT_TOOL_NAMES.RECORD_CONCEPT,
       description: 'Record the structured character concept.',
       inputSchema: CHARACTER_CONCEPT_SCHEMA,
       outputSchema: CONCEPT_TOOL_RESULT_SCHEMA,
     }).server(async (input) => handlers.recordConcept(CHARACTER_CONCEPT_SCHEMA.parse(input))),
     ...(characterFieldsInputSchema
       ? {
-          [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields]: toolDefinition({
-            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+          [CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS]: toolDefinition({
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
             description: 'Propose updates to enabled standard character text fields.',
             inputSchema: characterFieldsInputSchema,
             outputSchema: PROPOSAL_TOOL_RESULT_SCHEMA,
@@ -380,40 +386,40 @@ export function createCharacterAssistantTools({
           ),
         }
       : {}),
-    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_tags,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_TAGS]: toolDefinition({
+      name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_TAGS,
       description: 'Propose a complete ordered replacement for tags.',
       inputSchema: PROPOSE_TAGS_INPUT_SCHEMA,
       outputSchema: PROPOSAL_TOOL_RESULT_SCHEMA,
     }).server(async (input, context) =>
       handlers.proposeTags(PROPOSE_TAGS_INPUT_SCHEMA.parse(input), context?.toolCallId),
     ),
-    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_alternate_greetings,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_ALTERNATE_GREETINGS]: toolDefinition({
+      name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_ALTERNATE_GREETINGS,
       description: 'Propose a complete ordered replacement for alternate greetings.',
       inputSchema: PROPOSE_ALTERNATE_GREETINGS_INPUT_SCHEMA,
       outputSchema: PROPOSAL_TOOL_RESULT_SCHEMA,
     }).server(async (input, context) =>
       handlers.proposeAlternateGreetings(PROPOSE_ALTERNATE_GREETINGS_INPUT_SCHEMA.parse(input), context?.toolCallId),
     ),
-    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_custom_fields,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CUSTOM_FIELDS]: toolDefinition({
+      name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CUSTOM_FIELDS,
       description: 'Propose a complete ordered replacement for custom fields.',
       inputSchema: PROPOSE_CUSTOM_FIELDS_INPUT_SCHEMA,
       outputSchema: PROPOSAL_TOOL_RESULT_SCHEMA,
     }).server(async (input, context) =>
       handlers.proposeCustomFields(PROPOSE_CUSTOM_FIELDS_INPUT_SCHEMA.parse(input), context?.toolCallId),
     ),
-    [CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_book,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_BOOK]: toolDefinition({
+      name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_BOOK,
       description: 'Propose a complete character book or null to remove it.',
       inputSchema: PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA,
       outputSchema: PROPOSAL_TOOL_RESULT_SCHEMA,
     }).server(async (input, context) =>
       handlers.proposeCharacterBook(PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA.parse(input), context?.toolCallId),
     ),
-    [CHARACTER_ASSISTANT_TOOL_NAMES.suggest_character_directions]: toolDefinition({
-      name: CHARACTER_ASSISTANT_TOOL_NAMES.suggest_character_directions,
+    [CHARACTER_ASSISTANT_TOOL_NAMES.SUGGEST_CHARACTER_DIRECTIONS]: toolDefinition({
+      name: CHARACTER_ASSISTANT_TOOL_NAMES.SUGGEST_CHARACTER_DIRECTIONS,
       description: 'Generate varied selectable character directions. The premise is optional.',
       inputSchema: SUGGEST_DIRECTIONS_INPUT_SCHEMA,
       outputSchema: SUGGEST_DIRECTIONS_RESULT_SCHEMA,

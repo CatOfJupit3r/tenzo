@@ -1,3 +1,5 @@
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
+
 export async function buildGenerationErrorMessage(response: Response) {
   const errorText = (await response.text()).trim();
   return errorText || `${response.status} ${response.statusText}`.trim();
@@ -28,7 +30,9 @@ export async function readTextResponseStream({
 
   while (true) {
     if (signal?.aborted) {
-      throw signal.reason instanceof Error ? signal.reason : new DOMException('Request aborted', 'AbortError');
+      throw signal.reason instanceof Error
+        ? signal.reason
+        : new DOMException('Request aborted', ABORT_ERROR_NAMES.ABORT_ERROR);
     }
 
     const { done: isDone, value } = await reader.read();

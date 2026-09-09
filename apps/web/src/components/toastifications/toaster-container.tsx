@@ -18,7 +18,7 @@ export default function ToasterContainer() {
       pauseOnFocusLoss
       draggable
       pauseOnHover
-      theme={appTheme === USER_THEME.dark ? 'dark' : 'light'}
+      theme={appTheme === USER_THEME.DARK ? 'dark' : 'light'}
     />
   );
 }

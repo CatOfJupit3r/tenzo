@@ -9,9 +9,10 @@ import {
   TOP_K_RANGE,
   TOP_P_RANGE,
 } from './generation-config';
+import { MESSAGE_ROLES } from './message-enums';
 
 export const GENERATION_STREAM_MESSAGE_SCHEMA = z.object({
-  role: z.enum(['system', 'user', 'assistant']),
+  role: z.enum(MESSAGE_ROLES),
   content: z.string(),
 });
 

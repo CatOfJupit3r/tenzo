@@ -1,3 +1,5 @@
+import { MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
+
 import {
   DEFAULT_CHARACTER_CARD_WRITING_GUIDE,
   DEFAULT_POST_HISTORY_INSTRUCTIONS,
@@ -8,9 +10,8 @@ import { getPrefilled } from '../generation/response-parser';
 import { CardContextSectionStrategy } from './card-context-section-strategy';
 import { CardContextService } from './card-context-service';
 import { ExampleContextSectionStrategy } from './example-context-section-strategy';
-import { ExampleContextService, MAX_EXAMPLE_CONTEXT_CHARACTERS } from './example-context-service';
 import type { iExampleContextSummary } from './example-context-service';
-import { GENERATION_MODES } from './generation-contracts';
+import { ExampleContextService, MAX_EXAMPLE_CONTEXT_CHARACTERS } from './example-context-service';
 import type {
   GenerationMode,
   iFieldGenerationTarget,
@@ -18,6 +19,7 @@ import type {
   iPromptExampleCharacter,
   iPromptFieldTemplate,
 } from './generation-contracts';
+import { GENERATION_MODES } from './generation-contracts';
 import type { iPromptPipelineContext, iPromptSectionStrategy } from './prompt-section-strategy';
 import { SeededRandom } from './seeded-random';
 import { TaskInstructionService } from './task-instruction-service';
@@ -85,16 +87,19 @@ export class CharacterPromptPipeline {
     );
 
     const messages: iGenerationMessage[] = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: sections.join('\n\n') },
+      { role: MESSAGE_ROLES.SYSTEM, content: systemPrompt },
+      { role: MESSAGE_ROLES.USER, content: sections.join('\n\n') },
     ];
 
     if (postHistoryInstructions) {
-      messages.push({ role: 'system', content: postHistoryInstructions });
+      messages.push({ role: MESSAGE_ROLES.SYSTEM, content: postHistoryInstructions });
     }
 
     if (context.isContinuation) {
-      messages.push({ role: 'assistant', content: getPrefilled(context.target.value, context.outputFormat) });
+      messages.push({
+        role: MESSAGE_ROLES.ASSISTANT,
+        content: getPrefilled(context.target.value, context.outputFormat),
+      });
     }
 
     return {
@@ -110,7 +115,7 @@ export class CharacterPromptPipeline {
     target,
     outputFormat,
     seed,
-    mode = GENERATION_MODES.generate,
+    mode = GENERATION_MODES.GENERATE,
     globalCharacterInstruction = '',
     generalCharacterIdea = '',
     shouldUseGeneralCharacterIdea = true,
@@ -128,7 +133,7 @@ export class CharacterPromptPipeline {
       random,
     });
     const variationSection = this.variationService.buildSection({ random, seed, target, mode });
-    const isContinuation = mode === GENERATION_MODES.continue && Boolean(target.value.trim());
+    const isContinuation = mode === GENERATION_MODES.CONTINUE && Boolean(target.value.trim());
 
     return {
       card,

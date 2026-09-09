@@ -13,17 +13,18 @@ import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Button } from '@~/components/ui/button';
 import { Label } from '@~/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@~/components/ui/popover';
-import { SingleSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
+import { SingleSelect } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
+import { ALERT_VARIANTS, BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
-import { FIELD_TEMPLATE_SELECTION_NONE, TEMPLATE_MODE_LABELS } from '../lib/cards/field-templates';
 import type {
   iCreateStoredFieldTemplateInput,
   iFieldTemplateViewModel,
   TemplateFieldKey,
 } from '../lib/cards/field-templates';
+import { FIELD_TEMPLATE_SELECTION_NONE, TEMPLATE_MODE_LABELS } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { SaveTemplateDialog } from './save-template-dialog';
 
@@ -104,8 +105,9 @@ export function FieldGenerationControls({
       return {
         label: isInheritedDefault ? `Default — ${templateName}` : templateName,
         value: template.id,
-        description: template.description.trim() !== '' ? template.description : TEMPLATE_MODE_LABELS[template.mode],
-        meta: TEMPLATE_MODE_LABELS[template.mode],
+        description:
+          template.description.trim() !== '' ? template.description : TEMPLATE_MODE_LABELS.get(template.mode),
+        meta: TEMPLATE_MODE_LABELS.get(template.mode),
       };
     }),
   ];
@@ -116,8 +118,8 @@ export function FieldGenerationControls({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            size="icon"
-            variant="ghost"
+            size={BUTTON_SIZES.ICON}
+            variant={BUTTON_VARIANTS.GHOST}
             aria-label={`AI generation for ${label}`}
             title={isGenerating ? 'Generating' : 'AI Generation'}
             className={cn(shouldShowErrorState ? 'text-destructive' : null)}
@@ -178,14 +180,14 @@ export function FieldGenerationControls({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" disabled={isGenerating} onClick={onGenerate}>
+            <Button type="button" size={BUTTON_SIZES.SM} disabled={isGenerating} onClick={onGenerate}>
               {isGenerating ? <LuLoaderCircle className="size-4 animate-spin" /> : <LuSparkles className="size-4" />}
               Generate
             </Button>
             <Button
               type="button"
-              size="sm"
-              variant="outline"
+              size={BUTTON_SIZES.SM}
+              variant={BUTTON_VARIANTS.OUTLINE}
               disabled={isGenerating || !hasExistingValue || isStrictTemplateSelected}
               onClick={onContinue}
             >
@@ -194,8 +196,8 @@ export function FieldGenerationControls({
             </Button>
             <Button
               type="button"
-              size="sm"
-              variant="outline"
+              size={BUTTON_SIZES.SM}
+              variant={BUTTON_VARIANTS.OUTLINE}
               disabled={isGenerating || !hasExistingValue}
               onClick={onRewrite}
             >
@@ -203,20 +205,32 @@ export function FieldGenerationControls({
               Rewrite
             </Button>
             {hasRewriteBackup ? (
-              <Button type="button" size="sm" variant="outline" disabled={isGenerating} onClick={onRevertRewrite}>
+              <Button
+                type="button"
+                size={BUTTON_SIZES.SM}
+                variant={BUTTON_VARIANTS.OUTLINE}
+                disabled={isGenerating}
+                onClick={onRevertRewrite}
+              >
                 <LuUndo2 className="size-4" />
                 Revert rewrite
               </Button>
             ) : null}
-            <Button type="button" size="sm" variant="ghost" disabled={!isGenerating} onClick={onCancel}>
+            <Button
+              type="button"
+              size={BUTTON_SIZES.SM}
+              variant={BUTTON_VARIANTS.GHOST}
+              disabled={!isGenerating}
+              onClick={onCancel}
+            >
               <LuSquare className="size-4" />
               Cancel
             </Button>
             {canSaveTemplate ? (
               <Button
                 type="button"
-                size="sm"
-                variant="ghost"
+                size={BUTTON_SIZES.SM}
+                variant={BUTTON_VARIANTS.GHOST}
                 disabled={isGenerating}
                 onClick={() => setIsSaveTemplateDialogOpen(true)}
               >
@@ -227,7 +241,7 @@ export function FieldGenerationControls({
           </div>
 
           {errorMessage ? (
-            <Alert variant="destructive">
+            <Alert variant={ALERT_VARIANTS.DESTRUCTIVE}>
               <AlertTitle>Generation failed</AlertTitle>
               <AlertDescription>{errorMessage}</AlertDescription>
             </Alert>

@@ -1,4 +1,5 @@
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
+import { CHARACTER_EDIT_PATCH_KINDS_CASES } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 import { cn } from '@~/lib/utils';
 
 import type { iCharacterFieldConfig } from '../constants/field-config';
@@ -34,7 +35,8 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
   const generationState = getStandardFieldGenerationState(config.key);
   const templateFieldKey = getTemplateFieldKeyForTargetKey(`field:${config.key}`);
   const assistantPatchView = workspace.activePatches.find(
-    (patchView) => patchView.patch.fieldKey === config.key && patchView.patch.kind === 'text',
+    (patchView) =>
+      patchView.patch.fieldKey === config.key && patchView.patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT,
   );
 
   const reportAssistantError = (error: unknown) => {
@@ -75,16 +77,18 @@ export function CharacterFieldPanel({ config, isWide }: iCharacterFieldPanelProp
           void generateStandardField(config.key, config.label);
         }}
         onContinue={() => {
-          void generateStandardField(config.key, config.label, GENERATION_MODES.continue);
+          void generateStandardField(config.key, config.label, GENERATION_MODES.CONTINUE);
         }}
         onRewrite={() => {
-          void generateStandardField(config.key, config.label, GENERATION_MODES.rewrite);
+          void generateStandardField(config.key, config.label, GENERATION_MODES.REWRITE);
         }}
         onRevertRewrite={() => revertStandardFieldRewrite(config.key)}
         onAcceptRewrite={() => acceptStandardFieldRewrite(config.key)}
         onResolveRewriteReview={(mergedValue) => resolveStandardFieldRewriteReview(config.key, mergedValue)}
         onCancel={() => cancelStandardFieldGeneration(config.key)}
-        assistantPatch={assistantPatchView?.patch.kind === 'text' ? assistantPatchView.patch : null}
+        assistantPatch={
+          assistantPatchView?.patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT ? assistantPatchView.patch : null
+        }
         onApplyAssistantProposal={
           assistantPatchView
             ? (resolvedValue) => {

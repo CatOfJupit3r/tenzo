@@ -4,11 +4,19 @@ import userEvent from '@testing-library/user-event';
 import { createRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  MESSAGE_PART_STATUSES,
+  MESSAGE_PART_TYPES_CASES,
+  MESSAGE_ROLES,
+  TOOL_CALL_STATES,
+} from '@~/features/character-creator/lib/generation/message-enums';
+
 import { createEmptyCharacterCard } from '../constants/card-defaults';
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from '../lib/assistant/character-assistant-contracts';
+import type { iCharacterEditProposal } from '../lib/proposals/character-edit-proposal';
 import { createCharacterEditProposal } from '../lib/proposals/character-edit-proposal';
-import { CharacterAssistantConversation } from './character-assistant-conversation';
 import type { iCharacterAssistantConversationProps } from './character-assistant-conversation';
+import { CharacterAssistantConversation } from './character-assistant-conversation';
 
 function getConversationProps(overrides: Partial<iCharacterAssistantConversationProps> = {}) {
   return {
@@ -30,19 +38,39 @@ function renderConversation(overrides: Partial<iCharacterAssistantConversationPr
   return render(<CharacterAssistantConversation {...getConversationProps(overrides)} />);
 }
 
+function createProposalMessages(proposal: iCharacterEditProposal): UIMessage[] {
+  return [
+    {
+      id: 'assistant-message',
+      role: MESSAGE_ROLES.ASSISTANT,
+      createdAt: new Date('2026-08-14T00:00:00.000Z'),
+      parts: [
+        {
+          type: MESSAGE_PART_TYPES_CASES.TOOL_CALL,
+          id: 'tool-call',
+          name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
+          arguments: '{}',
+          state: TOOL_CALL_STATES.COMPLETE,
+          output: { proposal },
+        },
+      ],
+    },
+  ];
+}
+
 describe('CharacterAssistantConversation', () => {
   it('shows idempotent proposal calls as a successful no-op', () => {
     const messages: UIMessage[] = [
       {
         id: 'assistant-message',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         parts: [
           {
-            type: 'tool-call',
+            type: MESSAGE_PART_TYPES_CASES.TOOL_CALL,
             id: 'no-op-tool-call',
-            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
             arguments: '{}',
-            state: 'complete',
+            state: TOOL_CALL_STATES.COMPLETE,
             output: {
               proposal: null,
               isNoOp: true,
@@ -63,14 +91,14 @@ describe('CharacterAssistantConversation', () => {
     const messages: UIMessage[] = [
       {
         id: 'assistant-message',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         parts: [
           {
-            type: 'tool-call',
+            type: MESSAGE_PART_TYPES_CASES.TOOL_CALL,
             id: 'failed-tool-call',
-            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
+            name: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
             arguments: '{}',
-            state: 'error',
+            state: TOOL_CALL_STATES.ERROR,
             output: 'Description is disabled for assistant editing.',
           },
         ],
@@ -96,9 +124,11 @@ describe('CharacterAssistantConversation', () => {
     const messages: UIMessage[] = [
       {
         id: 'assistant-message',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         createdAt: new Date('2026-08-14T00:00:00.000Z'),
-        parts: [{ type: 'text', content: '**{{char}}** greets *{{user}}* with ~~formal~~ warmth.' }],
+        parts: [
+          { type: MESSAGE_PART_TYPES_CASES.TEXT, content: '**{{char}}** greets *{{user}}* with ~~formal~~ warmth.' },
+        ],
       },
     ];
 
@@ -130,23 +160,7 @@ describe('CharacterAssistantConversation', () => {
       toolCallId: 'tool-call',
       summary: 'Coordinate the character details.',
     });
-    const messages: UIMessage[] = [
-      {
-        id: 'assistant-message',
-        role: 'assistant',
-        createdAt: new Date('2026-08-14T00:00:00.000Z'),
-        parts: [
-          {
-            type: 'tool-call',
-            id: 'tool-call',
-            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
-            arguments: '{}',
-            state: 'complete',
-            output: { proposal },
-          },
-        ],
-      },
-    ];
+    const messages = createProposalMessages(proposal);
     const onApply = vi.fn();
     const onReject = vi.fn();
     const onJumpToField = vi.fn();
@@ -178,23 +192,7 @@ describe('CharacterAssistantConversation', () => {
       proposedCard,
       toolCallId: 'tool-call',
     });
-    const messages: UIMessage[] = [
-      {
-        id: 'assistant-message',
-        role: 'assistant',
-        createdAt: new Date('2026-08-14T00:00:00.000Z'),
-        parts: [
-          {
-            type: 'tool-call',
-            id: 'tool-call',
-            name: CHARACTER_ASSISTANT_TOOL_NAMES.propose_character_fields,
-            arguments: '{}',
-            state: 'complete',
-            output: { proposal },
-          },
-        ],
-      },
-    ];
+    const messages = createProposalMessages(proposal);
 
     renderConversation({ messages });
 
@@ -205,13 +203,13 @@ describe('CharacterAssistantConversation', () => {
     const messages: UIMessage[] = [
       {
         id: 'assistant-message',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         createdAt: new Date('2026-08-14T00:00:00.000Z'),
         parts: [
-          { type: 'text', content: 'The character is ready.' },
+          { type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'The character is ready.' },
           {
-            type: 'structured-output',
-            status: 'complete',
+            type: MESSAGE_PART_TYPES_CASES.STRUCTURED_OUTPUT,
+            status: MESSAGE_PART_STATUSES.COMPLETE,
             raw: '{}',
             data: { assistantMessage: 'The character is ready.', followUpSuggestions: [] },
           },
@@ -228,27 +226,34 @@ describe('CharacterAssistantConversation', () => {
     const messages: UIMessage[] = [
       {
         id: 'user-message',
-        role: 'user',
+        role: MESSAGE_ROLES.USER,
         createdAt: new Date('2026-08-14T00:00:00.000Z'),
-        parts: [{ type: 'text', content: 'Create a character.' }],
+        parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'Create a character.' }],
       },
       {
         id: 'assistant-tool-call',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         createdAt: new Date('2026-08-14T00:00:01.000Z'),
-        parts: [{ type: 'text', content: 'I will build the concept.' }],
+        parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'I will build the concept.' }],
       },
       {
         id: 'tool-result',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         createdAt: new Date('2026-08-14T00:00:02.000Z'),
-        parts: [{ type: 'tool-result', toolCallId: 'tool-call', content: 'Complete', state: 'complete' }],
+        parts: [
+          {
+            type: MESSAGE_PART_TYPES_CASES.TOOL_RESULT,
+            toolCallId: 'tool-call',
+            content: 'Complete',
+            state: MESSAGE_PART_STATUSES.COMPLETE,
+          },
+        ],
       },
       {
         id: 'assistant-result',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         createdAt: new Date('2026-08-14T00:00:03.000Z'),
-        parts: [{ type: 'text', content: 'The character is ready.' }],
+        parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'The character is ready.' }],
       },
     ];
 
@@ -276,10 +281,26 @@ describe('CharacterAssistantConversation', () => {
   it('shifts the editable user message after later messages are deleted', async () => {
     const user = userEvent.setup();
     const initialMessages: UIMessage[] = [
-      { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'First prompt' }] },
-      { id: 'assistant-1', role: 'assistant', parts: [{ type: 'text', content: 'First response' }] },
-      { id: 'user-2', role: 'user', parts: [{ type: 'text', content: 'Second prompt' }] },
-      { id: 'assistant-2', role: 'assistant', parts: [{ type: 'text', content: 'Second response' }] },
+      {
+        id: 'user-1',
+        role: MESSAGE_ROLES.USER,
+        parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'First prompt' }],
+      },
+      {
+        id: 'assistant-1',
+        role: MESSAGE_ROLES.ASSISTANT,
+        parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'First response' }],
+      },
+      {
+        id: 'user-2',
+        role: MESSAGE_ROLES.USER,
+        parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'Second prompt' }],
+      },
+      {
+        id: 'assistant-2',
+        role: MESSAGE_ROLES.ASSISTANT,
+        parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'Second response' }],
+      },
     ];
     const onEdit = vi.fn().mockResolvedValue(undefined);
 

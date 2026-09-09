@@ -1,5 +1,7 @@
-import type { iArea, iMediaSize, iSize } from '@~/components/ui/cropper';
 import { z } from 'zod';
+
+import type { iArea, iMediaSize, iSize } from '@~/components/ui/cropper';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 
 export const SILLY_TAVERN_PORTRAIT_ASPECT_RATIO = 2 / 3;
 export const SILLY_TAVERN_PORTRAIT_WIDTH = 512;
@@ -197,7 +199,7 @@ export async function readPortraitDimensions(blob: Blob): Promise<iPortraitDimen
 
 export const PORTRAIT_THUMBNAIL_WIDTH = 128;
 export const PORTRAIT_THUMBNAIL_HEIGHT = 192;
-const PORTRAIT_THUMBNAIL_MIME_TYPE = 'image/webp';
+const PORTRAIT_THUMBNAIL_MIME_TYPE = MEDIA_TYPES.WEBP;
 const PORTRAIT_THUMBNAIL_QUALITY = 0.72;
 
 async function drawCroppedPortraitToCanvas(
@@ -263,7 +265,7 @@ export async function renderPortraitBlobWithCrop(
       }
 
       reject(new Error('Failed to encode portrait as PNG.'));
-    }, 'image/png');
+    }, MEDIA_TYPES.PNG);
   });
 }
 

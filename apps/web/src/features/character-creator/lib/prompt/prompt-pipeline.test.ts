@@ -4,8 +4,8 @@ import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import { TEMPLATE_MODES } from '../cards/field-templates';
 import { OUTPUT_FORMATS } from '../generation/generation-config';
 import { ExampleContextService } from './example-context-service';
-import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import type { iFieldGenerationTarget, iPromptExampleCharacter } from './generation-contracts';
+import { GENERATION_MODES, GENERATION_TARGET_KINDS } from './generation-contracts';
 import { characterPromptPipeline } from './prompt-pipeline';
 import { SeededRandom } from './seeded-random';
 
@@ -16,7 +16,7 @@ function createDescriptionTarget(value = ''): iFieldGenerationTarget {
     key: 'field:description',
     label: 'Description',
     value,
-    kind: GENERATION_TARGET_KINDS.field,
+    kind: GENERATION_TARGET_KINDS.FIELD,
   };
 }
 
@@ -40,9 +40,9 @@ describe('prompt-pipeline', () => {
         key: 'field:first_mes',
         label: 'First Message',
         value: '',
-        kind: GENERATION_TARGET_KINDS.field,
+        kind: GENERATION_TARGET_KINDS.FIELD,
       },
-      outputFormat: OUTPUT_FORMATS.xml,
+      outputFormat: OUTPUT_FORMATS.XML,
       seed: 1,
       globalCharacterInstruction: 'Favor tsundere dynamics while keeping each character distinct.',
       generalCharacterIdea: 'A quietly devout firekeeper with ceremonial language.',
@@ -68,7 +68,7 @@ describe('prompt-pipeline', () => {
     const { messages } = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget(),
-      outputFormat: OUTPUT_FORMATS.none,
+      outputFormat: OUTPUT_FORMATS.NONE,
       seed: 1,
       generalCharacterIdea: 'A knight who masks grief with ritual politeness.',
       shouldUseGeneralCharacterIdea: false,
@@ -85,7 +85,7 @@ describe('prompt-pipeline', () => {
     const { messages } = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget('Current text'),
-      outputFormat: OUTPUT_FORMATS.none,
+      outputFormat: OUTPUT_FORMATS.NONE,
       seed: 1,
     });
 
@@ -101,7 +101,7 @@ describe('prompt-pipeline', () => {
     const { messages } = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget(),
-      outputFormat: OUTPUT_FORMATS.none,
+      outputFormat: OUTPUT_FORMATS.NONE,
       seed: 1,
       exampleCharacters: [
         {
@@ -120,7 +120,7 @@ describe('prompt-pipeline', () => {
     const { messages } = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget(),
-      outputFormat: OUTPUT_FORMATS.none,
+      outputFormat: OUTPUT_FORMATS.NONE,
       seed: 1,
       exampleCharacters: MANY_EXAMPLES,
     });
@@ -134,7 +134,7 @@ describe('prompt-pipeline', () => {
     const input = {
       card,
       target: createDescriptionTarget(),
-      outputFormat: OUTPUT_FORMATS.xml,
+      outputFormat: OUTPUT_FORMATS.XML,
       seed: 42,
       exampleCharacters: MANY_EXAMPLES,
     };
@@ -148,7 +148,7 @@ describe('prompt-pipeline', () => {
       characterPromptPipeline.build({
         card,
         target: createDescriptionTarget(),
-        outputFormat: OUTPUT_FORMATS.xml,
+        outputFormat: OUTPUT_FORMATS.XML,
         seed,
         exampleCharacters: MANY_EXAMPLES,
       }).messages[1]?.content;
@@ -165,7 +165,7 @@ describe('prompt-pipeline', () => {
     const generateResult = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget(),
-      outputFormat: OUTPUT_FORMATS.none,
+      outputFormat: OUTPUT_FORMATS.NONE,
       seed: 7,
     });
 
@@ -175,9 +175,9 @@ describe('prompt-pipeline', () => {
     const continueResult = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget('Existing text to continue.'),
-      outputFormat: OUTPUT_FORMATS.none,
+      outputFormat: OUTPUT_FORMATS.NONE,
       seed: 7,
-      mode: GENERATION_MODES.continue,
+      mode: GENERATION_MODES.CONTINUE,
     });
 
     expect(continueResult.messages[1]?.content).not.toContain('Variation seed:');
@@ -189,11 +189,11 @@ describe('prompt-pipeline', () => {
     const { messages } = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget(),
-      outputFormat: OUTPUT_FORMATS.xml,
+      outputFormat: OUTPUT_FORMATS.XML,
       seed: 1,
       fieldTemplate: {
         name: 'Trait List',
-        mode: TEMPLATE_MODES.prompt,
+        mode: TEMPLATE_MODES.PROMPT,
         content: 'core traits: trait1, trait2;',
       },
     });
@@ -209,11 +209,11 @@ describe('prompt-pipeline', () => {
     const { messages } = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget(),
-      outputFormat: OUTPUT_FORMATS.xml,
+      outputFormat: OUTPUT_FORMATS.XML,
       seed: 1,
       fieldTemplate: {
         name: 'Structured Description',
-        mode: TEMPLATE_MODES.strict,
+        mode: TEMPLATE_MODES.STRICT,
         content: 'Appearance: {{gen:appearance:build}}\nBackground: {{gen:background}}',
       },
     });
@@ -232,12 +232,12 @@ describe('prompt-pipeline', () => {
     const { messages } = characterPromptPipeline.build({
       card,
       target: createDescriptionTarget('Existing text to continue.'),
-      outputFormat: OUTPUT_FORMATS.xml,
+      outputFormat: OUTPUT_FORMATS.XML,
       seed: 1,
-      mode: GENERATION_MODES.continue,
+      mode: GENERATION_MODES.CONTINUE,
       fieldTemplate: {
         name: 'Structured Description',
-        mode: TEMPLATE_MODES.strict,
+        mode: TEMPLATE_MODES.STRICT,
         content: 'Appearance: {{gen:appearance}}',
       },
     });
@@ -255,9 +255,9 @@ describe('prompt-pipeline', () => {
         key: 'field:creator',
         label: 'Creator',
         value: '',
-        kind: GENERATION_TARGET_KINDS.field,
+        kind: GENERATION_TARGET_KINDS.FIELD,
       },
-      outputFormat: OUTPUT_FORMATS.none,
+      outputFormat: OUTPUT_FORMATS.NONE,
       seed: 7,
     });
 

@@ -1,17 +1,21 @@
 import { createIsomorphicFn } from '@tanstack/react-start';
+import { em } from 'enumwaii';
 
 import { clientAbsoluteLink } from './client-absolute-link';
 
+export const BROWSER_STORAGE_KINDS_ENUM = em(['LOCAL', 'SESSION']);
+export const BROWSER_STORAGE_KINDS = BROWSER_STORAGE_KINDS_ENUM.enum;
+
 export const isOnClient = typeof window !== 'undefined';
 
-export type BrowserStorageKind = 'local' | 'session';
+export type BrowserStorageKind = (typeof BROWSER_STORAGE_KINDS_ENUM)['~type'];
 
 export function getBrowserStorage(kind: BrowserStorageKind): Storage | null {
   if (!isOnClient) {
     return null;
   }
 
-  return kind === 'local' ? window.localStorage : window.sessionStorage;
+  return kind === BROWSER_STORAGE_KINDS.LOCAL ? window.localStorage : window.sessionStorage;
 }
 
 export function createBrowserObjectUrl(blob: Blob): string | null {

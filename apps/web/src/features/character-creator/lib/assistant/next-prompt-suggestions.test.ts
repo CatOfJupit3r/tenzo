@@ -1,12 +1,19 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import { describe, expect, it } from 'vitest';
 
-import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import {
+  NEXT_PROMPT_SUGGESTION_KINDS,
   deriveNextPromptSuggestions,
   mergeNextPromptSuggestions,
   readModelPromptSuggestions,
-} from './next-prompt-suggestions';
+} from '@~/features/character-creator/lib/assistant/next-prompt-suggestions';
+import {
+  MESSAGE_PART_STATUSES,
+  MESSAGE_PART_TYPES_CASES,
+  MESSAGE_ROLES,
+} from '@~/features/character-creator/lib/generation/message-enums';
+
+import { createEmptyCharacterCard } from '../../constants/card-defaults';
 
 describe('next prompt suggestions', () => {
   it('shows discovery-first choices for an empty conversation', () => {
@@ -23,7 +30,9 @@ describe('next prompt suggestions', () => {
     card.data.mes_example = 'Defined';
     const suggestions = deriveNextPromptSuggestions({
       card,
-      messages: [{ id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'Hello' }] }],
+      messages: [
+        { id: 'user-1', role: MESSAGE_ROLES.USER, parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'Hello' }] },
+      ],
     });
     expect(suggestions[0]?.id).toBe('review');
   });
@@ -32,11 +41,11 @@ describe('next prompt suggestions', () => {
     const messages: UIMessage[] = [
       {
         id: 'assistant-1',
-        role: 'assistant',
+        role: MESSAGE_ROLES.ASSISTANT,
         parts: [
           {
-            type: 'structured-output',
-            status: 'complete',
+            type: MESSAGE_PART_TYPES_CASES.STRUCTURED_OUTPUT,
+            status: MESSAGE_PART_STATUSES.COMPLETE,
             raw: '{}',
             data: { assistantMessage: 'Done', followUpSuggestions: ['Add tension', 'Draft a greeting'] },
           },
@@ -44,7 +53,9 @@ describe('next prompt suggestions', () => {
       },
     ];
     const merged = mergeNextPromptSuggestions({
-      deterministic: [{ id: 'same', label: 'Add tension', prompt: 'Add tension', kind: 'refine' }],
+      deterministic: [
+        { id: 'same', label: 'Add tension', prompt: 'Add tension', kind: NEXT_PROMPT_SUGGESTION_KINDS.REFINE },
+      ],
       modelProvided: readModelPromptSuggestions(messages),
       maximum: 2,
     });

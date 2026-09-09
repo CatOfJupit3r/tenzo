@@ -1,5 +1,7 @@
-import { TEMPLATE_FIELD_KEY_LABELS, TEMPLATE_MODE_LABELS, TEMPLATE_MODES } from '../cards/field-templates';
+import { MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
+
 import type { iFieldTemplateViewModel } from '../cards/field-templates';
+import { TEMPLATE_FIELD_KEY_LABELS, TEMPLATE_MODE_LABELS, TEMPLATE_MODES } from '../cards/field-templates';
 import { ExampleContextService } from '../prompt/example-context-service';
 import type { iGenerationMessage, iPromptExampleCharacter } from '../prompt/generation-contracts';
 
@@ -18,7 +20,7 @@ function formatTemplate(template: iFieldTemplateViewModel, shouldIncludeContent 
 
   return [
     `Name: ${template.name || 'Untitled template'}`,
-    `Mode: ${TEMPLATE_MODE_LABELS[template.mode]}`,
+    `Mode: ${TEMPLATE_MODE_LABELS.get(template.mode)}`,
     `Fields: ${fieldLabels.join(', ') || 'Unbound'}`,
     template.description.trim() ? `Notes: ${template.description.trim()}` : '',
     shouldIncludeContent ? 'Content:' : '',
@@ -41,7 +43,7 @@ export function buildTemplateEnhancementMessages({
     .map((template, index) => `Reference template ${index + 1}:\n${formatTemplate(template)}`)
     .join('\n\n');
   const strictModeInstruction =
-    targetTemplate.mode === TEMPLATE_MODES.strict
+    targetTemplate.mode === TEMPLATE_MODES.STRICT
       ? [
           'This is a strict skeleton template.',
           'Return a complete fixed skeleton containing one or more valid {{gen:label}} or {{gen:label:hint}} slots.',
@@ -55,7 +57,7 @@ export function buildTemplateEnhancementMessages({
 
   return [
     {
-      role: 'system',
+      role: MESSAGE_ROLES.SYSTEM,
       content: [
         'You improve reusable character field templates.',
         'Return only the complete enhanced template content with no preamble, commentary, or Markdown code fence.',
@@ -65,7 +67,7 @@ export function buildTemplateEnhancementMessages({
       ].join('\n'),
     },
     {
-      role: 'user',
+      role: MESSAGE_ROLES.USER,
       content: [
         'Template to enhance:',
         formatTemplate(targetTemplate, shouldIncludeCurrentTemplate),

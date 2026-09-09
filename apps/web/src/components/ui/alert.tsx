@@ -1,7 +1,8 @@
-import { cva } from 'class-variance-authority';
 import type { VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import type { ComponentProps } from 'react';
 
+import { ALERT_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 const alertVariants = cva(
@@ -9,13 +10,13 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-card text-card-foreground',
-        destructive:
+        [ALERT_VARIANTS.DEFAULT]: 'bg-card text-card-foreground',
+        [ALERT_VARIANTS.DESTRUCTIVE]:
           'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 [&>svg]:text-current',
       },
     },
     defaultVariants: {
-      variant: 'default',
+      variant: ALERT_VARIANTS.DEFAULT,
     },
   },
 );
@@ -47,4 +48,4 @@ function AlertDescription({ className, ...props }: ComponentProps<'div'>) {
   );
 }
 
-export { Alert, AlertTitle, AlertDescription };
+export { Alert, AlertDescription, AlertTitle };

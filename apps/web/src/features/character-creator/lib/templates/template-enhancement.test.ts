@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { TEMPLATE_MODES } from '../cards/field-templates';
+import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '@~/features/character-creator/lib/cards/field-templates';
+
 import type { iFieldTemplateViewModel } from '../cards/field-templates';
 import { buildTemplateEnhancementMessages, normalizeTemplateEnhancementResponse } from './template-enhancement';
 
@@ -9,8 +10,8 @@ function createTemplate(overrides: Partial<iFieldTemplateViewModel> = {}): iFiel
     id: 'target-template',
     name: 'Character description',
     description: 'A structured description.',
-    mode: TEMPLATE_MODES.prompt,
-    fieldKeys: ['description'],
+    mode: TEMPLATE_MODES.PROMPT,
+    fieldKeys: [TEMPLATE_FIELD_KEYS.DESCRIPTION],
     content: 'Write a vivid description.',
     createdAt: '2026-08-16T00:00:00.000Z',
     updatedAt: '2026-08-16T00:00:00.000Z',
@@ -44,7 +45,7 @@ describe('buildTemplateEnhancementMessages', () => {
   it('requires strict output to keep generation slots instead of filling them', () => {
     const messages = buildTemplateEnhancementMessages({
       targetTemplate: createTemplate({
-        mode: TEMPLATE_MODES.strict,
+        mode: TEMPLATE_MODES.STRICT,
         content: '## Appearance\n{{gen:appearance:two vivid paragraphs}}',
       }),
       shouldIncludeCurrentTemplate: true,

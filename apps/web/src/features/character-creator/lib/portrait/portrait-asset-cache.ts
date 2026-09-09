@@ -1,13 +1,16 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import { createBrowserObjectUrl, revokeBrowserObjectUrl } from '@~/utils/ssr-helpers';
 
 import { readCharacterAssetBlob } from '../cards/image-store';
-import { readPortraitDimensions } from './portrait-focal-point';
 import type { iPortraitDimensions } from './portrait-focal-point';
+import { readPortraitDimensions } from './portrait-focal-point';
 
-export const PORTRAIT_ASSET_STATUS_SCHEMA = z.enum(['loading', 'loaded', 'error']);
-export const PORTRAIT_ASSET_STATUSES = PORTRAIT_ASSET_STATUS_SCHEMA.enum;
+export const PORTRAIT_ASSET_STATUS_ENUM = em(['LOADING', 'LOADED', 'ERROR']);
+export const PORTRAIT_ASSET_STATUSES = PORTRAIT_ASSET_STATUS_ENUM.enum;
+export const PORTRAIT_ASSET_STATUS_SCHEMA = z.enum(PORTRAIT_ASSET_STATUSES);
+
 export type PortraitAssetStatus = z.infer<typeof PORTRAIT_ASSET_STATUS_SCHEMA>;
 
 export interface iPortraitAssetEntry {
@@ -27,7 +30,7 @@ const MAX_RETAINED_ASSETS = 24;
  * live in IndexedDB; this layer is the reactive, in-memory view over them.
  */
 export const MISSING_PORTRAIT_ASSET_ENTRY: iPortraitAssetEntry = Object.freeze({
-  status: PORTRAIT_ASSET_STATUSES.loading,
+  status: PORTRAIT_ASSET_STATUSES.LOADING,
   blob: null,
   objectUrl: null,
   dimensions: null,
@@ -36,7 +39,7 @@ export const MISSING_PORTRAIT_ASSET_ENTRY: iPortraitAssetEntry = Object.freeze({
 
 /** Stable snapshot returned when there is no asset to load at all. */
 export const EMPTY_PORTRAIT_ASSET_ENTRY: iPortraitAssetEntry = Object.freeze({
-  status: PORTRAIT_ASSET_STATUSES.loaded,
+  status: PORTRAIT_ASSET_STATUSES.LOADED,
   blob: null,
   objectUrl: null,
   dimensions: null,
@@ -97,7 +100,7 @@ export function getPortraitAssetSnapshot(assetId: string): iPortraitAssetEntry {
 export async function ensurePortraitAssetLoaded(assetId: string): Promise<iPortraitAssetEntry> {
   const existingEntry = store.get(assetId);
 
-  if (existingEntry?.status === PORTRAIT_ASSET_STATUSES.loaded) {
+  if (existingEntry?.status === PORTRAIT_ASSET_STATUSES.LOADED) {
     setEntry(assetId, existingEntry);
     return Promise.resolve(existingEntry);
   }
@@ -119,7 +122,7 @@ export async function ensurePortraitAssetLoaded(assetId: string): Promise<iPortr
 
       if (!blob) {
         const missingEntry: iPortraitAssetEntry = {
-          status: PORTRAIT_ASSET_STATUSES.error,
+          status: PORTRAIT_ASSET_STATUSES.ERROR,
           blob: null,
           objectUrl: null,
           dimensions: null,
@@ -131,7 +134,7 @@ export async function ensurePortraitAssetLoaded(assetId: string): Promise<iPortr
 
       const dimensions = await readPortraitDimensions(blob);
       const loadedEntry: iPortraitAssetEntry = {
-        status: PORTRAIT_ASSET_STATUSES.loaded,
+        status: PORTRAIT_ASSET_STATUSES.LOADED,
         blob,
         objectUrl: createBrowserObjectUrl(blob),
         dimensions,
@@ -141,7 +144,7 @@ export async function ensurePortraitAssetLoaded(assetId: string): Promise<iPortr
       return loadedEntry;
     } catch (error) {
       const failedEntry: iPortraitAssetEntry = {
-        status: PORTRAIT_ASSET_STATUSES.error,
+        status: PORTRAIT_ASSET_STATUSES.ERROR,
         blob: null,
         objectUrl: null,
         dimensions: null,
@@ -167,7 +170,7 @@ export function primePortraitAsset(assetId: string, blob: Blob, dimensions: iPor
   revokeObjectUrl(store.get(assetId)?.objectUrl ?? null);
 
   const primedEntry: iPortraitAssetEntry = {
-    status: PORTRAIT_ASSET_STATUSES.loaded,
+    status: PORTRAIT_ASSET_STATUSES.LOADED,
     blob,
     objectUrl: createBrowserObjectUrl(blob),
     dimensions,

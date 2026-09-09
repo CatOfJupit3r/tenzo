@@ -37,8 +37,8 @@ describe('validateFieldTemplate', () => {
   it('accepts a valid strict template', () => {
     const issues = validateFieldTemplate({
       name: 'Structured Description',
-      mode: TEMPLATE_MODES.strict,
-      fieldKeys: [TEMPLATE_FIELD_KEYS.description],
+      mode: TEMPLATE_MODES.STRICT,
+      fieldKeys: [TEMPLATE_FIELD_KEYS.DESCRIPTION],
       content: 'Appearance: {{gen:appearance}}',
     });
 
@@ -48,8 +48,8 @@ describe('validateFieldTemplate', () => {
   it('flags strict templates without slots', () => {
     const issues = validateFieldTemplate({
       name: 'No Slots',
-      mode: TEMPLATE_MODES.strict,
-      fieldKeys: [TEMPLATE_FIELD_KEYS.description],
+      mode: TEMPLATE_MODES.STRICT,
+      fieldKeys: [TEMPLATE_FIELD_KEYS.DESCRIPTION],
       content: 'Just fixed text with {{char}}.',
     });
 
@@ -59,8 +59,8 @@ describe('validateFieldTemplate', () => {
   it('flags {{original}} bound to fields that do not support it', () => {
     const issues = validateFieldTemplate({
       name: 'Override',
-      mode: TEMPLATE_MODES.prompt,
-      fieldKeys: [TEMPLATE_FIELD_KEYS.system_prompt, TEMPLATE_FIELD_KEYS.description],
+      mode: TEMPLATE_MODES.PROMPT,
+      fieldKeys: [TEMPLATE_FIELD_KEYS.SYSTEM_PROMPT, TEMPLATE_FIELD_KEYS.DESCRIPTION],
       content: '{{original}} Also stay concise.',
     });
 
@@ -70,8 +70,8 @@ describe('validateFieldTemplate', () => {
   it('allows {{original}} for prompt override fields only', () => {
     const issues = validateFieldTemplate({
       name: 'Override',
-      mode: TEMPLATE_MODES.prompt,
-      fieldKeys: [TEMPLATE_FIELD_KEYS.system_prompt, TEMPLATE_FIELD_KEYS.post_history_instructions],
+      mode: TEMPLATE_MODES.PROMPT,
+      fieldKeys: [TEMPLATE_FIELD_KEYS.SYSTEM_PROMPT, TEMPLATE_FIELD_KEYS.POST_HISTORY_INSTRUCTIONS],
       content: '{{original}} Also stay concise.',
     });
 
@@ -81,7 +81,7 @@ describe('validateFieldTemplate', () => {
   it('requires a name, content, and at least one bound field', () => {
     const issues = validateFieldTemplate({
       name: ' ',
-      mode: TEMPLATE_MODES.prompt,
+      mode: TEMPLATE_MODES.PROMPT,
       fieldKeys: [],
       content: '',
     });
@@ -92,9 +92,9 @@ describe('validateFieldTemplate', () => {
 
 describe('getTemplateFieldKeyForTargetKey', () => {
   it('maps generation target keys to template field keys', () => {
-    expect(getTemplateFieldKeyForTargetKey('field:description')).toBe(TEMPLATE_FIELD_KEYS.description);
-    expect(getTemplateFieldKeyForTargetKey('alternate_greetings:2')).toBe(TEMPLATE_FIELD_KEYS.alternate_greeting);
-    expect(getTemplateFieldKeyForTargetKey('custom:abc-123')).toBe(TEMPLATE_FIELD_KEYS.custom_field);
+    expect(getTemplateFieldKeyForTargetKey('field:description')).toBe(TEMPLATE_FIELD_KEYS.DESCRIPTION);
+    expect(getTemplateFieldKeyForTargetKey('alternate_greetings:2')).toBe(TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING);
+    expect(getTemplateFieldKeyForTargetKey('custom:abc-123')).toBe(TEMPLATE_FIELD_KEYS.CUSTOM_FIELD);
     expect(getTemplateFieldKeyForTargetKey('field:name')).toBeNull();
   });
 });

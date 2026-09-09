@@ -1,6 +1,10 @@
 import { parseAsStringEnum, useQueryState } from 'nuqs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  CHARACTER_CREATOR_TABS,
+  characterCreatorTabsEnum,
+} from '@~/features/character-creator/components/tabs/tabs.constants';
 import { cn } from '@~/lib/utils';
 
 import { CharacterAssistantProvider } from '../context/character-assistant-context';
@@ -14,10 +18,9 @@ import { CharacterSwitcher } from './character-switcher';
 import { PageDialogs } from './page-dialogs';
 import { PortraitPanel } from './portrait-panel';
 import { SettingsDialog } from './settings-dialog';
-import { SETTINGS_DIALOG_TABS } from './settings-dialog-tabs';
 import type { SettingsDialogTab } from './settings-dialog-tabs';
+import { SETTINGS_DIALOG_TABS } from './settings-dialog-tabs';
 import { CharacterCreatorTabs } from './tabs/character-creator-tabs';
-import { CHARACTER_CREATOR_TABS } from './tabs/tabs.constants';
 import type { CharacterCreatorTab } from './tabs/tabs.constants';
 
 const ASSISTANT_COLUMN_MEDIA_QUERY = '(min-width: 1280px)';
@@ -25,12 +28,12 @@ const ASSISTANT_COLUMN_MEDIA_QUERY = '(min-width: 1280px)';
 function CharacterCreatorWorkspace() {
   const [isCharacterLibraryPanelOpen, setIsCharacterLibraryPanelOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsDialogTab>(SETTINGS_DIALOG_TABS.connection);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<SettingsDialogTab>(SETTINGS_DIALOG_TABS.CONNECTION);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null | undefined>(undefined);
   const [activeCharacterTab, setActiveCharacterTab] = useQueryState(
     'tab',
-    parseAsStringEnum<CharacterCreatorTab>(Object.values(CHARACTER_CREATOR_TABS)).withDefault(
-      CHARACTER_CREATOR_TABS.core,
+    parseAsStringEnum<CharacterCreatorTab>([...characterCreatorTabsEnum.values]).withDefault(
+      CHARACTER_CREATOR_TABS.CORE,
     ),
   );
   const [isAssistantColumnViewport, setIsAssistantColumnViewport] = useState(false);
@@ -75,12 +78,12 @@ function CharacterCreatorWorkspace() {
 
   const openTemplateSettings = useCallback((templateId: string | null) => {
     setSelectedTemplateId(templateId);
-    setActiveSettingsTab(SETTINGS_DIALOG_TABS.templates);
+    setActiveSettingsTab(SETTINGS_DIALOG_TABS.TEMPLATES);
     setIsSettingsDialogOpen(true);
   }, []);
 
   const openConnectionSettings = useCallback(() => {
-    openSettingsDialog(SETTINGS_DIALOG_TABS.connection);
+    openSettingsDialog(SETTINGS_DIALOG_TABS.CONNECTION);
   }, [openSettingsDialog]);
 
   const restoreAssistantToggleFocus = useCallback(() => {

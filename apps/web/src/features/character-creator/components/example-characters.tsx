@@ -6,35 +6,37 @@ import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button';
 import { Checkbox } from '@~/components/ui/checkbox';
 import { Label } from '@~/components/ui/label';
-import { cn } from '@~/lib/utils';
-
+import { BADGE_VARIANTS, BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import {
+  EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY,
   EXAMPLE_CHARACTER_CONTEXT_FIELD_KEYS,
   EXAMPLE_CHARACTER_CONTEXT_FIELD_LABELS,
-  MAX_EXAMPLE_CHARACTER_COUNT,
   getExampleCharacterDisplayName,
   hasExampleCharacterContextField,
-} from '../lib/cards/example-characters';
+  MAX_EXAMPLE_CHARACTER_COUNT,
+} from '@~/features/character-creator/lib/cards/example-characters';
+import { cn } from '@~/lib/utils';
+
 import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/cards/example-characters';
-import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/cards/field-templates';
+import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import type { iExampleContextSummary } from '../lib/prompt/example-context-service';
 import { SaveTemplateDialog } from './save-template-dialog';
 
 const TEMPLATE_SOURCE_FIELD_KEYS = [
-  'description',
-  'personality',
-  'scenario',
-  'first_mes',
-  'mes_example',
+  EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.DESCRIPTION,
+  EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.PERSONALITY,
+  EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.SCENARIO,
+  EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.FIRST_MES,
+  EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.MES_EXAMPLE,
 ] as const satisfies readonly ExampleCharacterContextFieldKey[];
 
 const TEMPLATE_SOURCE_FIELD_KEY_MAP = {
-  description: TEMPLATE_FIELD_KEYS.description,
-  personality: TEMPLATE_FIELD_KEYS.personality,
-  scenario: TEMPLATE_FIELD_KEYS.scenario,
-  first_mes: TEMPLATE_FIELD_KEYS.first_mes,
-  mes_example: TEMPLATE_FIELD_KEYS.mes_example,
+  description: TEMPLATE_FIELD_KEYS.DESCRIPTION,
+  personality: TEMPLATE_FIELD_KEYS.PERSONALITY,
+  scenario: TEMPLATE_FIELD_KEYS.SCENARIO,
+  first_mes: TEMPLATE_FIELD_KEYS.FIRST_MES,
+  mes_example: TEMPLATE_FIELD_KEYS.MES_EXAMPLE,
 } satisfies Record<(typeof TEMPLATE_SOURCE_FIELD_KEYS)[number], TemplateFieldKey>;
 
 interface iPendingTemplateSource {
@@ -118,7 +120,7 @@ export function ExampleCharacters({
           <Button
             disabled={isImporting || isAtLimit}
             type="button"
-            variant="outline"
+            variant={BUTTON_VARIANTS.OUTLINE}
             onClick={() => inputRef.current?.click()}
           >
             <LuFileUp className="size-4" />
@@ -210,12 +212,12 @@ export function ExampleCharacters({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-sm font-semibold">{displayName}</h3>
-                      <Badge variant="outline">{exampleCharacter.sourceKind.toUpperCase()}</Badge>
+                      <Badge variant={BADGE_VARIANTS.OUTLINE}>{exampleCharacter.sourceKind.toUpperCase()}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{exampleCharacter.fileName}</p>
                   </div>
 
-                  <Button type="button" variant="ghost" onClick={() => onRemove(exampleCharacter.id)}>
+                  <Button type="button" variant={BUTTON_VARIANTS.GHOST} onClick={() => onRemove(exampleCharacter.id)}>
                     <LuTrash2 className="size-4" />
                     Remove
                   </Button>
@@ -231,8 +233,8 @@ export function ExampleCharacters({
                         <Button
                           key={fieldKey}
                           type="button"
-                          size="sm"
-                          variant="outline"
+                          size={BUTTON_SIZES.SM}
+                          variant={BUTTON_VARIANTS.OUTLINE}
                           onClick={() =>
                             setPendingTemplateSource({
                               name: `${displayName} ${EXAMPLE_CHARACTER_CONTEXT_FIELD_LABELS[fieldKey]}`,

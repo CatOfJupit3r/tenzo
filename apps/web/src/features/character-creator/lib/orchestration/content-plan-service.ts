@@ -2,14 +2,15 @@ import { uniq } from 'lodash-es';
 
 import type { CharacterTextFieldKey } from '../cards/card-schema';
 import { AGENT_EVAL_FIELD_RUBRICS } from '../evaluation/agent-eval-rubric';
+import type { iCharacterBrief, iCharacterContentPlan, iProseJob } from './agent-orchestration-contracts';
 import {
   CHARACTER_CONTENT_PLAN_DRAFT_SCHEMA,
   CHARACTER_CONTENT_PLAN_SCHEMA,
   PROSE_JOB_SCHEMA,
+  USER_PROMPT_FACT_ID,
 } from './agent-orchestration-contracts';
-import type { iCharacterBrief, iCharacterContentPlan, iProseJob } from './agent-orchestration-contracts';
-import { FIELD_WRITING_STRATEGIES } from './field-writing-strategy';
 import type { FieldWritingStrategy } from './field-writing-strategy';
+import { FIELD_WRITING_STRATEGIES } from './field-writing-strategy';
 
 export interface iContentPlanInput {
   brief: iCharacterBrief;
@@ -24,8 +25,6 @@ export interface iContentPlanInput {
 export interface iContentPlanServiceDependencies {
   planContent: (input: iContentPlanInput, abortSignal?: AbortSignal) => Promise<unknown>;
 }
-
-const USER_PROMPT_FACT_ID = 'user-prompt';
 
 const DEFAULT_CONTENT_DEPTH = {
   name: { minimumInformationUnits: 1, maximumOutputTokens: 80 },
@@ -182,7 +181,7 @@ function createJob(
 }
 
 export function createProseJobs(plan: iCharacterContentPlan, input: iContentPlanInput): iProseJob[] {
-  if (input.fieldWritingStrategy === FIELD_WRITING_STRATEGIES['combined-fields']) {
+  if (input.fieldWritingStrategy === FIELD_WRITING_STRATEGIES.COMBINED_FIELDS) {
     return [createJob(input.requestedFieldKeys, plan, input)];
   }
   const groups = plan.entries.map((entry) => [entry.fieldKey]);

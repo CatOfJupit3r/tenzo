@@ -1,22 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  getModelCompatibilityStatus,
-  MODEL_CAPABILITIES,
-  MODEL_COMPATIBILITY_STATUSES,
-  readModelCapabilities,
-} from './model-capabilities';
+import { getModelCompatibilityStatus, MODEL_COMPATIBILITY_STATUSES, readModelCapabilities } from './model-capabilities';
 
 describe('model capabilities', () => {
   it('normalizes OpenAI-compatible supported parameters', () => {
     expect(readModelCapabilities(['temperature', 'response_format', 'tools'])).toEqual({
-      [MODEL_CAPABILITIES['structured-output']]: true,
-      [MODEL_CAPABILITIES['tool-calling']]: true,
+      hasStructuredOutput: true,
+      hasToolCalling: true,
       hasJointStructuredOutputAndToolCalling: true,
     });
     expect(readModelCapabilities(['structured_outputs'])).toEqual({
-      [MODEL_CAPABILITIES['structured-output']]: true,
-      [MODEL_CAPABILITIES['tool-calling']]: false,
+      hasStructuredOutput: true,
+      hasToolCalling: false,
       hasJointStructuredOutputAndToolCalling: false,
     });
   });
@@ -24,14 +19,14 @@ describe('model capabilities', () => {
   it('requires structured output for the content-planning pipeline', () => {
     expect(
       getModelCompatibilityStatus({
-        [MODEL_CAPABILITIES['structured-output']]: false,
-        [MODEL_CAPABILITIES['tool-calling']]: true,
+        hasStructuredOutput: false,
+        hasToolCalling: true,
         hasJointStructuredOutputAndToolCalling: false,
       }),
-    ).toBe(MODEL_COMPATIBILITY_STATUSES.incompatible);
+    ).toBe(MODEL_COMPATIBILITY_STATUSES.INCOMPATIBLE);
   });
 
   it('reports unknown when the provider does not publish capability metadata', () => {
-    expect(getModelCompatibilityStatus(null)).toBe(MODEL_COMPATIBILITY_STATUSES.unknown);
+    expect(getModelCompatibilityStatus(null)).toBe(MODEL_COMPATIBILITY_STATUSES.UNKNOWN);
   });
 });

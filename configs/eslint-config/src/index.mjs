@@ -11,6 +11,7 @@ import { configs, plugins, rules } from 'eslint-config-airbnb-extended';
 import { rules as prettierConfigRules } from 'eslint-config-prettier';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import prettierPlugin from 'eslint-plugin-prettier';
+import enumwaii from 'eslint-plugin-enumwaii';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -65,6 +66,7 @@ const booleanPrefixes = [
     ...configs.base.recommended,
     // Strict Import Config
     rules.base.importsStrict,
+    ...enumwaii.configs['flat/recommended'],
   ];
 
   const typescriptConfig = [
@@ -74,6 +76,10 @@ const booleanPrefixes = [
     ...configs.base.typescript,
     // Strict TypeScript Config
     rules.typescript.typescriptEslintStrict,
+    ...enumwaii.configs['flat/recommended-type-checked'].map((config) => ({
+      ...config,
+      files: ['**/*.{ts,tsx,mts,cts}'],
+    })),
   ];
 
   const prettierConfig = [
@@ -146,7 +152,11 @@ const booleanPrefixes = [
         },
         {
           selector: 'TSEnumDeclaration',
-          message: "Avoid using 'enum' as a type. Use `const SOME_ENUM = { VALUE: 'VALUE'; } as const` instead.",
+          message: 'Declare closed string sets with em(...) from enumwaii.',
+        },
+        {
+          selector: "CallExpression[callee.object.name='z'][callee.property.name='enum'] > ArrayExpression",
+          message: 'Declare members with enumwaii and derive Zod schemas from extracted enum member views.',
         },
       ],
       '@typescript-eslint/explicit-module-boundary-types': 'off',

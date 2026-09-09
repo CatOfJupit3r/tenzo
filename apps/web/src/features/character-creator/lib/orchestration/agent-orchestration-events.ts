@@ -1,3 +1,4 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import {
@@ -7,14 +8,15 @@ import {
   QUALITY_FINDING_SCHEMA,
 } from './agent-orchestration-contracts';
 
-export const AGENT_ORCHESTRATION_EVENT_NAMES = {
-  phase: 'agent-orchestration.phase',
-  assumptions: 'agent-orchestration.assumptions',
-  quality: 'agent-orchestration.quality',
-  recovery: 'agent-orchestration.recovery',
-  metrics: 'agent-orchestration.metrics',
-  proposal: 'agent-orchestration.proposal',
-} as const;
+export const AGENT_ORCHESTRATION_EVENT_NAMES_ENUM = em([
+  'PHASE',
+  'ASSUMPTIONS',
+  'QUALITY',
+  'RECOVERY',
+  'METRICS',
+  'PROPOSAL',
+]);
+export const AGENT_ORCHESTRATION_EVENT_NAMES = AGENT_ORCHESTRATION_EVENT_NAMES_ENUM.enum;
 
 export const AGENT_ORCHESTRATION_PHASE_EVENT_SCHEMA = z.object({
   runId: z.string().trim().min(1),

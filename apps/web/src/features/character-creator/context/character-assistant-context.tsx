@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PropsWithChildren } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import {
+  MODEL_CAPABILITY_ENUM,
+  hasModelCapability,
+} from '@~/features/character-creator/lib/provider/model-capabilities';
 
 import { useCharacterAssistantWorkspace } from '../hooks/use-character-assistant-workspace';
-import {
-  CHARACTER_ASSISTANT_FOCUS_KINDS,
-  MAX_CHAT_TEMPLATE_REF_COUNT,
-} from '../lib/assistant/character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
   iChatTemplateRef,
+} from '../lib/assistant/character-assistant-contracts';
+import {
+  CHARACTER_ASSISTANT_FOCUS_KINDS_CASES,
+  MAX_CHAT_TEMPLATE_REF_COUNT,
 } from '../lib/assistant/character-assistant-contracts';
 import { CHARACTER_TEXT_FIELD_KEYS } from '../lib/cards/card-schema';
 import { toPromptExampleCharacter } from '../lib/cards/example-characters';
@@ -17,21 +22,20 @@ import { resolveEffectiveFieldTemplateId } from '../lib/cards/field-template-res
 import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
 import { CHARACTER_EDIT_FIELD_KEYS } from '../lib/proposals/character-edit-proposal';
-import { MODEL_CAPABILITIES } from '../lib/provider/model-capabilities';
 import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import { CharacterAssistantContext } from './character-assistant-context.constants';
 import { useCharacterCreatorContext } from './character-creator-context/character-creator-context.hooks';
 
 const DEFAULT_ASSISTANT_FOCUS = {
-  kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card,
+  kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD,
 } satisfies CharacterAssistantFocus;
 
 function getTemplateBindableFieldKeys(focus: CharacterAssistantFocus): readonly string[] {
-  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field) {
+  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD) {
     return [focus.fieldKey];
   }
 
-  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.fields) {
+  if (focus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELDS) {
     return focus.fieldKeys;
   }
 
@@ -40,7 +44,7 @@ function getTemplateBindableFieldKeys(focus: CharacterAssistantFocus): readonly 
 
 function getAssistantTemplateTargetKey(fieldKey: string) {
   const templateFieldKey =
-    fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings ? TEMPLATE_FIELD_KEYS.alternate_greeting : fieldKey;
+    fieldKey === CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS ? TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING : fieldKey;
 
   return `field:${templateFieldKey}`;
 }
@@ -81,7 +85,7 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
 
   const openAssistantForField = useCallback((fieldKey: CharacterEditFieldKey) => {
     setAssistantFocus({
-      kind: CHARACTER_ASSISTANT_FOCUS_KINDS.field,
+      kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD,
       fieldKey,
     });
     setIsAssistantOpen(true);
@@ -135,8 +139,8 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     generationSettings.shouldUseDefaultFieldTemplates,
   ]);
   const selectedModelCapabilities = connectionHealth.modelCapabilities[generationSettings.model];
-  const localCapabilities = Object.values(MODEL_CAPABILITIES).filter(
-    (capability) => selectedModelCapabilities?.[capability],
+  const localCapabilities = MODEL_CAPABILITY_ENUM.values.filter((capability) =>
+    selectedModelCapabilities ? hasModelCapability(selectedModelCapabilities, capability) : undefined,
   );
   const workspace = useCharacterAssistantWorkspace({
     characterId: activeCharacterId,
@@ -146,7 +150,7 @@ export function CharacterAssistantProvider({ children }: PropsWithChildren) {
     generationSettings,
     generalCharacterIdea,
     updateGeneralCharacterIdea,
-    shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp,
+    shouldSendDisabledSamplers: connectionHealth.providerKind === PROVIDER_KINDS.KOBOLDCPP,
     providerKind: connectionHealth.providerKind,
     localCapabilities,
     focus: assistantFocus,

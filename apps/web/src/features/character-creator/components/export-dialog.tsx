@@ -1,5 +1,6 @@
+import { em } from 'enumwaii';
 import { useMemo, useState } from 'react';
-import { LuArchive, LuDownload, LuDatabaseBackup } from 'react-icons/lu';
+import { LuArchive, LuDatabaseBackup, LuDownload } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button';
 import { Checkbox } from '@~/components/ui/checkbox';
@@ -12,20 +13,24 @@ import {
   DialogTitle,
 } from '@~/components/ui/dialog';
 import { Label } from '@~/components/ui/label';
-import { SingleSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
+import { SingleSelect } from '@~/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@~/components/ui/tabs';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import {
+  ARCHIVE_FORMAT_ENUM,
+  ARCHIVE_FORMAT_LABELS,
+  EXPORT_DETAIL_LEVEL_DESCRIPTIONS,
+  EXPORT_DETAIL_LEVEL_ENUM,
+  EXPORT_DETAIL_LEVEL_LABELS,
+} from '@~/features/character-creator/lib/cards/export-settings';
 
 import type { iCharacterLibraryItem } from '../lib/cards/character-library';
 import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
-import {
-  ARCHIVE_FORMAT_LABELS,
-  ARCHIVE_FORMATS,
-  EXPORT_DETAIL_LEVEL_DESCRIPTIONS,
-  EXPORT_DETAIL_LEVEL_LABELS,
-  EXPORT_DETAIL_LEVELS,
-} from '../lib/cards/export-settings';
-import type { ArchiveFormat, ExportDetailLevel, iExportSettings } from '../lib/cards/export-settings';
+import type { ArchiveFormat, iExportSettings } from '../lib/cards/export-settings';
+
+const ACTIVE_EXPORTS_ENUM = em(['JSON', 'PNG', 'BULK', 'ALL']);
+const ACTIVE_EXPORTS = ACTIVE_EXPORTS_ENUM.enum;
 
 export interface iExportDialogProps {
   isOpen: boolean;
@@ -40,23 +45,20 @@ export interface iExportDialogProps {
   onExportAll: () => Promise<unknown>;
 }
 
-const EXPORT_DIALOG_TABS = {
-  current: 'current',
-  bulk: 'bulk',
-  everything: 'everything',
-} as const;
+const EXPORT_DIALOG_TABS_ENUM = em(['CURRENT', 'BULK', 'EVERYTHING']);
+const EXPORT_DIALOG_TABS = EXPORT_DIALOG_TABS_ENUM.enum;
 
-type ActiveExport = 'json' | 'png' | 'bulk' | 'all' | null;
+type ActiveExport = (typeof ACTIVE_EXPORTS_ENUM)['~type'] | null;
 
-const detailLevelOptions: iOptionType[] = Object.values(EXPORT_DETAIL_LEVELS).map((detailLevel) => ({
+const detailLevelOptions: iOptionType[] = EXPORT_DETAIL_LEVEL_ENUM.values.map((detailLevel) => ({
   value: detailLevel,
-  label: EXPORT_DETAIL_LEVEL_LABELS[detailLevel],
-  description: EXPORT_DETAIL_LEVEL_DESCRIPTIONS[detailLevel],
+  label: EXPORT_DETAIL_LEVEL_LABELS.get(detailLevel),
+  description: EXPORT_DETAIL_LEVEL_DESCRIPTIONS.get(detailLevel),
 }));
 
-const archiveFormatOptions: iOptionType[] = Object.values(ARCHIVE_FORMATS).map((archiveFormat) => ({
+const archiveFormatOptions: iOptionType[] = ARCHIVE_FORMAT_ENUM.values.map((archiveFormat) => ({
   value: archiveFormat,
-  label: ARCHIVE_FORMAT_LABELS[archiveFormat],
+  label: ARCHIVE_FORMAT_LABELS.get(archiveFormat),
 }));
 
 function ArchiveFormatSelect({
@@ -77,7 +79,7 @@ function ArchiveFormatSelect({
         value={value}
         onValueChange={(nextValue) => {
           if (nextValue) {
-            onValueChange(nextValue as ArchiveFormat);
+            onValueChange(ARCHIVE_FORMAT_ENUM.parse(nextValue));
           }
         }}
       />
@@ -136,23 +138,23 @@ export function ExportDialog({
             value={exportSettings.detailLevel}
             onValueChange={(value) => {
               if (value) {
-                onExportSettingsChange({ detailLevel: value as ExportDetailLevel });
+                onExportSettingsChange({ detailLevel: EXPORT_DETAIL_LEVEL_ENUM.parse(value) });
               }
             }}
           />
           <p className="text-sm text-muted-foreground">
-            {EXPORT_DETAIL_LEVEL_DESCRIPTIONS[exportSettings.detailLevel]}
+            {EXPORT_DETAIL_LEVEL_DESCRIPTIONS.get(exportSettings.detailLevel)}
           </p>
         </div>
 
-        <Tabs defaultValue={EXPORT_DIALOG_TABS.current}>
+        <Tabs defaultValue={EXPORT_DIALOG_TABS.CURRENT}>
           <TabsList className="w-full">
-            <TabsTrigger value={EXPORT_DIALOG_TABS.current}>Current character</TabsTrigger>
-            <TabsTrigger value={EXPORT_DIALOG_TABS.bulk}>Multiple characters</TabsTrigger>
-            <TabsTrigger value={EXPORT_DIALOG_TABS.everything}>Everything</TabsTrigger>
+            <TabsTrigger value={EXPORT_DIALOG_TABS.CURRENT}>Current character</TabsTrigger>
+            <TabsTrigger value={EXPORT_DIALOG_TABS.BULK}>Multiple characters</TabsTrigger>
+            <TabsTrigger value={EXPORT_DIALOG_TABS.EVERYTHING}>Everything</TabsTrigger>
           </TabsList>
 
-          <TabsContent className="space-y-4 pt-2" value={EXPORT_DIALOG_TABS.current}>
+          <TabsContent className="space-y-4 pt-2" value={EXPORT_DIALOG_TABS.CURRENT}>
             <div className="space-y-3 rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">
               <p>JSON export writes the hybrid V1+V2 format. PNG export embeds the same JSON into a `chara` chunk.</p>
               <p>
@@ -164,24 +166,24 @@ export function ExportDialog({
               <Button
                 disabled={activeExport !== null}
                 type="button"
-                variant="outline"
-                onClick={async () => runExport('json', onExportJson)}
+                variant={BUTTON_VARIANTS.OUTLINE}
+                onClick={async () => runExport(ACTIVE_EXPORTS.JSON, onExportJson)}
               >
                 <LuDownload className="size-4" />
-                {activeExport === 'json' ? 'Exporting JSON...' : 'Download JSON'}
+                {activeExport === ACTIVE_EXPORTS.JSON ? 'Exporting JSON...' : 'Download JSON'}
               </Button>
               <Button
                 disabled={!hasPortrait || activeExport !== null}
                 type="button"
-                onClick={async () => runExport('png', onExportPng)}
+                onClick={async () => runExport(ACTIVE_EXPORTS.PNG, onExportPng)}
               >
                 <LuDownload className="size-4" />
-                {activeExport === 'png' ? 'Exporting PNG...' : 'Download PNG'}
+                {activeExport === ACTIVE_EXPORTS.PNG ? 'Exporting PNG...' : 'Download PNG'}
               </Button>
             </DialogFooter>
           </TabsContent>
 
-          <TabsContent className="space-y-4 pt-2" value={EXPORT_DIALOG_TABS.bulk}>
+          <TabsContent className="space-y-4 pt-2" value={EXPORT_DIALOG_TABS.BULK}>
             <ArchiveFormatSelect
               inputId="bulk-archive-format"
               value={exportSettings.archiveFormat}
@@ -230,17 +232,17 @@ export function ExportDialog({
               <Button
                 disabled={selectedIds.length === 0 || activeExport !== null}
                 type="button"
-                onClick={async () => runExport('bulk', async () => onBulkExport(selectedIds))}
+                onClick={async () => runExport(ACTIVE_EXPORTS.BULK, async () => onBulkExport(selectedIds))}
               >
                 <LuArchive className="size-4" />
-                {activeExport === 'bulk'
+                {activeExport === ACTIVE_EXPORTS.BULK
                   ? 'Building archive...'
                   : `Export ${selectedIds.length || 'selected'} as archive`}
               </Button>
             </DialogFooter>
           </TabsContent>
 
-          <TabsContent className="space-y-4 pt-2" value={EXPORT_DIALOG_TABS.everything}>
+          <TabsContent className="space-y-4 pt-2" value={EXPORT_DIALOG_TABS.EVERYTHING}>
             <ArchiveFormatSelect
               inputId="backup-archive-format"
               value={exportSettings.archiveFormat}
@@ -259,10 +261,10 @@ export function ExportDialog({
               <Button
                 disabled={activeExport !== null}
                 type="button"
-                onClick={async () => runExport('all', onExportAll)}
+                onClick={async () => runExport(ACTIVE_EXPORTS.ALL, onExportAll)}
               >
                 <LuDatabaseBackup className="size-4" />
-                {activeExport === 'all' ? 'Building backup...' : 'Export full backup'}
+                {activeExport === ACTIVE_EXPORTS.ALL ? 'Building backup...' : 'Export full backup'}
               </Button>
             </DialogFooter>
           </TabsContent>

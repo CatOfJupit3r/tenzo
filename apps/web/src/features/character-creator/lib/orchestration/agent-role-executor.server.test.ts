@@ -1,19 +1,29 @@
-import { EventType } from '@tanstack/ai';
 import type { AnyTextAdapter, StreamChunk, TokenUsage } from '@tanstack/ai';
+import { EventType } from '@tanstack/ai';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
+import {
+  PROVIDER_DATA_COLLECTION_DENY,
+  PROVIDER_POLICY_FAILURE_REASONS,
+} from '@~/features/character-creator/lib/provider/provider-policy-resolver';
+
 import type { iAgentRoleCallEvent } from '../evaluation/agent-run-observability';
+import { AGENT_ROLE_CALL_OUTCOMES } from '../evaluation/agent-run-observability';
 import type { iGenerateValidatedObject, iGenerateValidatedObjectOptions } from '../generation/structured-output.server';
 import type { iCharacterChatOptions } from '../generation/tanstack-ai-text-generation';
-import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import type { iAgentRoleProfile } from '../provider/agent-role-contracts';
+import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import { MODEL_CAPABILITIES } from '../provider/model-capabilities';
 import { PROVIDER_KINDS } from '../provider/provider-health';
 import { createProviderPolicyCatalogCache } from '../provider/provider-policy-catalog-cache';
 import type { iProviderPolicyCatalog } from '../provider/provider-policy-resolver';
-import { AgentRolePolicyError, createAgentRoleExecutor } from './agent-role-executor.server';
 import type { iAgentRoleCallOptions, iAgentRoleExecutorDependencies } from './agent-role-executor.server';
+import {
+  AGENT_ROLE_EXECUTION_ERROR_CODES,
+  AgentRolePolicyError,
+  createAgentRoleExecutor,
+} from './agent-role-executor.server';
 
 const NOW = new Date('2026-08-21T00:00:00.000Z');
 const ENDPOINT = 'https://openrouter.ai/api';
@@ -22,11 +32,11 @@ const EMPTY_ADAPTER = {} as AnyTextAdapter;
 function createProfile(overrides: Partial<iAgentRoleProfile> = {}): iAgentRoleProfile {
   return {
     id: 'role-test',
-    role: AGENT_ROLES['content-planner'],
-    providerKind: PROVIDER_KINDS.openrouter,
+    role: AGENT_ROLES.CONTENT_PLANNER,
+    providerKind: PROVIDER_KINDS.OPENROUTER,
     modelId: 'test/unmoderated',
     allowedProviderSlugs: ['eligible-provider'],
-    requiredCapabilities: [MODEL_CAPABILITIES['structured-output']],
+    requiredCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT],
     temperature: 0.4,
     topP: 0.9,
     budget: {
@@ -58,7 +68,7 @@ function createCatalog(
             isZeroDataRetention: true,
             doesCollectData: false,
             isAvailable: true,
-            supportedCapabilities: [MODEL_CAPABILITIES['structured-output']],
+            supportedCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT],
             promptPricePerMillionUsd: 1,
             completionPricePerMillionUsd: 2,
             ...overrides,
@@ -133,12 +143,15 @@ describe('agent role executor', () => {
       provider: {
         only: ['eligible-provider'],
         allowFallbacks: false,
-        dataCollection: 'deny',
+        dataCollection: PROVIDER_DATA_COLLECTION_DENY,
         zdr: true,
         requireParameters: true,
       },
     });
-    expect(harness.logs[0]).toMatchObject({ outcome: 'completed', providerId: 'eligible-provider' });
+    expect(harness.logs[0]).toMatchObject({
+      outcome: AGENT_ROLE_CALL_OUTCOMES.COMPLETED,
+      providerId: 'eligible-provider',
+    });
     expect(JSON.stringify(harness.logs)).not.toContain('bounded role input');
   });
 
@@ -149,8 +162,8 @@ describe('agent role executor', () => {
     const result = await executor.executeStructured({
       ...callOptions(
         createProfile({
-          role: AGENT_ROLES['prose-worker'],
-          requiredCapabilities: [MODEL_CAPABILITIES['structured-output']],
+          role: AGENT_ROLES.PROSE_WORKER,
+          requiredCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT],
         }),
       ),
       schema: z.object({ accepted: z.boolean() }),
@@ -171,7 +184,10 @@ describe('agent role executor', () => {
       }),
     ).rejects.toBeInstanceOf(AgentRolePolicyError);
     expect(harness.generationCalls).toHaveLength(0);
-    expect(harness.logs[0]).toMatchObject({ outcome: 'failed', policyFailureReason: 'endpoint-data-collecting' });
+    expect(harness.logs[0]).toMatchObject({
+      outcome: AGENT_ROLE_CALL_OUTCOMES.FAILED,
+      policyFailureReason: PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_DATA_COLLECTING,
+    });
   });
 
   it('requires an explicit schema for structured calls', async () => {
@@ -183,7 +199,7 @@ describe('agent role executor', () => {
         ...callOptions(createProfile()),
         schema: undefined as never,
       }),
-    ).rejects.toMatchObject({ code: 'invalid-request' });
+    ).rejects.toMatchObject({ code: AGENT_ROLE_EXECUTION_ERROR_CODES.INVALID_REQUEST });
     expect(harness.generationCalls).toHaveLength(0);
   });
 
@@ -218,16 +234,16 @@ describe('agent role executor', () => {
     const harness = createDependencies(createCatalog());
     const executor = createAgentRoleExecutor(harness.dependencies);
     const profile = createProfile({
-      providerKind: PROVIDER_KINDS.koboldcpp,
+      providerKind: PROVIDER_KINDS.KOBOLDCPP,
       modelId: 'koboldcpp/local',
       allowedProviderSlugs: [],
-      requiredCapabilities: [MODEL_CAPABILITIES['structured-output']],
+      requiredCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT],
     });
 
     await executor.executeStructured({
       ...callOptions(profile, { endpoint: 'http://localhost:5001', apiKey: '' }),
       schema: z.object({ accepted: z.boolean() }),
-      localCapabilities: [MODEL_CAPABILITIES['structured-output']],
+      localCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT],
     });
     expect(harness.fetchCalls).toHaveLength(0);
 
@@ -305,7 +321,7 @@ describe('agent role executor', () => {
     expect(generate).toHaveBeenCalledTimes(2);
     expect(result.usage.retryCount).toBe(1);
     expect(result.usage).toMatchObject({ inputTokens: 7, outputTokens: 5, totalTokens: 12 });
-    expect(harness.logs[0]).toMatchObject({ outcome: 'completed', retryCount: 1 });
+    expect(harness.logs[0]).toMatchObject({ outcome: AGENT_ROLE_CALL_OUTCOMES.COMPLETED, retryCount: 1 });
   });
 
   it('estimates multi-provider routing cost conservatively', async () => {
@@ -322,7 +338,7 @@ describe('agent role executor', () => {
               isZeroDataRetention: true,
               doesCollectData: false,
               isAvailable: true,
-              supportedCapabilities: [MODEL_CAPABILITIES['structured-output']],
+              supportedCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT],
               promptPricePerMillionUsd: 3,
               completionPricePerMillionUsd: 4,
             },
@@ -373,10 +389,10 @@ describe('agent role executor', () => {
 
     await expect(
       executor.executeProse({
-        ...callOptions(createProfile({ role: AGENT_ROLES['prose-worker'], requiredCapabilities: [] })),
+        ...callOptions(createProfile({ role: AGENT_ROLES.PROSE_WORKER, requiredCapabilities: [] })),
       }),
-    ).rejects.toMatchObject({ code: 'generation-failed' });
-    expect(harness.logs[0]).toMatchObject({ outcome: 'failed' });
+    ).rejects.toMatchObject({ code: AGENT_ROLE_EXECUTION_ERROR_CODES.GENERATION_FAILED });
+    expect(harness.logs[0]).toMatchObject({ outcome: AGENT_ROLE_CALL_OUTCOMES.FAILED });
   });
 
   it('rejects results that exceed the role budget and logs failure', async () => {
@@ -393,8 +409,8 @@ describe('agent role executor', () => {
         ...callOptions(createProfile()),
         schema: z.object({ accepted: z.boolean() }),
       }),
-    ).rejects.toMatchObject({ code: 'budget-exceeded' });
-    expect(harness.logs[0]).toMatchObject({ outcome: 'failed', policyFailureReason: null });
+    ).rejects.toMatchObject({ code: AGENT_ROLE_EXECUTION_ERROR_CODES.BUDGET_EXCEEDED });
+    expect(harness.logs[0]).toMatchObject({ outcome: AGENT_ROLE_CALL_OUTCOMES.FAILED, policyFailureReason: null });
   });
 
   it('collects raw prose without tools or structured output', async () => {
@@ -415,7 +431,7 @@ describe('agent role executor', () => {
     const executor = createAgentRoleExecutor(harness.dependencies);
 
     const result = await executor.executeProse({
-      ...callOptions(createProfile({ role: AGENT_ROLES['prose-worker'], requiredCapabilities: [] })),
+      ...callOptions(createProfile({ role: AGENT_ROLES.PROSE_WORKER, requiredCapabilities: [] })),
       isRepair: true,
     });
 
@@ -425,7 +441,7 @@ describe('agent role executor', () => {
     expect(harness.logs[0]).toMatchObject({
       inputTokens: 3,
       outputTokens: 2,
-      outcome: 'completed',
+      outcome: AGENT_ROLE_CALL_OUTCOMES.COMPLETED,
       repairCount: 1,
     });
   });

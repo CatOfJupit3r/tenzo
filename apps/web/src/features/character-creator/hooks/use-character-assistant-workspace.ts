@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastInfo } from '@~/components/toastifications/create-jsx-toasts';
 import { usePersistentCollection } from '@~/db/persistent-collection';
+import { MESSAGE_PART_TYPES_CASES, MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
 import { loggerFactory } from '@~/lib/logging/logger';
 
+import type { iCharacterAssistantComposerDraft } from '../collections/character-assistant-composer-drafts.collection';
 import {
   characterAssistantComposerDraftsCollection,
   clearCharacterAssistantComposerDraft,
@@ -13,7 +15,6 @@ import {
   ensureCharacterAssistantComposerDraft,
   saveCharacterAssistantComposerDraft,
 } from '../collections/character-assistant-composer-drafts.collection';
-import type { iCharacterAssistantComposerDraft } from '../collections/character-assistant-composer-drafts.collection';
 import {
   characterAssistantSessionsCollection,
   createCharacterAssistantSessionRecord,
@@ -22,17 +23,17 @@ import {
   updateCharacterAssistantSession,
 } from '../collections/character-assistant-sessions.collection';
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../lib/assistant/assistant-final-response';
-import { MAX_CHAT_TEMPLATE_REF_COUNT } from '../lib/assistant/character-assistant-contracts';
 import type {
   CharacterAssistantFocus,
   iCharacterAssistantContextAttachment,
   iChatTemplateRef,
 } from '../lib/assistant/character-assistant-contracts';
+import { MAX_CHAT_TEMPLATE_REF_COUNT } from '../lib/assistant/character-assistant-contracts';
 import type { iCharacterAssistantSession } from '../lib/assistant/character-assistant-session';
 import { readNewRecordedCharacterConcept } from '../lib/assistant/recorded-character-concept';
 import type { CharacterCard } from '../lib/cards/card-schema';
-import { buildChatInputContentParts, readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
 import type { iChatInputAttachment } from '../lib/editor/chat-input-attachments';
+import { buildChatInputContentParts, readChatAttachmentMetadata } from '../lib/editor/chat-input-attachments';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import type { AgentProgressPhase, iQualityFinding } from '../lib/orchestration/agent-orchestration-contracts';
 import {
@@ -43,12 +44,12 @@ import {
   AGENT_ORCHESTRATION_RECOVERY_EVENT_SCHEMA,
 } from '../lib/orchestration/agent-orchestration-events';
 import type { iPromptExampleCharacter } from '../lib/prompt/generation-contracts';
+import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
 import {
   CHARACTER_EDIT_PROPOSAL_SCHEMA,
   isCharacterEditPatchUnresolved,
   supersedeOverlappingCharacterEditProposals,
 } from '../lib/proposals/character-edit-proposal';
-import type { iCharacterEditPatch } from '../lib/proposals/character-edit-proposal';
 import type { ModelCapability } from '../lib/provider/model-capabilities';
 import type { ProviderKind } from '../lib/provider/provider-health';
 import { useProposalActions } from './use-proposal-actions';
@@ -88,7 +89,8 @@ function readProposalIds(messages: readonly iCharacterAssistantSession['messages
   return new Set(
     messages.flatMap((message) =>
       message.parts.flatMap((part) => {
-        if (part.type !== 'tool-call' || !part.output || typeof part.output !== 'object') return [];
+        if (part.type !== MESSAGE_PART_TYPES_CASES.TOOL_CALL || !part.output || typeof part.output !== 'object')
+          return [];
         const result = CHARACTER_EDIT_PROPOSAL_SCHEMA.safeParse((part.output as { proposal?: unknown }).proposal);
         return result.success ? [result.data.id] : [];
       }),
@@ -97,7 +99,9 @@ function readProposalIds(messages: readonly iCharacterAssistantSession['messages
 }
 
 function hasToolCall(messages: readonly iCharacterAssistantSession['messages'][number][], toolCallId: string) {
-  return messages.some((message) => message.parts.some((part) => part.type === 'tool-call' && part.id === toolCallId));
+  return messages.some((message) =>
+    message.parts.some((part) => part.type === MESSAGE_PART_TYPES_CASES.TOOL_CALL && part.id === toolCallId),
+  );
 }
 
 function areMessagesEqual(
@@ -177,12 +181,12 @@ export function useCharacterAssistantWorkspace({
     forwardedProps,
     outputSchema: ASSISTANT_FINAL_RESPONSE_SCHEMA,
     onCustomEvent: (eventName, data) => {
-      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.phase) {
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.PHASE) {
         const event = AGENT_ORCHESTRATION_PHASE_EVENT_SCHEMA.safeParse(data);
         if (event.success) setOrchestrationPhase(event.data.phase);
         return;
       }
-      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.assumptions) {
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.ASSUMPTIONS) {
         const event = AGENT_ORCHESTRATION_ASSUMPTIONS_EVENT_SCHEMA.safeParse(data);
         if (event.success) {
           setAssumptionSummary([
@@ -192,12 +196,12 @@ export function useCharacterAssistantWorkspace({
         }
         return;
       }
-      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.quality) {
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.QUALITY) {
         const event = AGENT_ORCHESTRATION_QUALITY_EVENT_SCHEMA.safeParse(data);
         if (event.success) setQualityFindings(event.data.findings.filter((finding) => !finding.isResolved));
         return;
       }
-      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.recovery) {
+      if (eventName === AGENT_ORCHESTRATION_EVENT_NAMES.RECOVERY) {
         const event = AGENT_ORCHESTRATION_RECOVERY_EVENT_SCHEMA.safeParse(data);
         if (event.success) setRecoveryMessage(event.data.message);
       }
@@ -230,7 +234,8 @@ export function useCharacterAssistantWorkspace({
     const hasMessageChanges = !areMessagesEqual(session.messages, chat.messages);
     const proposals = chat.messages.flatMap((message) =>
       message.parts.flatMap((part) => {
-        if (part.type !== 'tool-call' || !part.output || typeof part.output !== 'object') return [];
+        if (part.type !== MESSAGE_PART_TYPES_CASES.TOOL_CALL || !part.output || typeof part.output !== 'object')
+          return [];
         const result = CHARACTER_EDIT_PROPOSAL_SCHEMA.safeParse((part.output as { proposal?: unknown }).proposal);
         return result.success ? [result.data] : [];
       }),
@@ -351,18 +356,21 @@ export function useCharacterAssistantWorkspace({
       if (!trimmedContent) throw new Error('A message cannot be empty.');
       const messageIndex = chat.messages.findIndex((message) => message.id === messageId);
       const message = chat.messages[messageIndex];
-      const lastUserMessageIndex = chat.messages.findLastIndex((candidate) => candidate.role === 'user');
-      if (message?.role !== 'user' || messageIndex !== lastUserMessageIndex) {
+      const lastUserMessageIndex = chat.messages.findLastIndex((candidate) => candidate.role === MESSAGE_ROLES.USER);
+      if (message?.role !== MESSAGE_ROLES.USER || messageIndex !== lastUserMessageIndex) {
         throw new Error('Only the latest user message can be edited.');
       }
       const editablePartIndex = message.parts.findIndex(
-        (part) => part.type === 'text' && !readChatAttachmentMetadata('metadata' in part ? part.metadata : undefined),
+        (part) =>
+          part.type === MESSAGE_PART_TYPES_CASES.TEXT &&
+          !readChatAttachmentMetadata('metadata' in part ? part.metadata : undefined),
       );
       if (editablePartIndex < 0) throw new Error('This message does not contain editable text.');
 
       const editedMessage = structuredClone(message);
       const editablePart = editedMessage.parts[editablePartIndex];
-      if (editablePart?.type !== 'text') throw new Error('This message does not contain editable text.');
+      if (editablePart?.type !== MESSAGE_PART_TYPES_CASES.TEXT)
+        throw new Error('This message does not contain editable text.');
       editablePart.content = trimmedContent;
       await replaceConversationMessages([...chat.messages.slice(0, messageIndex), editedMessage]);
       await chat.reload();

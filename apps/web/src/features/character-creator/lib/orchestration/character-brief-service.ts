@@ -1,7 +1,12 @@
 import type { CharacterCard, CharacterTextFieldKey } from '../cards/card-schema';
 import { AGENT_EVAL_FIELD_RUBRICS } from '../evaluation/agent-eval-rubric';
-import { AGENT_FACT_PROVENANCES, AGENT_GAP_IMPACTS, CHARACTER_BRIEF_SCHEMA } from './agent-orchestration-contracts';
 import type { iCharacterBrief } from './agent-orchestration-contracts';
+import {
+  AGENT_FACT_PROVENANCES,
+  AGENT_GAP_IMPACTS,
+  CHARACTER_BRIEF_SCHEMA,
+  USER_PROMPT_FACT_ID,
+} from './agent-orchestration-contracts';
 
 export interface iCharacterBriefInput {
   prompt: string;
@@ -23,11 +28,11 @@ export interface iCharacterBriefResult {
 
 function createUserPromptFact(prompt: string) {
   return {
-    id: 'user-prompt',
+    id: USER_PROMPT_FACT_ID,
     statement: prompt.trim(),
-    provenance: AGENT_FACT_PROVENANCES.user,
+    provenance: AGENT_FACT_PROVENANCES.USER,
     sourceId: null,
-    impact: AGENT_GAP_IMPACTS.high,
+    impact: AGENT_GAP_IMPACTS.HIGH,
     isReversibleDefault: false,
   } as const;
 }
@@ -54,9 +59,9 @@ export function createCharacterBriefFromSufficientInput(input: iCharacterBriefIn
             {
               id: `card-${fieldKey}`,
               statement: value.slice(0, 600),
-              provenance: AGENT_FACT_PROVENANCES.card,
+              provenance: AGENT_FACT_PROVENANCES.CARD,
               sourceId: fieldKey,
-              impact: AGENT_GAP_IMPACTS.high,
+              impact: AGENT_GAP_IMPACTS.HIGH,
               isReversibleDefault: false,
             },
           ]
@@ -65,9 +70,9 @@ export function createCharacterBriefFromSufficientInput(input: iCharacterBriefIn
     ...input.referenceSummaries.map((summary, index) => ({
       id: `reference-${index + 1}`,
       statement: summary.slice(0, 600),
-      provenance: AGENT_FACT_PROVENANCES['reference-inspiration'],
+      provenance: AGENT_FACT_PROVENANCES.REFERENCE_INSPIRATION,
       sourceId: `reference-${index + 1}`,
-      impact: AGENT_GAP_IMPACTS.low,
+      impact: AGENT_GAP_IMPACTS.LOW,
       isReversibleDefault: true,
     })),
   ];
@@ -95,7 +100,7 @@ function assertBriefScope(brief: iCharacterBrief, requestedFieldKeys: readonly C
     throw new Error(`Brief enrichment expanded outside the requested focus: ${unexpectedCoverage.fieldKey}.`);
   }
 
-  const highImpactAssumption = brief.assumptions.find((fact) => fact.impact === AGENT_GAP_IMPACTS.high);
+  const highImpactAssumption = brief.assumptions.find((fact) => fact.impact === AGENT_GAP_IMPACTS.HIGH);
   if (highImpactAssumption) {
     throw new Error('High-impact model assumptions must be represented as unresolved questions.');
   }
@@ -113,7 +118,7 @@ export function createCharacterBriefService(dependencies: iCharacterBriefService
         ...enrichedBrief,
         confirmedFacts: [
           createUserPromptFact(input.prompt),
-          ...enrichedBrief.confirmedFacts.filter((fact) => fact.id !== 'user-prompt'),
+          ...enrichedBrief.confirmedFacts.filter((fact) => fact.id !== USER_PROMPT_FACT_ID),
         ],
       });
       assertBriefScope(brief, input.requestedFieldKeys);

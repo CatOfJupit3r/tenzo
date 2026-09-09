@@ -6,12 +6,13 @@ import { toastError } from '@~/components/toastifications/create-jsx-toasts';
 import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Button } from '@~/components/ui/button/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@~/components/ui/dialog';
+import { ALERT_VARIANTS, BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { loggerFactory } from '@~/lib/logging/logger';
 import { cn } from '@~/lib/utils';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
-import { CHARACTER_ASSISTANT_FOCUS_KINDS } from '../lib/assistant/character-assistant-contracts';
+import { CHARACTER_ASSISTANT_FOCUS_KINDS_CASES } from '../lib/assistant/character-assistant-contracts';
 import {
   deriveNextPromptSuggestions,
   mergeNextPromptSuggestions,
@@ -67,11 +68,11 @@ export function CharacterAssistantPanel({
   const settledOutcomeRef = useRef<HTMLDivElement>(null);
   const hydratedDraftIdRef = useRef<string | null>(null);
   const focusLabel =
-    assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field
+    assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD
       ? formatFieldLabel(assistantFocus.fieldKey)
       : 'Whole character';
   const assistantTitle =
-    assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS.field ? `Discuss ${focusLabel}` : 'Tenzo Assistant';
+    assistantFocus.kind === CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD ? `Discuss ${focusLabel}` : 'Tenzo Assistant';
   const suggestions = useMemo(
     () =>
       mergeNextPromptSuggestions({
@@ -154,8 +155,8 @@ export function CharacterAssistantPanel({
           </div>
           <Button
             type="button"
-            size="sm"
-            variant="ghost"
+            size={BUTTON_SIZES.SM}
+            variant={BUTTON_VARIANTS.GHOST}
             aria-label="Close Character Assistant"
             onClick={closeAssistant}
           >
@@ -203,7 +204,7 @@ export function CharacterAssistantPanel({
           </Alert>
         ) : null}
         {workspace.qualityFindings.length > 0 ? (
-          <Alert className="mx-1 mt-1 w-auto" variant="destructive">
+          <Alert className="mx-1 mt-1 w-auto" variant={ALERT_VARIANTS.DESTRUCTIVE}>
             <AlertTitle>Quality review warnings</AlertTitle>
             <AlertDescription>
               {workspace.qualityFindings.map((finding) => finding.explanation).join(' ')}
@@ -211,7 +212,7 @@ export function CharacterAssistantPanel({
           </Alert>
         ) : null}
         {workspace.recoveryMessage ? (
-          <Alert className="mx-1 mt-1 w-auto" variant="destructive">
+          <Alert className="mx-1 mt-1 w-auto" variant={ALERT_VARIANTS.DESTRUCTIVE}>
             <AlertTitle>Generation needs attention</AlertTitle>
             <AlertDescription>{workspace.recoveryMessage}</AlertDescription>
           </Alert>
@@ -328,7 +329,12 @@ export function CharacterAssistantPanel({
                 Set {missingConnectionSettings.join(', ')} before sending a message.
               </p>
             </div>
-            <Button type="button" size="sm" variant="outline" onClick={onOpenConnectionSettings}>
+            <Button
+              type="button"
+              size={BUTTON_SIZES.SM}
+              variant={BUTTON_VARIANTS.OUTLINE}
+              onClick={onOpenConnectionSettings}
+            >
               Open Settings
             </Button>
           </div>
@@ -345,8 +351,8 @@ export function CharacterAssistantPanel({
                 <Button
                   key={suggestion.id}
                   type="button"
-                  size="sm"
-                  variant="outline"
+                  size={BUTTON_SIZES.SM}
+                  variant={BUTTON_VARIANTS.OUTLINE}
                   className="h-auto min-h-8 max-w-full shrink rounded-full whitespace-normal text-left"
                   disabled={workspace.isRunning}
                   onClick={() => {
@@ -382,7 +388,12 @@ export function CharacterAssistantPanel({
                 {workspace.sessions.length} {workspace.sessions.length === 1 ? 'conversation' : 'conversations'}
               </span>
               {workspace.isRunning ? (
-                <Button type="button" size="sm" variant="outline" onClick={workspace.cancelRun}>
+                <Button
+                  type="button"
+                  size={BUTTON_SIZES.SM}
+                  variant={BUTTON_VARIANTS.OUTLINE}
+                  onClick={workspace.cancelRun}
+                >
                   Stop
                 </Button>
               ) : (
@@ -390,8 +401,8 @@ export function CharacterAssistantPanel({
                   {workspace.messages.length > 0 ? (
                     <Button
                       type="button"
-                      size="sm"
-                      variant="outline"
+                      size={BUTTON_SIZES.SM}
+                      variant={BUTTON_VARIANTS.OUTLINE}
                       onClick={() => {
                         void workspace.requestResponse();
                       }}
@@ -400,7 +411,11 @@ export function CharacterAssistantPanel({
                       {workspace.errorMessage ? 'Retry' : 'Regenerate'}
                     </Button>
                   ) : null}
-                  <Button type="submit" size="sm" disabled={!inputValue.trim() && inputAttachments.length === 0}>
+                  <Button
+                    type="submit"
+                    size={BUTTON_SIZES.SM}
+                    disabled={!inputValue.trim() && inputAttachments.length === 0}
+                  >
                     Send
                   </Button>
                 </div>

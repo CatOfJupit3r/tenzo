@@ -1,55 +1,78 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
-import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_SCHEMA } from '../orchestration/field-writing-strategy';
 import type { FieldWritingStrategy } from '../orchestration/field-writing-strategy';
-import { CHARACTER_EDIT_FIELD_KEYS, CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
+import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_SCHEMA } from '../orchestration/field-writing-strategy';
 import type { CharacterEditFieldKey } from '../proposals/character-edit-proposal';
-import { AGENT_GENERATION_BUDGETS, AGENT_GENERATION_BUDGET_SCHEMA } from '../provider/agent-generation-budget';
+import { CHARACTER_EDIT_FIELD_KEYS, CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
 import type { AgentGenerationBudget } from '../provider/agent-generation-budget';
+import { AGENT_GENERATION_BUDGETS, AGENT_GENERATION_BUDGET_SCHEMA } from '../provider/agent-generation-budget';
 
-export const OUTPUT_FORMAT_SCHEMA = z.enum(['xml', 'json', 'none']);
-export const OUTPUT_FORMATS = OUTPUT_FORMAT_SCHEMA.enum;
+export const OUTPUT_FORMAT_ENUM = em({
+  XML: 'xml',
+  JSON: 'json',
+  NONE: 'none',
+});
+export const OUTPUT_FORMATS = OUTPUT_FORMAT_ENUM.enum;
+export const OUTPUT_FORMAT_SCHEMA = z.enum(OUTPUT_FORMATS);
+
 export type OutputFormat = z.infer<typeof OUTPUT_FORMAT_SCHEMA>;
 
-export const REQUEST_MODE_SCHEMA = z.enum(['proxy', 'browser']);
-export const REQUEST_MODES = REQUEST_MODE_SCHEMA.enum;
+export const REQUEST_MODE_ENUM = em({
+  PROXY: 'proxy',
+  BROWSER: 'browser',
+});
+export const REQUEST_MODES = REQUEST_MODE_ENUM.enum;
+export const REQUEST_MODE_SCHEMA = z.enum(REQUEST_MODES);
+
 export type RequestMode = z.infer<typeof REQUEST_MODE_SCHEMA>;
 
-export const GENERATION_PROVIDER_SCHEMA = z.enum(['koboldcpp', 'openrouter']);
-export const GENERATION_PROVIDERS = GENERATION_PROVIDER_SCHEMA.enum;
+export const GENERATION_PROVIDER_ENUM = em({
+  KOBOLDCPP: 'koboldcpp',
+  OPENROUTER: 'openrouter',
+});
+export const GENERATION_PROVIDERS = GENERATION_PROVIDER_ENUM.enum;
+export const GENERATION_PROVIDER_SCHEMA = z.enum(GENERATION_PROVIDERS);
+
 export type GenerationProvider = z.infer<typeof GENERATION_PROVIDER_SCHEMA>;
 
 export const CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA = z.record(CHARACTER_EDIT_FIELD_KEY_SCHEMA, z.boolean());
 export type CharacterAssistantFieldEditing = z.infer<typeof CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA>;
 
 export const DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING = {
-  [CHARACTER_EDIT_FIELD_KEYS.name]: true,
-  [CHARACTER_EDIT_FIELD_KEYS.description]: true,
-  [CHARACTER_EDIT_FIELD_KEYS.personality]: true,
-  [CHARACTER_EDIT_FIELD_KEYS.scenario]: true,
-  [CHARACTER_EDIT_FIELD_KEYS.first_mes]: true,
-  [CHARACTER_EDIT_FIELD_KEYS.mes_example]: true,
-  [CHARACTER_EDIT_FIELD_KEYS.creator_notes]: false,
-  [CHARACTER_EDIT_FIELD_KEYS.system_prompt]: false,
-  [CHARACTER_EDIT_FIELD_KEYS.post_history_instructions]: false,
-  [CHARACTER_EDIT_FIELD_KEYS.creator]: false,
-  [CHARACTER_EDIT_FIELD_KEYS.character_version]: false,
-  [CHARACTER_EDIT_FIELD_KEYS.tags]: false,
-  [CHARACTER_EDIT_FIELD_KEYS.alternate_greetings]: true,
-  [CHARACTER_EDIT_FIELD_KEYS.custom_fields]: false,
-  [CHARACTER_EDIT_FIELD_KEYS.character_book]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.NAME]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.DESCRIPTION]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.PERSONALITY]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.SCENARIO]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.FIRST_MES]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.MES_EXAMPLE]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.CREATOR_NOTES]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.SYSTEM_PROMPT]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.POST_HISTORY_INSTRUCTIONS]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.CREATOR]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.CHARACTER_VERSION]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.TAGS]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS]: true,
+  [CHARACTER_EDIT_FIELD_KEYS.CUSTOM_FIELDS]: false,
+  [CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK]: false,
 } satisfies Record<CharacterEditFieldKey, boolean>;
 
-export const GENERATION_PROVIDER_DEFAULTS = {
-  [GENERATION_PROVIDERS.koboldcpp]: {
-    endpoint: 'http://localhost:5001',
-    model: 'local-model',
-  },
-  [GENERATION_PROVIDERS.openrouter]: {
-    endpoint: 'https://openrouter.ai/api/v1',
-    model: 'openai/gpt-4.1-mini',
-  },
-} satisfies Record<GenerationProvider, { endpoint: string; model: string }>;
+export const GENERATION_PROVIDER_DEFAULTS = GENERATION_PROVIDER_ENUM.derive<{ endpoint: string; model: string }>()(
+  [
+    GENERATION_PROVIDERS.KOBOLDCPP,
+    {
+      endpoint: 'http://localhost:5001',
+      model: 'local-model',
+    },
+  ],
+  [
+    GENERATION_PROVIDERS.OPENROUTER,
+    {
+      endpoint: 'https://openrouter.ai/api/v1',
+      model: 'openai/gpt-4.1-mini',
+    },
+  ],
+);
 
 export const DEFAULT_CONTEXT_SIZE = 32_768;
 export const DEFAULT_MAX_TOKENS = 2_048;
@@ -101,17 +124,17 @@ export interface iCharacterGenerationSettings
 
 export const DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS: iCharacterGenerationConnectionSettings = {
   globalCharacterInstruction: '',
-  provider: GENERATION_PROVIDERS.koboldcpp,
-  ...GENERATION_PROVIDER_DEFAULTS[GENERATION_PROVIDERS.koboldcpp],
+  provider: GENERATION_PROVIDERS.KOBOLDCPP,
+  ...GENERATION_PROVIDER_DEFAULTS.get(GENERATION_PROVIDERS.KOBOLDCPP),
   visionModel: '',
   openRouterProvider: '',
   apiKeyCiphertext: '',
   contextSize: DEFAULT_CONTEXT_SIZE,
   maxTokens: DEFAULT_MAX_TOKENS,
-  outputFormat: OUTPUT_FORMATS.xml,
-  requestMode: REQUEST_MODES.proxy,
-  agentGenerationBudget: AGENT_GENERATION_BUDGETS.balanced,
-  fieldWritingStrategy: FIELD_WRITING_STRATEGIES['separate-fields'],
+  outputFormat: OUTPUT_FORMATS.XML,
+  requestMode: REQUEST_MODES.PROXY,
+  agentGenerationBudget: AGENT_GENERATION_BUDGETS.BALANCED,
+  fieldWritingStrategy: FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS,
   temperature: 1,
   topP: 1,
   frequencyPenalty: 0,

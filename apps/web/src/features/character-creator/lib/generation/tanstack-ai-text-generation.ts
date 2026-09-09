@@ -1,13 +1,16 @@
-import { chat, EventType } from '@tanstack/ai';
 import type { AnyServerTool, AnyTextAdapter, ChatMiddleware, ModelMessage, StreamChunk, UIMessage } from '@tanstack/ai';
+import { chat, EventType } from '@tanstack/ai';
 import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { createOpenRouterText } from '@tanstack/ai-openrouter';
+
+import { PROVIDER_DATA_COLLECTION_DENY } from '@~/features/character-creator/lib/provider/provider-policy-resolver';
 
 import { normalizeOpenAiCompatibleBaseUrl } from '../provider/openai-compatible-endpoint';
 import type { ProviderPolicyResolution } from '../provider/provider-policy-resolver';
 import { suppressGenerationAbort } from './abort-safe-stream';
 import type { iCharacterGenerationStreamRequest } from './generation-stream-contracts';
 import { repairJson } from './json-repair';
+import { MESSAGE_ROLE_CASES, MESSAGE_ROLES } from './message-enums';
 import { createOpenRouterErrorPreservingHttpClient } from './openrouter-stream-error';
 
 export interface iStreamCharacterTextOptions extends iCharacterGenerationStreamRequest {
@@ -68,9 +71,11 @@ interface iCharacterModelOptions {
   openRouterProvider?: string;
 }
 
+export const OPENROUTER_RESPONSE_HEALING_PLUGIN_ID = 'response-healing';
+
 const OPENROUTER_PROVIDER_PRIVACY_OPTIONS = {
   allowFallbacks: false,
-  dataCollection: 'deny',
+  dataCollection: PROVIDER_DATA_COLLECTION_DENY,
   requireParameters: true,
   zdr: true,
 } as const;
@@ -102,13 +107,20 @@ function createAbortController(signal?: AbortSignal) {
 function readSystemPrompts({ messages, instructions }: Pick<iStreamCharacterTextOptions, 'messages' | 'instructions'>) {
   return [
     ...(instructions ? [instructions] : []),
-    ...messages.filter((message) => message.role === 'system').map((message) => message.content),
+    ...messages.filter((message) => message.role === MESSAGE_ROLES.SYSTEM).map((message) => message.content),
   ];
 }
 
 function toModelMessages(messages: iCharacterGenerationStreamRequest['messages']): ModelMessage[] {
   return messages.flatMap((message) =>
-    message.role === 'system' ? [] : [{ role: message.role, content: message.content }],
+    message.role === MESSAGE_ROLE_CASES.SYSTEM
+      ? []
+      : [
+          {
+            role: message.role === MESSAGE_ROLES.USER ? MESSAGE_ROLES.USER : MESSAGE_ROLES.ASSISTANT,
+            content: message.content,
+          },
+        ],
   );
 }
 
@@ -220,7 +232,7 @@ export function createCharacterStructuredModelOptions(endpoint: string, generati
   }
   return {
     ...modelOptions,
-    plugins: [{ id: 'response-healing' as const }],
+    plugins: [{ id: OPENROUTER_RESPONSE_HEALING_PLUGIN_ID }],
     provider: {
       ...modelOptions.provider,
       requireParameters: true,

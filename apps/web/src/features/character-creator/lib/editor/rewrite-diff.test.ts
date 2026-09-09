@@ -51,7 +51,7 @@ describe('mergeRewriteDiffHunks', () => {
   it('reproduces the old value when every decision keeps old', () => {
     const hunks = computeRewriteDiffHunks(OLD_VALUE, NEW_VALUE);
     const decisions = Object.fromEntries(
-      hunks.filter((hunk) => hunk.isChanged).map((hunk) => [hunk.id, REWRITE_HUNK_DECISIONS.keepOld]),
+      hunks.filter((hunk) => hunk.isChanged).map((hunk) => [hunk.id, REWRITE_HUNK_DECISIONS.KEEP_OLD]),
     );
     expect(mergeRewriteDiffHunks(hunks, decisions)).toBe(OLD_VALUE);
   });
@@ -60,21 +60,21 @@ describe('mergeRewriteDiffHunks', () => {
     const hunks = computeRewriteDiffHunks(OLD_VALUE, NEW_VALUE);
     const changedIds = hunks.filter((hunk) => hunk.isChanged).map((hunk) => hunk.id);
     const merged = mergeRewriteDiffHunks(hunks, {
-      [changedIds[0] ?? 0]: REWRITE_HUNK_DECISIONS.keepOld,
-      [changedIds[1] ?? 0]: REWRITE_HUNK_DECISIONS.keepNew,
+      [changedIds[0] ?? 0]: REWRITE_HUNK_DECISIONS.KEEP_OLD,
+      [changedIds[1] ?? 0]: REWRITE_HUNK_DECISIONS.KEEP_NEW,
     });
     expect(merged).toBe('shared intro\nold detail line\nshared middle\nnew ending\n');
   });
 
   it('keeps both texts stacked when asked', () => {
     const hunks = computeRewriteDiffHunks('old line\n', 'new line\n');
-    const merged = mergeRewriteDiffHunks(hunks, { 0: REWRITE_HUNK_DECISIONS.keepBoth });
+    const merged = mergeRewriteDiffHunks(hunks, { 0: REWRITE_HUNK_DECISIONS.KEEP_BOTH });
     expect(merged).toBe('old line\nnew line\n');
   });
 
   it('inserts a newline when keeping both and the old text lacks one', () => {
     const hunks = computeRewriteDiffHunks('old ending', 'new ending');
-    const merged = mergeRewriteDiffHunks(hunks, { 0: REWRITE_HUNK_DECISIONS.keepBoth });
+    const merged = mergeRewriteDiffHunks(hunks, { 0: REWRITE_HUNK_DECISIONS.KEEP_BOTH });
     expect(merged).toBe('old ending\nnew ending');
   });
 

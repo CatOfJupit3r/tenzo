@@ -1,8 +1,18 @@
+import { em } from 'enumwaii';
 import pngChunkText from 'png-chunk-text';
 import encodeChunks from 'png-chunks-encode';
 import extractChunks from 'png-chunks-extract';
 
-const CHARACTER_CHUNK_KEYWORDS = new Set(['chara', 'ccv3']);
+const CHARACTER_CHUNK_KEYWORD_ENUM = em({
+  CHARA: 'chara',
+  CCV3: 'ccv3',
+});
+const CHARACTER_CHUNK_KEYWORDS = CHARACTER_CHUNK_KEYWORD_ENUM.enum;
+const PNG_CHUNK_TYPE_ENUM = em({
+  T_EXT: 'tEXt',
+  IEND: 'IEND',
+});
+const PNG_CHUNK_TYPES = PNG_CHUNK_TYPE_ENUM.enum;
 
 export interface iPngChunk {
   name: string;
@@ -50,7 +60,7 @@ function decodeUtf8Base64(base64Text: string): string {
 
 export function readCharacterCardFromPng(pngBytes: Uint8Array): string {
   const textChunks = extractPngChunks(pngBytes)
-    .filter((chunk) => chunk.name === 'tEXt')
+    .filter((chunk) => chunk.name === PNG_CHUNK_TYPES.T_EXT)
     .map((chunk) => decodePngTextChunk(chunk.data));
 
   if (textChunks.length === 0) {
@@ -58,8 +68,8 @@ export function readCharacterCardFromPng(pngBytes: Uint8Array): string {
   }
 
   const preferredChunk =
-    textChunks.find((chunk) => chunk.keyword.toLowerCase() === 'ccv3') ??
-    textChunks.find((chunk) => chunk.keyword.toLowerCase() === 'chara');
+    textChunks.find((chunk) => chunk.keyword.toLowerCase() === CHARACTER_CHUNK_KEYWORDS.CCV3) ??
+    textChunks.find((chunk) => chunk.keyword.toLowerCase() === CHARACTER_CHUNK_KEYWORDS.CHARA);
 
   if (!preferredChunk) {
     throw new Error('PNG metadata does not contain any character data.');
@@ -70,21 +80,21 @@ export function readCharacterCardFromPng(pngBytes: Uint8Array): string {
 
 export function embedCharacterCardInPng(pngBytes: Uint8Array, jsonText: string): Uint8Array {
   const chunks = extractPngChunks(pngBytes).filter((chunk) => {
-    if (chunk.name !== 'tEXt') {
+    if (chunk.name !== PNG_CHUNK_TYPES.T_EXT) {
       return true;
     }
 
     const decodedChunk = decodePngTextChunk(chunk.data);
-    return !CHARACTER_CHUNK_KEYWORDS.has(decodedChunk.keyword.toLowerCase());
+    return !CHARACTER_CHUNK_KEYWORD_ENUM.is(decodedChunk.keyword.toLowerCase());
   });
 
-  const iendIndex = chunks.findIndex((chunk) => chunk.name === 'IEND');
+  const iendIndex = chunks.findIndex((chunk) => chunk.name === PNG_CHUNK_TYPES.IEND);
 
   if (iendIndex === -1) {
     throw new Error('Invalid PNG: missing IEND chunk.');
   }
 
-  chunks.splice(iendIndex, 0, encodePngTextChunk('chara', encodeUtf8Base64(jsonText)));
+  chunks.splice(iendIndex, 0, encodePngTextChunk(CHARACTER_CHUNK_KEYWORDS.CHARA, encodeUtf8Base64(jsonText)));
 
   return encodePngChunks(chunks);
 }

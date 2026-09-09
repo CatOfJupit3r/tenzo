@@ -3,7 +3,7 @@ import type { iPromptFieldTemplate } from './generation-contracts';
 
 export class TemplateService {
   isStrict(fieldTemplate: iPromptFieldTemplate | null): boolean {
-    return fieldTemplate?.mode === TEMPLATE_MODES.strict;
+    return fieldTemplate?.mode === TEMPLATE_MODES.STRICT;
   }
 
   buildSection(fieldTemplate: iPromptFieldTemplate | null): string {
@@ -11,7 +11,7 @@ export class TemplateService {
       return '';
     }
 
-    if (fieldTemplate.mode === TEMPLATE_MODES.strict) {
+    if (fieldTemplate.mode === TEMPLATE_MODES.STRICT) {
       return this.buildStrictSection(fieldTemplate);
     }
 

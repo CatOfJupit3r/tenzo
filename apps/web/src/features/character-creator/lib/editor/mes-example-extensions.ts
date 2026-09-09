@@ -8,16 +8,18 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
+import { EDITOR_NODE_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
+
 import { buildBaseEditorExtensions } from './base-editor-extensions';
 import type { iEditorSerializer } from './editor-contracts';
 import { MES_EXAMPLE_LINE_KINDS, classifyMesExampleLine, getSpeakerPrefixLength } from './mes-example-format';
 
 export function parseMesExampleToDoc(raw: string): JSONContent {
   return {
-    type: 'doc',
+    type: EDITOR_NODE_TYPES.DOC,
     content: raw.split('\n').map((line) => ({
-      type: 'paragraph',
-      ...(line.length > 0 ? { content: [{ type: 'text', text: line }] } : {}),
+      type: EDITOR_NODE_TYPES.PARAGRAPH,
+      ...(line.length > 0 ? { content: [{ type: EDITOR_NODE_TYPES.TEXT, text: line }] } : {}),
     })),
   };
 }
@@ -41,14 +43,14 @@ function buildMesExampleDecorations(doc: ProseMirrorNode): DecorationSet {
   doc.forEach((child, offset) => {
     const line = child.textContent;
     const kind = classifyMesExampleLine(line);
-    if (kind === MES_EXAMPLE_LINE_KINDS.start) {
+    if (kind === MES_EXAMPLE_LINE_KINDS.START) {
       decorations.push(Decoration.node(offset, offset + child.nodeSize, { class: 'mes-example-start-line' }));
       return;
     }
-    if (kind === MES_EXAMPLE_LINE_KINDS.charTurn || kind === MES_EXAMPLE_LINE_KINDS.userTurn) {
+    if (kind === MES_EXAMPLE_LINE_KINDS.CHAR_TURN || kind === MES_EXAMPLE_LINE_KINDS.USER_TURN) {
       const prefixLength = getSpeakerPrefixLength(line);
       const speakerClass =
-        kind === MES_EXAMPLE_LINE_KINDS.charTurn ? 'mes-example-speaker-char' : 'mes-example-speaker-user';
+        kind === MES_EXAMPLE_LINE_KINDS.CHAR_TURN ? 'mes-example-speaker-char' : 'mes-example-speaker-user';
       decorations.push(Decoration.inline(offset + 1, offset + 1 + prefixLength, { class: speakerClass }));
     }
   });

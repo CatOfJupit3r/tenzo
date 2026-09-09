@@ -5,10 +5,11 @@ import {
   CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA,
   CHARACTER_CONCEPT_SCHEMA,
 } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
-import { createCharacterDiscoveryDirectionsService } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
 import type { iCharacterDiscoveryDirectionsService } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
+import { createCharacterDiscoveryDirectionsService } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
 import { REQUEST_MODES } from '@~/features/character-creator/lib/generation/generation-config';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation/generation-stream-contracts';
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
 import { loggerFactory } from '@~/lib/logging/logger';
 
 export const MAX_DISCOVERY_PREMISE_LENGTH = 2_000;
@@ -34,7 +35,7 @@ export function createCharacterAssistantDiscoveryRequestHandler(
   return async function handleCharacterAssistantDiscoveryRequest({ request }: { request: Request }) {
     let requestContext: Record<string, unknown> = {
       operation: 'character-assistant-discovery',
-      requestMode: REQUEST_MODES.proxy,
+      requestMode: REQUEST_MODES.PROXY,
     };
 
     try {
@@ -69,7 +70,8 @@ export function createCharacterAssistantDiscoveryRequestHandler(
       const isRequestError = error instanceof ZodError || error instanceof SyntaxError;
       const isAbortError =
         request.signal.aborted ||
-        (error instanceof Error && (error.name === 'AbortError' || error.name === 'RequestAbortedError'));
+        (error instanceof Error &&
+          (error.name === ABORT_ERROR_NAMES.ABORT_ERROR || error.name === ABORT_ERROR_NAMES.REQUEST_ABORTED_ERROR));
       if (!isRequestError && !isAbortError) {
         CHARACTER_ASSISTANT_DISCOVERY_ROUTE_LOGGER.error(
           'Character assistant discovery request failed',

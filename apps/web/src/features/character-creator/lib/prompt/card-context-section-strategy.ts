@@ -1,9 +1,9 @@
 import type { CardContextService } from './card-context-service';
-import { PROMPT_SECTION_NAMES } from './prompt-section-strategy';
 import type { iPromptPipelineContext, iPromptSectionStrategy } from './prompt-section-strategy';
+import { PROMPT_SECTION_NAMES } from './prompt-section-strategy';
 
 export class CardContextSectionStrategy implements iPromptSectionStrategy {
-  readonly name = PROMPT_SECTION_NAMES['card-context'];
+  readonly name = PROMPT_SECTION_NAMES.CARD_CONTEXT;
 
   constructor(private readonly cardContextService: CardContextService) {}
 

@@ -170,7 +170,7 @@ describe('card export detail levels', () => {
 
   it('strips tenzo-specific data on minimal export', () => {
     const exportedCard = buildExportedCharacterCard(createCardWithTenzoData(), {
-      detailLevel: EXPORT_DETAIL_LEVELS.minimal,
+      detailLevel: EXPORT_DETAIL_LEVELS.MINIMAL,
       promptSettings,
       portraitCropRect: cropRect,
     });
@@ -180,7 +180,7 @@ describe('card export detail levels', () => {
 
   it('keeps custom fields and common metadata but not per-field guidance on tenzo_metadata export', () => {
     const exportedCard = buildExportedCharacterCard(createCardWithTenzoData(), {
-      detailLevel: EXPORT_DETAIL_LEVELS.tenzo_metadata,
+      detailLevel: EXPORT_DETAIL_LEVELS.TENZO_METADATA,
       promptSettings,
       portraitCropRect: cropRect,
     });
@@ -196,7 +196,7 @@ describe('card export detail levels', () => {
 
   it('round-trips custom fields, crop rect, and generation guidance through a full export', () => {
     const jsonText = serializeCharacterCard(createCardWithTenzoData(), {
-      detailLevel: EXPORT_DETAIL_LEVELS.full,
+      detailLevel: EXPORT_DETAIL_LEVELS.FULL,
       promptSettings,
       portraitCropRect: cropRect,
     });

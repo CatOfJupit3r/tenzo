@@ -1,6 +1,12 @@
 import type { UIMessage } from '@tanstack/ai-react';
 import { describe, expect, it } from 'vitest';
 
+import {
+  MESSAGE_PART_TYPES_CASES,
+  MESSAGE_ROLES,
+  TOOL_CALL_STATES,
+} from '@~/features/character-creator/lib/generation/message-enums';
+
 import { CHARACTER_ASSISTANT_TOOL_NAMES } from './character-assistant-contracts';
 import { readNewRecordedCharacterConcept } from './recorded-character-concept';
 
@@ -16,15 +22,15 @@ const concept = {
 const messages: UIMessage[] = [
   {
     id: 'assistant-message',
-    role: 'assistant',
+    role: MESSAGE_ROLES.ASSISTANT,
     createdAt: new Date('2026-08-15T00:00:00.000Z'),
     parts: [
       {
-        type: 'tool-call',
+        type: MESSAGE_PART_TYPES_CASES.TOOL_CALL,
         id: 'concept-call',
-        name: CHARACTER_ASSISTANT_TOOL_NAMES.record_concept,
+        name: CHARACTER_ASSISTANT_TOOL_NAMES.RECORD_CONCEPT,
         arguments: '{}',
-        state: 'complete',
+        state: TOOL_CALL_STATES.COMPLETE,
         output: { concept },
       },
     ],

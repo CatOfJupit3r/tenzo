@@ -1,17 +1,17 @@
 import type { CharacterTextFieldKey } from '../cards/card-schema';
-import { evaluateDeterministicQuality, QUALITY_SEVERITIES } from '../evaluation/deterministic-quality-metrics';
 import type { iDeterministicQualityFinding } from '../evaluation/deterministic-quality-metrics';
-import {
-  PROSE_JOB_RESULT_SCHEMA,
-  QUALITY_FINDING_EVIDENCE,
-  QUALITY_FINDING_SCHEMA,
-  QUALITY_FINDING_SEVERITIES,
-} from './agent-orchestration-contracts';
+import { evaluateDeterministicQuality, QUALITY_SEVERITIES } from '../evaluation/deterministic-quality-metrics';
 import type {
   iCharacterBrief,
   iCharacterContentPlan,
   iProseJob,
   iQualityFinding,
+} from './agent-orchestration-contracts';
+import {
+  PROSE_JOB_RESULT_SCHEMA,
+  QUALITY_FINDING_EVIDENCE,
+  QUALITY_FINDING_SCHEMA,
+  QUALITY_FINDING_SEVERITIES,
 } from './agent-orchestration-contracts';
 import type { iAgentCallUsage } from './agent-run-budget';
 import { createAgentRunBudget } from './agent-run-budget';
@@ -53,10 +53,10 @@ function convertDeterministicFinding(finding: iDeterministicQualityFinding): iQu
     ruleId: finding.rule,
     fieldKeys: finding.fieldKeys,
     severity:
-      finding.severity === QUALITY_SEVERITIES.error
-        ? QUALITY_FINDING_SEVERITIES.error
-        : QUALITY_FINDING_SEVERITIES.warning,
-    evidence: QUALITY_FINDING_EVIDENCE.deterministic,
+      finding.severity === QUALITY_SEVERITIES.ERROR
+        ? QUALITY_FINDING_SEVERITIES.ERROR
+        : QUALITY_FINDING_SEVERITIES.WARNING,
+    evidence: QUALITY_FINDING_EVIDENCE.DETERMINISTIC,
     explanation: finding.message,
     repairInstruction: finding.repairInstruction,
     isResolved: false,
@@ -77,14 +77,14 @@ function runDeterministicChecks(input: iQualityGateInput): iQualityFinding[] {
 }
 
 function countBlockingFindings(findings: readonly iQualityFinding[]): number {
-  return findings.filter((finding) => !finding.isResolved && finding.severity === QUALITY_FINDING_SEVERITIES.error)
+  return findings.filter((finding) => !finding.isResolved && finding.severity === QUALITY_FINDING_SEVERITIES.ERROR)
     .length;
 }
 
 function getBlockingJobFindings(job: iProseJob, findings: readonly iQualityFinding[]): iQualityFinding[] {
   return findings.filter(
     (finding) =>
-      finding.severity === QUALITY_FINDING_SEVERITIES.error &&
+      finding.severity === QUALITY_FINDING_SEVERITIES.ERROR &&
       finding.fieldKeys.some((fieldKey) => job.fieldKeys.includes(fieldKey)),
   );
 }

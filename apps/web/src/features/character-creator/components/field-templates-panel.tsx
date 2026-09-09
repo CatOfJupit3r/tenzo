@@ -6,39 +6,37 @@ import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
-import { MultiSelect, SingleSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
+import { MultiSelect, SingleSelect } from '@~/components/ui/select';
+import { ALERT_VARIANTS, BADGE_VARIANTS, BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 import type { FieldTemplatePatch } from '../hooks/use-field-templates';
 import type { iEnhanceTemplateOptions } from '../hooks/use-template-enhancement';
 import type { iStoredExampleCharacter } from '../lib/cards/example-characters';
+import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/cards/field-templates';
 import {
   parseTemplateSlots,
   TEMPLATE_FIELD_KEY_LABELS,
   TEMPLATE_FIELD_KEY_SCHEMA,
   TEMPLATE_FIELD_KEYS_ALLOWING_ORIGINAL_MACRO,
+  TEMPLATE_MODE_ENUM,
   TEMPLATE_MODE_LABELS,
   TEMPLATE_MODES,
   validateFieldTemplate,
-} from '../lib/cards/field-templates';
-import type {
-  iFieldTemplateViewModel,
-  TemplateMode,
-  iCreateStoredFieldTemplateInput,
 } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { EnhanceFieldTemplateDialog } from './enhance-field-template-dialog';
 
 const templateModeOptions: iOptionType[] = [
   {
-    label: TEMPLATE_MODE_LABELS[TEMPLATE_MODES.prompt],
-    value: TEMPLATE_MODES.prompt,
+    label: TEMPLATE_MODE_LABELS.get(TEMPLATE_MODES.PROMPT),
+    value: TEMPLATE_MODES.PROMPT,
     description: 'The AI receives the template as structural guidance and writes the whole field freely.',
   },
   {
-    label: TEMPLATE_MODE_LABELS[TEMPLATE_MODES.strict],
-    value: TEMPLATE_MODES.strict,
+    label: TEMPLATE_MODE_LABELS.get(TEMPLATE_MODES.STRICT),
+    value: TEMPLATE_MODES.STRICT,
     description: 'The template is a fixed skeleton; the AI only fills the {{gen:label}} slots.',
   },
 ];
@@ -93,7 +91,7 @@ export function FieldTemplatesPanel({
   const handleCreateTemplate = () => {
     const newTemplateId = onAddTemplate({
       name: 'New template',
-      mode: TEMPLATE_MODES.prompt,
+      mode: TEMPLATE_MODES.PROMPT,
       fieldKeys: [],
       content: '',
     });
@@ -119,7 +117,13 @@ export function FieldTemplatesPanel({
   return (
     <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
       <div className="space-y-2">
-        <Button type="button" size="sm" variant="outline" className="w-full" onClick={handleCreateTemplate}>
+        <Button
+          type="button"
+          size={BUTTON_SIZES.SM}
+          variant={BUTTON_VARIANTS.OUTLINE}
+          className="w-full"
+          onClick={handleCreateTemplate}
+        >
           <LuPlus className="size-4" />
           New template
         </Button>
@@ -142,14 +146,14 @@ export function FieldTemplatesPanel({
                 {template.isBuiltIn ? <LuLock aria-label="Built-in template" className="size-3 shrink-0" /> : null}
               </span>
               <span className="mt-1 flex flex-wrap gap-1">
-                <Badge variant="secondary">{TEMPLATE_MODE_LABELS[template.mode]}</Badge>
+                <Badge variant={BADGE_VARIANTS.SECONDARY}>{TEMPLATE_MODE_LABELS.get(template.mode)}</Badge>
                 {template.fieldKeys.slice(0, 2).map((fieldKey) => (
-                  <Badge key={fieldKey} variant="outline">
+                  <Badge key={fieldKey} variant={BADGE_VARIANTS.OUTLINE}>
                     {TEMPLATE_FIELD_KEY_LABELS[fieldKey]}
                   </Badge>
                 ))}
                 {template.fieldKeys.length > 2 ? (
-                  <Badge variant="outline">+{template.fieldKeys.length - 2}</Badge>
+                  <Badge variant={BADGE_VARIANTS.OUTLINE}>+{template.fieldKeys.length - 2}</Badge>
                 ) : null}
               </span>
             </button>
@@ -162,7 +166,7 @@ export function FieldTemplatesPanel({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               {selectedTemplate.isBuiltIn ? (
-                <Badge variant="secondary">
+                <Badge variant={BADGE_VARIANTS.SECONDARY}>
                   <LuLock className="size-3" />
                   Built-in | duplicate to edit
                 </Badge>
@@ -171,7 +175,7 @@ export function FieldTemplatesPanel({
             <div className="flex items-center gap-2">
               <Button
                 type="button"
-                size="sm"
+                size={BUTTON_SIZES.SM}
                 disabled={selectedTemplate.isBuiltIn || isEnhancingTemplate}
                 onClick={() => setIsEnhanceDialogOpen(true)}
               >
@@ -180,8 +184,8 @@ export function FieldTemplatesPanel({
               </Button>
               <Button
                 type="button"
-                size="sm"
-                variant="outline"
+                size={BUTTON_SIZES.SM}
+                variant={BUTTON_VARIANTS.OUTLINE}
                 onClick={() => handleDuplicateTemplate(selectedTemplate.id)}
               >
                 <LuCopy className="size-4" />
@@ -189,8 +193,8 @@ export function FieldTemplatesPanel({
               </Button>
               <Button
                 type="button"
-                size="sm"
-                variant="outline"
+                size={BUTTON_SIZES.SM}
+                variant={BUTTON_VARIANTS.OUTLINE}
                 disabled={selectedTemplate.isBuiltIn}
                 onClick={() => handleRemoveTemplate(selectedTemplate.id)}
               >
@@ -220,7 +224,7 @@ export function FieldTemplatesPanel({
                 isDisabled={selectedTemplate.isBuiltIn}
                 onValueChange={(value) => {
                   if (value) {
-                    onUpdateTemplate(selectedTemplate.id, { mode: value as TemplateMode });
+                    onUpdateTemplate(selectedTemplate.id, { mode: TEMPLATE_MODE_ENUM.parse(value) });
                   }
                 }}
               />
@@ -267,7 +271,7 @@ export function FieldTemplatesPanel({
                 value={selectedTemplate.content}
                 rows={10}
                 placeholder={
-                  selectedTemplate.mode === TEMPLATE_MODES.strict
+                  selectedTemplate.mode === TEMPLATE_MODES.STRICT
                     ? 'Fixed skeleton text with {{gen:label}} or {{gen:label:hint}} slots for the AI to fill.'
                     : 'Structure, sections, and style notes the AI should follow for this field.'
                 }
@@ -277,7 +281,7 @@ export function FieldTemplatesPanel({
                 ariaLabelledBy="template-content-label"
                 onValueChange={(value) => onUpdateTemplate(selectedTemplate.id, { content: value })}
               />
-              {selectedTemplate.mode === TEMPLATE_MODES.strict ? (
+              {selectedTemplate.mode === TEMPLATE_MODES.STRICT ? (
                 <p className="text-sm text-muted-foreground">
                   {templateSlots.length > 0
                     ? `Detected slots: ${templateSlots.map((slot) => slot.label).join(', ')}`
@@ -288,7 +292,7 @@ export function FieldTemplatesPanel({
           </div>
 
           {validationIssues.length > 0 ? (
-            <Alert variant="destructive">
+            <Alert variant={ALERT_VARIANTS.DESTRUCTIVE}>
               <AlertTitle>Template needs attention</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc pl-4">

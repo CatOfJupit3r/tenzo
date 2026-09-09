@@ -7,30 +7,30 @@ describe('findMacroRanges', () => {
     const text = '{{char}} greets {{user}}.';
     const ranges = findMacroRanges(text, { doesAllowOriginalMacro: false });
     expect(ranges).toEqual([
-      { from: 0, to: 8, kind: MACRO_KINDS.char },
-      { from: 16, to: 24, kind: MACRO_KINDS.user },
+      { from: 0, to: 8, kind: MACRO_KINDS.CHAR },
+      { from: 16, to: 24, kind: MACRO_KINDS.USER },
     ]);
   });
 
   it('handles whitespace inside braces', () => {
     const ranges = findMacroRanges('{{ char }} and {{  user  }}', { doesAllowOriginalMacro: false });
-    expect(ranges.map((range) => range.kind)).toEqual([MACRO_KINDS.char, MACRO_KINDS.user]);
+    expect(ranges.map((range) => range.kind)).toEqual([MACRO_KINDS.CHAR, MACRO_KINDS.USER]);
   });
 
   it('is case-insensitive for macro names', () => {
     const ranges = findMacroRanges('{{Char}} {{USER}}', { doesAllowOriginalMacro: false });
-    expect(ranges.map((range) => range.kind)).toEqual([MACRO_KINDS.char, MACRO_KINDS.user]);
+    expect(ranges.map((range) => range.kind)).toEqual([MACRO_KINDS.CHAR, MACRO_KINDS.USER]);
   });
 
   it('treats original as known only when allowed', () => {
     const text = 'before {{original}} after';
-    expect(findMacroRanges(text, { doesAllowOriginalMacro: true })[0]?.kind).toBe(MACRO_KINDS.original);
-    expect(findMacroRanges(text, { doesAllowOriginalMacro: false })[0]?.kind).toBe(MACRO_KINDS.unknown);
+    expect(findMacroRanges(text, { doesAllowOriginalMacro: true })[0]?.kind).toBe(MACRO_KINDS.ORIGINAL);
+    expect(findMacroRanges(text, { doesAllowOriginalMacro: false })[0]?.kind).toBe(MACRO_KINDS.UNKNOWN);
   });
 
   it('marks unrecognized macros as unknown', () => {
     const ranges = findMacroRanges('{{random_macro}}', { doesAllowOriginalMacro: false });
-    expect(ranges).toEqual([{ from: 0, to: 16, kind: MACRO_KINDS.unknown }]);
+    expect(ranges).toEqual([{ from: 0, to: 16, kind: MACRO_KINDS.UNKNOWN }]);
   });
 
   it('ignores single braces and unclosed macros', () => {
@@ -45,11 +45,11 @@ describe('findMacroRanges', () => {
     const text = '{{char}}: {{gen:appearance:build and clothing}}';
 
     expect(findMacroRanges(text, { doesAllowOriginalMacro: false })).toEqual([
-      { from: 0, to: 8, kind: MACRO_KINDS.char },
+      { from: 0, to: 8, kind: MACRO_KINDS.CHAR },
     ]);
     expect(findMacroRanges(text, { doesAllowOriginalMacro: false, doesHighlightTemplateSlots: true })).toEqual([
-      { from: 0, to: 8, kind: MACRO_KINDS.char },
-      { from: 10, to: 47, kind: MACRO_KINDS.slot },
+      { from: 0, to: 8, kind: MACRO_KINDS.CHAR },
+      { from: 10, to: 47, kind: MACRO_KINDS.SLOT },
     ]);
   });
 });

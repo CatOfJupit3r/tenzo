@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@~/components/ui/dialog';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 export interface iImportDialogProps {
@@ -101,7 +102,12 @@ export function ImportDialog({ isOpen, onOpenChange, onImportFile }: iImportDial
         </button>
 
         <DialogFooter>
-          <Button disabled={isImporting} type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            disabled={isImporting}
+            type="button"
+            variant={BUTTON_VARIANTS.OUTLINE}
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button disabled={isImporting} type="button" onClick={() => inputRef.current?.click()}>

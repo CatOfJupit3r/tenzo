@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS } from './generation-config';
+import {
+  DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
+  GENERATION_PROVIDERS,
+  REQUEST_MODES,
+} from '@~/features/character-creator/lib/generation/generation-config';
+
 import { createGenerationPresetSettings, sanitizeGenerationPresets } from './generation-presets';
 
 describe('generation presets', () => {
   it('captures generation controls without connection or credential fields', () => {
     const settings = createGenerationPresetSettings({
       ...DEFAULT_CHARACTER_GENERATION_CONNECTION_SETTINGS,
-      provider: 'openrouter',
+      provider: GENERATION_PROVIDERS.OPENROUTER,
       endpoint: 'https://example.test/v1',
-      requestMode: 'browser',
+      requestMode: REQUEST_MODES.BROWSER,
       apiKeyCiphertext: 'secret',
       model: 'text-model',
       visionModel: 'vision-model',

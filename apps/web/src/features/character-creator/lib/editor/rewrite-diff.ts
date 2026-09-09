@@ -1,8 +1,11 @@
 import { diffLines } from 'diff';
+import { em } from 'enumwaii';
 import z from 'zod';
 
-export const rewriteHunkDecisionSchema = z.enum(['keepNew', 'keepOld', 'keepBoth']);
-export const REWRITE_HUNK_DECISIONS = rewriteHunkDecisionSchema.enum;
+export const rewriteHunkDecisionEnum = em(['KEEP_NEW', 'KEEP_OLD', 'KEEP_BOTH']);
+export const REWRITE_HUNK_DECISIONS = rewriteHunkDecisionEnum.enum;
+export const rewriteHunkDecisionSchema = z.enum(REWRITE_HUNK_DECISIONS);
+
 export type RewriteHunkDecision = z.infer<typeof rewriteHunkDecisionSchema>;
 
 export interface iRewriteDiffHunk {
@@ -63,11 +66,11 @@ export function mergeRewriteDiffHunks(
       if (!hunk.isChanged) {
         return hunk.newText;
       }
-      const decision = decisions[hunk.id] ?? REWRITE_HUNK_DECISIONS.keepNew;
-      if (decision === REWRITE_HUNK_DECISIONS.keepOld) {
+      const decision = decisions[hunk.id] ?? REWRITE_HUNK_DECISIONS.KEEP_NEW;
+      if (decision === REWRITE_HUNK_DECISIONS.KEEP_OLD) {
         return hunk.oldText;
       }
-      if (decision === REWRITE_HUNK_DECISIONS.keepBoth) {
+      if (decision === REWRITE_HUNK_DECISIONS.KEEP_BOTH) {
         return joinKeepBoth(hunk.oldText, hunk.newText);
       }
       return hunk.newText;

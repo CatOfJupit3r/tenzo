@@ -9,8 +9,8 @@ import { createAgentRoleProfiles } from './agent-role-profile-service';
 describe('agent role profile service', () => {
   it('builds replaceable same-model roles with immutable capability requirements', () => {
     const profiles = createAgentRoleProfiles({
-      generationBudget: AGENT_GENERATION_BUDGETS.balanced,
-      providerKind: PROVIDER_KINDS.openrouter,
+      generationBudget: AGENT_GENERATION_BUDGETS.BALANCED,
+      providerKind: PROVIDER_KINDS.OPENROUTER,
       modelId: 'test/model',
       allowedProviderSlug: 'test-provider',
       maximumProseOutputTokens: 2_000,
@@ -18,12 +18,12 @@ describe('agent role profile service', () => {
       topP: 0.9,
     });
 
-    expect(Object.keys(profiles)).toHaveLength(Object.keys(AGENT_ROLES).length);
-    expect(profiles[AGENT_ROLES['brief-enricher']].requiredCapabilities).toContain(
-      MODEL_CAPABILITIES['structured-output'],
+    expect(Object.keys(profiles.record)).toHaveLength(Object.keys(AGENT_ROLES).length);
+    expect(profiles.get(AGENT_ROLES.BRIEF_ENRICHER).requiredCapabilities).toContain(
+      MODEL_CAPABILITIES.STRUCTURED_OUTPUT,
     );
-    expect(profiles[AGENT_ROLES['content-planner']].budget.maximumOutputTokens).toBe(4_000);
-    expect(profiles[AGENT_ROLES['prose-worker']]).toMatchObject({
+    expect(profiles.get(AGENT_ROLES.CONTENT_PLANNER).budget.maximumOutputTokens).toBe(4_000);
+    expect(profiles.get(AGENT_ROLES.PROSE_WORKER)).toMatchObject({
       modelId: 'test/model',
       allowedProviderSlugs: ['test-provider'],
       requiredCapabilities: [],
@@ -33,8 +33,8 @@ describe('agent role profile service', () => {
 
   it('keeps local profiles separate from remote provider routing', () => {
     const profiles = createAgentRoleProfiles({
-      generationBudget: AGENT_GENERATION_BUDGETS.economy,
-      providerKind: PROVIDER_KINDS.koboldcpp,
+      generationBudget: AGENT_GENERATION_BUDGETS.ECONOMY,
+      providerKind: PROVIDER_KINDS.KOBOLDCPP,
       modelId: 'koboldcpp/local',
       allowedProviderSlug: 'must-not-be-used',
       maximumProseOutputTokens: 1_000,
@@ -42,15 +42,15 @@ describe('agent role profile service', () => {
       topP: 1,
     });
 
-    expect(profiles[AGENT_ROLES['content-planner']].allowedProviderSlugs).toEqual([]);
-    expect(profiles[AGENT_ROLES['prose-worker']].budget.maximumOutputTokens).toBe(750);
+    expect(profiles.get(AGENT_ROLES.CONTENT_PLANNER).allowedProviderSlugs).toEqual([]);
+    expect(profiles.get(AGENT_ROLES.PROSE_WORKER).budget.maximumOutputTokens).toBe(750);
   });
 
   it('rejects unsupported provider kinds before a role can be executed', () => {
     expect(() =>
       createAgentRoleProfiles({
-        generationBudget: AGENT_GENERATION_BUDGETS.expanded,
-        providerKind: PROVIDER_KINDS.unknown,
+        generationBudget: AGENT_GENERATION_BUDGETS.EXPANDED,
+        providerKind: PROVIDER_KINDS.UNKNOWN,
         modelId: 'unknown/model',
         allowedProviderSlug: '',
         maximumProseOutputTokens: 2_000,
@@ -62,22 +62,22 @@ describe('agent role profile service', () => {
 
   it('accepts replaceable per-role assignments for evaluation without branching on model IDs', () => {
     const profiles = createAgentRoleProfiles({
-      generationBudget: AGENT_GENERATION_BUDGETS.expanded,
-      providerKind: PROVIDER_KINDS.openrouter,
+      generationBudget: AGENT_GENERATION_BUDGETS.EXPANDED,
+      providerKind: PROVIDER_KINDS.OPENROUTER,
       modelId: 'default/model',
       allowedProviderSlug: 'default-provider',
       maximumProseOutputTokens: 2_000,
       proseTemperature: 1,
       topP: 1,
-      roleAssignments: {
-        [AGENT_ROLES['prose-worker']]: { modelId: 'prose/model', allowedProviderSlug: 'prose-provider' },
-      },
+      roleAssignments: new Map([
+        [AGENT_ROLES.PROSE_WORKER, { modelId: 'prose/model', allowedProviderSlug: 'prose-provider' }],
+      ]),
     });
 
-    expect(profiles[AGENT_ROLES['prose-worker']]).toMatchObject({
+    expect(profiles.get(AGENT_ROLES.PROSE_WORKER)).toMatchObject({
       modelId: 'prose/model',
       allowedProviderSlugs: ['prose-provider'],
     });
-    expect(profiles[AGENT_ROLES['content-planner']].modelId).toBe('default/model');
+    expect(profiles.get(AGENT_ROLES.CONTENT_PLANNER).modelId).toBe('default/model');
   });
 });

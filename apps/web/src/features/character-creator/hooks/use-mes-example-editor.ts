@@ -1,21 +1,21 @@
+import { EDITOR_CONTENT_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
+
 import {
   buildMesExampleExtensions,
   MES_EXAMPLE_EDITOR_SERIALIZER,
   parseMesExampleToDoc,
 } from '../lib/editor/mes-example-extensions';
+import type { iSyncedEditorHookOptions, SyncedEditorOverrideProps } from '../lib/editor/synced-editor-hook';
 import { createSyncedEditorHook } from '../lib/editor/synced-editor-hook';
-import type { iSyncedEditorHookOptions } from '../lib/editor/synced-editor-hook';
 import type { iSyncedEditorContent } from './use-synced-field-editor';
 
 export interface iUseMesExampleEditorOptions
-  extends
-    Partial<Pick<iSyncedEditorHookOptions, 'isReadOnly' | 'isStreaming' | 'editorAttributes'>>,
-    Omit<iSyncedEditorHookOptions, 'isReadOnly' | 'isStreaming' | 'editorAttributes'> {
+  extends Partial<SyncedEditorOverrideProps>, Omit<iSyncedEditorHookOptions, keyof SyncedEditorOverrideProps> {
   placeholder?: string;
 }
 
 function toMesExampleEditorContent(value: string): iSyncedEditorContent {
-  return { content: parseMesExampleToDoc(value), contentType: 'json' };
+  return { content: parseMesExampleToDoc(value), contentType: EDITOR_CONTENT_TYPES.JSON };
 }
 
 interface iNormalizedMesExampleEditorOptions extends iUseMesExampleEditorOptions {

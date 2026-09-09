@@ -6,6 +6,8 @@ import { Button } from '@~/components/ui/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
 import { SingleSelect } from '@~/components/ui/select';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import { KEYBOARD_KEYS } from '@~/lib/keyboard-enums';
 
 import { generationPresetsAtom } from '../atoms/generation-presets.atom';
 import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
@@ -61,7 +63,7 @@ export function GenerationPresets({ generationSettings, onSettingsChange }: iGen
         />
         <Button
           type="button"
-          variant="outline"
+          variant={BUTTON_VARIANTS.OUTLINE}
           disabled={!selectedPreset}
           tooltip="Delete selected preset"
           onClick={() => {
@@ -85,7 +87,7 @@ export function GenerationPresets({ generationSettings, onSettingsChange }: iGen
           value={presetName}
           onChange={(event) => setPresetName(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') {
+            if (event.key === KEYBOARD_KEYS.ENTER) {
               event.preventDefault();
               savePreset();
             }

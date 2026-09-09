@@ -2,7 +2,13 @@ import { useAtom, useSetAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { toastError, toastSuccess } from '@~/components/toastifications';
+import {
+  IMPORTED_ARCHIVE_KINDS_CASES,
+  IMPORTED_CARD_SOURCE_KINDS,
+} from '@~/features/character-creator/lib/cards/card-file-enums';
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
 import { loggerFactory } from '@~/lib/logging/logger';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 import { generateUuid } from '@~/utils/uuid';
 
 import { characterGenerationSettingsAtom } from '../atoms/character-generation.atom';
@@ -11,6 +17,7 @@ import { characterLibraryCollection } from '../collections/character-library.col
 import { exampleCharactersCollection } from '../collections/example-characters.collection';
 import type { iCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.constants';
 import type { iBackupPortraitAsset, iTenzoBackup } from '../lib/cards/backup';
+import type { iBulkExportCharacter, iImportedCharacterCardFile } from '../lib/cards/card-files';
 import {
   exportCharacterCardJson,
   exportCharacterCardPng,
@@ -20,10 +27,9 @@ import {
   importCharacterCardFile,
   isArchiveFile,
 } from '../lib/cards/card-files';
-import type { iBulkExportCharacter, iImportedCharacterCardFile } from '../lib/cards/card-files';
 import type { CharacterTextFieldKey } from '../lib/cards/card-schema';
-import { CHARACTER_LIBRARY_SOURCES, createCharacterLibraryItem } from '../lib/cards/character-library';
 import type { iCharacterPortraitReference } from '../lib/cards/character-library';
+import { CHARACTER_LIBRARY_SOURCES, createCharacterLibraryItem } from '../lib/cards/character-library';
 import {
   createStoredExampleCharacter,
   getExampleCharacterDisplayName,
@@ -38,16 +44,16 @@ import {
   TEMPLATE_MODES,
 } from '../lib/cards/field-templates';
 import { readCharacterAssetBlob, writeCharacterAssetBlob } from '../lib/cards/image-store';
-import { sanitizeCharacterGenerationConnectionSettings, REQUEST_MODES } from '../lib/generation/generation-config';
+import { REQUEST_MODES, sanitizeCharacterGenerationConnectionSettings } from '../lib/generation/generation-config';
 import { invalidatePortraitAsset } from '../lib/portrait/portrait-asset-cache';
 import { renderPortraitThumbnailDataUrl } from '../lib/portrait/portrait-focal-point';
 import { ExampleContextService } from '../lib/prompt/example-context-service';
+import type { GenerationMode, iFieldGenerationTarget, iPromptFieldTemplate } from '../lib/prompt/generation-contracts';
 import {
   GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY,
   GENERATION_MODES,
   GENERATION_TARGET_KINDS,
 } from '../lib/prompt/generation-contracts';
-import type { GenerationMode, iFieldGenerationTarget, iPromptFieldTemplate } from '../lib/prompt/generation-contracts';
 import { useCharacterPortrait } from './use-character-portrait';
 import { useCharacterSession } from './use-character-session';
 import { useFieldTemplates } from './use-field-templates';
@@ -67,7 +73,7 @@ async function createImportedPortraitReference(
   const portrait: iCharacterPortraitReference = {
     assetId: generateUuid(),
     fileName: importedCardFile.fileName,
-    mimeType: importedCardFile.portraitBlob.type || 'application/octet-stream',
+    mimeType: importedCardFile.portraitBlob.type || MEDIA_TYPES.OCTET_STREAM,
     cropRect,
     thumbnailDataUrl: await renderPortraitThumbnailDataUrl(importedCardFile.portraitBlob, cropRect),
   };
@@ -91,7 +97,7 @@ export interface iFieldGenerationState {
 }
 
 function isAbortError(error: unknown) {
-  return error instanceof DOMException && error.name === 'AbortError';
+  return error instanceof DOMException && error.name === ABORT_ERROR_NAMES.ABORT_ERROR;
 }
 
 function removeRewriteBackup(backups: Record<string, string>, fieldKey: string) {
@@ -108,7 +114,7 @@ function createStandardFieldTarget(key: CharacterTextFieldKey, label: string, va
     key: `field:${key}`,
     label,
     value,
-    kind: 'field',
+    kind: GENERATION_TARGET_KINDS.FIELD,
   };
 }
 
@@ -207,7 +213,7 @@ export function useCharacterCreatorPage() {
   const { data } = card;
   const generalCharacterIdea = getGeneralCharacterIdea();
   const selectedRequestModeLabel =
-    generationSettings.requestMode === REQUEST_MODES.proxy ? 'Server proxy' : 'Browser request';
+    generationSettings.requestMode === REQUEST_MODES.PROXY ? 'Server proxy' : 'Browser request';
   const maxExampleContextCharacters = exampleContextService.getCharacterBudget(
     generationSettings.contextSize,
     generationSettings.maxTokens,
@@ -255,7 +261,7 @@ export function useCharacterCreatorPage() {
         templateId: selectedTemplate?.id ?? null,
         isDefaultTemplateSelected: explicitTemplateId === undefined && selectedTemplate !== null,
         isExplicitTemplateNone: explicitTemplateId === FIELD_TEMPLATE_SELECTION_NONE,
-        isStrictTemplateSelected: selectedTemplate?.mode === TEMPLATE_MODES.strict,
+        isStrictTemplateSelected: selectedTemplate?.mode === TEMPLATE_MODES.STRICT,
         errorMessage: runtime.errorMessage,
         isGenerating: runtime.isGenerating,
         hasRewriteBackup: rewriteBackups[fieldKey] !== undefined,
@@ -283,14 +289,14 @@ export function useCharacterCreatorPage() {
     async (
       target: iFieldGenerationTarget,
       onValueChange: (value: string) => unknown,
-      mode: GenerationMode = GENERATION_MODES.generate,
+      mode: GenerationMode = GENERATION_MODES.GENERATE,
     ) => {
       setRewriteBackups((prev) => {
-        if (mode === GENERATION_MODES.rewrite) {
+        if (mode === GENERATION_MODES.REWRITE) {
           return { ...prev, [target.key]: target.value };
         }
 
-        if (mode === GENERATION_MODES.continue) {
+        if (mode === GENERATION_MODES.CONTINUE) {
           return prev;
         }
 
@@ -315,7 +321,7 @@ export function useCharacterCreatorPage() {
           maxExampleContextCharacters,
         });
 
-        if (mode === GENERATION_MODES.rewrite) {
+        if (mode === GENERATION_MODES.REWRITE) {
           setPendingRewriteReviewKeys((prev) => ({ ...prev, [target.key]: true }));
         }
       } catch (error) {
@@ -360,7 +366,7 @@ export function useCharacterCreatorPage() {
   }, []);
 
   const generateStandardField = useCallback(
-    async (key: CharacterTextFieldKey, label: string, mode: GenerationMode = GENERATION_MODES.generate) => {
+    async (key: CharacterTextFieldKey, label: string, mode: GenerationMode = GENERATION_MODES.GENERATE) => {
       await runGeneration(createStandardFieldTarget(key, label, data[key]), (value) => updateField(key, value), mode);
     },
     [data, runGeneration, updateField],
@@ -405,13 +411,13 @@ export function useCharacterCreatorPage() {
   const generalCharacterIdeaGenerationState = getGenerationState(GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY);
 
   const generateGeneralCharacterIdea = useCallback(
-    async (mode: GenerationMode = GENERATION_MODES.generate) => {
+    async (mode: GenerationMode = GENERATION_MODES.GENERATE) => {
       await runGeneration(
         {
           key: GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY,
           label: 'General Character Idea',
           value: generalCharacterIdea,
-          kind: GENERATION_TARGET_KINDS['general-character-idea'],
+          kind: GENERATION_TARGET_KINDS.GENERAL_CHARACTER_IDEA,
         },
         updateGeneralCharacterIdea,
         mode,
@@ -500,7 +506,10 @@ export function useCharacterCreatorPage() {
         card: importedCardFile.card,
         portrait,
         promptSettings: importedCardFile.tenzoMetadata.promptSettings ?? undefined,
-        source: importedCardFile.sourceKind === 'png' ? CHARACTER_LIBRARY_SOURCES.png : CHARACTER_LIBRARY_SOURCES.json,
+        source:
+          importedCardFile.sourceKind === IMPORTED_CARD_SOURCE_KINDS.PNG
+            ? CHARACTER_LIBRARY_SOURCES.PNG
+            : CHARACTER_LIBRARY_SOURCES.JSON,
       });
     },
     [createCharacter],
@@ -577,7 +586,7 @@ export function useCharacterCreatorPage() {
         if (isArchiveFile(file)) {
           const importedArchive = await importArchiveFile(file);
 
-          if (importedArchive.kind === 'backup') {
+          if (importedArchive.kind === IMPORTED_ARCHIVE_KINDS_CASES.BACKUP) {
             await restoreFullBackup(importedArchive.backup);
             return;
           }
@@ -734,13 +743,13 @@ export function useCharacterCreatorPage() {
   );
 
   const generateAlternateGreeting = useCallback(
-    async (index: number, mode: GenerationMode = GENERATION_MODES.generate) => {
+    async (index: number, mode: GenerationMode = GENERATION_MODES.GENERATE) => {
       await runGeneration(
         {
           key: `alternate_greetings:${index}`,
           label: `Alternate Greeting ${index + 1}`,
           value: data.alternate_greetings[index] ?? '',
-          kind: 'alternate-greeting',
+          kind: GENERATION_TARGET_KINDS.ALTERNATE_GREETING,
         },
         (value) => updateGreeting(index, value),
         mode,
@@ -794,7 +803,7 @@ export function useCharacterCreatorPage() {
   );
 
   const generateCustomField = useCallback(
-    async (id: string, mode: GenerationMode = GENERATION_MODES.generate) => {
+    async (id: string, mode: GenerationMode = GENERATION_MODES.GENERATE) => {
       const customField = data.extensions.custom_fields.find((field) => field.id === id);
 
       if (!customField) {
@@ -806,7 +815,7 @@ export function useCharacterCreatorPage() {
           key: `custom:${id}`,
           label: customField.label.trim() ?? 'Custom Field',
           value: customField.value,
-          kind: 'custom-field',
+          kind: GENERATION_TARGET_KINDS.CUSTOM_FIELD,
         },
         (value) => updateCustomField(id, { value }),
         mode,

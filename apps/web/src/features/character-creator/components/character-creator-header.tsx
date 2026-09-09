@@ -12,14 +12,15 @@ import {
 
 import { Button } from '@~/components/ui/button/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@~/components/ui/popover';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
 import { MAX_EXAMPLE_CHARACTER_COUNT } from '../lib/cards/example-characters';
-import { SETTINGS_DIALOG_TABS } from './settings-dialog-tabs';
 import type { SettingsDialogTab } from './settings-dialog-tabs';
+import { SETTINGS_DIALOG_TABS } from './settings-dialog-tabs';
 import { TokenStats } from './token-stats';
 
 export interface iCharacterCreatorHeaderProps {
@@ -103,8 +104,8 @@ export function CharacterCreatorHeader({
                 <PopoverTrigger asChild>
                   <Button
                     type="button"
-                    size="sm"
-                    variant="ghost"
+                    size={BUTTON_SIZES.SM}
+                    variant={BUTTON_VARIANTS.GHOST}
                     className={cn(
                       'h-6 gap-1 px-1.5 text-xs',
                       connectionHealth.errorMessage || !isConnectionConfigured
@@ -145,10 +146,10 @@ export function CharacterCreatorHeader({
                   ) : null}
                   <Button
                     type="button"
-                    size="sm"
-                    variant="outline"
+                    size={BUTTON_SIZES.SM}
+                    variant={BUTTON_VARIANTS.OUTLINE}
                     className="w-full"
-                    onClick={() => onSettingsOpen(SETTINGS_DIALOG_TABS.connection)}
+                    onClick={() => onSettingsOpen(SETTINGS_DIALOG_TABS.CONNECTION)}
                   >
                     <LuSettings className="size-4" />
                     Open connection settings
@@ -162,8 +163,8 @@ export function CharacterCreatorHeader({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            size="sm"
-            variant="outline"
+            size={BUTTON_SIZES.SM}
+            variant={BUTTON_VARIANTS.OUTLINE}
             aria-controls="character-library-panel"
             aria-expanded={isCharacterLibraryPanelOpen}
             aria-label={isCharacterLibraryPanelOpen ? 'Hide character library' : 'Show character library'}
@@ -177,18 +178,18 @@ export function CharacterCreatorHeader({
 
           <Button
             type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onSettingsOpen(SETTINGS_DIALOG_TABS.examples)}
+            size={BUTTON_SIZES.SM}
+            variant={BUTTON_VARIANTS.OUTLINE}
+            onClick={() => onSettingsOpen(SETTINGS_DIALOG_TABS.EXAMPLES)}
           >
             Reference Examples {exampleCharacters.length}/{MAX_EXAMPLE_CHARACTER_COUNT}
           </Button>
 
           <Button
             type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onSettingsOpen(SETTINGS_DIALOG_TABS.connection)}
+            size={BUTTON_SIZES.SM}
+            variant={BUTTON_VARIANTS.OUTLINE}
+            onClick={() => onSettingsOpen(SETTINGS_DIALOG_TABS.CONNECTION)}
           >
             <LuSettings className="size-4" />
             Settings
@@ -197,8 +198,8 @@ export function CharacterCreatorHeader({
           <Button
             ref={assistantToggleRef}
             type="button"
-            size="sm"
-            variant={isAssistantOpen ? 'secondary' : 'outline'}
+            size={BUTTON_SIZES.SM}
+            variant={isAssistantOpen ? BUTTON_VARIANTS.SECONDARY : BUTTON_VARIANTS.OUTLINE}
             aria-pressed={isAssistantOpen}
             onClick={isAssistantOpen ? closeAssistant : openAssistant}
           >
@@ -208,11 +209,11 @@ export function CharacterCreatorHeader({
 
           <div className="hidden h-5 w-px bg-border sm:block" />
 
-          <Button type="button" size="sm" variant="outline" onClick={openImportDialog}>
+          <Button type="button" size={BUTTON_SIZES.SM} variant={BUTTON_VARIANTS.OUTLINE} onClick={openImportDialog}>
             <LuFileUp className="size-4" />
             Import
           </Button>
-          <Button type="button" size="sm" onClick={openExportDialog}>
+          <Button type="button" size={BUTTON_SIZES.SM} onClick={openExportDialog}>
             <LuDownload className="size-4" />
             Export
           </Button>

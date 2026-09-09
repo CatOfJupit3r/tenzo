@@ -1,3 +1,5 @@
+import { CHARACTER_TEXT_FIELD_KEY } from '@~/features/character-creator/lib/cards/card-schema';
+
 import type { CharacterData, CharacterTextFieldKey } from '../cards/card-schema';
 
 /**
@@ -22,13 +24,18 @@ export function guesstimateTokenCount(text: string): number {
  * of the character definition injected into every prompt, as opposed to fields like the
  * first message or example dialogue that are only used situationally.
  */
-export const PERMANENT_TOKEN_FIELD_KEYS: CharacterTextFieldKey[] = ['name', 'description', 'personality', 'scenario'];
+export const PERMANENT_TOKEN_FIELD_KEYS: CharacterTextFieldKey[] = [
+  CHARACTER_TEXT_FIELD_KEY.NAME,
+  CHARACTER_TEXT_FIELD_KEY.DESCRIPTION,
+  CHARACTER_TEXT_FIELD_KEY.PERSONALITY,
+  CHARACTER_TEXT_FIELD_KEY.SCENARIO,
+];
 
 export const TEMPORARY_TOKEN_FIELD_KEYS: CharacterTextFieldKey[] = [
-  'first_mes',
-  'mes_example',
-  'system_prompt',
-  'post_history_instructions',
+  CHARACTER_TEXT_FIELD_KEY.FIRST_MES,
+  CHARACTER_TEXT_FIELD_KEY.MES_EXAMPLE,
+  CHARACTER_TEXT_FIELD_KEY.SYSTEM_PROMPT,
+  CHARACTER_TEXT_FIELD_KEY.POST_HISTORY_INSTRUCTIONS,
 ];
 
 export interface iCharacterTokenStats {

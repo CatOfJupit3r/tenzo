@@ -17,8 +17,9 @@ import {
   selectLatestSessions,
 } from '../features/character-creator/lib/assistant/character-assistant-session-storage';
 import { createArchiveBlob } from '../features/character-creator/lib/cards/archive';
-import { buildFullBackupFiles } from '../features/character-creator/lib/cards/backup';
 import type { iBackupPortraitAsset } from '../features/character-creator/lib/cards/backup';
+import { buildFullBackupFiles } from '../features/character-creator/lib/cards/backup';
+import type { iCharacterLibraryItem } from '../features/character-creator/lib/cards/character-library';
 import {
   CHARACTER_LIBRARY_SOURCES,
   DEFAULT_CHARACTER_LIBRARY_ITEM_ID,
@@ -26,7 +27,6 @@ import {
   sanitizeCharacterLibrary,
   sanitizeCharacterPortraitReference,
 } from '../features/character-creator/lib/cards/character-library';
-import type { iCharacterLibraryItem } from '../features/character-creator/lib/cards/character-library';
 import { readStoredCharacterLibrary } from '../features/character-creator/lib/cards/character-library-storage';
 import { STORED_EXAMPLE_CHARACTER_SCHEMA } from '../features/character-creator/lib/cards/example-characters';
 import { ARCHIVE_FORMATS } from '../features/character-creator/lib/cards/export-settings';
@@ -40,6 +40,7 @@ import {
 } from '../features/character-creator/lib/generation/generation-config';
 import { UI_PREFERENCE_SCHEMA } from './collections/ui-preferences.collection';
 import { applicationDatabase } from './database';
+import { standardizeStoredEnumValues, upgradeLegacySessionCollectionJson } from './migrations/standardize-enum-values';
 
 interface iMigrationBase {
   id: string;
@@ -110,7 +111,7 @@ function readLegacySingleCharacter(): iCharacterLibraryItem[] {
         parseStoredJsonValue(window.localStorage.getItem(LEGACY_PORTRAIT_KEY)),
       ),
       promptSettings: sanitizeCharacterGenerationPromptSettings(legacyGenerationSettings),
-      source: CHARACTER_LIBRARY_SOURCES.manual,
+      source: CHARACTER_LIBRARY_SOURCES.MANUAL,
     },
   ]);
 
@@ -148,7 +149,9 @@ async function importLocalStorageData(transaction: Transaction) {
   const sessionValues = [
     CHARACTER_ASSISTANT_SESSIONS_COLLECTION_STORAGE_KEY,
     ...LEGACY_CHARACTER_AGENT_SESSION_STORAGE_KEYS,
-  ].flatMap((storageKey) => readStoredCollectionItems(window.localStorage.getItem(storageKey)));
+  ].flatMap((storageKey) =>
+    readStoredCollectionItems(upgradeLegacySessionCollectionJson(window.localStorage.getItem(storageKey))),
+  );
   const assistantSessions = selectLatestSessions(sessionValues);
   const assistantDrafts = readTanstackCollection(
     CHARACTER_ASSISTANT_COMPOSER_DRAFTS_STORAGE_KEY,
@@ -172,6 +175,11 @@ export const APPLICATION_MIGRATIONS = [
     id: '001-import-tanstack-local-storage',
     isDestructive: false,
     run: importLocalStorageData,
+  },
+  {
+    id: '002-standardize-enum-values',
+    isDestructive: false,
+    run: standardizeStoredEnumValues,
   },
 ] satisfies readonly ApplicationMigration[];
 
@@ -233,7 +241,7 @@ export async function downloadMigrationBackup() {
     ),
   });
 
-  const archiveBlob = createArchiveBlob(files, ARCHIVE_FORMATS.zip);
+  const archiveBlob = createArchiveBlob(files, ARCHIVE_FORMATS.ZIP);
   const dateStamp = new Date().toISOString().slice(0, 10);
   downloadBlob(archiveBlob, `tenzo-migration-backup-${dateStamp}.zip`);
 }

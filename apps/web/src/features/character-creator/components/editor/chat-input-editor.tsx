@@ -7,22 +7,25 @@ import { LuBold, LuFileText, LuImage, LuItalic, LuPaperclip, LuStrikethrough, Lu
 
 import { Button } from '@~/components/ui/button/button';
 import { Toggle } from '@~/components/ui/toggle';
+import { BUTTON_SIZES, BUTTON_VARIANTS, TOGGLE_SIZES } from '@~/components/ui/ui-enums';
+import { EDITOR_NODE_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
+import { KEYBOARD_KEYS } from '@~/lib/keyboard-enums';
 import { cn } from '@~/lib/utils';
 
 import type { iFieldTemplateViewModel } from '../../lib/cards/field-templates';
 import { buildBaseEditorExtensions } from '../../lib/editor/base-editor-extensions';
+import type { iChatInputAttachment } from '../../lib/editor/chat-input-attachments';
 import {
   CHAT_INPUT_ATTACHMENT_ACCEPT,
   CHAT_INPUT_ATTACHMENT_KINDS,
   createChatInputAttachments,
 } from '../../lib/editor/chat-input-attachments';
-import type { iChatInputAttachment } from '../../lib/editor/chat-input-attachments';
 import { CHAT_INPUT_EDITOR_SERIALIZER } from '../../lib/editor/chat-input-serialization';
+import type { iChatTemplateMentionReference } from '../../lib/editor/chat-template-mention';
 import {
   buildChatTemplateMentionExtension,
   parseChatTemplateMentionReference,
 } from '../../lib/editor/chat-template-mention';
-import type { iChatTemplateMentionReference } from '../../lib/editor/chat-template-mention';
 import { buildEditorAccessibilityAttributes } from '../../lib/editor/editor-contracts';
 import { createEditorHook } from '../../lib/editor/synced-editor-hook';
 
@@ -43,11 +46,11 @@ interface iChatInputEditorProps {
 
 function createInitialContent(value: string) {
   return {
-    type: 'doc' as const,
+    type: EDITOR_NODE_TYPES.DOC,
     content: [
       {
-        type: 'paragraph' as const,
-        content: value ? [{ type: 'text' as const, text: value }] : [],
+        type: EDITOR_NODE_TYPES.PARAGRAPH,
+        content: value ? [{ type: EDITOR_NODE_TYPES.TEXT, text: value }] : [],
       },
     ],
   };
@@ -96,7 +99,7 @@ const useCreatedChatInputEditor = createEditorHook<iChatInputEditorHookOptions>(
         className: 'min-h-20 max-h-36 overflow-y-auto px-3 py-2 text-sm outline-none',
       }),
       handleKeyDown: (_view, event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
+        if (event.key === KEYBOARD_KEYS.ENTER && !event.shiftKey) {
           event.preventDefault();
           onSubmit();
           return true;
@@ -107,7 +110,7 @@ const useCreatedChatInputEditor = createEditorHook<iChatInputEditorHookOptions>(
         if (!onTemplateClick) return false;
         const resolvedPosition = view.state.doc.resolve(position);
         const mentionNode = resolvedPosition.nodeAfter ?? resolvedPosition.nodeBefore;
-        if (mentionNode?.type.name !== 'mention') return false;
+        if (mentionNode?.type.name !== EDITOR_NODE_TYPES.MENTION) return false;
         const mentionReference = parseChatTemplateMentionReference(mentionNode.attrs);
         if (!mentionReference) return false;
         onTemplateClick(mentionReference);
@@ -234,7 +237,7 @@ export function ChatInputEditor({
           <div className="flex items-center gap-0.5 rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
             <Toggle
               type="button"
-              size="sm"
+              size={TOGGLE_SIZES.SM}
               className="size-8 p-0"
               aria-label="Bold"
               pressed={textStyleState?.isBoldActive ?? false}
@@ -244,7 +247,7 @@ export function ChatInputEditor({
             </Toggle>
             <Toggle
               type="button"
-              size="sm"
+              size={TOGGLE_SIZES.SM}
               className="size-8 p-0"
               aria-label="Italic"
               pressed={textStyleState?.isItalicActive ?? false}
@@ -254,7 +257,7 @@ export function ChatInputEditor({
             </Toggle>
             <Toggle
               type="button"
-              size="sm"
+              size={TOGGLE_SIZES.SM}
               className="size-8 p-0"
               aria-label="Strikethrough"
               pressed={textStyleState?.isStrikeActive ?? false}
@@ -272,7 +275,7 @@ export function ChatInputEditor({
               key={attachment.id}
               className="flex max-w-full items-center gap-2 rounded-md border bg-muted/40 px-2 py-1"
             >
-              {attachment.kind === CHAT_INPUT_ATTACHMENT_KINDS.image ? (
+              {attachment.kind === CHAT_INPUT_ATTACHMENT_KINDS.IMAGE ? (
                 <LuImage className="size-4 shrink-0" />
               ) : (
                 <LuFileText className="size-4 shrink-0" />
@@ -280,8 +283,8 @@ export function ChatInputEditor({
               <span className="truncate text-xs">{attachment.name}</span>
               <Button
                 type="button"
-                size="icon"
-                variant="ghost"
+                size={BUTTON_SIZES.ICON}
+                variant={BUTTON_VARIANTS.GHOST}
                 className="size-6 shrink-0"
                 aria-label={`Remove ${attachment.name}`}
                 disabled={isDisabled}
@@ -314,8 +317,8 @@ export function ChatInputEditor({
         />
         <Button
           type="button"
-          size="sm"
-          variant="ghost"
+          size={BUTTON_SIZES.SM}
+          variant={BUTTON_VARIANTS.GHOST}
           disabled={isDisabled}
           onClick={() => fileInputRef.current?.click()}
         >

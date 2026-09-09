@@ -1,12 +1,15 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
-import { sanitizeCharacterGenerationConnectionSettings } from '../generation/generation-config';
+import { MEDIA_TYPE_ENUM, MEDIA_TYPES } from '@~/lib/media-type-enums';
+
 import type { iCharacterGenerationConnectionSettings } from '../generation/generation-config';
+import { sanitizeCharacterGenerationConnectionSettings } from '../generation/generation-config';
 import type { iArchiveFileEntry } from './archive';
-import { sanitizeCharacterLibrary } from './character-library';
 import type { iCharacterLibraryItem } from './character-library';
-import { STORED_EXAMPLE_CHARACTER_SCHEMA } from './example-characters';
+import { sanitizeCharacterLibrary } from './character-library';
 import type { iStoredExampleCharacter } from './example-characters';
+import { STORED_EXAMPLE_CHARACTER_SCHEMA } from './example-characters';
 
 export const TENZO_BACKUP_FORMAT = 'tenzo-backup';
 export const TENZO_BACKUP_VERSION = 1;
@@ -19,13 +22,14 @@ export const TENZO_BACKUP_MANIFEST_SCHEMA = z.object({
 
 export type iTenzoBackupManifest = z.infer<typeof TENZO_BACKUP_MANIFEST_SCHEMA>;
 
-const BACKUP_FILE_PATHS = {
-  manifest: 'manifest.json',
-  characters: 'characters.json',
-  exampleCharacters: 'example-characters.json',
-  settings: 'settings.json',
-  assetsDirectory: 'assets/',
-} as const;
+const BACKUP_FILE_PATHS_ENUM = em({
+  MANIFEST: 'manifest.json',
+  CHARACTERS: 'characters.json',
+  EXAMPLE_CHARACTERS: 'example-characters.json',
+  SETTINGS: 'settings.json',
+  ASSETS_DIRECTORY: 'assets/',
+});
+const BACKUP_FILE_PATHS = BACKUP_FILE_PATHS_ENUM.enum;
 
 export interface iBackupPortraitAsset {
   assetId: string;
@@ -41,22 +45,36 @@ export interface iTenzoBackup {
   assets: iBackupPortraitAsset[];
 }
 
-const ASSET_FILE_EXTENSIONS_BY_MIME_TYPE = {
-  'image/png': '.png',
-  'image/jpeg': '.jpg',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-} satisfies Record<string, string>;
-
-const ASSET_MIME_TYPES_BY_FILE_EXTENSION = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.gif': 'image/gif',
-} satisfies Record<string, string>;
+const ASSET_FILE_EXTENSION_ENUM = em({ PNG: '.png', JPEG: '.jpg', WEBP: '.webp', GIF: '.gif', BIN: '.bin' });
+const ASSET_FILE_EXTENSIONS = ASSET_FILE_EXTENSION_ENUM.enum;
+const ASSET_MEDIA_TYPE_ENUM = MEDIA_TYPE_ENUM.pick([
+  MEDIA_TYPES.PNG,
+  MEDIA_TYPES.JPEG,
+  MEDIA_TYPES.WEBP,
+  MEDIA_TYPES.GIF,
+  MEDIA_TYPES.OCTET_STREAM,
+]);
+const ASSET_FILE_EXTENSIONS_BY_MIME_TYPE = ASSET_MEDIA_TYPE_ENUM.deriveTo(
+  ASSET_FILE_EXTENSION_ENUM,
+  [MEDIA_TYPES.PNG, ASSET_FILE_EXTENSIONS.PNG],
+  [MEDIA_TYPES.JPEG, ASSET_FILE_EXTENSIONS.JPEG],
+  [MEDIA_TYPES.WEBP, ASSET_FILE_EXTENSIONS.WEBP],
+  [MEDIA_TYPES.GIF, ASSET_FILE_EXTENSIONS.GIF],
+  [MEDIA_TYPES.OCTET_STREAM, ASSET_FILE_EXTENSIONS.BIN],
+);
+const ASSET_MIME_TYPES_BY_FILE_EXTENSION = ASSET_FILE_EXTENSION_ENUM.deriveTo(
+  ASSET_MEDIA_TYPE_ENUM,
+  [ASSET_FILE_EXTENSIONS.PNG, MEDIA_TYPES.PNG],
+  [ASSET_FILE_EXTENSIONS.JPEG, MEDIA_TYPES.JPEG],
+  [ASSET_FILE_EXTENSIONS.WEBP, MEDIA_TYPES.WEBP],
+  [ASSET_FILE_EXTENSIONS.GIF, MEDIA_TYPES.GIF],
+  [ASSET_FILE_EXTENSIONS.BIN, MEDIA_TYPES.OCTET_STREAM],
+);
 
 function getAssetFileExtension(mimeType: string): string {
-  return ASSET_FILE_EXTENSIONS_BY_MIME_TYPE[mimeType as keyof typeof ASSET_FILE_EXTENSIONS_BY_MIME_TYPE] ?? '.bin';
+  return ASSET_MEDIA_TYPE_ENUM.is(mimeType)
+    ? ASSET_FILE_EXTENSIONS_BY_MIME_TYPE.get(mimeType)
+    : ASSET_FILE_EXTENSIONS.BIN;
 }
 
 function encodeJsonEntry(path: string, value: unknown): iArchiveFileEntry {
@@ -88,19 +106,19 @@ export function buildFullBackupFiles({
   const exportableSettings = { ...connectionSettings, apiKeyCiphertext: '' };
 
   return [
-    encodeJsonEntry(BACKUP_FILE_PATHS.manifest, manifest),
-    encodeJsonEntry(BACKUP_FILE_PATHS.characters, characters),
-    encodeJsonEntry(BACKUP_FILE_PATHS.exampleCharacters, exampleCharacters),
-    encodeJsonEntry(BACKUP_FILE_PATHS.settings, exportableSettings),
+    encodeJsonEntry(BACKUP_FILE_PATHS.MANIFEST, manifest),
+    encodeJsonEntry(BACKUP_FILE_PATHS.CHARACTERS, characters),
+    encodeJsonEntry(BACKUP_FILE_PATHS.EXAMPLE_CHARACTERS, exampleCharacters),
+    encodeJsonEntry(BACKUP_FILE_PATHS.SETTINGS, exportableSettings),
     ...assets.map((asset) => ({
-      path: `${BACKUP_FILE_PATHS.assetsDirectory}${asset.assetId}${getAssetFileExtension(asset.mimeType)}`,
+      path: `${BACKUP_FILE_PATHS.ASSETS_DIRECTORY}${asset.assetId}${getAssetFileExtension(asset.mimeType)}`,
       data: asset.bytes,
     })),
   ];
 }
 
 export function findBackupManifest(files: iArchiveFileEntry[]): iTenzoBackupManifest | null {
-  const manifestEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.manifest);
+  const manifestEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.MANIFEST);
 
   if (!manifestEntry) {
     return null;
@@ -115,7 +133,7 @@ export function findBackupManifest(files: iArchiveFileEntry[]): iTenzoBackupMani
 }
 
 function parseAssetEntry(entry: iArchiveFileEntry): iBackupPortraitAsset | null {
-  const fileName = entry.path.slice(BACKUP_FILE_PATHS.assetsDirectory.length);
+  const fileName = entry.path.slice(BACKUP_FILE_PATHS.ASSETS_DIRECTORY.length);
   const dotIndex = fileName.lastIndexOf('.');
   const assetId = dotIndex === -1 ? fileName : fileName.slice(0, dotIndex);
   const extension = dotIndex === -1 ? '' : fileName.slice(dotIndex);
@@ -126,9 +144,9 @@ function parseAssetEntry(entry: iArchiveFileEntry): iBackupPortraitAsset | null 
 
   return {
     assetId,
-    mimeType:
-      ASSET_MIME_TYPES_BY_FILE_EXTENSION[extension as keyof typeof ASSET_MIME_TYPES_BY_FILE_EXTENSION] ??
-      'application/octet-stream',
+    mimeType: ASSET_FILE_EXTENSION_ENUM.is(extension)
+      ? ASSET_MIME_TYPES_BY_FILE_EXTENSION.get(extension)
+      : MEDIA_TYPES.OCTET_STREAM,
     bytes: entry.data,
   };
 }
@@ -144,9 +162,9 @@ export function parseFullBackup(files: iArchiveFileEntry[]): iTenzoBackup {
     throw new Error(`This backup was created by a newer Tenzo version (backup v${manifest.version}).`);
   }
 
-  const charactersEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.characters);
-  const exampleCharactersEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.exampleCharacters);
-  const settingsEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.settings);
+  const charactersEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.CHARACTERS);
+  const exampleCharactersEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.EXAMPLE_CHARACTERS);
+  const settingsEntry = files.find((file) => file.path === BACKUP_FILE_PATHS.SETTINGS);
 
   const exampleCharacters: iStoredExampleCharacter[] = [];
 
@@ -172,7 +190,7 @@ export function parseFullBackup(files: iArchiveFileEntry[]): iTenzoBackup {
       ? sanitizeCharacterGenerationConnectionSettings(decodeJsonEntry(settingsEntry))
       : null,
     assets: files
-      .filter((file) => file.path.startsWith(BACKUP_FILE_PATHS.assetsDirectory))
+      .filter((file) => file.path.startsWith(BACKUP_FILE_PATHS.ASSETS_DIRECTORY))
       .map((entry) => parseAssetEntry(entry))
       .filter((asset): asset is iBackupPortraitAsset => asset !== null),
   };

@@ -11,6 +11,11 @@ export type iSyncedEditorHookOptions = Omit<
   'extensions' | 'serializeValue' | 'toEditorContent'
 >;
 
+export type SyncedEditorOverrideProps = Pick<
+  iSyncedEditorHookOptions,
+  'isReadOnly' | 'isStreaming' | 'editorAttributes'
+>;
+
 interface iSyncedEditorFactoryOptions<TOptions extends iSyncedEditorHookOptions> {
   buildExtensions: (options: TOptions) => Extensions;
   getExtensionDependencies: (options: TOptions) => readonly unknown[];

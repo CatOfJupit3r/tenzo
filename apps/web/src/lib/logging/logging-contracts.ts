@@ -1,11 +1,22 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
-export const LOG_LEVEL_SCHEMA = z.enum(['debug', 'info', 'warn', 'error', 'fatal']);
-export const LOG_LEVELS = LOG_LEVEL_SCHEMA.enum;
+export const LOG_LEVEL_ENUM = em({
+  DEBUG: 'debug',
+  INFO: 'info',
+  WARN: 'warn',
+  ERROR: 'error',
+  FATAL: 'fatal',
+});
+export const LOG_LEVELS = LOG_LEVEL_ENUM.enum;
+export const LOG_LEVEL_SCHEMA = z.enum(LOG_LEVELS);
+
 export type LogLevel = z.infer<typeof LOG_LEVEL_SCHEMA>;
 
-export const LOG_RUNTIME_SCHEMA = z.enum(['client', 'server']);
-export const LOG_RUNTIMES = LOG_RUNTIME_SCHEMA.enum;
+export const LOG_RUNTIME_ENUM = em(['CLIENT', 'SERVER']);
+export const LOG_RUNTIMES = LOG_RUNTIME_ENUM.enum;
+export const LOG_RUNTIME_SCHEMA = z.enum(LOG_RUNTIMES);
+
 export type LogRuntime = z.infer<typeof LOG_RUNTIME_SCHEMA>;
 
 export const serializedErrorSchema = z.object({
@@ -15,8 +26,11 @@ export const serializedErrorSchema = z.object({
   cause: z.string().max(2_000).optional(),
 });
 
+const CLIENT_LOG_LEVEL_ENUM = LOG_LEVEL_ENUM.pick([LOG_LEVELS.ERROR, LOG_LEVELS.FATAL]);
+const CLIENT_LOG_LEVELS = CLIENT_LOG_LEVEL_ENUM.enum;
+
 export const clientLogRecordSchema = z.object({
-  level: z.enum([LOG_LEVELS.error, LOG_LEVELS.fatal]),
+  level: z.enum(CLIENT_LOG_LEVELS),
   component: z.string().min(1).max(120),
   message: z.string().min(1).max(2_000),
   context: z.record(z.string(), z.unknown()).optional(),

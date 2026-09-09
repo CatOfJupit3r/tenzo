@@ -1,37 +1,53 @@
-import { chat, EventType } from '@tanstack/ai';
 import type { AnyTextAdapter, ModelMessage, TokenUsage, UIMessage } from '@tanstack/ai';
+import { chat, EventType } from '@tanstack/ai';
+import { em } from 'enumwaii';
 import type { z } from 'zod';
 
+import {
+  AGENT_ROLE_CALL_OUTCOMES,
+  logAgentRoleCall,
+} from '@~/features/character-creator/lib/evaluation/agent-run-observability';
+import { MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 import { generateUuid } from '@~/utils/uuid';
 
-import { logAgentRoleCall } from '../evaluation/agent-run-observability';
 import type { iAgentRoleCallEvent } from '../evaluation/agent-run-observability';
 import { describeGenerationError } from '../generation/generation-error';
 import type { iGenerateValidatedObject } from '../generation/structured-output.server';
 import { generateValidatedObject } from '../generation/structured-output.server';
-import { createAgentRoleModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
 import type { iCharacterChat } from '../generation/tanstack-ai-text-generation';
-import { AGENT_ROLES } from '../provider/agent-role-contracts';
+import { createAgentRoleModelOptions, createCharacterTextAdapter } from '../generation/tanstack-ai-text-generation';
 import type { AgentRole, iAgentRoleProfile } from '../provider/agent-role-contracts';
+import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import type { ModelCapability } from '../provider/model-capabilities';
 import { normalizeOpenAiCompatibleBaseUrl } from '../provider/openai-compatible-endpoint';
 import { buildOpenRouterPolicyCatalog } from '../provider/openrouter-policy-catalog';
 import { PROVIDER_KINDS } from '../provider/provider-health';
-import { createProviderPolicyCatalogCache } from '../provider/provider-policy-catalog-cache';
 import type { iProviderPolicyCatalogCache } from '../provider/provider-policy-catalog-cache';
-import {
-  PROVIDER_POLICY_FAILURE_REASONS,
-  PROVIDER_POLICY_CATALOG_SCHEMA,
-  resolveProviderPolicy,
-} from '../provider/provider-policy-resolver';
+import { createProviderPolicyCatalogCache } from '../provider/provider-policy-catalog-cache';
 import type {
+  iProviderPolicyCatalog,
   ProviderPolicyFailureReason,
   ProviderPolicyResolution,
-  iProviderPolicyCatalog,
 } from '../provider/provider-policy-resolver';
-import { createAgentCallPacer } from './agent-call-pacer.server';
+import {
+  PROVIDER_POLICY_CATALOG_SCHEMA,
+  PROVIDER_POLICY_FAILURE_REASONS,
+  resolveProviderPolicy,
+} from '../provider/provider-policy-resolver';
 import type { iAgentCallPacer } from './agent-call-pacer.server';
+import { createAgentCallPacer } from './agent-call-pacer.server';
 import { getAgentRolePrompt } from './agent-role-prompts';
+
+export const AGENT_ROLE_EXECUTION_ERROR_CODES_ENUM = em([
+  'INVALID_REQUEST',
+  'POLICY_INELIGIBLE',
+  'POLICY_CATALOG_UNAVAILABLE',
+  'GENERATION_FAILED',
+  'BUDGET_EXCEEDED',
+]);
+export const AGENT_ROLE_EXECUTION_ERROR_CODES = AGENT_ROLE_EXECUTION_ERROR_CODES_ENUM.enum;
 
 export interface iAgentRolePolicyCatalogFetchOptions {
   endpoint: string;
@@ -103,12 +119,7 @@ export interface iAgentRoleExecutor {
   executeProse: (options: iProseAgentRoleCallOptions) => Promise<iAgentRoleExecutionResult<string>>;
 }
 
-export type AgentRoleExecutionErrorCode =
-  | 'invalid-request'
-  | 'policy-ineligible'
-  | 'policy-catalog-unavailable'
-  | 'generation-failed'
-  | 'budget-exceeded';
+export type AgentRoleExecutionErrorCode = (typeof AGENT_ROLE_EXECUTION_ERROR_CODES_ENUM)['~type'];
 
 export class AgentRoleExecutionError extends Error {
   readonly code: AgentRoleExecutionErrorCode;
@@ -130,7 +141,10 @@ export class AgentRoleExecutionError extends Error {
     },
   ) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
-    this.name = options.code === 'policy-ineligible' ? 'AgentRolePolicyError' : 'AgentRoleExecutionError';
+    this.name =
+      options.code === AGENT_ROLE_EXECUTION_ERROR_CODES.POLICY_INELIGIBLE
+        ? 'AgentRolePolicyError'
+        : 'AgentRoleExecutionError';
     this.code = options.code;
 
     this.reasons = options.reasons ?? [];
@@ -178,9 +192,9 @@ function buildGenerationSettings(profile: iAgentRoleProfile) {
 
 function buildMessages(prompt?: string, messages?: Array<ModelMessage | UIMessage>): Array<ModelMessage | UIMessage> {
   if (messages) return messages;
-  if (prompt?.trim()) return [{ role: 'user', content: prompt }];
+  if (prompt?.trim()) return [{ role: MESSAGE_ROLES.USER, content: prompt }];
   throw new AgentRoleExecutionError('Agent role input requires a prompt or messages.', {
-    code: 'invalid-request',
+    code: AGENT_ROLE_EXECUTION_ERROR_CODES.INVALID_REQUEST,
   });
 }
 
@@ -189,12 +203,12 @@ function buildSystemPrompts(role: AgentRole, systemPrompt?: string): string[] {
 }
 
 function getProviderId(profile: iAgentRoleProfile, resolution: ProviderPolicyResolution): string {
-  if (resolution.isLocal) return PROVIDER_KINDS.koboldcpp;
-  return resolution.routing?.only.join(',') ?? PROVIDER_KINDS.openrouter;
+  if (resolution.isLocal) return PROVIDER_KINDS.KOBOLDCPP;
+  return resolution.routing?.only.join(',') ?? PROVIDER_KINDS.OPENROUTER;
 }
 
 function getEndpointPricing(catalog: iProviderPolicyCatalog | null, profile: iAgentRoleProfile, providerId: string) {
-  if (!catalog || providerId === PROVIDER_KINDS.koboldcpp) return { prompt: 0, completion: 0 };
+  if (!catalog || providerId === PROVIDER_KINDS.KOBOLDCPP) return { prompt: 0, completion: 0 };
   const model = catalog.models.find((candidate) => candidate.modelId === profile.modelId);
   const providerSlugs = new Set(providerId.split(',').filter(Boolean));
   const endpoints = model?.endpoints.filter((candidate) => providerSlugs.has(candidate.providerSlug)) ?? [];
@@ -228,7 +242,7 @@ function createBudgetError(
   if (violations.length === 0) return null;
   return new AgentRoleExecutionError(
     `Agent role "${profile.role}" exceeded its ${violations.join(', ')}. Reduce the role scope or choose a profile with a larger budget.`,
-    { code: 'budget-exceeded', role: profile.role, modelId: profile.modelId },
+    { code: AGENT_ROLE_EXECUTION_ERROR_CODES.BUDGET_EXCEEDED, role: profile.role, modelId: profile.modelId },
   );
 }
 
@@ -238,7 +252,7 @@ async function defaultFetchPolicyCatalog(
 ): Promise<iProviderPolicyCatalog | null> {
   const baseUrl = normalizeOpenAiCompatibleBaseUrl(options.endpoint);
   const headers = new Headers();
-  headers.set('Accept', 'application/json');
+  headers.set('Accept', MEDIA_TYPES.JSON);
   if (options.apiKey.trim()) headers.set('Authorization', `Bearer ${options.apiKey.trim()}`);
   const [modelsResponse, endpointsResponse] = await Promise.all([
     fetchJson(`${baseUrl}/models`, { headers }),
@@ -255,7 +269,7 @@ async function defaultFetchPolicyCatalog(
 }
 
 function isCancellation(error: unknown, signal?: AbortSignal) {
-  return signal?.aborted === true || (error instanceof Error && error.name === 'AbortError');
+  return signal?.aborted === true || (error instanceof Error && error.name === ABORT_ERROR_NAMES.ABORT_ERROR);
 }
 
 function toFailureReason(error: unknown): ProviderPolicyFailureReason | null {
@@ -296,7 +310,7 @@ function createPolicyError(profile: iAgentRoleProfile, resolution: ProviderPolic
   const reasonText = reasons.length > 0 ? reasons.join(', ') : 'unknown policy failure';
   return new AgentRolePolicyError(
     `Agent role "${profile.role}" cannot run model "${profile.modelId}": ${reasonText}. Configure an eligible unmoderated ZDR endpoint with the required capabilities and price.`,
-    { code: 'policy-ineligible', reasons, role: profile.role, modelId: profile.modelId },
+    { code: AGENT_ROLE_EXECUTION_ERROR_CODES.POLICY_INELIGIBLE, reasons, role: profile.role, modelId: profile.modelId },
   );
 }
 
@@ -401,7 +415,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
   ) => {
     const now = dependencies.now();
     let catalog: iProviderPolicyCatalog | null = null;
-    const isLocal = profile.providerKind === PROVIDER_KINDS.koboldcpp;
+    const isLocal = profile.providerKind === PROVIDER_KINDS.KOBOLDCPP;
     if (!isLocal) {
       const cacheKey = `${normalizeOpenAiCompatibleBaseUrl(endpoint)}::${profile.modelId}`;
       catalog = dependencies.cache.get(cacheKey, now);
@@ -421,8 +435,8 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
           throw new AgentRoleExecutionError(
             `Agent role policy metadata could not be refreshed for model "${profile.modelId}". Check the OpenRouter catalog and API key, then retry.`,
             {
-              code: 'policy-catalog-unavailable',
-              reasons: [PROVIDER_POLICY_FAILURE_REASONS['catalog-missing']],
+              code: AGENT_ROLE_EXECUTION_ERROR_CODES.POLICY_CATALOG_UNAVAILABLE,
+              reasons: [PROVIDER_POLICY_FAILURE_REASONS.CATALOG_MISSING],
               role: profile.role,
               modelId: profile.modelId,
               cause: error,
@@ -461,7 +475,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
     const { profile, schema } = options;
     if (!schema) {
       throw new AgentRoleExecutionError('Structured agent roles require an explicit output schema.', {
-        code: 'invalid-request',
+        code: AGENT_ROLE_EXECUTION_ERROR_CODES.INVALID_REQUEST,
         role: profile.role,
         modelId: profile.modelId,
       });
@@ -496,14 +510,16 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       const budgetError = createBudgetError(profile, executionUsage);
       if (budgetError) throw budgetError;
       recordExecution(context, dependencies.logAgentRoleCall, {
-        outcome: 'completed',
+        outcome: AGENT_ROLE_CALL_OUTCOMES.COMPLETED,
         repairCount: 0,
         policyFailureReason: null,
       });
       return createExecutionResult(value, context, executionUsage);
     } catch (error) {
       recordExecution(context, dependencies.logAgentRoleCall, {
-        outcome: isCancellation(error, options.abortSignal) ? 'cancelled' : 'failed',
+        outcome: isCancellation(error, options.abortSignal)
+          ? AGENT_ROLE_CALL_OUTCOMES.CANCELLED
+          : AGENT_ROLE_CALL_OUTCOMES.FAILED,
         repairCount: 0,
         policyFailureReason: toFailureReason(error),
       });
@@ -511,7 +527,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       throw new AgentRoleExecutionError(
         `Agent role "${profile.role}" generation failed: ${describeGenerationError(error)}`,
         {
-          code: 'generation-failed',
+          code: AGENT_ROLE_EXECUTION_ERROR_CODES.GENERATION_FAILED,
           role: profile.role,
           modelId: profile.modelId,
           cause: error,
@@ -522,9 +538,9 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
 
   const executeProse = async (options: iProseAgentRoleCallOptions): Promise<iAgentRoleExecutionResult<string>> => {
     const { profile } = options;
-    if (profile.role !== AGENT_ROLES['prose-worker']) {
+    if (profile.role !== AGENT_ROLES.PROSE_WORKER) {
       throw new AgentRoleExecutionError('Only prose-worker profiles may use raw prose execution.', {
-        code: 'invalid-request',
+        code: AGENT_ROLE_EXECUTION_ERROR_CODES.INVALID_REQUEST,
         role: profile.role,
         modelId: profile.modelId,
       });
@@ -564,7 +580,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       const executionUsage = getExecutionUsage(context);
       if (!value.trim()) {
         throw new AgentRoleExecutionError(`Agent role "${profile.role}" returned empty prose.`, {
-          code: 'generation-failed',
+          code: AGENT_ROLE_EXECUTION_ERROR_CODES.GENERATION_FAILED,
           role: profile.role,
           modelId: profile.modelId,
         });
@@ -572,14 +588,16 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       const budgetError = createBudgetError(profile, executionUsage);
       if (budgetError) throw budgetError;
       recordExecution(context, dependencies.logAgentRoleCall, {
-        outcome: 'completed',
+        outcome: AGENT_ROLE_CALL_OUTCOMES.COMPLETED,
         repairCount: options.isRepair === true ? 1 : 0,
         policyFailureReason: null,
       });
       return createExecutionResult(value, context, executionUsage);
     } catch (error) {
       recordExecution(context, dependencies.logAgentRoleCall, {
-        outcome: isCancellation(error, options.abortSignal) ? 'cancelled' : 'failed',
+        outcome: isCancellation(error, options.abortSignal)
+          ? AGENT_ROLE_CALL_OUTCOMES.CANCELLED
+          : AGENT_ROLE_CALL_OUTCOMES.FAILED,
         repairCount: options.isRepair === true ? 1 : 0,
         policyFailureReason: toFailureReason(error),
       });
@@ -587,7 +605,7 @@ export function createAgentRoleExecutor(providedDependencies: iAgentRoleExecutor
       throw new AgentRoleExecutionError(
         `Agent role "${profile.role}" generation failed: ${describeGenerationError(error)}`,
         {
-          code: 'generation-failed',
+          code: AGENT_ROLE_EXECUTION_ERROR_CODES.GENERATION_FAILED,
           role: profile.role,
           modelId: profile.modelId,
           cause: error,

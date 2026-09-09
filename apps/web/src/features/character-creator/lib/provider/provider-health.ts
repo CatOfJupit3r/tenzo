@@ -1,17 +1,21 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import { loggerFactory } from '@~/lib/logging/logger';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 
-import { REQUEST_MODES } from '../generation/generation-config';
 import type { RequestMode } from '../generation/generation-config';
-import { mergeModelCapabilities, readModelCapabilities } from './model-capabilities';
+import { REQUEST_MODES } from '../generation/generation-config';
 import type { iModelCapabilities, iModelProviderOption } from './model-capabilities';
+import { mergeModelCapabilities, readModelCapabilities } from './model-capabilities';
 import { normalizeOpenAiCompatibleBaseUrl } from './openai-compatible-endpoint';
 import { buildOpenRouterPolicyCatalog, OPENROUTER_ZDR_ENDPOINTS_RESPONSE_SCHEMA } from './openrouter-policy-catalog';
 import type { iProviderPolicyCatalog } from './provider-policy-resolver';
 
-export const PROVIDER_KIND_SCHEMA = z.enum(['koboldcpp', 'openrouter', 'openai-compatible', 'unknown']);
-export const PROVIDER_KINDS = PROVIDER_KIND_SCHEMA.enum;
+export const PROVIDER_KIND_ENUM = em(['KOBOLDCPP', 'OPENROUTER', 'OPENAI_COMPATIBLE', 'UNKNOWN']);
+export const PROVIDER_KINDS = PROVIDER_KIND_ENUM.enum;
+export const PROVIDER_KIND_SCHEMA = z.enum(PROVIDER_KINDS);
+
 export type ProviderKind = z.infer<typeof PROVIDER_KIND_SCHEMA>;
 
 export function isKoboldCppModel(model: string) {
@@ -69,12 +73,12 @@ interface iEndpointCandidates {
   zdrEndpointsUrl: string | null;
 }
 
-const PROVIDER_KIND_LABELS = {
-  [PROVIDER_KINDS.koboldcpp]: 'KoboldCpp',
-  [PROVIDER_KINDS.openrouter]: 'OpenRouter',
-  [PROVIDER_KINDS['openai-compatible']]: 'OpenAI-compatible',
-  [PROVIDER_KINDS.unknown]: 'Unknown provider',
-} satisfies Record<ProviderKind, string>;
+const PROVIDER_KIND_LABELS = PROVIDER_KIND_ENUM.derive<string>()(
+  [PROVIDER_KINDS.KOBOLDCPP, 'KoboldCpp'],
+  [PROVIDER_KINDS.OPENROUTER, 'OpenRouter'],
+  [PROVIDER_KINDS.OPENAI_COMPATIBLE, 'OpenAI-compatible'],
+  [PROVIDER_KINDS.UNKNOWN, 'Unknown provider'],
+);
 const PROVIDER_HEALTH_LOGGER = loggerFactory.getLogger('provider.health');
 
 function buildEndpointCandidates(endpoint: string, model?: string): iEndpointCandidates {
@@ -115,7 +119,7 @@ async function fetchJson(url: string, init?: RequestInit): Promise<iFetchJsonRes
   const response = await fetch(url, init);
   const contentType = response.headers.get('content-type') ?? '';
 
-  if (contentType.includes('application/json')) {
+  if (contentType.includes(MEDIA_TYPES.JSON)) {
     return {
       isOk: response.ok,
       status: response.status,
@@ -488,7 +492,7 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
   if (!isKoboldCpp && !hasOpenAiSurface && !contextSize) {
     const authHint = request.apiKey.trim() ? '' : ' Add an API key if the provider requires one.';
     const modeHint =
-      request.requestMode === REQUEST_MODES.browser
+      request.requestMode === REQUEST_MODES.BROWSER
         ? ' If this provider blocks browser CORS requests, enable the server proxy and retry.'
         : '';
 
@@ -499,22 +503,22 @@ async function probeProviderMetadataWithFetcher(request: iConnectionHealthReques
 
   if (!resolvedProviderName) {
     if (isKoboldCpp) {
-      resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS.koboldcpp];
+      resolvedProviderName = PROVIDER_KIND_LABELS.get(PROVIDER_KINDS.KOBOLDCPP);
     } else if (isOpenRouter) {
-      resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS.openrouter];
+      resolvedProviderName = PROVIDER_KIND_LABELS.get(PROVIDER_KINDS.OPENROUTER);
     } else if (hasOpenAiSurface) {
-      resolvedProviderName = PROVIDER_KIND_LABELS[PROVIDER_KINDS['openai-compatible']];
+      resolvedProviderName = PROVIDER_KIND_LABELS.get(PROVIDER_KINDS.OPENAI_COMPATIBLE);
     }
   }
 
-  let providerKind: ProviderKind = PROVIDER_KINDS.unknown;
+  let providerKind: ProviderKind = PROVIDER_KINDS.UNKNOWN;
 
   if (isKoboldCpp) {
-    providerKind = PROVIDER_KINDS.koboldcpp;
+    providerKind = PROVIDER_KINDS.KOBOLDCPP;
   } else if (isOpenRouter) {
-    providerKind = PROVIDER_KINDS.openrouter;
+    providerKind = PROVIDER_KINDS.OPENROUTER;
   } else if (hasOpenAiSurface) {
-    providerKind = PROVIDER_KINDS['openai-compatible'];
+    providerKind = PROVIDER_KINDS.OPENAI_COMPATIBLE;
   }
 
   return {

@@ -1,14 +1,15 @@
 import { LuChevronDown, LuChevronUp, LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button/button';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
-import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/cards/field-templates';
+import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
-import { FieldGenerationControls } from './field-generation-controls';
 import { buildFieldGenerationControlProps } from './field-generation-control-props';
+import { FieldGenerationControls } from './field-generation-controls';
 
 export interface iAlternateGreetingsProps {
   greetings: string[];
@@ -56,7 +57,7 @@ export function AlternateGreetings({
       <div className="flex items-center justify-between">
         <span className="text-sm leading-none font-medium">Alternate Greetings</span>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+          <Button type="button" variant={BUTTON_VARIANTS.OUTLINE} size={BUTTON_SIZES.SM} onClick={onAdd}>
             <LuPlus className="size-4" />
             Add greeting
           </Button>
@@ -89,7 +90,7 @@ export function AlternateGreetings({
                         fieldId: `alternate-greeting-${index}`,
                         label: `Alternate Greeting ${index + 1}`,
                         fieldValue: greeting,
-                        templateFieldKey: TEMPLATE_FIELD_KEYS.alternate_greeting,
+                        templateFieldKey: TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING,
                         generationState,
                         templateOptions,
                         onTemplateIdChange: (templateId) => onTemplateIdChange(index, templateId),
@@ -106,8 +107,8 @@ export function AlternateGreetings({
                     />
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
+                      variant={BUTTON_VARIANTS.GHOST}
+                      size={BUTTON_SIZES.ICON}
                       aria-label={`Move greeting ${index + 1} up`}
                       disabled={index === 0}
                       tooltip="Move up"
@@ -117,8 +118,8 @@ export function AlternateGreetings({
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
+                      variant={BUTTON_VARIANTS.GHOST}
+                      size={BUTTON_SIZES.ICON}
                       aria-label={`Move greeting ${index + 1} down`}
                       disabled={index === greetings.length - 1}
                       tooltip="Move down"
@@ -128,8 +129,8 @@ export function AlternateGreetings({
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
+                      variant={BUTTON_VARIANTS.GHOST}
+                      size={BUTTON_SIZES.ICON}
                       aria-label={`Remove greeting ${index + 1}`}
                       tooltip="Remove greeting"
                       onClick={() => onRemove(index)}

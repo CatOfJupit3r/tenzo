@@ -1,26 +1,35 @@
-import { EventType } from '@tanstack/ai';
 import type { ModelMessage, StreamChunk, TokenUsage, UIMessage } from '@tanstack/ai';
+import { EventType } from '@tanstack/ai';
 import { z } from 'zod';
 
+import { CHARACTER_ASSISTANT_TOOL_NAMES } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+import { GENERATION_PROVIDERS } from '@~/features/character-creator/lib/generation/generation-config';
+import {
+  MESSAGE_PART_TYPES_CASES,
+  MESSAGE_ROLES,
+  STREAM_MESSAGE_ROLES,
+  STREAM_TOOL_STATES,
+} from '@~/features/character-creator/lib/generation/message-enums';
 import { generateUuid } from '@~/utils/uuid';
 
 import { ASSISTANT_FINAL_RESPONSE_SCHEMA } from '../assistant/assistant-final-response';
 import type { iCharacterAssistantStreamRequest, iChatTemplateRef } from '../assistant/character-assistant-contracts';
+import type { iCharacterAssistantProposalStore } from '../assistant/character-assistant-tools';
 import {
   createCharacterAssistantActionHandlers,
   getAllowedCharacterAssistantTextFieldKeys,
 } from '../assistant/character-assistant-tools';
-import type { iCharacterAssistantProposalStore } from '../assistant/character-assistant-tools';
-import { CHARACTER_TEXT_FIELD_KEYS, CHARACTER_TEXT_FIELD_KEY_SCHEMA } from '../cards/card-schema';
 import type { CharacterTextFieldKey } from '../cards/card-schema';
+import { CHARACTER_TEXT_FIELD_KEYS, CHARACTER_TEXT_FIELD_KEY_SCHEMA } from '../cards/card-schema';
 import { doesValueMatchStrictFieldTemplate } from '../cards/field-template-enforcement';
-import { normalizeTemplateSlotLabel, parseTemplateSlots, TEMPLATE_MODES } from '../cards/field-templates';
+import { TEMPLATE_MODES, normalizeTemplateSlotLabel, parseTemplateSlots } from '../cards/field-templates';
 import { parseRepairedJson } from '../generation/json-repair';
 import { parseSlotResponse, renderStrictTemplate } from '../generation/strict-template-renderer';
-import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import type { AgentRole } from '../provider/agent-role-contracts';
+import { AGENT_ROLES } from '../provider/agent-role-contracts';
 import { MODEL_CAPABILITIES } from '../provider/model-capabilities';
 import { PROVIDER_KINDS } from '../provider/provider-health';
+import type { AgentProgressPhase, AgentRoute, iProseJob } from './agent-orchestration-contracts';
 import {
   AGENT_PROGRESS_PHASES,
   AGENT_ROUTES,
@@ -29,20 +38,19 @@ import {
   CHARACTER_CONTENT_PLAN_DRAFT_SCHEMA,
   PROSE_JOB_RESULT_SCHEMA,
 } from './agent-orchestration-contracts';
-import type { AgentProgressPhase, AgentRoute, iProseJob } from './agent-orchestration-contracts';
 import {
   AGENT_ORCHESTRATION_EVENT_NAMES,
   AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA,
   AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA,
 } from './agent-orchestration-events';
-import { createAgentOrchestrationService } from './agent-orchestration-service';
 import type { iAgentOrchestrationCallResult, iAgentOrchestrationInput } from './agent-orchestration-service';
-import { createAgentRoleExecutor } from './agent-role-executor.server';
+import { createAgentOrchestrationService } from './agent-orchestration-service';
 import type { iAgentRoleExecutionResult, iAgentRoleExecutor } from './agent-role-executor.server';
+import { createAgentRoleExecutor } from './agent-role-executor.server';
 import { createAgentRoleProfiles } from './agent-role-profile-service';
 import type { iAgentCallUsage, iAgentRunBudgetLimits } from './agent-run-budget';
-import { createCharacterBriefService } from './character-brief-service';
 import type { iCharacterBriefInput } from './character-brief-service';
+import { createCharacterBriefService } from './character-brief-service';
 import { createContentPlanService } from './content-plan-service';
 import { createQualityGateService } from './quality-gate-service';
 
@@ -51,7 +59,7 @@ export interface iOrchestratedCharacterAssistantOptions {
   messages: Array<ModelMessage | UIMessage>;
   store: iCharacterAssistantProposalStore;
   abortSignal?: AbortSignal;
-  roleAssignments?: Partial<Record<AgentRole, { modelId: string; allowedProviderSlug: string }>>;
+  roleAssignments?: ReadonlyMap<AgentRole, { modelId: string; allowedProviderSlug: string }>;
 }
 
 export interface iOrchestratedCharacterAssistantDependencies {
@@ -85,9 +93,9 @@ function createDeterministicDraftRoute(input: iAgentOrchestrationInput) {
   const hasExistingRequestedContent = input.requestedFieldKeys.some((fieldKey) =>
     input.currentFields[fieldKey]?.trim(),
   );
-  let route: AgentRoute = AGENT_ROUTES['full-card'];
-  if (input.requestedFieldKeys.length === 1) route = AGENT_ROUTES['focused-edit'];
-  else if (hasExistingRequestedContent) route = AGENT_ROUTES['multi-field-edit'];
+  let route: AgentRoute = AGENT_ROUTES.FULL_CARD;
+  if (input.requestedFieldKeys.length === 1) route = AGENT_ROUTES.FOCUSED_EDIT;
+  else if (hasExistingRequestedContent) route = AGENT_ROUTES.MULTI_FIELD_EDIT;
   return {
     output: { route, answer: null },
     usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, latencyMs: 0 },
@@ -154,17 +162,22 @@ function addRoleMetrics(total: iAgentRunMetrics, result: iAgentRoleExecutionResu
 function emitRunMetrics(queue: iStreamEventQueue, metrics: iAgentRunMetrics) {
   queue.push({
     type: EventType.CUSTOM,
-    name: AGENT_ORCHESTRATION_EVENT_NAMES.metrics,
+    name: AGENT_ORCHESTRATION_EVENT_NAMES.METRICS,
     value: AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metrics),
   });
 }
 
-function readMessageText(message: ModelMessage | UIMessage): string {
+function readMessageText(message: unknown): string {
+  if (!message || typeof message !== 'object') return '';
   if ('content' in message && typeof message.content === 'string') return message.content;
   if ('parts' in message && Array.isArray(message.parts)) {
     return message.parts
       .flatMap((part) =>
-        part && typeof part === 'object' && 'type' in part && part.type === 'text' && 'content' in part
+        part &&
+        typeof part === 'object' &&
+        'type' in part &&
+        part.type === MESSAGE_PART_TYPES_CASES.TEXT &&
+        'content' in part
           ? [String(part.content)]
           : [],
       )
@@ -174,7 +187,7 @@ function readMessageText(message: ModelMessage | UIMessage): string {
 }
 
 function getLatestUserPrompt(messages: readonly (ModelMessage | UIMessage)[]) {
-  const message = messages.findLast((candidate) => candidate.role === 'user');
+  const message = messages.findLast((candidate) => candidate.role === MESSAGE_ROLES.USER);
   const prompt = message ? readMessageText(message).trim() : '';
   if (!prompt) throw new Error('The orchestration run requires a user message.');
   return prompt;
@@ -183,7 +196,7 @@ function getLatestUserPrompt(messages: readonly (ModelMessage | UIMessage)[]) {
 function getStrictTemplates(templates: readonly iChatTemplateRef[]) {
   return Object.fromEntries(
     templates.flatMap((template) => {
-      if (template.mode !== TEMPLATE_MODES.strict) return [];
+      if (template.mode !== TEMPLATE_MODES.STRICT) return [];
       return template.fieldKeys.flatMap((fieldKey) =>
         CHARACTER_TEXT_FIELD_KEY_SCHEMA.safeParse(fieldKey).success ? [[fieldKey, template.content]] : [],
       );
@@ -194,7 +207,7 @@ function getStrictTemplates(templates: readonly iChatTemplateRef[]) {
 function getPromptTemplates(templates: readonly iChatTemplateRef[]) {
   return Object.fromEntries(
     templates.flatMap((template) => {
-      if (template.mode !== TEMPLATE_MODES.prompt) return [];
+      if (template.mode !== TEMPLATE_MODES.PROMPT) return [];
       return template.fieldKeys.flatMap((fieldKey) =>
         CHARACTER_TEXT_FIELD_KEY_SCHEMA.safeParse(fieldKey).success ? [[fieldKey, template.content]] : [],
       );
@@ -351,14 +364,14 @@ function createRunBudgets(maximumOutputTokens: number): {
 }
 
 function emitPhase(queue: iStreamEventQueue, runId: string, phase: AgentProgressPhase) {
-  queue.push({ type: EventType.CUSTOM, name: AGENT_ORCHESTRATION_EVENT_NAMES.phase, value: { runId, phase } });
+  queue.push({ type: EventType.CUSTOM, name: AGENT_ORCHESTRATION_EVENT_NAMES.PHASE, value: { runId, phase } });
 }
 
 function getProviderKind(payload: iCharacterAssistantStreamRequest) {
-  if (payload.providerKind === PROVIDER_KINDS.openrouter || payload.providerKind === PROVIDER_KINDS.koboldcpp) {
+  if (payload.providerKind === PROVIDER_KINDS.OPENROUTER || payload.providerKind === PROVIDER_KINDS.KOBOLDCPP) {
     return payload.providerKind;
   }
-  return payload.provider === 'openrouter' ? PROVIDER_KINDS.openrouter : PROVIDER_KINDS.koboldcpp;
+  return payload.provider === GENERATION_PROVIDERS.OPENROUTER ? PROVIDER_KINDS.OPENROUTER : PROVIDER_KINDS.KOBOLDCPP;
 }
 
 function createOrchestrationRun(
@@ -399,14 +412,14 @@ function createOrchestrationRun(
   });
   const usage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
   const executeStructured = async <T, TInput>(
-    role: keyof typeof profiles,
+    role: AgentRole,
     schema: z.ZodType<T>,
     roleInput: TInput,
     schemaDescription: string,
   ): Promise<iAgentOrchestrationCallResult<T>> => {
     metrics.roleCallCount += 1;
     const execution = await dependencies.executor.executeStructured({
-      profile: profiles[role],
+      profile: profiles.get(role),
       endpoint: payload.endpoint,
       apiKey: payload.apiKey,
       runId,
@@ -436,8 +449,8 @@ function createOrchestrationRun(
       metrics.roleCallCount += 1;
       const execution = await dependencies.executor.executeStructured({
         profile: {
-          ...profiles[AGENT_ROLES['prose-worker']],
-          requiredCapabilities: [MODEL_CAPABILITIES['structured-output']],
+          ...profiles.get(AGENT_ROLES.PROSE_WORKER),
+          requiredCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT],
         },
         endpoint: payload.endpoint,
         apiKey: payload.apiKey,
@@ -462,7 +475,7 @@ function createOrchestrationRun(
 
     metrics.roleCallCount += 1;
     const execution = await dependencies.executor.executeProse({
-      profile: profiles[AGENT_ROLES['prose-worker']],
+      profile: profiles.get(AGENT_ROLES.PROSE_WORKER),
       endpoint: payload.endpoint,
       apiKey: payload.apiKey,
       runId,
@@ -478,7 +491,7 @@ function createOrchestrationRun(
   const briefService = createCharacterBriefService({
     enrichBrief: async (input, abortSignal) => {
       const result = await executeStructured(
-        AGENT_ROLES['brief-enricher'],
+        AGENT_ROLES.BRIEF_ENRICHER,
         CHARACTER_BRIEF_SCHEMA,
         input,
         'Provenance-aware character brief.',
@@ -490,7 +503,7 @@ function createOrchestrationRun(
   const planService = createContentPlanService({
     planContent: async (input, abortSignal) => {
       const result = await executeStructured(
-        AGENT_ROLES['content-planner'],
+        AGENT_ROLES.CONTENT_PLANNER,
         CHARACTER_CONTENT_PLAN_DRAFT_SCHEMA,
         input,
         'Field ownership and content plan.',
@@ -511,7 +524,7 @@ function createOrchestrationRun(
     routeIntent: async (input) => {
       if (!shouldUseModelIntentRouter(input.prompt)) return createDeterministicDraftRoute(input);
       return executeStructured(
-        AGENT_ROLES['intent-router'],
+        AGENT_ROLES.INTENT_ROUTER,
         AGENT_ROUTE_DECISION_SCHEMA,
         { prompt: input.prompt, requestedFieldKeys: input.requestedFieldKeys },
         'Advice or drafting route decision.',
@@ -521,7 +534,7 @@ function createOrchestrationRun(
       const result = await briefService.createBrief(input, abortSignal);
       queue.push({
         type: EventType.CUSTOM,
-        name: AGENT_ORCHESTRATION_EVENT_NAMES.assumptions,
+        name: AGENT_ORCHESTRATION_EVENT_NAMES.ASSUMPTIONS,
         value: {
           runId,
           assumptions: result.brief.assumptions.map((fact) => ({ id: fact.id, statement: fact.statement })),
@@ -554,8 +567,8 @@ function createOrchestrationRun(
       queue.push({
         type: EventType.TOOL_CALL_START,
         toolCallId,
-        toolCallName: 'propose_character_fields',
-        toolName: 'propose_character_fields',
+        toolCallName: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
+        toolName: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
       });
       queue.push({
         type: EventType.TOOL_CALL_ARGS,
@@ -565,24 +578,24 @@ function createOrchestrationRun(
       queue.push({
         type: EventType.TOOL_CALL_END,
         toolCallId,
-        toolCallName: 'propose_character_fields',
-        toolName: 'propose_character_fields',
+        toolCallName: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
+        toolName: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
         input: { changes },
         output: proposalOutput,
         result: JSON.stringify(proposalOutput),
-        state: 'output-available',
+        state: STREAM_TOOL_STATES.OUTPUT_AVAILABLE,
       });
       queue.push({
         type: EventType.TOOL_CALL_RESULT,
         messageId: dependencies.generateUuid(),
         toolCallId,
         content: JSON.stringify(proposalOutput),
-        role: 'tool',
-        state: 'output-available',
+        role: STREAM_MESSAGE_ROLES.TOOL,
+        state: STREAM_TOOL_STATES.OUTPUT_AVAILABLE,
       });
       queue.push({
         type: EventType.CUSTOM,
-        name: AGENT_ORCHESTRATION_EVENT_NAMES.proposal,
+        name: AGENT_ORCHESTRATION_EVENT_NAMES.PROPOSAL,
         value: AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA.parse({
           runId,
           proposalId: proposalOutput.proposal?.id ?? toolCallId,
@@ -645,7 +658,7 @@ export function createOrchestratedCharacterAssistantService(
           if (result.brief) {
             queue.push({
               type: EventType.CUSTOM,
-              name: AGENT_ORCHESTRATION_EVENT_NAMES.assumptions,
+              name: AGENT_ORCHESTRATION_EVENT_NAMES.ASSUMPTIONS,
               value: {
                 runId: run.runId,
                 assumptions: result.brief.assumptions.map((fact) => ({ id: fact.id, statement: fact.statement })),
@@ -656,24 +669,24 @@ export function createOrchestratedCharacterAssistantService(
           if (result.findings.length > 0) {
             queue.push({
               type: EventType.CUSTOM,
-              name: AGENT_ORCHESTRATION_EVENT_NAMES.quality,
+              name: AGENT_ORCHESTRATION_EVENT_NAMES.QUALITY,
               value: { runId: run.runId, findings: result.findings },
             });
           }
           if (result.recovery) {
             queue.push({
               type: EventType.CUSTOM,
-              name: AGENT_ORCHESTRATION_EVENT_NAMES.recovery,
+              name: AGENT_ORCHESTRATION_EVENT_NAMES.RECOVERY,
               value: { runId: run.runId, recovery: result.recovery, message: result.answer },
             });
           }
           const finalResponse = ASSISTANT_FINAL_RESPONSE_SCHEMA.parse({
             assistantMessage: result.answer,
             followUpSuggestions:
-              result.phase === AGENT_PROGRESS_PHASES.completed ? [] : ['Revise the request and retry'],
+              result.phase === AGENT_PROGRESS_PHASES.COMPLETED ? [] : ['Revise the request and retry'],
           });
           const raw = JSON.stringify(finalResponse);
-          queue.push({ type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' });
+          queue.push({ type: EventType.TEXT_MESSAGE_START, messageId, role: MESSAGE_ROLES.ASSISTANT });
           queue.push({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: result.answer });
           queue.push({ type: EventType.TEXT_MESSAGE_END, messageId });
           queue.push({ type: EventType.CUSTOM, name: 'structured-output.start', value: { messageId } });

@@ -1,21 +1,33 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import { loggerFactory } from '@~/lib/logging/logger';
 import type { iLogger } from '@~/lib/logging/logging-contracts';
 
-const ERROR_DETAIL_KEYS = [
-  'message',
-  'code',
-  'status',
-  'statusCode',
-  'error_type',
-  'provider_code',
-  'provider_name',
-  'raw',
-  'responseBody',
-] as const;
+const ERROR_DETAIL_KEY_ENUM = em({
+  MESSAGE: 'message',
+  CODE: 'code',
+  STATUS: 'status',
+  STATUS_CODE: 'statusCode',
+  ERROR_TYPE: 'error_type',
+  PROVIDER_CODE: 'provider_code',
+  PROVIDER_NAME: 'provider_name',
+  RAW: 'raw',
+  RESPONSE_BODY: 'responseBody',
+});
+const ERROR_DETAIL_KEYS = ERROR_DETAIL_KEY_ENUM.rawValues;
+const ERROR_DETAIL_KEY = ERROR_DETAIL_KEY_ENUM.enum;
+type ErrorDetailKey = (typeof ERROR_DETAIL_KEY_ENUM)['~keys'];
 
-const ERROR_CHILD_KEYS = ['rawValue', 'error', 'metadata', 'cause', 'rawEvent', 'response'] as const;
+const ERROR_CHILD_KEY_ENUM = em({
+  RAW_VALUE: 'rawValue',
+  ERROR: 'error',
+  METADATA: 'metadata',
+  CAUSE: 'cause',
+  RAW_EVENT: 'rawEvent',
+  RESPONSE: 'response',
+});
+const ERROR_CHILD_KEYS = ERROR_CHILD_KEY_ENUM.rawValues;
 const MAX_ERROR_MESSAGE_LENGTH = 1_200;
 const GENERATION_LOGGER = loggerFactory.getLogger('character-creator.generation');
 
@@ -48,10 +60,10 @@ function redactSensitiveValues(value: string) {
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]');
 }
 
-function appendErrorDetail(details: string[], key: (typeof ERROR_DETAIL_KEYS)[number], value: unknown) {
+function appendErrorDetail(details: string[], key: ErrorDetailKey, value: unknown) {
   if ((typeof value !== 'string' && typeof value !== 'number') || String(value).trim().length === 0) return;
   const sanitizedValue = redactSensitiveValues(String(value).replace(/\s+/g, ' ').trim());
-  if (key === 'message' || key === 'raw' || key === 'responseBody') {
+  if (key === ERROR_DETAIL_KEY.MESSAGE || key === ERROR_DETAIL_KEY.RAW || key === ERROR_DETAIL_KEY.RESPONSE_BODY) {
     details.push(sanitizedValue);
     return;
   }

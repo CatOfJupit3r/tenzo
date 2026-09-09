@@ -1,6 +1,7 @@
 import { ClientOnly } from '@tanstack/react-router';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { merge } from 'lodash-es';
+import type { Dispatch, ReactElement, Ref, RefAttributes, SetStateAction, UIEvent, WheelEvent } from 'react';
 import {
   Children,
   createContext,
@@ -14,24 +15,23 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { Dispatch, ReactElement, Ref, RefAttributes, SetStateAction, UIEvent, WheelEvent } from 'react';
 import { LuCheck, LuChevronDown, LuX } from 'react-icons/lu';
-import { components, createFilter } from 'react-select';
 import type {
   ActionMeta,
+  ClearIndicatorProps,
   DropdownIndicatorProps,
   GroupBase,
-  MultiValueRemoveProps,
-  ClearIndicatorProps,
-  OptionProps,
-  MenuProps,
   MenuListProps,
-  SingleValueProps,
+  MenuProps,
+  MultiValueRemoveProps,
+  OptionProps,
   Props,
   SelectInstance,
+  SingleValueProps,
 } from 'react-select';
-import CreatableSelectComponent from 'react-select/creatable';
+import { components, createFilter } from 'react-select';
 import type { CreatableProps } from 'react-select/creatable';
+import CreatableSelectComponent from 'react-select/creatable';
 
 import { isOnClient } from '@~/utils/ssr-helpers';
 
@@ -381,10 +381,9 @@ const ForwardedCreatableSelectSingle = forwardRef<
   CreatableSingleSelectBaseProps
 >((props, ref) => BaseSelect({ ...props, isMulti: false, isCreatable: true }, ref));
 
-export interface iSingleSelectProps extends Omit<
-  SingleSelectBaseProps,
-  'value' | 'defaultValue' | 'onChange' | 'isMulti'
-> {
+type ManagedSelectProp = keyof Pick<SingleSelectBaseProps, 'value' | 'defaultValue' | 'onChange' | 'isMulti'>;
+
+export interface iSingleSelectProps extends Omit<SingleSelectBaseProps, ManagedSelectProp> {
   value?: string | null;
   defaultValue?: string | null;
   onValueChange?: (value: string | null, option: iOptionType | null, action: ActionMeta<iOptionType>) => void;
@@ -409,10 +408,7 @@ export const SingleSelect = forwardRef<SelectInstance<iOptionType, false, GroupB
   },
 );
 
-export interface iCreatableSingleSelectProps extends Omit<
-  CreatableSingleSelectBaseProps,
-  'value' | 'defaultValue' | 'onChange' | 'isMulti'
-> {
+export interface iCreatableSingleSelectProps extends Omit<CreatableSingleSelectBaseProps, ManagedSelectProp> {
   value?: string | null;
   defaultValue?: string | null;
   onValueChange?: (value: string | null, option: iOptionType | null, action: ActionMeta<iOptionType>) => void;
@@ -440,10 +436,7 @@ export const CreatableSingleSelect = forwardRef<
   },
 );
 
-export interface iMultiSelectProps extends Omit<
-  MultiSelectBaseProps,
-  'value' | 'defaultValue' | 'onChange' | 'isMulti'
-> {
+export interface iMultiSelectProps extends Omit<MultiSelectBaseProps, ManagedSelectProp> {
   value?: string[];
   defaultValue?: string[];
   onValueChange?: (values: string[], options: Array<iOptionType>, action: ActionMeta<iOptionType>) => void;

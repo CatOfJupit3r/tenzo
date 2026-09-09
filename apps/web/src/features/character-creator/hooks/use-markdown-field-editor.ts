@@ -1,19 +1,19 @@
+import { EDITOR_CONTENT_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
+
 import { buildMarkdownEditorExtensions, MARKDOWN_EDITOR_SERIALIZER } from '../lib/editor/markdown-editor-extensions';
+import type { iSyncedEditorHookOptions, SyncedEditorOverrideProps } from '../lib/editor/synced-editor-hook';
 import { createSyncedEditorHook } from '../lib/editor/synced-editor-hook';
-import type { iSyncedEditorHookOptions } from '../lib/editor/synced-editor-hook';
 import type { iSyncedEditorContent } from './use-synced-field-editor';
 
 export interface iUseMarkdownFieldEditorOptions
-  extends
-    Partial<Pick<iSyncedEditorHookOptions, 'isReadOnly' | 'isStreaming' | 'editorAttributes'>>,
-    Omit<iSyncedEditorHookOptions, 'isReadOnly' | 'isStreaming' | 'editorAttributes'> {
+  extends Partial<SyncedEditorOverrideProps>, Omit<iSyncedEditorHookOptions, keyof SyncedEditorOverrideProps> {
   placeholder?: string;
   doesAllowOriginalMacro?: boolean;
   doesHighlightTemplateSlots?: boolean;
 }
 
 function toMarkdownEditorContent(value: string): iSyncedEditorContent {
-  return { content: value, contentType: 'markdown' };
+  return { content: value, contentType: EDITOR_CONTENT_TYPES.MARKDOWN };
 }
 
 interface iNormalizedMarkdownFieldEditorOptions extends iUseMarkdownFieldEditorOptions {

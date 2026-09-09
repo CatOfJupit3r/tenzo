@@ -3,6 +3,7 @@ import { LuCopy, LuFolderOpen, LuImage, LuPlus, LuSparkles, LuUserPen, LuX } fro
 
 import { Badge } from '@~/components/ui/badge';
 import { Button } from '@~/components/ui/button/button';
+import { BADGE_VARIANTS, BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 import { useCharacterAssistant } from '../context/character-assistant-context.hooks';
@@ -107,8 +108,8 @@ const CharacterLibraryItem = memo(
         <div className="flex justify-end gap-1 border-t px-2 py-1.5">
           <Button
             type="button"
-            size="icon"
-            variant="ghost"
+            size={BUTTON_SIZES.ICON}
+            variant={BUTTON_VARIANTS.GHOST}
             aria-label={`Duplicate ${displayName}`}
             title="Duplicate"
             onClick={async () => {
@@ -189,7 +190,7 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
             <div className="min-w-0 space-y-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-base font-semibold">Library</h2>
-                <Badge variant="outline">
+                <Badge variant={BADGE_VARIANTS.OUTLINE}>
                   {!isCharacterLibraryReady && characterLibrary.length === 0 ? '...' : characterLibrary.length}
                 </Badge>
               </div>
@@ -198,8 +199,8 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
 
             <Button
               type="button"
-              size="icon"
-              variant="ghost"
+              size={BUTTON_SIZES.ICON}
+              variant={BUTTON_VARIANTS.GHOST}
               className="lg:hidden"
               aria-label="Close character library"
               onClick={onClose}
@@ -210,17 +211,22 @@ export function CharacterLibraryPanel({ isOpen, onClose }: iCharacterLibraryPane
 
           <div className="grid gap-2">
             <div className="grid gap-2">
-              <Button type="button" size="sm" onClick={handleCreateWithAssistant}>
+              <Button type="button" size={BUTTON_SIZES.SM} onClick={handleCreateWithAssistant}>
                 <LuSparkles className="size-4" />
                 Create with assistant
               </Button>
-              <Button type="button" size="sm" variant="outline" onClick={handleCreateCharacter}>
+              <Button
+                type="button"
+                size={BUTTON_SIZES.SM}
+                variant={BUTTON_VARIANTS.OUTLINE}
+                onClick={handleCreateCharacter}
+              >
                 <LuPlus className="size-4" />
                 New blank card
               </Button>
             </div>
           </div>
-          <Button type="button" size="sm" variant="outline" onClick={openImportDialog}>
+          <Button type="button" size={BUTTON_SIZES.SM} variant={BUTTON_VARIANTS.OUTLINE} onClick={openImportDialog}>
             <LuFolderOpen className="size-4" />
             Import
           </Button>

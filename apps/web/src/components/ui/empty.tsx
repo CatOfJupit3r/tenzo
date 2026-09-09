@@ -1,7 +1,8 @@
-import { cva } from 'class-variance-authority';
 import type { VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import type { ComponentProps } from 'react';
 
+import { EMPTY_MEDIA_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 function Empty({ className, ...props }: ComponentProps<'div'>) {
@@ -32,19 +33,20 @@ const emptyMediaVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-transparent',
-        icon: "flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground [&_svg:not([class*='size-'])]:size-6",
+        [EMPTY_MEDIA_VARIANTS.DEFAULT]: 'bg-transparent',
+        [EMPTY_MEDIA_VARIANTS.ICON]:
+          "flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground [&_svg:not([class*='size-'])]:size-6",
       },
     },
     defaultVariants: {
-      variant: 'default',
+      variant: EMPTY_MEDIA_VARIANTS.DEFAULT,
     },
   },
 );
 
 function EmptyMedia({
   className,
-  variant = 'default',
+  variant = EMPTY_MEDIA_VARIANTS.DEFAULT,
   ...props
 }: ComponentProps<'div'> & VariantProps<typeof emptyMediaVariants>) {
   return (
@@ -84,4 +86,4 @@ function EmptyContent({ className, ...props }: ComponentProps<'div'>) {
   );
 }
 
-export { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent, EmptyMedia };
+export { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle };

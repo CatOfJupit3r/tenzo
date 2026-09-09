@@ -14,7 +14,7 @@ describe('DiscoveryCardGrid', () => {
         cards={[
           {
             id: 'direction-1',
-            category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+            category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE,
             title: 'Quietly theatrical',
             description: 'Layer dry humor over carefully concealed anxiety.',
             sourceCardId: null,

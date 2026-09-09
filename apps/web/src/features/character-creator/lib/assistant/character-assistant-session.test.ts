@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MESSAGE_PART_TYPES_CASES, MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
+
 import { sanitizeCharacterAssistantSession } from './character-assistant-session';
 
 describe('character assistant session storage', () => {
@@ -10,11 +12,11 @@ describe('character assistant session storage', () => {
       messages: [
         {
           id: 'message-1',
-          role: 'user',
-          parts: [{ type: 'text', content: 'Keep the voice warm.' }],
+          role: MESSAGE_ROLES.USER,
+          parts: [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: 'Keep the voice warm.' }],
           createdAt: '2026-08-18T20:00:00.000Z',
         },
-        { id: 'missing-parts', role: 'assistant' },
+        { id: 'missing-parts', role: MESSAGE_ROLES.ASSISTANT },
       ],
       proposals: [{ malformed: true }],
       createdAt: '',

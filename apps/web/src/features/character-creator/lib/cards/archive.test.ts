@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { createArchiveBytes, detectArchiveFormat, readArchiveBytes } from './archive';
 import type { iArchiveFileEntry } from './archive';
+import { createArchiveBytes, detectArchiveFormat, readArchiveBytes } from './archive';
 import { ARCHIVE_FORMATS } from './export-settings';
 
 function createSampleFiles(): iArchiveFileEntry[] {
@@ -21,9 +21,9 @@ function toComparable(entries: iArchiveFileEntry[]) {
 describe('archive', () => {
   it('round-trips files through a zip archive', () => {
     const files = createSampleFiles();
-    const archiveBytes = createArchiveBytes(files, ARCHIVE_FORMATS.zip);
+    const archiveBytes = createArchiveBytes(files, ARCHIVE_FORMATS.ZIP);
 
-    expect(detectArchiveFormat(archiveBytes)).toBe(ARCHIVE_FORMATS.zip);
+    expect(detectArchiveFormat(archiveBytes)).toBe(ARCHIVE_FORMATS.ZIP);
 
     const restored = toComparable(readArchiveBytes(archiveBytes));
     expect(restored.map((entry) => entry.path)).toEqual(['assets/portrait.png', 'characters.json', 'empty.txt']);
@@ -32,9 +32,9 @@ describe('archive', () => {
 
   it('round-trips files through a tar.gz archive', () => {
     const files = createSampleFiles();
-    const archiveBytes = createArchiveBytes(files, ARCHIVE_FORMATS.tar_gz);
+    const archiveBytes = createArchiveBytes(files, ARCHIVE_FORMATS.TAR_GZ);
 
-    expect(detectArchiveFormat(archiveBytes)).toBe(ARCHIVE_FORMATS.tar_gz);
+    expect(detectArchiveFormat(archiveBytes)).toBe(ARCHIVE_FORMATS.TAR_GZ);
 
     const restored = toComparable(readArchiveBytes(archiveBytes));
     expect(restored).toEqual(toComparable(files));
@@ -46,7 +46,7 @@ describe('archive', () => {
 
   it('rejects tar entry paths longer than the ustar name field', () => {
     const longPath = `${'a'.repeat(120)}.json`;
-    expect(() => createArchiveBytes([{ path: longPath, data: new Uint8Array(1) }], ARCHIVE_FORMATS.tar_gz)).toThrow(
+    expect(() => createArchiveBytes([{ path: longPath, data: new Uint8Array(1) }], ARCHIVE_FORMATS.TAR_GZ)).toThrow(
       /too long/,
     );
   });

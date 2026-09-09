@@ -4,18 +4,18 @@ import {
   getStrictTemplateFormatInstructions,
 } from '../../constants/default-prompts';
 import { parseTemplateSlots, TEMPLATE_MODES } from '../cards/field-templates';
-import { PROMPT_SECTION_NAMES } from './prompt-section-strategy';
 import type { iPromptPipelineContext, iPromptSectionStrategy } from './prompt-section-strategy';
+import { PROMPT_SECTION_NAMES } from './prompt-section-strategy';
 import type { TaskInstructionService } from './task-instruction-service';
 
 export class TaskSectionStrategy implements iPromptSectionStrategy {
-  readonly name = PROMPT_SECTION_NAMES.task;
+  readonly name = PROMPT_SECTION_NAMES.TASK;
 
   constructor(private readonly taskInstructionService: TaskInstructionService) {}
 
   build(context: iPromptPipelineContext): string {
     const { target, mode, exampleContextSummary, fieldTemplate } = context;
-    const isStrictTemplate = fieldTemplate?.mode === TEMPLATE_MODES.strict;
+    const isStrictTemplate = fieldTemplate?.mode === TEMPLATE_MODES.STRICT;
 
     return [
       `Your task is to write the "${target.label}" field for a SillyTavern V2 character card.`,

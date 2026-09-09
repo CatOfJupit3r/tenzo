@@ -1,3 +1,4 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import { CHARACTER_CARD_SCHEMA } from '../cards/card-schema';
@@ -11,30 +12,37 @@ import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '../generation/genera
 import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_SCHEMA } from '../orchestration/field-writing-strategy';
 import { PROMPT_EXAMPLE_CHARACTER_SCHEMA } from '../prompt/generation-contracts';
 import { CHARACTER_EDIT_FIELD_KEY_SCHEMA } from '../proposals/character-edit-proposal';
-import { AGENT_GENERATION_BUDGETS, AGENT_GENERATION_BUDGET_SCHEMA } from '../provider/agent-generation-budget';
+import { AGENT_GENERATION_BUDGET_SCHEMA, AGENT_GENERATION_BUDGETS } from '../provider/agent-generation-budget';
 import { MODEL_CAPABILITY_SCHEMA } from '../provider/model-capabilities';
 import { PROVIDER_KIND_SCHEMA, PROVIDER_KINDS } from '../provider/provider-health';
 
-export const CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA = z.enum(['card', 'field', 'fields']);
-export const CHARACTER_ASSISTANT_FOCUS_KINDS = CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA.enum;
+export const CHARACTER_ASSISTANT_FOCUS_KIND_ENUM = em({
+  CARD: 'card',
+  FIELD: 'field',
+  FIELDS: 'fields',
+});
+export const CHARACTER_ASSISTANT_FOCUS_KIND_MEMBERS = CHARACTER_ASSISTANT_FOCUS_KIND_ENUM.enum;
+export const CHARACTER_ASSISTANT_FOCUS_KIND_SCHEMA = z.enum(CHARACTER_ASSISTANT_FOCUS_KIND_MEMBERS);
+export const CHARACTER_ASSISTANT_FOCUS_KINDS_CASES = CHARACTER_ASSISTANT_FOCUS_KIND_ENUM.cases;
 
 export const CHARACTER_ASSISTANT_FOCUS_SCHEMA = z.discriminatedUnion('kind', [
   z.object({
-    kind: z.literal(CHARACTER_ASSISTANT_FOCUS_KINDS.card),
+    kind: z.literal(CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD),
   }),
   z.object({
-    kind: z.literal(CHARACTER_ASSISTANT_FOCUS_KINDS.field),
+    kind: z.literal(CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD),
     fieldKey: CHARACTER_EDIT_FIELD_KEY_SCHEMA,
   }),
   z.object({
-    kind: z.literal(CHARACTER_ASSISTANT_FOCUS_KINDS.fields),
+    kind: z.literal(CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELDS),
     fieldKeys: z.array(CHARACTER_EDIT_FIELD_KEY_SCHEMA).min(1),
   }),
 ]);
 
-export const CHARACTER_ASSISTANT_ATTACHMENT_KINDS = {
-  imageAnalysis: 'image-analysis',
-} as const;
+export const CHARACTER_ASSISTANT_ATTACHMENT_KINDS_ENUM = em({
+  IMAGE_ANALYSIS: 'image-analysis',
+});
+export const CHARACTER_ASSISTANT_ATTACHMENT_KINDS = CHARACTER_ASSISTANT_ATTACHMENT_KINDS_ENUM.enum;
 
 export const CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_KIND_SCHEMA = z.string().trim().min(1);
 
@@ -47,17 +55,18 @@ export const CHARACTER_ASSISTANT_CONTEXT_ATTACHMENT_SCHEMA = z.object({
   confidence: z.number().min(0).max(1).nullable(),
 });
 
-export const CHARACTER_ASSISTANT_TOOL_NAME_SCHEMA = z.enum([
-  'read_character',
-  'record_concept',
-  'propose_character_fields',
-  'propose_tags',
-  'propose_alternate_greetings',
-  'propose_custom_fields',
-  'propose_character_book',
-  'suggest_character_directions',
-]);
-export const CHARACTER_ASSISTANT_TOOL_NAMES = CHARACTER_ASSISTANT_TOOL_NAME_SCHEMA.enum;
+export const CHARACTER_ASSISTANT_TOOL_NAME_ENUM = em({
+  READ_CHARACTER: 'read_character',
+  RECORD_CONCEPT: 'record_concept',
+  PROPOSE_CHARACTER_FIELDS: 'propose_character_fields',
+  PROPOSE_TAGS: 'propose_tags',
+  PROPOSE_ALTERNATE_GREETINGS: 'propose_alternate_greetings',
+  PROPOSE_CUSTOM_FIELDS: 'propose_custom_fields',
+  PROPOSE_CHARACTER_BOOK: 'propose_character_book',
+  SUGGEST_CHARACTER_DIRECTIONS: 'suggest_character_directions',
+});
+export const CHARACTER_ASSISTANT_TOOL_NAMES = CHARACTER_ASSISTANT_TOOL_NAME_ENUM.enum;
+export const CHARACTER_ASSISTANT_TOOL_NAME_SCHEMA = z.enum(CHARACTER_ASSISTANT_TOOL_NAMES);
 
 export const CHARACTER_CONCEPT_SCHEMA = z.object({
   premise: z.string().trim().default(''),
@@ -81,14 +90,17 @@ export const CHAT_TEMPLATE_REF_SCHEMA = STORED_FIELD_TEMPLATE_SCHEMA.pick({
 export type iCharacterConcept = z.infer<typeof CHARACTER_CONCEPT_SCHEMA>;
 export type iChatTemplateRef = z.infer<typeof CHAT_TEMPLATE_REF_SCHEMA>;
 
-export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA = z.enum([
-  'character-concept',
-  'relationship-dynamic',
-  'scenario',
-  'tone',
-]);
+export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_ENUM = em({
+  CHARACTER_CONCEPT: 'character-concept',
+  RELATIONSHIP_DYNAMIC: 'relationship-dynamic',
+  SCENARIO: 'scenario',
+  TONE: 'tone',
+});
 export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES =
-  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA.enum;
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_ENUM.enum;
+export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORY_SCHEMA = z.enum(
+  CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES,
+);
 
 export const CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CARD_SCHEMA = z.object({
   id: z.string().trim().min(1),
@@ -116,24 +128,24 @@ export const CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_SCHEMA = z.object({
   originalPremise: z.string().trim().max(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_ORIGINAL_PREMISE_MAX_LENGTH),
   handoffSummary: z
     .object({
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept']]: z
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.CHARACTER_CONCEPT]: z
         .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
         .max(3),
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['relationship-dynamic']]: z
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.RELATIONSHIP_DYNAMIC]: z
         .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
         .max(3),
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]: z
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.SCENARIO]: z
         .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
         .max(3),
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone]: z
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE]: z
         .array(CHARACTER_ASSISTANT_DISCOVERY_CONTEXT_CARD_SCHEMA)
         .max(3),
     })
     .default({
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['character-concept']]: [],
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES['relationship-dynamic']]: [],
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.scenario]: [],
-      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone]: [],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.CHARACTER_CONCEPT]: [],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.RELATIONSHIP_DYNAMIC]: [],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.SCENARIO]: [],
+      [CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE]: [],
     }),
 });
 
@@ -154,9 +166,9 @@ export const CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA = CHARACTER_ASSISTANT_GEN
   templates: z.array(CHAT_TEMPLATE_REF_SCHEMA).max(MAX_CHAT_TEMPLATE_REF_COUNT).optional().default([]),
   exampleCharacters: z.array(PROMPT_EXAMPLE_CHARACTER_SCHEMA).max(MAX_EXAMPLE_CHARACTER_COUNT).optional().default([]),
   maxExampleContextCharacters: z.number().int().positive().optional(),
-  providerKind: PROVIDER_KIND_SCHEMA.optional().default(PROVIDER_KINDS.unknown),
-  agentGenerationBudget: AGENT_GENERATION_BUDGET_SCHEMA.optional().default(AGENT_GENERATION_BUDGETS.balanced),
-  fieldWritingStrategy: FIELD_WRITING_STRATEGY_SCHEMA.optional().default(FIELD_WRITING_STRATEGIES['separate-fields']),
+  providerKind: PROVIDER_KIND_SCHEMA.optional().default(PROVIDER_KINDS.UNKNOWN),
+  agentGenerationBudget: AGENT_GENERATION_BUDGET_SCHEMA.optional().default(AGENT_GENERATION_BUDGETS.BALANCED),
+  fieldWritingStrategy: FIELD_WRITING_STRATEGY_SCHEMA.optional().default(FIELD_WRITING_STRATEGIES.SEPARATE_FIELDS),
   localCapabilities: z.array(MODEL_CAPABILITY_SCHEMA).optional().default([]),
   fieldShouldAllowAssistantEditing: CHARACTER_ASSISTANT_FIELD_EDITING_SCHEMA.optional().default(
     DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,

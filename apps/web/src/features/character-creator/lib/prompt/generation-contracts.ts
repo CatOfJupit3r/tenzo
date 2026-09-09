@@ -1,25 +1,31 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import { CUSTOM_FIELD_SCHEMA } from '../cards/card-schema';
 import type { TemplateMode } from '../cards/field-templates';
+import type { MessageRole } from '../generation/message-enums';
 
-export const GENERATION_MODE_SCHEMA = z.enum(['generate', 'continue', 'rewrite']);
-export const GENERATION_MODES = GENERATION_MODE_SCHEMA.enum;
+export const GENERATION_MODE_ENUM = em(['GENERATE', 'CONTINUE', 'REWRITE']);
+export const GENERATION_MODES = GENERATION_MODE_ENUM.enum;
+export const GENERATION_MODE_SCHEMA = z.enum(GENERATION_MODES);
+
 export type GenerationMode = z.infer<typeof GENERATION_MODE_SCHEMA>;
 
-export const GENERATION_TARGET_KIND_SCHEMA = z.enum([
-  'field',
-  'alternate-greeting',
-  'custom-field',
-  'general-character-idea',
+export const GENERATION_TARGET_KIND_ENUM = em([
+  'FIELD',
+  'ALTERNATE_GREETING',
+  'CUSTOM_FIELD',
+  'GENERAL_CHARACTER_IDEA',
 ]);
-export const GENERATION_TARGET_KINDS = GENERATION_TARGET_KIND_SCHEMA.enum;
+export const GENERATION_TARGET_KINDS = GENERATION_TARGET_KIND_ENUM.enum;
+export const GENERATION_TARGET_KIND_SCHEMA = z.enum(GENERATION_TARGET_KINDS);
+
 export type GenerationTargetKind = z.infer<typeof GENERATION_TARGET_KIND_SCHEMA>;
 
 export const GENERAL_CHARACTER_IDEA_GENERATION_TARGET_KEY = 'general-character-idea';
 
 export interface iGenerationMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: MessageRole;
   content: string;
 }
 

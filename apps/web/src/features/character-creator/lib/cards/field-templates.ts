@@ -1,52 +1,65 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
+import { CHARACTER_FIELD_KEY_ENUM, CHARACTER_FIELD_KEYS } from '@~/features/character-creator/lib/cards/card-schema';
 import { generateUuid } from '@~/utils/uuid';
 
-export const TEMPLATE_MODE_SCHEMA = z.enum(['prompt', 'strict']);
-export const TEMPLATE_MODES = TEMPLATE_MODE_SCHEMA.enum;
+export const TEMPLATE_MODE_ENUM = em({
+  PROMPT: 'prompt',
+  STRICT: 'strict',
+});
+export const TEMPLATE_MODES = TEMPLATE_MODE_ENUM.enum;
+export const TEMPLATE_MODE_SCHEMA = z.enum(TEMPLATE_MODES);
+
 export type TemplateMode = z.infer<typeof TEMPLATE_MODE_SCHEMA>;
 
-export const FIELD_TEMPLATE_SELECTION_SCHEMA = z.enum(['none']);
-export const FIELD_TEMPLATE_SELECTIONS = FIELD_TEMPLATE_SELECTION_SCHEMA.enum;
-export const FIELD_TEMPLATE_SELECTION_NONE = FIELD_TEMPLATE_SELECTIONS.none;
+export const FIELD_TEMPLATE_SELECTION_ENUM = em({
+  NONE: 'none',
+});
+export const FIELD_TEMPLATE_SELECTIONS = FIELD_TEMPLATE_SELECTION_ENUM.enum;
+export const FIELD_TEMPLATE_SELECTION_SCHEMA = z.enum(FIELD_TEMPLATE_SELECTIONS);
 
-export const TEMPLATE_MODE_LABELS = {
-  [TEMPLATE_MODES.prompt]: 'Prompt guidance',
-  [TEMPLATE_MODES.strict]: 'Strict skeleton',
-} satisfies Record<TemplateMode, string>;
+export const FIELD_TEMPLATE_SELECTION_NONE = FIELD_TEMPLATE_SELECTIONS.NONE;
 
-export const TEMPLATE_FIELD_KEY_SCHEMA = z.enum([
-  'description',
-  'personality',
-  'scenario',
-  'first_mes',
-  'mes_example',
-  'creator_notes',
-  'system_prompt',
-  'post_history_instructions',
-  'alternate_greeting',
-  'custom_field',
+export const TEMPLATE_MODE_LABELS = TEMPLATE_MODE_ENUM.derive<string>()(
+  [TEMPLATE_MODES.PROMPT, 'Prompt guidance'],
+  [TEMPLATE_MODES.STRICT, 'Strict skeleton'],
+);
+
+export const TEMPLATE_FIELD_KEY_ENUM = CHARACTER_FIELD_KEY_ENUM.pick([
+  CHARACTER_FIELD_KEYS.DESCRIPTION,
+  CHARACTER_FIELD_KEYS.PERSONALITY,
+  CHARACTER_FIELD_KEYS.SCENARIO,
+  CHARACTER_FIELD_KEYS.FIRST_MES,
+  CHARACTER_FIELD_KEYS.MES_EXAMPLE,
+  CHARACTER_FIELD_KEYS.CREATOR_NOTES,
+  CHARACTER_FIELD_KEYS.SYSTEM_PROMPT,
+  CHARACTER_FIELD_KEYS.POST_HISTORY_INSTRUCTIONS,
+  CHARACTER_FIELD_KEYS.ALTERNATE_GREETING,
+  CHARACTER_FIELD_KEYS.CUSTOM_FIELD,
 ]);
-export const TEMPLATE_FIELD_KEYS = TEMPLATE_FIELD_KEY_SCHEMA.enum;
+export const TEMPLATE_FIELD_KEYS = TEMPLATE_FIELD_KEY_ENUM.rawEnum;
+export const TEMPLATE_FIELD_KEY_SCHEMA = z.enum(TEMPLATE_FIELD_KEYS);
+
 export type TemplateFieldKey = z.infer<typeof TEMPLATE_FIELD_KEY_SCHEMA>;
 
 export const TEMPLATE_FIELD_KEY_LABELS = {
-  [TEMPLATE_FIELD_KEYS.description]: 'Description',
-  [TEMPLATE_FIELD_KEYS.personality]: 'Personality',
-  [TEMPLATE_FIELD_KEYS.scenario]: 'Scenario',
-  [TEMPLATE_FIELD_KEYS.first_mes]: 'First Message',
-  [TEMPLATE_FIELD_KEYS.mes_example]: 'Example Dialogue',
-  [TEMPLATE_FIELD_KEYS.creator_notes]: 'Creator Notes',
-  [TEMPLATE_FIELD_KEYS.system_prompt]: 'System Prompt',
-  [TEMPLATE_FIELD_KEYS.post_history_instructions]: 'Post-History Instructions',
-  [TEMPLATE_FIELD_KEYS.alternate_greeting]: 'Alternate Greetings',
-  [TEMPLATE_FIELD_KEYS.custom_field]: 'Custom Fields',
+  [TEMPLATE_FIELD_KEYS.DESCRIPTION]: 'Description',
+  [TEMPLATE_FIELD_KEYS.PERSONALITY]: 'Personality',
+  [TEMPLATE_FIELD_KEYS.SCENARIO]: 'Scenario',
+  [TEMPLATE_FIELD_KEYS.FIRST_MES]: 'First Message',
+  [TEMPLATE_FIELD_KEYS.MES_EXAMPLE]: 'Example Dialogue',
+  [TEMPLATE_FIELD_KEYS.CREATOR_NOTES]: 'Creator Notes',
+  [TEMPLATE_FIELD_KEYS.SYSTEM_PROMPT]: 'System Prompt',
+  [TEMPLATE_FIELD_KEYS.POST_HISTORY_INSTRUCTIONS]: 'Post-History Instructions',
+  [TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING]: 'Alternate Greetings',
+  [TEMPLATE_FIELD_KEYS.CUSTOM_FIELD]: 'Custom Fields',
 } satisfies Record<TemplateFieldKey, string>;
 
 /** Template field keys where the {{original}} macro is meaningful. */
 export const TEMPLATE_FIELD_KEYS_ALLOWING_ORIGINAL_MACRO: readonly TemplateFieldKey[] = [
-  TEMPLATE_FIELD_KEYS.system_prompt,
-  TEMPLATE_FIELD_KEYS.post_history_instructions,
+  TEMPLATE_FIELD_KEYS.SYSTEM_PROMPT,
+  TEMPLATE_FIELD_KEYS.POST_HISTORY_INSTRUCTIONS,
 ];
 
 export const STORED_FIELD_TEMPLATE_SCHEMA = z.object({
@@ -125,7 +138,7 @@ export function validateFieldTemplate(template: iFieldTemplateValidationInput): 
     issues.push('Bind the template to at least one field.');
   }
 
-  if (template.mode === TEMPLATE_MODES.strict && parseTemplateSlots(template.content).length === 0) {
+  if (template.mode === TEMPLATE_MODES.STRICT && parseTemplateSlots(template.content).length === 0) {
     issues.push('Strict templates need at least one {{gen:label}} slot for the AI to fill.');
   }
 
@@ -191,11 +204,11 @@ export function createStoredFieldTemplate({
 /** Maps a generation-target key ("field:description", "alternate_greetings:0", "custom:<id>") to its template field key. */
 export function getTemplateFieldKeyForTargetKey(targetKey: string): TemplateFieldKey | null {
   if (targetKey.startsWith('alternate_greetings:')) {
-    return TEMPLATE_FIELD_KEYS.alternate_greeting;
+    return TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING;
   }
 
   if (targetKey.startsWith('custom:')) {
-    return TEMPLATE_FIELD_KEYS.custom_field;
+    return TEMPLATE_FIELD_KEYS.CUSTOM_FIELD;
   }
 
   const parsedFieldKey = TEMPLATE_FIELD_KEY_SCHEMA.safeParse(targetKey.replace(/^field:/, ''));

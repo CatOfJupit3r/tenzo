@@ -2,19 +2,26 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  CHARACTER_CARD_SPECS,
+  CHARACTER_CARD_SPEC_VERSIONS,
+  IMPORTED_CARD_SOURCE_KINDS,
+} from '@~/features/character-creator/lib/cards/card-file-enums';
+import { EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY } from '@~/features/character-creator/lib/cards/example-characters';
+import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '@~/features/character-creator/lib/cards/field-templates';
+
 import type { iStoredExampleCharacter } from '../lib/cards/example-characters';
-import { TEMPLATE_MODES } from '../lib/cards/field-templates';
 import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
-import { EnhanceFieldTemplateDialog } from './enhance-field-template-dialog';
 import type { iEnhanceFieldTemplateDialogProps } from './enhance-field-template-dialog';
+import { EnhanceFieldTemplateDialog } from './enhance-field-template-dialog';
 
 function createTemplate(): iFieldTemplateViewModel {
   return {
     id: 'target-template',
     name: 'Description template',
     description: '',
-    mode: TEMPLATE_MODES.prompt,
-    fieldKeys: ['description'],
+    mode: TEMPLATE_MODES.PROMPT,
+    fieldKeys: [TEMPLATE_FIELD_KEYS.DESCRIPTION],
     content: 'Original template content',
     createdAt: '2026-08-16T00:00:00.000Z',
     updatedAt: '2026-08-16T00:00:00.000Z',
@@ -26,11 +33,15 @@ function createExampleCharacter(): iStoredExampleCharacter {
   return {
     id: 'example-character',
     fileName: 'reference.json',
-    sourceKind: 'json',
-    includedFieldKeys: ['name', 'description', 'personality'],
+    sourceKind: IMPORTED_CARD_SOURCE_KINDS.JSON,
+    includedFieldKeys: [
+      EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.NAME,
+      EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.DESCRIPTION,
+      EXAMPLE_CHARACTER_CONTEXT_FIELD_KEY.PERSONALITY,
+    ],
     card: {
-      spec: 'chara_card_v2',
-      spec_version: '2.0',
+      spec: CHARACTER_CARD_SPECS.CHARA_CARD_V2,
+      spec_version: CHARACTER_CARD_SPEC_VERSIONS.VALUE_2_0,
       data: {
         name: 'Reference Name',
         description: 'Reference description',

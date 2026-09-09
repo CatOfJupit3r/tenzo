@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { createValidatedObjectGenerator } from './structured-output.server';
+import { MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
+
 import type { iStructuredOutputChat, iStructuredOutputChatOptions } from './structured-output.server';
+import { createValidatedObjectGenerator } from './structured-output.server';
 import { createCharacterTextAdapter } from './tanstack-ai-text-generation';
 
 const RESPONSE_SCHEMA = z.object({
@@ -57,7 +59,7 @@ describe('structured output generation', () => {
     expect(harness.calls).toHaveLength(1);
     expect(harness.calls[0]).toEqual(
       expect.objectContaining({
-        messages: [{ role: 'user', content: 'Create it.' }],
+        messages: [{ role: MESSAGE_ROLES.USER, content: 'Create it.' }],
         systemPrompts: ['Generate a card.'],
         outputSchema: expect.any(Object),
         modelOptions: { max_tokens: 100, temperature: 0.5 },

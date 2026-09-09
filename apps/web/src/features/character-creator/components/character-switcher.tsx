@@ -1,13 +1,14 @@
 import { LuImage, LuPlus } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button/button';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 import { useCharacterCreatorActions } from '../context/character-creator-context/character-creator-actions-context.hooks';
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { useCharacterLibraryList } from '../hooks/use-character-library-list';
-import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
 import type { iCharacterLibraryItem } from '../lib/cards/character-library';
+import { getCharacterLibraryItemDisplayName } from '../lib/cards/character-library';
 import { CharacterDeleteDialog } from './character-delete-dialog';
 
 export interface iCharacterSwitcherViewProps {
@@ -73,7 +74,7 @@ export function CharacterSwitcherView({
         })}
         <Button
           type="button"
-          variant="ghost"
+          variant={BUTTON_VARIANTS.GHOST}
           className="h-14 min-w-40 shrink-0 justify-start border border-dashed"
           onClick={onCreateCharacter}
         >

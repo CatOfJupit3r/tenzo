@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  CHARACTER_ASSISTANT_FOCUS_KINDS_CASES,
+  CHARACTER_ASSISTANT_TOOL_NAMES,
+} from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+import { CHARACTER_TEXT_FIELD_KEY } from '@~/features/character-creator/lib/cards/card-schema';
+
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import type { TemplateFieldKey, TemplateMode } from '../cards/field-templates';
 import { TEMPLATE_FIELD_KEYS, TEMPLATE_MODES } from '../cards/field-templates';
 import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
-import { CHARACTER_ASSISTANT_FOCUS_KINDS } from './character-assistant-contracts';
+import type { iCharacterAssistantProposalStore } from './character-assistant-tools';
 import {
   createCharacterAssistantActionHandlers,
   createCharacterAssistantTools,
@@ -12,7 +19,6 @@ import {
   PROPOSE_CHARACTER_BOOK_INPUT_SCHEMA,
   PROPOSE_CUSTOM_FIELDS_INPUT_SCHEMA,
 } from './character-assistant-tools';
-import type { iCharacterAssistantProposalStore } from './character-assistant-tools';
 
 function createStore(): iCharacterAssistantProposalStore & {
   appendProposedCard: ReturnType<typeof vi.fn>;
@@ -25,7 +31,7 @@ function createStore(): iCharacterAssistantProposalStore & {
   };
 }
 
-function createTemplate(mode: 'prompt' | 'strict', fieldKey: 'description' | 'alternate_greeting') {
+function createTemplate(mode: TemplateMode, fieldKey: TemplateFieldKey) {
   return {
     id: `template-${mode}-${fieldKey}`,
     name: `${mode} ${fieldKey}`,
@@ -66,7 +72,7 @@ describe('character assistant template enforcement', () => {
     };
     const characterFieldsSchema = createProposeCharacterFieldsInputSchema(fieldShouldAllowAssistantEditing);
     const tools = createCharacterAssistantTools({
-      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD },
       store: createStore(),
       fieldShouldAllowAssistantEditing,
     });
@@ -83,8 +89,8 @@ describe('character assistant template enforcement', () => {
         summary: 'Change name',
       }).success,
     ).toBe(true);
-    expect(tools).not.toHaveProperty('propose_tags');
-    expect(tools).toHaveProperty('propose_character_fields');
+    expect(tools).not.toHaveProperty(CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_TAGS);
+    expect(tools).toHaveProperty(CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS);
   });
 
   it('returns a successful no-op when proposed values already match the card', () => {
@@ -94,7 +100,7 @@ describe('character assistant template enforcement', () => {
     expect(
       createProposalFromChanges({
         store,
-        focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+        focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD },
         summary: 'Keep the current name',
         fieldKeys: ['name'],
         updateCard: () => undefined,
@@ -109,15 +115,15 @@ describe('character assistant template enforcement', () => {
   it('accepts a proposal that preserves a strict template skeleton', () => {
     const store = createStore();
     const handlers = createCharacterAssistantActionHandlers({
-      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD },
       store,
-      templates: [createTemplate(TEMPLATE_MODES.strict, TEMPLATE_FIELD_KEYS.description)],
+      templates: [createTemplate(TEMPLATE_MODES.STRICT, TEMPLATE_FIELD_KEYS.DESCRIPTION)],
     });
 
     handlers.proposeCharacterFields({
       changes: [
         {
-          fieldKey: 'description',
+          fieldKey: CHARACTER_TEXT_FIELD_KEY.DESCRIPTION,
           value: '<START>\n{{char}}: A careful archivist.\n{{user}}: I need your help.',
         },
       ],
@@ -130,14 +136,14 @@ describe('character assistant template enforcement', () => {
   it('rejects strict skeleton drift with a retryable descriptive error', () => {
     const store = createStore();
     const handlers = createCharacterAssistantActionHandlers({
-      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD },
       store,
-      templates: [createTemplate(TEMPLATE_MODES.strict, TEMPLATE_FIELD_KEYS.description)],
+      templates: [createTemplate(TEMPLATE_MODES.STRICT, TEMPLATE_FIELD_KEYS.DESCRIPTION)],
     });
 
     expect(() =>
       handlers.proposeCharacterFields({
-        changes: [{ fieldKey: 'description', value: 'A description without the skeleton.' }],
+        changes: [{ fieldKey: CHARACTER_TEXT_FIELD_KEY.DESCRIPTION, value: 'A description without the skeleton.' }],
         summary: 'Add a description',
       }),
     ).toThrow(
@@ -149,13 +155,13 @@ describe('character assistant template enforcement', () => {
   it('does not reject prompt-mode templates', () => {
     const store = createStore();
     const handlers = createCharacterAssistantActionHandlers({
-      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD },
       store,
-      templates: [createTemplate(TEMPLATE_MODES.prompt, TEMPLATE_FIELD_KEYS.description)],
+      templates: [createTemplate(TEMPLATE_MODES.PROMPT, TEMPLATE_FIELD_KEYS.DESCRIPTION)],
     });
 
     handlers.proposeCharacterFields({
-      changes: [{ fieldKey: 'description', value: 'Free-form description guidance.' }],
+      changes: [{ fieldKey: CHARACTER_TEXT_FIELD_KEY.DESCRIPTION, value: 'Free-form description guidance.' }],
       summary: 'Add a description',
     });
 
@@ -165,9 +171,9 @@ describe('character assistant template enforcement', () => {
   it('maps strict alternate-greeting templates to every proposed greeting', () => {
     const store = createStore();
     const handlers = createCharacterAssistantActionHandlers({
-      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.card },
+      focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.CARD },
       store,
-      templates: [createTemplate(TEMPLATE_MODES.strict, TEMPLATE_FIELD_KEYS.alternate_greeting)],
+      templates: [createTemplate(TEMPLATE_MODES.STRICT, TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING)],
     });
 
     expect(() =>

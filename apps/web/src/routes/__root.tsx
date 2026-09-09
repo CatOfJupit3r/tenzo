@@ -5,10 +5,12 @@ import { NuqsAdapter } from 'nuqs/adapters/tanstack-router';
 
 import { AiDevtools } from '@~/components/ai-devtools';
 import { ClientErrorObserver } from '@~/components/client-error-observer';
+import { userThemeEnum } from '@~/components/themes/constants';
 import { getInitialThemeClass, getStoredTheme } from '@~/components/themes/helpers';
 import { ThemeProvider } from '@~/components/themes/theme-provider';
 import ToasterContainer from '@~/components/toastifications/toaster-container';
 import { MigrationGate } from '@~/db/migration-gate';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 import { seo } from '@~/utils/seo';
 
 import appCss from '../index.css?url';
@@ -41,8 +43,8 @@ export const Route = createRootRouteWithContext<iRouterAppContext>()({
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
-      { rel: 'icon', type: 'image/png', href: '/favicon/favicon-96x96.png', sizes: '96x96' },
-      { rel: 'icon', type: 'image/svg+xml', href: '/favicon/favicon.svg' },
+      { rel: 'icon', type: MEDIA_TYPES.PNG, href: '/favicon/favicon-96x96.png', sizes: '96x96' },
+      { rel: 'icon', type: MEDIA_TYPES.SVG, href: '/favicon/favicon.svg' },
       { rel: 'shortcut icon', href: '/favicon/favicon.ico' },
       { rel: 'apple-touch-icon', sizes: '180x180', href: '/favicon/apple-touch-icon.png' },
       { rel: 'manifest', href: '/favicon/site.webmanifest' },
@@ -51,7 +53,7 @@ export const Route = createRootRouteWithContext<iRouterAppContext>()({
 });
 
 function RootComponent() {
-  const { initialTheme } = Route.useLoaderData();
+  const initialTheme = userThemeEnum.parse(Route.useLoaderData().initialTheme);
   const themeClass = getInitialThemeClass(initialTheme);
 
   return (

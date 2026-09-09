@@ -1,6 +1,7 @@
 import { Link, useRouter } from '@tanstack/react-router';
 import { HiOutlineExclamationCircle, HiOutlineHome, HiOutlineRefresh } from 'react-icons/hi';
 
+import { ALERT_VARIANTS, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { IS_DEVELOPMENT } from '@~/constants';
 
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -15,11 +16,11 @@ interface iErrorBoundaryProps {
 function ErrorBoundaryActions({ onReset }: { onReset: () => unknown }) {
   return (
     <div className="flex flex-wrap gap-2">
-      <Button onClick={onReset} variant="default">
+      <Button onClick={onReset} variant={BUTTON_VARIANTS.DEFAULT}>
         <HiOutlineRefresh className="mr-2 size-4" />
         Try Again
       </Button>
-      <Button variant="outline" asChild>
+      <Button variant={BUTTON_VARIANTS.OUTLINE} asChild>
         <Link to="/">
           <HiOutlineHome className="mr-2 size-4" />
           Go Home
@@ -56,7 +57,7 @@ export function ErrorBoundary({ error, reset }: iErrorBoundaryProps) {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert variant="destructive">
+            <Alert variant={ALERT_VARIANTS.DESTRUCTIVE}>
               <HiOutlineExclamationCircle className="size-4" />
               <AlertTitle>{error.name || 'Error'}</AlertTitle>
               <AlertDescription>{error.message}</AlertDescription>

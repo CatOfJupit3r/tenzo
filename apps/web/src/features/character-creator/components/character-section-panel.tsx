@@ -9,19 +9,20 @@ import {
 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button/button';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 import { ResizablePanelHandle } from './resizable-panel-handle';
-import { CHARACTER_CREATOR_TABS } from './tabs/tabs.constants';
 import type { CharacterCreatorTab } from './tabs/tabs.constants';
+import { CHARACTER_CREATOR_TABS } from './tabs/tabs.constants';
 import { WORKSPACE_PANEL_WIDTHS } from './workspace-panel-layout';
 
 const SECTION_ITEMS = [
-  { value: CHARACTER_CREATOR_TABS.core, label: 'Core Fields', Icon: LuUserRound },
-  { value: CHARACTER_CREATOR_TABS.dialogue, label: 'Dialogue', Icon: LuMessageCircle },
-  { value: CHARACTER_CREATOR_TABS.character_book, label: 'Character Book', Icon: LuBookOpen },
-  { value: CHARACTER_CREATOR_TABS.overrides, label: 'Prompt Overrides', Icon: LuSlidersHorizontal },
-  { value: CHARACTER_CREATOR_TABS.metadata, label: 'Metadata', Icon: LuTags },
+  { value: CHARACTER_CREATOR_TABS.CORE, label: 'Core Fields', Icon: LuUserRound },
+  { value: CHARACTER_CREATOR_TABS.DIALOGUE, label: 'Dialogue', Icon: LuMessageCircle },
+  { value: CHARACTER_CREATOR_TABS.CHARACTER_BOOK, label: 'Character Book', Icon: LuBookOpen },
+  { value: CHARACTER_CREATOR_TABS.OVERRIDES, label: 'Prompt Overrides', Icon: LuSlidersHorizontal },
+  { value: CHARACTER_CREATOR_TABS.METADATA, label: 'Metadata', Icon: LuTags },
 ] satisfies Array<{ value: CharacterCreatorTab; label: string; Icon: typeof LuUserRound }>;
 
 interface iCharacterSectionPanelProps {
@@ -58,8 +59,8 @@ export function CharacterSectionPanel({
           ) : null}
           <Button
             type="button"
-            size="icon"
-            variant="ghost"
+            size={BUTTON_SIZES.ICON}
+            variant={BUTTON_VARIANTS.GHOST}
             aria-label={isCollapsed ? 'Expand section panel' : 'Collapse section panel'}
             aria-expanded={!isCollapsed}
             disabled={isCollapseLocked}

@@ -1,36 +1,85 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
-
-import { generateUuid } from '@~/utils/uuid';
 
 import {
   CHARACTER_BOOK_SCHEMA,
   CHARACTER_CARD_SCHEMA,
-  CHARACTER_TEXT_FIELD_KEYS,
+  CHARACTER_FIELD_KEY_ENUM,
+  CHARACTER_FIELD_KEYS,
   CHARACTER_TEXT_FIELD_KEY_SCHEMA,
+  CHARACTER_TEXT_FIELD_KEYS,
   CUSTOM_FIELD_SCHEMA,
-} from '../cards/card-schema';
+} from '@~/features/character-creator/lib/cards/card-schema';
+import { generateUuid } from '@~/utils/uuid';
+
 import type { CharacterBook, CharacterCard, CustomField } from '../cards/card-schema';
 
-export const CHARACTER_EDIT_LIST_FIELD_KEY_SCHEMA = z.enum(['tags', 'alternate_greetings']);
-export const CHARACTER_EDIT_LIST_FIELD_KEYS = CHARACTER_EDIT_LIST_FIELD_KEY_SCHEMA.enum;
+export const CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_ENUM = em([
+  'PATCHES_UPSERTED',
+  'REVIEW_REQUESTED',
+  'APPLY_REQUESTED',
+  'APPLY_SUCCEEDED',
+  'PATCHES_REJECTED',
+  'CONFLICTS_DETECTED',
+  'FAILED',
+]);
+export const CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES = CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_ENUM.cases;
+
+export const CHARACTER_EDIT_PATCH_KINDS_ENUM = em({
+  TEXT: 'text',
+  STRING_LIST: 'string-list',
+  CUSTOM_FIELDS: 'custom-fields',
+  CHARACTER_BOOK: 'character-book',
+});
+export const CHARACTER_EDIT_PATCH_KINDS_CASES = CHARACTER_EDIT_PATCH_KINDS_ENUM.cases;
+
+export const CHARACTER_EDIT_LIST_FIELD_KEY_ENUM = CHARACTER_FIELD_KEY_ENUM.pick([
+  CHARACTER_FIELD_KEYS.TAGS,
+  CHARACTER_FIELD_KEYS.ALTERNATE_GREETINGS,
+]);
+export const CHARACTER_EDIT_LIST_FIELD_KEYS = CHARACTER_EDIT_LIST_FIELD_KEY_ENUM.rawEnum;
+export const CHARACTER_EDIT_LIST_FIELD_KEY_SCHEMA = z.enum(CHARACTER_EDIT_LIST_FIELD_KEYS);
+
 export type CharacterEditListFieldKey = z.infer<typeof CHARACTER_EDIT_LIST_FIELD_KEY_SCHEMA>;
 
-export const CHARACTER_EDIT_FIELD_KEY_SCHEMA = z.enum([
-  ...CHARACTER_TEXT_FIELD_KEYS,
-  'tags',
-  'alternate_greetings',
-  'custom_fields',
-  'character_book',
+export const CHARACTER_EDIT_FIELD_KEY_ENUM = CHARACTER_FIELD_KEY_ENUM.pick([
+  CHARACTER_FIELD_KEYS.NAME,
+  CHARACTER_FIELD_KEYS.DESCRIPTION,
+  CHARACTER_FIELD_KEYS.PERSONALITY,
+  CHARACTER_FIELD_KEYS.SCENARIO,
+  CHARACTER_FIELD_KEYS.FIRST_MES,
+  CHARACTER_FIELD_KEYS.MES_EXAMPLE,
+  CHARACTER_FIELD_KEYS.CREATOR_NOTES,
+  CHARACTER_FIELD_KEYS.SYSTEM_PROMPT,
+  CHARACTER_FIELD_KEYS.POST_HISTORY_INSTRUCTIONS,
+  CHARACTER_FIELD_KEYS.CREATOR,
+  CHARACTER_FIELD_KEYS.CHARACTER_VERSION,
+  CHARACTER_FIELD_KEYS.TAGS,
+  CHARACTER_FIELD_KEYS.ALTERNATE_GREETINGS,
+  CHARACTER_FIELD_KEYS.CUSTOM_FIELDS,
+  CHARACTER_FIELD_KEYS.CHARACTER_BOOK,
 ]);
-export const CHARACTER_EDIT_FIELD_KEYS = CHARACTER_EDIT_FIELD_KEY_SCHEMA.enum;
+export const CHARACTER_EDIT_FIELD_KEYS = CHARACTER_EDIT_FIELD_KEY_ENUM.rawEnum;
+export const CHARACTER_EDIT_FIELD_KEY_SCHEMA = z.enum(CHARACTER_EDIT_FIELD_KEYS);
+
 export type CharacterEditFieldKey = z.infer<typeof CHARACTER_EDIT_FIELD_KEY_SCHEMA>;
 
-export const CHARACTER_EDIT_PATCH_STATUS_SCHEMA = z.enum(['proposed', 'applying', 'applied', 'rejected', 'conflict']);
-export const CHARACTER_EDIT_PATCH_STATUSES = CHARACTER_EDIT_PATCH_STATUS_SCHEMA.enum;
+export const CHARACTER_EDIT_PATCH_STATUS_ENUM = em(['PROPOSED', 'APPLYING', 'APPLIED', 'REJECTED', 'CONFLICT']);
+export const CHARACTER_EDIT_PATCH_STATUSES = CHARACTER_EDIT_PATCH_STATUS_ENUM.enum;
+export const CHARACTER_EDIT_PATCH_STATUS_SCHEMA = z.enum(CHARACTER_EDIT_PATCH_STATUSES);
+
 export type CharacterEditPatchStatus = z.infer<typeof CHARACTER_EDIT_PATCH_STATUS_SCHEMA>;
 
+export const CHARACTER_EDIT_PATCH_STATUS_LABELS = CHARACTER_EDIT_PATCH_STATUS_ENUM.derive<string>()(
+  [CHARACTER_EDIT_PATCH_STATUSES.PROPOSED, 'proposed'],
+  [CHARACTER_EDIT_PATCH_STATUSES.APPLYING, 'applying'],
+  [CHARACTER_EDIT_PATCH_STATUSES.APPLIED, 'applied'],
+  [CHARACTER_EDIT_PATCH_STATUSES.REJECTED, 'rejected'],
+  [CHARACTER_EDIT_PATCH_STATUSES.CONFLICT, 'conflict'],
+);
+
 const CHARACTER_EDIT_TEXT_PATCH_SCHEMA = z.object({
-  kind: z.literal('text'),
+  kind: z.literal(CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT),
   fieldKey: CHARACTER_TEXT_FIELD_KEY_SCHEMA,
   oldValue: z.string(),
   newValue: z.string(),
@@ -38,7 +87,7 @@ const CHARACTER_EDIT_TEXT_PATCH_SCHEMA = z.object({
 });
 
 const CHARACTER_EDIT_LIST_PATCH_SCHEMA = z.object({
-  kind: z.literal('string-list'),
+  kind: z.literal(CHARACTER_EDIT_PATCH_KINDS_CASES.STRING_LIST),
   fieldKey: CHARACTER_EDIT_LIST_FIELD_KEY_SCHEMA,
   oldValue: z.array(z.string()),
   newValue: z.array(z.string()),
@@ -46,16 +95,16 @@ const CHARACTER_EDIT_LIST_PATCH_SCHEMA = z.object({
 });
 
 const CHARACTER_EDIT_CUSTOM_FIELDS_PATCH_SCHEMA = z.object({
-  kind: z.literal('custom-fields'),
-  fieldKey: z.literal('custom_fields'),
+  kind: z.literal(CHARACTER_EDIT_PATCH_KINDS_CASES.CUSTOM_FIELDS),
+  fieldKey: z.literal(CHARACTER_EDIT_FIELD_KEYS.CUSTOM_FIELDS),
   oldValue: z.array(CUSTOM_FIELD_SCHEMA),
   newValue: z.array(CUSTOM_FIELD_SCHEMA),
   status: CHARACTER_EDIT_PATCH_STATUS_SCHEMA,
 });
 
 const CHARACTER_EDIT_CHARACTER_BOOK_PATCH_SCHEMA = z.object({
-  kind: z.literal('character-book'),
-  fieldKey: z.literal('character_book'),
+  kind: z.literal(CHARACTER_EDIT_PATCH_KINDS_CASES.CHARACTER_BOOK),
+  fieldKey: z.literal(CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK),
   oldValue: CHARACTER_BOOK_SCHEMA.optional(),
   newValue: CHARACTER_BOOK_SCHEMA.optional(),
   status: CHARACTER_EDIT_PATCH_STATUS_SCHEMA,
@@ -71,22 +120,24 @@ export type iCharacterEditPatch = z.infer<typeof CHARACTER_EDIT_PATCH_SCHEMA>;
 
 export function isCharacterEditPatchUnresolved(patch: iCharacterEditPatch) {
   return (
-    patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed ||
-    patch.status === CHARACTER_EDIT_PATCH_STATUSES.applying ||
-    patch.status === CHARACTER_EDIT_PATCH_STATUSES.conflict
+    patch.status === CHARACTER_EDIT_PATCH_STATUSES.PROPOSED ||
+    patch.status === CHARACTER_EDIT_PATCH_STATUSES.APPLYING ||
+    patch.status === CHARACTER_EDIT_PATCH_STATUSES.CONFLICT
   );
 }
 
-export const CHARACTER_EDIT_PROPOSAL_STATUS_SCHEMA = z.enum([
-  'streaming',
-  'review',
-  'applying',
-  'applied',
-  'rejected',
-  'conflict',
-  'failed',
+export const CHARACTER_EDIT_PROPOSAL_STATUS_ENUM = em([
+  'STREAMING',
+  'REVIEW',
+  'APPLYING',
+  'APPLIED',
+  'REJECTED',
+  'CONFLICT',
+  'FAILED',
 ]);
-export const CHARACTER_EDIT_PROPOSAL_STATUSES = CHARACTER_EDIT_PROPOSAL_STATUS_SCHEMA.enum;
+export const CHARACTER_EDIT_PROPOSAL_STATUSES = CHARACTER_EDIT_PROPOSAL_STATUS_ENUM.enum;
+export const CHARACTER_EDIT_PROPOSAL_STATUS_SCHEMA = z.enum(CHARACTER_EDIT_PROPOSAL_STATUSES);
+
 export type CharacterEditProposalStatus = z.infer<typeof CHARACTER_EDIT_PROPOSAL_STATUS_SCHEMA>;
 
 export const CHARACTER_EDIT_PROPOSAL_SCHEMA = z.object({
@@ -138,7 +189,7 @@ export function supersedeOverlappingCharacterEditProposals(
     if (supersededFieldKeys.length === 0) return proposal;
 
     return reduceCharacterEditProposal(proposal, {
-      type: 'patches-rejected',
+      type: CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.PATCHES_REJECTED,
       fieldKeys: supersededFieldKeys,
       occurredAt: nextProposal.createdAt,
     });
@@ -147,32 +198,36 @@ export function supersedeOverlappingCharacterEditProposals(
 
 export const CHARACTER_EDIT_PROPOSAL_EVENT_SCHEMA = z.discriminatedUnion('type', [
   z.object({
-    type: z.literal('patches-upserted'),
+    type: z.literal(CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.PATCHES_UPSERTED),
     patches: z.array(CHARACTER_EDIT_PATCH_SCHEMA),
     occurredAt: z.string(),
   }),
-  z.object({ type: z.literal('review-requested'), occurredAt: z.string() }),
+  z.object({ type: z.literal(CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.REVIEW_REQUESTED), occurredAt: z.string() }),
   z.object({
-    type: z.literal('apply-requested'),
+    type: z.literal(CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_REQUESTED),
     fieldKeys: z.array(CHARACTER_EDIT_FIELD_KEY_SCHEMA),
     occurredAt: z.string(),
   }),
   z.object({
-    type: z.literal('apply-succeeded'),
+    type: z.literal(CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_SUCCEEDED),
     fieldKeys: z.array(CHARACTER_EDIT_FIELD_KEY_SCHEMA),
     occurredAt: z.string(),
   }),
   z.object({
-    type: z.literal('patches-rejected'),
+    type: z.literal(CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.PATCHES_REJECTED),
     fieldKeys: z.array(CHARACTER_EDIT_FIELD_KEY_SCHEMA),
     occurredAt: z.string(),
   }),
   z.object({
-    type: z.literal('conflicts-detected'),
+    type: z.literal(CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.CONFLICTS_DETECTED),
     fieldKeys: z.array(CHARACTER_EDIT_FIELD_KEY_SCHEMA),
     occurredAt: z.string(),
   }),
-  z.object({ type: z.literal('failed'), message: z.string(), occurredAt: z.string() }),
+  z.object({
+    type: z.literal(CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.FAILED),
+    message: z.string(),
+    occurredAt: z.string(),
+  }),
 ]);
 export type iCharacterEditProposalEvent = z.infer<typeof CHARACTER_EDIT_PROPOSAL_EVENT_SCHEMA>;
 
@@ -222,11 +277,14 @@ function hashString(value: string) {
 }
 
 function getPatchValue(card: CharacterCard, patch: iCharacterEditPatch) {
-  if (patch.kind === 'text' || patch.kind === 'string-list') {
+  if (
+    patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT ||
+    patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.STRING_LIST
+  ) {
     return card.data[patch.fieldKey];
   }
 
-  if (patch.kind === 'custom-fields') {
+  if (patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.CUSTOM_FIELDS) {
     return card.data.extensions.custom_fields;
   }
 
@@ -234,17 +292,17 @@ function getPatchValue(card: CharacterCard, patch: iCharacterEditPatch) {
 }
 
 function applyPatch(card: CharacterCard, patch: iCharacterEditPatch) {
-  if (patch.kind === 'text') {
+  if (patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT) {
     card.data[patch.fieldKey] = patch.newValue;
     return;
   }
 
-  if (patch.kind === 'string-list') {
+  if (patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.STRING_LIST) {
     card.data[patch.fieldKey] = structuredClone(patch.newValue);
     return;
   }
 
-  if (patch.kind === 'custom-fields') {
+  if (patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.CUSTOM_FIELDS) {
     card.data.extensions.custom_fields = structuredClone(patch.newValue);
     return;
   }
@@ -255,17 +313,17 @@ function applyPatch(card: CharacterCard, patch: iCharacterEditPatch) {
 function getProposalStatusAfterSettlingPatches(patches: iCharacterEditPatch[]) {
   const hasActivePatch = patches.some(
     (patch) =>
-      patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed ||
-      patch.status === CHARACTER_EDIT_PATCH_STATUSES.applying ||
-      patch.status === CHARACTER_EDIT_PATCH_STATUSES.conflict,
+      patch.status === CHARACTER_EDIT_PATCH_STATUSES.PROPOSED ||
+      patch.status === CHARACTER_EDIT_PATCH_STATUSES.APPLYING ||
+      patch.status === CHARACTER_EDIT_PATCH_STATUSES.CONFLICT,
   );
 
   if (hasActivePatch) {
-    return CHARACTER_EDIT_PROPOSAL_STATUSES.review;
+    return CHARACTER_EDIT_PROPOSAL_STATUSES.REVIEW;
   }
 
-  const hasAppliedPatch = patches.some((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.applied);
-  return hasAppliedPatch ? CHARACTER_EDIT_PROPOSAL_STATUSES.applied : CHARACTER_EDIT_PROPOSAL_STATUSES.rejected;
+  const hasAppliedPatch = patches.some((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.APPLIED);
+  return hasAppliedPatch ? CHARACTER_EDIT_PROPOSAL_STATUSES.APPLIED : CHARACTER_EDIT_PROPOSAL_STATUSES.REJECTED;
 }
 
 export function createCharacterCardRevision(card: CharacterCard) {
@@ -284,21 +342,27 @@ export function createCharacterEditPatches(
     const newValue = proposedCard.data[fieldKey];
 
     if (oldValue !== newValue) {
-      patches.push({ kind: 'text', fieldKey, oldValue, newValue, status: CHARACTER_EDIT_PATCH_STATUSES.proposed });
+      patches.push({
+        kind: CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT,
+        fieldKey,
+        oldValue,
+        newValue,
+        status: CHARACTER_EDIT_PATCH_STATUSES.PROPOSED,
+      });
     }
   });
 
-  Object.values(CHARACTER_EDIT_LIST_FIELD_KEYS).forEach((fieldKey) => {
+  CHARACTER_EDIT_LIST_FIELD_KEY_ENUM.rawValues.forEach((fieldKey) => {
     const oldValue = baseCard.data[fieldKey];
     const newValue = proposedCard.data[fieldKey];
 
     if (!areValuesEqual(oldValue, newValue)) {
       patches.push({
-        kind: 'string-list',
+        kind: CHARACTER_EDIT_PATCH_KINDS_CASES.STRING_LIST,
         fieldKey,
         oldValue: structuredClone(oldValue),
         newValue: structuredClone(newValue),
-        status: CHARACTER_EDIT_PATCH_STATUSES.proposed,
+        status: CHARACTER_EDIT_PATCH_STATUSES.PROPOSED,
       });
     }
   });
@@ -307,11 +371,11 @@ export function createCharacterEditPatches(
   const newCustomFields: CustomField[] = proposedCard.data.extensions.custom_fields;
   if (!areValuesEqual(oldCustomFields, newCustomFields)) {
     patches.push({
-      kind: 'custom-fields',
-      fieldKey: CHARACTER_EDIT_FIELD_KEYS.custom_fields,
+      kind: CHARACTER_EDIT_PATCH_KINDS_CASES.CUSTOM_FIELDS,
+      fieldKey: CHARACTER_EDIT_FIELD_KEYS.CUSTOM_FIELDS,
       oldValue: structuredClone(oldCustomFields),
       newValue: structuredClone(newCustomFields),
-      status: CHARACTER_EDIT_PATCH_STATUSES.proposed,
+      status: CHARACTER_EDIT_PATCH_STATUSES.PROPOSED,
     });
   }
 
@@ -319,11 +383,11 @@ export function createCharacterEditPatches(
   const newCharacterBook: CharacterBook | undefined = proposedCard.data.character_book;
   if (!areValuesEqual(oldCharacterBook, newCharacterBook)) {
     patches.push({
-      kind: 'character-book',
-      fieldKey: CHARACTER_EDIT_FIELD_KEYS.character_book,
+      kind: CHARACTER_EDIT_PATCH_KINDS_CASES.CHARACTER_BOOK,
+      fieldKey: CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK,
       oldValue: oldCharacterBook ? structuredClone(oldCharacterBook) : undefined,
       newValue: newCharacterBook ? structuredClone(newCharacterBook) : undefined,
-      status: CHARACTER_EDIT_PATCH_STATUSES.proposed,
+      status: CHARACTER_EDIT_PATCH_STATUSES.PROPOSED,
     });
   }
 
@@ -343,17 +407,17 @@ export function preserveAssistantProtectedFields(
     }
   });
 
-  Object.values(CHARACTER_EDIT_LIST_FIELD_KEYS).forEach((fieldKey) => {
+  CHARACTER_EDIT_LIST_FIELD_KEY_ENUM.rawValues.forEach((fieldKey) => {
     if (!fieldShouldAllowAssistantEditing[fieldKey]) {
       nextCard.data[fieldKey] = structuredClone(currentCard.data[fieldKey]);
     }
   });
 
-  if (!fieldShouldAllowAssistantEditing[CHARACTER_EDIT_FIELD_KEYS.custom_fields]) {
+  if (!fieldShouldAllowAssistantEditing[CHARACTER_EDIT_FIELD_KEYS.CUSTOM_FIELDS]) {
     nextCard.data.extensions.custom_fields = structuredClone(currentCard.data.extensions.custom_fields);
   }
 
-  if (!fieldShouldAllowAssistantEditing[CHARACTER_EDIT_FIELD_KEYS.character_book]) {
+  if (!fieldShouldAllowAssistantEditing[CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK]) {
     nextCard.data.character_book = currentCard.data.character_book
       ? structuredClone(currentCard.data.character_book)
       : undefined;
@@ -377,7 +441,7 @@ export function createCharacterEditProposal({
     characterId: characterId ?? null,
     baseRevision: createCharacterCardRevision(baseCard),
     patches: createCharacterEditPatches(baseCard, proposedCard),
-    status: CHARACTER_EDIT_PROPOSAL_STATUSES.review,
+    status: CHARACTER_EDIT_PROPOSAL_STATUSES.REVIEW,
     sourceMessageId,
     toolCallId,
     summary,
@@ -391,25 +455,25 @@ export function reduceCharacterEditProposal(
   proposal: iCharacterEditProposal,
   event: iCharacterEditProposalEvent,
 ): iCharacterEditProposal {
-  if (event.type === 'patches-upserted') {
+  if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.PATCHES_UPSERTED) {
     const incomingFieldKeys = new Set(event.patches.map((patch) => patch.fieldKey));
     return {
       ...proposal,
       patches: [...proposal.patches.filter((patch) => !incomingFieldKeys.has(patch.fieldKey)), ...event.patches],
-      status: CHARACTER_EDIT_PROPOSAL_STATUSES.streaming,
+      status: CHARACTER_EDIT_PROPOSAL_STATUSES.STREAMING,
       errorMessage: null,
       updatedAt: event.occurredAt,
     };
   }
 
-  if (event.type === 'review-requested') {
-    return { ...proposal, status: CHARACTER_EDIT_PROPOSAL_STATUSES.review, updatedAt: event.occurredAt };
+  if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.REVIEW_REQUESTED) {
+    return { ...proposal, status: CHARACTER_EDIT_PROPOSAL_STATUSES.REVIEW, updatedAt: event.occurredAt };
   }
 
-  if (event.type === 'failed') {
+  if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.FAILED) {
     return {
       ...proposal,
-      status: CHARACTER_EDIT_PROPOSAL_STATUSES.failed,
+      status: CHARACTER_EDIT_PROPOSAL_STATUSES.FAILED,
       errorMessage: event.message,
       updatedAt: event.occurredAt,
     };
@@ -417,35 +481,35 @@ export function reduceCharacterEditProposal(
 
   const fieldKeys = new Set(event.fieldKeys);
   let nextPatchStatus: CharacterEditPatchStatus;
-  if (event.type === 'apply-requested') {
-    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.applying;
-  } else if (event.type === 'apply-succeeded') {
-    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.applied;
-  } else if (event.type === 'patches-rejected') {
-    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.rejected;
+  if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_REQUESTED) {
+    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.APPLYING;
+  } else if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_SUCCEEDED) {
+    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.APPLIED;
+  } else if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.PATCHES_REJECTED) {
+    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.REJECTED;
   } else {
-    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.conflict;
+    nextPatchStatus = CHARACTER_EDIT_PATCH_STATUSES.CONFLICT;
   }
 
   const patches = proposal.patches.map((patch) =>
     fieldKeys.has(patch.fieldKey) ? { ...patch, status: nextPatchStatus } : patch,
   );
 
-  if (event.type === 'apply-requested') {
+  if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_REQUESTED) {
     return {
       ...proposal,
       patches,
-      status: CHARACTER_EDIT_PROPOSAL_STATUSES.applying,
+      status: CHARACTER_EDIT_PROPOSAL_STATUSES.APPLYING,
       errorMessage: null,
       updatedAt: event.occurredAt,
     };
   }
 
-  if (event.type === 'conflicts-detected') {
+  if (event.type === CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.CONFLICTS_DETECTED) {
     return {
       ...proposal,
       patches,
-      status: CHARACTER_EDIT_PROPOSAL_STATUSES.conflict,
+      status: CHARACTER_EDIT_PROPOSAL_STATUSES.CONFLICT,
       updatedAt: event.occurredAt,
     };
   }
@@ -488,7 +552,7 @@ export function applyCharacterEditProposal(
     return {
       card: currentCard,
       proposal: reduceCharacterEditProposal(proposal, {
-        type: 'conflicts-detected',
+        type: CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.CONFLICTS_DETECTED,
         fieldKeys: conflictFieldKeys,
         occurredAt,
       }),
@@ -507,7 +571,7 @@ export function applyCharacterEditProposal(
   return {
     card: nextCard,
     proposal: reduceCharacterEditProposal(proposal, {
-      type: 'apply-succeeded',
+      type: CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_SUCCEEDED,
       fieldKeys: [...selectedFieldKeys],
       occurredAt,
     }),

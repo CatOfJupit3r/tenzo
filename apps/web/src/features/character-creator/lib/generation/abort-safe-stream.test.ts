@@ -1,6 +1,8 @@
 import { EventType } from '@tanstack/ai';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
+
 import { suppressGenerationAbort, toAbortSafeServerSentEventsResponse } from './abort-safe-stream';
 
 async function collect<T>(stream: AsyncIterable<T>) {
@@ -15,7 +17,7 @@ describe('abort-safe generation streams', () => {
     async function* stream() {
       yield 'started';
       abortController.abort();
-      throw new DOMException('Request aborted', 'AbortError');
+      throw new DOMException('Request aborted', ABORT_ERROR_NAMES.ABORT_ERROR);
     }
 
     await expect(collect(suppressGenerationAbort(stream(), abortController.signal))).resolves.toEqual(['started']);
@@ -37,7 +39,7 @@ describe('abort-safe generation streams', () => {
       await new Promise<never>((_resolve, reject) => {
         abortController.signal.addEventListener(
           'abort',
-          () => reject(new DOMException('Request aborted', 'AbortError')),
+          () => reject(new DOMException('Request aborted', ABORT_ERROR_NAMES.ABORT_ERROR)),
           { once: true },
         );
       });

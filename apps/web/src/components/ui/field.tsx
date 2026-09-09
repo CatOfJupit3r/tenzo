@@ -1,12 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createFormHook, createFormHookContexts } from '@tanstack/react-form';
-import { cva } from 'class-variance-authority';
 import type { VariantProps } from 'class-variance-authority';
-import { useCallback, useMemo } from 'react';
+import { cva } from 'class-variance-authority';
 import type { FormEvent } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Label } from '@~/components/ui/label';
 import { Separator } from '@~/components/ui/separator';
+import { FIELD_LEGEND_VARIANTS, FIELD_ORIENTATIONS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 // eslint-disable-next-line import-x/no-cycle
@@ -58,9 +59,9 @@ function FieldSet({ className, ...props }: React.ComponentProps<'fieldset'>) {
 
 function FieldLegend({
   className,
-  variant = 'legend',
+  variant = FIELD_LEGEND_VARIANTS.LEGEND,
   ...props
-}: React.ComponentProps<'legend'> & { variant?: 'legend' | 'label' }) {
+}: React.ComponentProps<'legend'> & { variant?: (typeof FIELD_LEGEND_VARIANTS)[keyof typeof FIELD_LEGEND_VARIANTS] }) {
   return (
     <legend
       data-slot="field-legend"
@@ -87,13 +88,13 @@ function FieldGroup({ className, ...props }: React.ComponentProps<'div'>) {
 const fieldVariants = cva('group/field flex w-full gap-3 data-[invalid=true]:text-destructive', {
   variants: {
     orientation: {
-      vertical: ['flex-col *:w-full [&>.sr-only]:w-auto'],
-      horizontal: [
+      [FIELD_ORIENTATIONS.VERTICAL]: ['flex-col *:w-full [&>.sr-only]:w-auto'],
+      [FIELD_ORIENTATIONS.HORIZONTAL]: [
         'flex-row items-center',
         '*:data-[slot=field-label]:flex-auto',
         'has-[>[data-slot=field-content]]:items-start has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
       ],
-      responsive: [
+      [FIELD_ORIENTATIONS.RESPONSIVE]: [
         'flex-col *:w-full @md/field-group:flex-row @md/field-group:items-center @md/field-group:*:w-auto [&>.sr-only]:w-auto',
         '@md/field-group:*:data-[slot=field-label]:flex-auto',
         '@md/field-group:has-[>[data-slot=field-content]]:items-start @md/field-group:has-[>[data-slot=field-content]]:[&>[role=checkbox],[role=radio]]:mt-px',
@@ -101,13 +102,13 @@ const fieldVariants = cva('group/field flex w-full gap-3 data-[invalid=true]:tex
     },
   },
   defaultVariants: {
-    orientation: 'vertical',
+    orientation: FIELD_ORIENTATIONS.VERTICAL,
   },
 });
 
 function Field({
   className,
-  orientation = 'vertical',
+  orientation = FIELD_ORIENTATIONS.VERTICAL,
   ...props
 }: React.ComponentProps<'div'> & VariantProps<typeof fieldVariants>) {
   return (
@@ -270,14 +271,14 @@ function Form({
 
 export {
   Field,
-  FieldLabel,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
+  FieldLabel,
   FieldLegend,
   FieldSeparator,
   FieldSet,
-  FieldContent,
   FieldTitle,
   Form,
 };

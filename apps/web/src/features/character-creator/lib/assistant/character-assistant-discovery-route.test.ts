@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
 import type { iCharacterDiscoveryDirectionsService } from '@~/features/character-creator/lib/assistant/discovery-directions.server';
 import { GENERATION_PROVIDERS } from '@~/features/character-creator/lib/generation/generation-config';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 
 import {
   createCharacterAssistantDiscoveryRequestHandler,
@@ -10,7 +11,7 @@ import {
 } from '../../../../routes/api/character-assistant-discovery';
 
 const BASE_REQUEST = {
-  provider: GENERATION_PROVIDERS.koboldcpp,
+  provider: GENERATION_PROVIDERS.KOBOLDCPP,
   endpoint: 'http://localhost:11434',
   apiKey: 'key',
   model: 'gpt-4.1-mini',
@@ -22,13 +23,13 @@ const BASE_REQUEST = {
   topK: 0,
   minP: 0,
   originalPremise: 'A quiet librarian hides a map in a broken clock.',
-  category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+  category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE,
 };
 
 function createRequest(payload: typeof BASE_REQUEST) {
   return new Request('http://localhost/api/character-assistant-discovery', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': MEDIA_TYPES.JSON },
     body: JSON.stringify(payload),
   });
 }
@@ -48,7 +49,7 @@ describe('character assistant discovery generation route', () => {
       createService([
         {
           id: 'card-1',
-          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE,
           title: 'Candid and careful',
           description: 'The character keeps emotional distance, but still answers every question directly.',
           sourceCardId: null,
@@ -56,7 +57,7 @@ describe('character assistant discovery generation route', () => {
         },
         {
           id: 'card-2',
-          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE,
           title: 'Dry and precise',
           description: 'The character speaks in clear clauses and trims every sentence to its core.',
           sourceCardId: null,
@@ -64,7 +65,7 @@ describe('character assistant discovery generation route', () => {
         },
         {
           id: 'card-3',
-          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+          category: CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE,
           title: 'Quietly theatrical',
           description: 'The character layers humor over anxiety, then reveals an old wound at the end.',
           sourceCardId: null,
@@ -78,7 +79,7 @@ describe('character assistant discovery generation route', () => {
     expect(body.cards).toHaveLength(3);
     expect(
       body.cards.every(
-        (card) => (card as { category: string }).category === CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.tone,
+        (card) => (card as { category: string }).category === CHARACTER_ASSISTANT_DISCOVERY_DIRECTION_CATEGORIES.TONE,
       ),
     ).toBe(true);
   });

@@ -4,13 +4,16 @@ import { ZodError } from 'zod';
 import { REQUEST_MODES } from '@~/features/character-creator/lib/generation/generation-config';
 import { CHARACTER_GENERATION_STREAM_REQUEST_SCHEMA } from '@~/features/character-creator/lib/generation/generation-stream-contracts';
 import { streamCharacterText } from '@~/features/character-creator/lib/generation/tanstack-ai-text-generation';
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
 import { loggerFactory } from '@~/lib/logging/logger';
 
 const CHARACTER_GENERATION_ROUTE_LOGGER = loggerFactory.getLogger('api.character-generation');
 
 function isCharacterGenerationAbort(error: unknown, signal: AbortSignal) {
   return (
-    signal.aborted || (error instanceof Error && (error.name === 'AbortError' || error.name === 'RequestAbortedError'))
+    signal.aborted ||
+    (error instanceof Error &&
+      (error.name === ABORT_ERROR_NAMES.ABORT_ERROR || error.name === ABORT_ERROR_NAMES.REQUEST_ABORTED_ERROR))
   );
 }
 
@@ -61,7 +64,7 @@ export const Route = createFileRoute('/api/character-generate')({
       POST: async ({ request }) => {
         let requestContext: Record<string, unknown> = {
           operation: 'character-generation',
-          requestMode: REQUEST_MODES.proxy,
+          requestMode: REQUEST_MODES.PROXY,
         };
 
         try {

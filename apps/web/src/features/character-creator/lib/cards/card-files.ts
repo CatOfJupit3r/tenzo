@@ -1,22 +1,29 @@
+import {
+  IMPORTED_ARCHIVE_KINDS_CASES,
+  IMPORTED_CARD_SOURCE_KINDS,
+} from '@~/features/character-creator/lib/cards/card-file-enums';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
+
 import type { iCharacterGenerationConnectionSettings } from '../generation/generation-config';
-import { renderPortraitBlobWithCrop } from '../portrait/portrait-focal-point';
 import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
-import { createArchiveBlob, readArchiveBytes } from './archive';
+import { renderPortraitBlobWithCrop } from '../portrait/portrait-focal-point';
 import type { iArchiveFileEntry } from './archive';
-import { buildFullBackupFiles, findBackupManifest, parseFullBackup } from './backup';
+import { createArchiveBlob, readArchiveBytes } from './archive';
 import type { iBackupPortraitAsset, iTenzoBackup } from './backup';
+import { buildFullBackupFiles, findBackupManifest, parseFullBackup } from './backup';
+import type { ImportedCardSourceKind } from './card-file-enums';
+import type { iCharacterCardExportOptions, iTenzoCardMetadata } from './card-format';
 import {
   extractTenzoCardMetadata,
   getCharacterCardFileStem,
   normalizeImportedCharacterCard,
   serializeCharacterCard,
 } from './card-format';
-import type { iCharacterCardExportOptions, iTenzoCardMetadata } from './card-format';
 import type { CharacterCard } from './card-schema';
 import type { iCharacterLibraryItem } from './character-library';
 import type { iStoredExampleCharacter } from './example-characters';
-import { ARCHIVE_FORMAT_FILE_EXTENSIONS } from './export-settings';
 import type { ArchiveFormat, ExportDetailLevel } from './export-settings';
+import { ARCHIVE_FORMAT_FILE_EXTENSIONS } from './export-settings';
 import { downloadBlob, readBlobAsUint8Array, readFileAsText } from './image-utils';
 import { embedCharacterCardInPng, readCharacterCardFromPng } from './png-embed';
 
@@ -25,24 +32,19 @@ export interface iImportedCharacterCardFile {
   tenzoMetadata: iTenzoCardMetadata;
   portraitBlob: Blob | null;
   fileName: string;
-  sourceKind: 'json' | 'png';
+  sourceKind: ImportedCardSourceKind;
 }
 
 function isJsonFile(file: File): boolean {
-  return file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+  return file.type === MEDIA_TYPES.JSON || file.name.toLowerCase().endsWith('.json');
 }
 
 function isPngFile(file: File): boolean {
-  return file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+  return file.type === MEDIA_TYPES.PNG || file.name.toLowerCase().endsWith('.png');
 }
 
 const ARCHIVE_FILE_NAME_PATTERN = /\.(zip|tar\.gz|tgz)$/;
-const ARCHIVE_MIME_TYPES = [
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/gzip',
-  'application/x-gzip',
-];
+const ARCHIVE_MIME_TYPES = [MEDIA_TYPES.ZIP, 'application/x-zip-compressed', MEDIA_TYPES.GZIP, 'application/x-gzip'];
 
 export function isArchiveFile(file: File): boolean {
   return ARCHIVE_MIME_TYPES.includes(file.type) || ARCHIVE_FILE_NAME_PATTERN.test(file.name.toLowerCase());
@@ -56,7 +58,7 @@ function importCharacterCardJsonText(jsonText: string, fileName: string): iImpor
     tenzoMetadata: extractTenzoCardMetadata(rawCard),
     portraitBlob: null,
     fileName,
-    sourceKind: 'json',
+    sourceKind: IMPORTED_CARD_SOURCE_KINDS.JSON,
   };
 }
 
@@ -73,7 +75,7 @@ function importCharacterCardPngBytes(
     tenzoMetadata: extractTenzoCardMetadata(rawCard),
     portraitBlob,
     fileName,
-    sourceKind: 'png',
+    sourceKind: IMPORTED_CARD_SOURCE_KINDS.PNG,
   };
 }
 
@@ -93,7 +95,7 @@ export async function importCharacterCardFile(file: File): Promise<iImportedChar
 
 export async function exportCharacterCardJson(card: CharacterCard, options: iCharacterCardExportOptions) {
   const jsonText = serializeCharacterCard(card, options);
-  const jsonBlob = new Blob([jsonText], { type: 'application/json' });
+  const jsonBlob = new Blob([jsonText], { type: MEDIA_TYPES.JSON });
   downloadBlob(jsonBlob, `${getCharacterCardFileStem(card)}.json`);
 }
 
@@ -116,7 +118,7 @@ export async function exportCharacterCardPng(
   options: iCharacterCardExportOptions,
 ) {
   const embeddedPngBytes = await buildCharacterCardPngBytes(card, portraitBlob, cropRect, options);
-  const embeddedPngBlob = new Blob([embeddedPngBytes.slice()], { type: 'image/png' });
+  const embeddedPngBlob = new Blob([embeddedPngBytes.slice()], { type: MEDIA_TYPES.PNG });
 
   downloadBlob(embeddedPngBlob, `${getCharacterCardFileStem(card)}.png`);
 }
@@ -180,7 +182,7 @@ export async function exportCharactersArchive(
   const archiveBlob = createArchiveBlob(files, format);
   const dateStamp = new Date().toISOString().slice(0, 10);
 
-  downloadBlob(archiveBlob, `tenzo-characters-${dateStamp}${ARCHIVE_FORMAT_FILE_EXTENSIONS[format]}`);
+  downloadBlob(archiveBlob, `tenzo-characters-${dateStamp}${ARCHIVE_FORMAT_FILE_EXTENSIONS.get(format)}`);
 }
 
 export async function exportFullBackupArchive(
@@ -201,12 +203,12 @@ export async function exportFullBackupArchive(
   const archiveBlob = createArchiveBlob(files, format);
   const dateStamp = new Date().toISOString().slice(0, 10);
 
-  downloadBlob(archiveBlob, `tenzo-backup-${dateStamp}${ARCHIVE_FORMAT_FILE_EXTENSIONS[format]}`);
+  downloadBlob(archiveBlob, `tenzo-backup-${dateStamp}${ARCHIVE_FORMAT_FILE_EXTENSIONS.get(format)}`);
 }
 
 export type iImportedArchive =
-  | { kind: 'backup'; backup: iTenzoBackup }
-  | { kind: 'cards'; cards: iImportedCharacterCardFile[]; failedPaths: string[] };
+  | { kind: typeof IMPORTED_ARCHIVE_KINDS_CASES.BACKUP; backup: iTenzoBackup }
+  | { kind: typeof IMPORTED_ARCHIVE_KINDS_CASES.CARDS; cards: iImportedCharacterCardFile[]; failedPaths: string[] };
 
 function getArchiveEntryBaseName(path: string): string {
   const segments = path.split('/');
@@ -218,7 +220,7 @@ export async function importArchiveFile(file: File): Promise<iImportedArchive> {
   const entries = readArchiveBytes(archiveBytes);
 
   if (findBackupManifest(entries)) {
-    return { kind: 'backup', backup: parseFullBackup(entries) };
+    return { kind: IMPORTED_ARCHIVE_KINDS_CASES.BACKUP, backup: parseFullBackup(entries) };
   }
 
   const cards: iImportedCharacterCardFile[] = [];
@@ -233,7 +235,7 @@ export async function importArchiveFile(file: File): Promise<iImportedArchive> {
           importCharacterCardJsonText(new TextDecoder().decode(entry.data), getArchiveEntryBaseName(entry.path)),
         );
       } else if (lowerPath.endsWith('.png')) {
-        const portraitBlob = new Blob([entry.data.slice()], { type: 'image/png' });
+        const portraitBlob = new Blob([entry.data.slice()], { type: MEDIA_TYPES.PNG });
         cards.push(importCharacterCardPngBytes(entry.data, portraitBlob, getArchiveEntryBaseName(entry.path)));
       }
     } catch {
@@ -245,5 +247,5 @@ export async function importArchiveFile(file: File): Promise<iImportedArchive> {
     throw new Error('The archive does not contain a Tenzo backup or any importable character cards.');
   }
 
-  return { kind: 'cards', cards, failedPaths };
+  return { kind: IMPORTED_ARCHIVE_KINDS_CASES.CARDS, cards, failedPaths };
 }

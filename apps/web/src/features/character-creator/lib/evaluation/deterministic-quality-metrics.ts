@@ -1,26 +1,33 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
 import type { CharacterTextFieldKey } from '../cards/card-schema';
 import { CHARACTER_TEXT_FIELD_KEYS } from '../cards/card-schema';
 import { TEMPLATE_SLOT_PATTERN } from '../cards/field-templates';
 
-export const QUALITY_RULE_SCHEMA = z.enum([
-  'empty_field',
-  'short_field',
-  'required_macro_missing',
-  'strict_template_preservation',
-  'duplicate_sentence',
-  'ngram_overlap',
+export const QUALITY_RULE_ENUM = em([
+  'EMPTY_FIELD',
+  'SHORT_FIELD',
+  'REQUIRED_MACRO_MISSING',
+  'STRICT_TEMPLATE_PRESERVATION',
+  'DUPLICATE_SENTENCE',
+  'NGRAM_OVERLAP',
 ]);
-export const QUALITY_RULES = QUALITY_RULE_SCHEMA.enum;
+export const QUALITY_RULES = QUALITY_RULE_ENUM.enum;
+export const QUALITY_RULE_SCHEMA = z.enum(QUALITY_RULES);
+
 export type QualityRule = z.infer<typeof QUALITY_RULE_SCHEMA>;
 
-export const QUALITY_SEVERITY_SCHEMA = z.enum(['error', 'warning']);
-export const QUALITY_SEVERITIES = QUALITY_SEVERITY_SCHEMA.enum;
+export const QUALITY_SEVERITY_ENUM = em(['ERROR', 'WARNING']);
+export const QUALITY_SEVERITIES = QUALITY_SEVERITY_ENUM.enum;
+export const QUALITY_SEVERITY_SCHEMA = z.enum(QUALITY_SEVERITIES);
+
 export type QualitySeverity = z.infer<typeof QUALITY_SEVERITY_SCHEMA>;
 
-export const QUALITY_EVIDENCE_CLASS_SCHEMA = z.enum(['length', 'macro', 'template', 'exact_sentence', 'ngram_overlap']);
-export const QUALITY_EVIDENCE_CLASSES = QUALITY_EVIDENCE_CLASS_SCHEMA.enum;
+export const QUALITY_EVIDENCE_CLASS_ENUM = em(['LENGTH', 'MACRO', 'TEMPLATE', 'EXACT_SENTENCE', 'NGRAM_OVERLAP']);
+export const QUALITY_EVIDENCE_CLASSES = QUALITY_EVIDENCE_CLASS_ENUM.enum;
+export const QUALITY_EVIDENCE_CLASS_SCHEMA = z.enum(QUALITY_EVIDENCE_CLASSES);
+
 export type QualityEvidenceClass = z.infer<typeof QUALITY_EVIDENCE_CLASS_SCHEMA>;
 
 export const DEFAULT_DETERMINISTIC_QUALITY_OPTIONS = {
@@ -65,14 +72,14 @@ export interface iDeterministicQualityEvaluationResult {
   findings: iDeterministicQualityFinding[];
 }
 
-const QUALITY_RULE_ORDER = {
-  [QUALITY_RULES.empty_field]: 0,
-  [QUALITY_RULES.short_field]: 1,
-  [QUALITY_RULES.required_macro_missing]: 2,
-  [QUALITY_RULES.strict_template_preservation]: 3,
-  [QUALITY_RULES.duplicate_sentence]: 4,
-  [QUALITY_RULES.ngram_overlap]: 5,
-} satisfies Record<QualityRule, number>;
+const QUALITY_RULE_ORDER = QUALITY_RULE_ENUM.derive<number>()(
+  [QUALITY_RULES.EMPTY_FIELD, 0],
+  [QUALITY_RULES.SHORT_FIELD, 1],
+  [QUALITY_RULES.REQUIRED_MACRO_MISSING, 2],
+  [QUALITY_RULES.STRICT_TEMPLATE_PRESERVATION, 3],
+  [QUALITY_RULES.DUPLICATE_SENTENCE, 4],
+  [QUALITY_RULES.NGRAM_OVERLAP, 5],
+);
 
 const FIELD_KEY_ORDER = new Map(CHARACTER_TEXT_FIELD_KEYS.map((fieldKey, index) => [fieldKey, index] as const));
 
@@ -80,52 +87,67 @@ const MACRO_PATTERN = /\{\{\s*([^{}]+?)\s*\}\}/g;
 const WORD_TOKEN_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)?/gu;
 const SENTENCE_BOUNDARY_PATTERN = /[.!?]+|\r?\n+/g;
 
-const QUALITY_FINDING_COPY = {
-  [QUALITY_RULES.empty_field]: {
-    severity: QUALITY_SEVERITIES.error,
-    evidenceClass: QUALITY_EVIDENCE_CLASSES.length,
-    message: 'Field is empty.',
-    repairInstruction: 'Add meaningful field content.',
-  },
-  [QUALITY_RULES.short_field]: {
-    severity: QUALITY_SEVERITIES.warning,
-    evidenceClass: QUALITY_EVIDENCE_CLASSES.length,
-    message: 'Field is shorter than its configured minimum.',
-    repairInstruction: 'Expand the field with specific, relevant detail.',
-  },
-  [QUALITY_RULES.required_macro_missing]: {
-    severity: QUALITY_SEVERITIES.error,
-    evidenceClass: QUALITY_EVIDENCE_CLASSES.macro,
-    message: 'A required macro is missing.',
-    repairInstruction: 'Restore every required macro without changing the surrounding content.',
-  },
-  [QUALITY_RULES.strict_template_preservation]: {
-    severity: QUALITY_SEVERITIES.error,
-    evidenceClass: QUALITY_EVIDENCE_CLASSES.template,
-    message: 'Strict template structure is not preserved.',
-    repairInstruction: 'Restore the template fragments in order and resolve every generation slot.',
-  },
-  [QUALITY_RULES.duplicate_sentence]: {
-    severity: QUALITY_SEVERITIES.warning,
-    evidenceClass: QUALITY_EVIDENCE_CLASSES.exact_sentence,
-    message: 'The same sentence is reused across fields.',
-    repairInstruction: 'Keep the sentence in its most appropriate field and write distinct content elsewhere.',
-  },
-  [QUALITY_RULES.ngram_overlap]: {
-    severity: QUALITY_SEVERITIES.warning,
-    evidenceClass: QUALITY_EVIDENCE_CLASSES.ngram_overlap,
-    message: 'Fields have substantial normalized n-gram overlap.',
-    repairInstruction: "Reduce repeated phrasing while preserving each field's distinct purpose.",
-  },
-} satisfies Record<
-  QualityRule,
-  {
-    severity: QualitySeverity;
-    evidenceClass: QualityEvidenceClass;
-    message: string;
-    repairInstruction: string;
-  }
->;
+const QUALITY_FINDING_COPY = QUALITY_RULE_ENUM.derive<{
+  severity: QualitySeverity;
+  evidenceClass: QualityEvidenceClass;
+  message: string;
+  repairInstruction: string;
+}>()(
+  [
+    QUALITY_RULES.EMPTY_FIELD,
+    {
+      severity: QUALITY_SEVERITIES.ERROR,
+      evidenceClass: QUALITY_EVIDENCE_CLASSES.LENGTH,
+      message: 'Field is empty.',
+      repairInstruction: 'Add meaningful field content.',
+    },
+  ],
+  [
+    QUALITY_RULES.SHORT_FIELD,
+    {
+      severity: QUALITY_SEVERITIES.WARNING,
+      evidenceClass: QUALITY_EVIDENCE_CLASSES.LENGTH,
+      message: 'Field is shorter than its configured minimum.',
+      repairInstruction: 'Expand the field with specific, relevant detail.',
+    },
+  ],
+  [
+    QUALITY_RULES.REQUIRED_MACRO_MISSING,
+    {
+      severity: QUALITY_SEVERITIES.ERROR,
+      evidenceClass: QUALITY_EVIDENCE_CLASSES.MACRO,
+      message: 'A required macro is missing.',
+      repairInstruction: 'Restore every required macro without changing the surrounding content.',
+    },
+  ],
+  [
+    QUALITY_RULES.STRICT_TEMPLATE_PRESERVATION,
+    {
+      severity: QUALITY_SEVERITIES.ERROR,
+      evidenceClass: QUALITY_EVIDENCE_CLASSES.TEMPLATE,
+      message: 'Strict template structure is not preserved.',
+      repairInstruction: 'Restore the template fragments in order and resolve every generation slot.',
+    },
+  ],
+  [
+    QUALITY_RULES.DUPLICATE_SENTENCE,
+    {
+      severity: QUALITY_SEVERITIES.WARNING,
+      evidenceClass: QUALITY_EVIDENCE_CLASSES.EXACT_SENTENCE,
+      message: 'The same sentence is reused across fields.',
+      repairInstruction: 'Keep the sentence in its most appropriate field and write distinct content elsewhere.',
+    },
+  ],
+  [
+    QUALITY_RULES.NGRAM_OVERLAP,
+    {
+      severity: QUALITY_SEVERITIES.WARNING,
+      evidenceClass: QUALITY_EVIDENCE_CLASSES.NGRAM_OVERLAP,
+      message: 'Fields have substantial normalized n-gram overlap.',
+      repairInstruction: "Reduce repeated phrasing while preserving each field's distinct purpose.",
+    },
+  ],
+);
 
 interface iSentenceRecord {
   fieldKey: CharacterTextFieldKey;
@@ -247,7 +269,7 @@ function createFinding(
   fieldKeys: QualityFindingFieldKeys,
   score?: number,
 ): iDeterministicQualityFinding {
-  const copy = QUALITY_FINDING_COPY[rule];
+  const copy = QUALITY_FINDING_COPY.get(rule);
   return {
     rule,
     severity: copy.severity,
@@ -296,7 +318,7 @@ export function evaluateDeterministicQuality(
     const constraints = input.constraints?.[fieldKey];
 
     if (!normalizedValue) {
-      findings.push(createFinding(QUALITY_RULES.empty_field, [fieldKey]));
+      findings.push(createFinding(QUALITY_RULES.EMPTY_FIELD, [fieldKey]));
       continue;
     }
 
@@ -305,7 +327,7 @@ export function evaluateDeterministicQuality(
 
     if (minimumWordCount !== undefined && Number.isFinite(minimumWordCount) && minimumWordCount > 0) {
       if (wordCount < minimumWordCount) {
-        findings.push(createFinding(QUALITY_RULES.short_field, [fieldKey]));
+        findings.push(createFinding(QUALITY_RULES.SHORT_FIELD, [fieldKey]));
       }
     }
 
@@ -316,15 +338,15 @@ export function evaluateDeterministicQuality(
       );
 
       if (hasMissingMacro) {
-        findings.push(createFinding(QUALITY_RULES.required_macro_missing, [fieldKey]));
+        findings.push(createFinding(QUALITY_RULES.REQUIRED_MACRO_MISSING, [fieldKey]));
       }
     }
 
     if (constraints?.strictTemplate !== undefined && !hasStaticFragmentsInOrder(constraints.strictTemplate, value)) {
-      findings.push(createFinding(QUALITY_RULES.strict_template_preservation, [fieldKey]));
+      findings.push(createFinding(QUALITY_RULES.STRICT_TEMPLATE_PRESERVATION, [fieldKey]));
     } else if (constraints?.strictTemplate !== undefined && TEMPLATE_SLOT_PATTERN.test(value)) {
       TEMPLATE_SLOT_PATTERN.lastIndex = 0;
-      findings.push(createFinding(QUALITY_RULES.strict_template_preservation, [fieldKey]));
+      findings.push(createFinding(QUALITY_RULES.STRICT_TEMPLATE_PRESERVATION, [fieldKey]));
     }
     TEMPLATE_SLOT_PATTERN.lastIndex = 0;
   }
@@ -348,7 +370,7 @@ export function evaluateDeterministicQuality(
     if (records.length >= 2) {
       const sortedRecords = [...records].sort((left, right) => compareFieldKeys(left.fieldKey, right.fieldKey));
       findings.push(
-        createFinding(QUALITY_RULES.duplicate_sentence, [sortedRecords[0].fieldKey, sortedRecords[1].fieldKey]),
+        createFinding(QUALITY_RULES.DUPLICATE_SENTENCE, [sortedRecords[0].fieldKey, sortedRecords[1].fieldKey]),
       );
     }
   }
@@ -370,7 +392,7 @@ export function evaluateDeterministicQuality(
       if (score >= ngramOverlapThreshold) {
         findings.push(
           createFinding(
-            QUALITY_RULES.ngram_overlap,
+            QUALITY_RULES.NGRAM_OVERLAP,
             [leftField.fieldKey, rightField.fieldKey],
             Number(score.toFixed(6)),
           ),
@@ -380,7 +402,7 @@ export function evaluateDeterministicQuality(
   }
 
   findings.sort((left, right) => {
-    const ruleOrderDifference = QUALITY_RULE_ORDER[left.rule] - QUALITY_RULE_ORDER[right.rule];
+    const ruleOrderDifference = QUALITY_RULE_ORDER.get(left.rule) - QUALITY_RULE_ORDER.get(right.rule);
 
     if (ruleOrderDifference !== 0) {
       return ruleOrderDifference;

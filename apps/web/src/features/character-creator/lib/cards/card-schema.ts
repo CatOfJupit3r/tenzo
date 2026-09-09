@@ -1,24 +1,54 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
-export const CHARACTER_TEXT_FIELD_KEYS = [
-  'name',
-  'description',
-  'personality',
-  'scenario',
-  'first_mes',
-  'mes_example',
-  'creator_notes',
-  'system_prompt',
-  'post_history_instructions',
-  'creator',
-  'character_version',
-] as const;
+import { CHARACTER_CARD_SPECS, CHARACTER_CARD_SPEC_VERSIONS } from './card-file-enums';
 
-export const CHARACTER_TEXT_FIELD_KEY_SCHEMA = z.enum(CHARACTER_TEXT_FIELD_KEYS);
+export const CHARACTER_FIELD_KEY_ENUM = em({
+  NAME: 'name',
+  DESCRIPTION: 'description',
+  PERSONALITY: 'personality',
+  SCENARIO: 'scenario',
+  FIRST_MES: 'first_mes',
+  MES_EXAMPLE: 'mes_example',
+  CREATOR_NOTES: 'creator_notes',
+  SYSTEM_PROMPT: 'system_prompt',
+  POST_HISTORY_INSTRUCTIONS: 'post_history_instructions',
+  CREATOR: 'creator',
+  CHARACTER_VERSION: 'character_version',
+  TAGS: 'tags',
+  ALTERNATE_GREETINGS: 'alternate_greetings',
+  CUSTOM_FIELDS: 'custom_fields',
+  CHARACTER_BOOK: 'character_book',
+  ALTERNATE_GREETING: 'alternate_greeting',
+  CUSTOM_FIELD: 'custom_field',
+});
+export const CHARACTER_FIELD_KEYS = CHARACTER_FIELD_KEY_ENUM.enum;
+
+export const CHARACTER_TEXT_FIELD_KEY_ENUM = CHARACTER_FIELD_KEY_ENUM.pick([
+  CHARACTER_FIELD_KEYS.NAME,
+  CHARACTER_FIELD_KEYS.DESCRIPTION,
+  CHARACTER_FIELD_KEYS.PERSONALITY,
+  CHARACTER_FIELD_KEYS.SCENARIO,
+  CHARACTER_FIELD_KEYS.FIRST_MES,
+  CHARACTER_FIELD_KEYS.MES_EXAMPLE,
+  CHARACTER_FIELD_KEYS.CREATOR_NOTES,
+  CHARACTER_FIELD_KEYS.SYSTEM_PROMPT,
+  CHARACTER_FIELD_KEYS.POST_HISTORY_INSTRUCTIONS,
+  CHARACTER_FIELD_KEYS.CREATOR,
+  CHARACTER_FIELD_KEYS.CHARACTER_VERSION,
+]);
+export const CHARACTER_TEXT_FIELD_KEY = CHARACTER_TEXT_FIELD_KEY_ENUM.rawEnum;
+export const CHARACTER_TEXT_FIELD_KEYS = CHARACTER_TEXT_FIELD_KEY_ENUM.rawValues;
+
+export const CHARACTER_TEXT_FIELD_KEY_SCHEMA = z.enum(CHARACTER_TEXT_FIELD_KEY);
 export type CharacterTextFieldKey = z.infer<typeof CHARACTER_TEXT_FIELD_KEY_SCHEMA>;
 
-export const CHARACTER_BOOK_ENTRY_POSITION_SCHEMA = z.enum(['before_char', 'after_char']);
-export const CHARACTER_BOOK_ENTRY_POSITIONS = CHARACTER_BOOK_ENTRY_POSITION_SCHEMA.enum;
+export const CHARACTER_BOOK_ENTRY_POSITION_ENUM = em({
+  BEFORE_CHAR: 'before_char',
+  AFTER_CHAR: 'after_char',
+});
+export const CHARACTER_BOOK_ENTRY_POSITIONS = CHARACTER_BOOK_ENTRY_POSITION_ENUM.enum;
+export const CHARACTER_BOOK_ENTRY_POSITION_SCHEMA = z.enum(CHARACTER_BOOK_ENTRY_POSITIONS);
 
 export const CHARACTER_BOOK_ENTRY_SCHEMA = z.object({
   keys: z.array(z.string()),
@@ -78,8 +108,8 @@ export const CHARACTER_DATA_SCHEMA = z.object({
 });
 
 export const CHARACTER_CARD_SCHEMA = z.object({
-  spec: z.literal('chara_card_v2'),
-  spec_version: z.literal('2.0'),
+  spec: z.literal(CHARACTER_CARD_SPECS.CHARA_CARD_V2),
+  spec_version: z.literal(CHARACTER_CARD_SPEC_VERSIONS.VALUE_2_0),
   data: CHARACTER_DATA_SCHEMA,
 });
 

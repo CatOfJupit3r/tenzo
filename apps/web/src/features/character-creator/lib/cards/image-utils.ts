@@ -1,3 +1,5 @@
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
+
 export async function readBlobAsUint8Array(blob: Blob): Promise<Uint8Array> {
   const buffer = await blob.arrayBuffer();
   return new Uint8Array(buffer);
@@ -8,7 +10,7 @@ export async function readFileAsText(file: File): Promise<string> {
 }
 
 export async function convertImageBlobToPng(sourceBlob: Blob): Promise<Blob> {
-  if (sourceBlob.type === 'image/png') {
+  if (sourceBlob.type === MEDIA_TYPES.PNG) {
     return sourceBlob;
   }
 
@@ -34,7 +36,7 @@ export async function convertImageBlobToPng(sourceBlob: Blob): Promise<Blob> {
         }
 
         reject(new Error('Failed to encode portrait as PNG.'));
-      }, 'image/png');
+      }, MEDIA_TYPES.PNG);
     });
   } finally {
     imageBitmap.close();

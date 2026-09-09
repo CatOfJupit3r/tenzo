@@ -1,9 +1,10 @@
-import { cva } from 'class-variance-authority';
 import type { VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import { Slot } from 'radix-ui';
 import type { ComponentProps } from 'react';
 
 import { Separator } from '@~/components/ui/separator';
+import { ITEM_MEDIA_VARIANTS, ITEM_SIZES, ITEM_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 function ItemGroup({ className, ...props }: ComponentProps<'div'>) {
@@ -21,26 +22,26 @@ const itemVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-transparent',
-        outline: 'border-border',
-        muted: 'bg-muted/50',
+        [ITEM_VARIANTS.DEFAULT]: 'bg-transparent',
+        [ITEM_VARIANTS.OUTLINE]: 'border-border',
+        [ITEM_VARIANTS.MUTED]: 'bg-muted/50',
       },
       size: {
-        default: 'gap-4 p-4',
-        sm: 'gap-2.5 px-4 py-3',
+        [ITEM_SIZES.DEFAULT]: 'gap-4 p-4',
+        [ITEM_SIZES.SM]: 'gap-2.5 px-4 py-3',
       },
     },
     defaultVariants: {
-      variant: 'default',
-      size: 'default',
+      variant: ITEM_VARIANTS.DEFAULT,
+      size: ITEM_SIZES.DEFAULT,
     },
   },
 );
 
 function Item({
   className,
-  variant = 'default',
-  size = 'default',
+  variant = ITEM_VARIANTS.DEFAULT,
+  size = ITEM_SIZES.DEFAULT,
   asChild = false,
   ...props
 }: ComponentProps<'div'> & VariantProps<typeof itemVariants> & { asChild?: boolean }) {
@@ -61,20 +62,20 @@ const itemMediaVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-transparent',
-        icon: "size-8 rounded-sm border bg-muted [&_svg:not([class*='size-'])]:size-4",
-        image: 'size-10 overflow-hidden rounded-sm [&_img]:size-full [&_img]:object-cover',
+        [ITEM_MEDIA_VARIANTS.DEFAULT]: 'bg-transparent',
+        [ITEM_MEDIA_VARIANTS.ICON]: "size-8 rounded-sm border bg-muted [&_svg:not([class*='size-'])]:size-4",
+        [ITEM_MEDIA_VARIANTS.IMAGE]: 'size-10 overflow-hidden rounded-sm [&_img]:size-full [&_img]:object-cover',
       },
     },
     defaultVariants: {
-      variant: 'default',
+      variant: ITEM_MEDIA_VARIANTS.DEFAULT,
     },
   },
 );
 
 function ItemMedia({
   className,
-  variant = 'default',
+  variant = ITEM_MEDIA_VARIANTS.DEFAULT,
   ...props
 }: ComponentProps<'div'> & VariantProps<typeof itemMediaVariants>) {
   return (
@@ -147,13 +148,13 @@ function ItemFooter({ className, ...props }: ComponentProps<'div'>) {
 
 export {
   Item,
-  ItemMedia,
-  ItemContent,
   ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
   ItemGroup,
+  ItemHeader,
+  ItemMedia,
   ItemSeparator,
   ItemTitle,
-  ItemDescription,
-  ItemHeader,
-  ItemFooter,
 };

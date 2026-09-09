@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { MODEL_CAPABILITIES, readModelCapabilities } from './model-capabilities';
+import {
+  hasModelCapability,
+  MODEL_CAPABILITY_ENUM,
+  readModelCapabilities,
+} from '@~/features/character-creator/lib/provider/model-capabilities';
+
 import type { iProviderPolicyCatalog } from './provider-policy-resolver';
 
 const OPTIONAL_STRING_SCHEMA = z.string().trim().min(1).optional();
@@ -69,7 +74,9 @@ export function buildOpenRouterPolicyCatalog(input: iOpenRouterPolicyCatalogInpu
         isZeroDataRetention: true,
         doesCollectData: false,
         isAvailable: endpoint.status === 0,
-        supportedCapabilities: Object.values(MODEL_CAPABILITIES).filter((capability) => capabilities[capability]),
+        supportedCapabilities: MODEL_CAPABILITY_ENUM.values.filter((capability) =>
+          hasModelCapability(capabilities, capability),
+        ),
         promptPricePerMillionUsd,
         completionPricePerMillionUsd,
       },

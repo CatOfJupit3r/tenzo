@@ -1,13 +1,22 @@
-import { EventType } from '@tanstack/ai';
 import type { AnyTextAdapter, StreamChunk } from '@tanstack/ai';
+import { EventType } from '@tanstack/ai';
 import { openaiCompatibleText } from '@tanstack/ai-openai/compatible';
 import { describe, expect, it } from 'vitest';
+
+import { CHARACTER_ASSISTANT_TOOL_NAMES } from '@~/features/character-creator/lib/assistant/character-assistant-contracts';
+import { MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
+import { CHARACTER_EDIT_PATCH_KINDS_CASES } from '@~/features/character-creator/lib/proposals/character-edit-proposal';
+import {
+  PROVIDER_DATA_COLLECTION_DENY,
+  PROVIDER_POLICY_FAILURE_REASONS,
+} from '@~/features/character-creator/lib/provider/provider-policy-resolver';
 
 import { GENERATION_PROVIDERS } from './generation-config';
 import { createOpenRouterErrorPreservingHttpClient } from './openrouter-stream-error';
 import {
-  createCharacterModelOptions,
+  OPENROUTER_RESPONSE_HEALING_PLUGIN_ID,
   createAgentRoleModelOptions,
+  createCharacterModelOptions,
   createCharacterStructuredModelOptions,
   createCharacterTextGenerationService,
   createCharacterToolModelOptions,
@@ -75,7 +84,7 @@ describe('TanStack AI text generation', () => {
         },
       }) as AnyTextAdapter,
       {
-        kind: 'text' as const,
+        kind: CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT,
         name: 'prototype-adapter',
         model: 'test-model',
         chatStream: () =>
@@ -109,8 +118,9 @@ describe('TanStack AI text generation', () => {
               yield {
                 type: EventType.TOOL_CALL_START,
                 toolCallId: 'call-1',
-                toolCallName: 'propose_character_fields',
-              } as StreamChunk;
+                toolCallName: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
+                toolName: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
+              } satisfies StreamChunk;
               yield {
                 type: EventType.TOOL_CALL_ARGS,
                 toolCallId: 'call-1',
@@ -124,7 +134,7 @@ describe('TanStack AI text generation', () => {
               yield {
                 type: EventType.TOOL_CALL_END,
                 toolCallId: 'call-1',
-                toolCallName: 'propose_character_fields',
+                toolCallName: CHARACTER_ASSISTANT_TOOL_NAMES.PROPOSE_CHARACTER_FIELDS,
               } as StreamChunk;
             })(),
         },
@@ -193,7 +203,7 @@ describe('TanStack AI text generation', () => {
       }),
     ).toMatchObject({
       maxTokens: 400,
-      provider: { dataCollection: 'deny', zdr: true },
+      provider: { dataCollection: PROVIDER_DATA_COLLECTION_DENY, zdr: true },
     });
   });
 
@@ -209,8 +219,8 @@ describe('TanStack AI text generation', () => {
         minP: 0,
       }),
     ).toMatchObject({
-      plugins: [{ id: 'response-healing' }],
-      provider: { dataCollection: 'deny', zdr: true, requireParameters: true },
+      plugins: [{ id: OPENROUTER_RESPONSE_HEALING_PLUGIN_ID }],
+      provider: { dataCollection: PROVIDER_DATA_COLLECTION_DENY, zdr: true, requireParameters: true },
     });
   });
 
@@ -226,7 +236,7 @@ describe('TanStack AI text generation', () => {
         minP: 0,
       }),
     ).toMatchObject({
-      provider: { dataCollection: 'deny', zdr: true, requireParameters: true },
+      provider: { dataCollection: PROVIDER_DATA_COLLECTION_DENY, zdr: true, requireParameters: true },
     });
   });
 
@@ -243,7 +253,7 @@ describe('TanStack AI text generation', () => {
         openRouterProvider: 'parasail',
       }),
     ).toMatchObject({
-      provider: { dataCollection: 'deny', zdr: true, only: ['parasail'] },
+      provider: { dataCollection: PROVIDER_DATA_COLLECTION_DENY, zdr: true, only: ['parasail'] },
     });
   });
 
@@ -265,7 +275,7 @@ describe('TanStack AI text generation', () => {
         routing: {
           only: ['eligible-provider'],
           allowFallbacks: false,
-          dataCollection: 'deny',
+          dataCollection: PROVIDER_DATA_COLLECTION_DENY,
           zdr: true,
           requireParameters: true,
         },
@@ -275,7 +285,7 @@ describe('TanStack AI text generation', () => {
       provider: {
         only: ['eligible-provider'],
         allowFallbacks: false,
-        dataCollection: 'deny',
+        dataCollection: PROVIDER_DATA_COLLECTION_DENY,
         zdr: true,
         requireParameters: true,
       },
@@ -285,9 +295,9 @@ describe('TanStack AI text generation', () => {
         isEligible: false,
         isLocal: false,
         routing: null,
-        failures: [{ reason: 'model-moderated', providerSlug: null }],
+        failures: [{ reason: PROVIDER_POLICY_FAILURE_REASONS.MODEL_MODERATED, providerSlug: null }],
       }),
-    ).toThrow('model-moderated');
+    ).toThrow(PROVIDER_POLICY_FAILURE_REASONS.MODEL_MODERATED);
   });
 
   it('passes compatible-provider samplers using native wire names', () => {
@@ -322,14 +332,14 @@ describe('TanStack AI text generation', () => {
     );
 
     const result = harness.service.streamCharacterText({
-      provider: GENERATION_PROVIDERS.openrouter,
+      provider: GENERATION_PROVIDERS.OPENROUTER,
       endpoint: 'https://openrouter.ai/api',
       apiKey: 'sk-or-v1-test',
       model: 'anthropic/claude-sonnet-4',
       maxTokens: 400,
       messages: [
-        { role: 'system', content: 'Write character prose.' },
-        { role: 'user', content: 'A storm caller.' },
+        { role: MESSAGE_ROLES.SYSTEM, content: 'Write character prose.' },
+        { role: MESSAGE_ROLES.USER, content: 'A storm caller.' },
       ],
       temperature: 0.8,
       topP: 0.9,
@@ -350,7 +360,7 @@ describe('TanStack AI text generation', () => {
     expect(harness.chatCalls).toHaveLength(1);
     expect(harness.chatCalls[0]).toEqual(
       expect.objectContaining({
-        messages: [{ role: 'user', content: 'A storm caller.' }],
+        messages: [{ role: MESSAGE_ROLES.USER, content: 'A storm caller.' }],
         systemPrompts: ['Write character prose.'],
         stream: true,
       }),

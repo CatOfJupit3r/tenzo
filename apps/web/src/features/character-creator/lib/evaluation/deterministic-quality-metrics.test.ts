@@ -20,8 +20,8 @@ describe('evaluateDeterministicQuality', () => {
     });
 
     expect(result.findings).toEqual([
-      expect.objectContaining({ rule: QUALITY_RULES.empty_field, fieldKeys: ['description'] }),
-      expect.objectContaining({ rule: QUALITY_RULES.short_field, fieldKeys: ['personality'] }),
+      expect.objectContaining({ rule: QUALITY_RULES.EMPTY_FIELD, fieldKeys: ['description'] }),
+      expect.objectContaining({ rule: QUALITY_RULES.SHORT_FIELD, fieldKeys: ['personality'] }),
     ]);
   });
 
@@ -36,7 +36,7 @@ describe('evaluateDeterministicQuality', () => {
         fields: { system_prompt: 'Speak as {{ char }}.' },
         constraints: { system_prompt: { requiredMacros: ['{{CHAR}}', '{{ user }}'] } },
       }),
-    ).toEqual([QUALITY_RULES.required_macro_missing]);
+    ).toEqual([QUALITY_RULES.REQUIRED_MACRO_MISSING]);
     expect(result.findings).toEqual([]);
   });
 
@@ -68,8 +68,8 @@ describe('evaluateDeterministicQuality', () => {
     });
 
     expect(result.findings).toEqual([
-      expect.objectContaining({ rule: QUALITY_RULES.strict_template_preservation, fieldKeys: ['scenario'] }),
-      expect.objectContaining({ rule: QUALITY_RULES.strict_template_preservation, fieldKeys: ['first_mes'] }),
+      expect.objectContaining({ rule: QUALITY_RULES.STRICT_TEMPLATE_PRESERVATION, fieldKeys: ['scenario'] }),
+      expect.objectContaining({ rule: QUALITY_RULES.STRICT_TEMPLATE_PRESERVATION, fieldKeys: ['first_mes'] }),
     ]);
   });
 
@@ -84,7 +84,7 @@ describe('evaluateDeterministicQuality', () => {
     });
 
     expect(result.findings).toEqual([
-      expect.objectContaining({ rule: QUALITY_RULES.duplicate_sentence, fieldKeys: ['description', 'personality'] }),
+      expect.objectContaining({ rule: QUALITY_RULES.DUPLICATE_SENTENCE, fieldKeys: ['description', 'personality'] }),
     ]);
   });
 
@@ -97,7 +97,7 @@ describe('evaluateDeterministicQuality', () => {
       options: { sentenceMinimumWordCount: 4 },
     });
 
-    expect(result.findings.some((finding) => finding.rule === QUALITY_RULES.duplicate_sentence)).toBe(false);
+    expect(result.findings.some((finding) => finding.rule === QUALITY_RULES.DUPLICATE_SENTENCE)).toBe(false);
   });
 
   it('flags n-gram overlap at the threshold and leaves below-threshold pairs alone', () => {
@@ -112,7 +112,7 @@ describe('evaluateDeterministicQuality', () => {
 
     expect(result.findings).toEqual([
       expect.objectContaining({
-        rule: QUALITY_RULES.ngram_overlap,
+        rule: QUALITY_RULES.NGRAM_OVERLAP,
         fieldKeys: ['description', 'personality'],
         score: expect.any(Number),
       }),
@@ -146,10 +146,10 @@ describe('evaluateDeterministicQuality', () => {
     });
 
     expect(result.findings.map((finding) => finding.rule)).toEqual([
-      QUALITY_RULES.empty_field,
-      QUALITY_RULES.short_field,
-      QUALITY_RULES.required_macro_missing,
-      QUALITY_RULES.duplicate_sentence,
+      QUALITY_RULES.EMPTY_FIELD,
+      QUALITY_RULES.SHORT_FIELD,
+      QUALITY_RULES.REQUIRED_MACRO_MISSING,
+      QUALITY_RULES.DUPLICATE_SENTENCE,
     ]);
     expect(JSON.stringify(result)).not.toContain('Secret phrase');
     expect(JSON.stringify(result)).not.toContain('{{char}}');

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 import { generateUuid } from '@~/utils/uuid';
 
 import type { iCharacterPortraitReference } from '../lib/cards/character-library';
@@ -9,6 +10,7 @@ import {
   PORTRAIT_ASSET_STATUSES,
   primePortraitAsset,
 } from '../lib/portrait/portrait-asset-cache';
+import type { iPortraitCropRect } from '../lib/portrait/portrait-focal-point';
 import {
   arePortraitCropRectsEqual,
   getPortraitCropRect,
@@ -16,7 +18,6 @@ import {
   renderPortraitThumbnailDataUrl,
   sanitizeStoredPortraitCropRect,
 } from '../lib/portrait/portrait-focal-point';
-import type { iPortraitCropRect } from '../lib/portrait/portrait-focal-point';
 import { useCharacterSession } from './use-character-session';
 import { isPortraitAssetHydrating, usePortraitAsset } from './use-portrait-asset';
 
@@ -72,7 +73,7 @@ export function useCharacterPortrait() {
 
   useEffect(() => {
     // A referenced asset that cannot be read is stale; drop the dangling reference.
-    if (portraitReference && portraitAsset.status === PORTRAIT_ASSET_STATUSES.error) {
+    if (portraitReference && portraitAsset.status === PORTRAIT_ASSET_STATUSES.ERROR) {
       setActiveCharacterPortrait(null);
     }
   }, [portraitAsset.status, portraitReference, setActiveCharacterPortrait]);
@@ -161,7 +162,7 @@ export function useCharacterPortrait() {
       setActiveCharacterPortrait({
         assetId,
         fileName,
-        mimeType: blob.type || 'application/octet-stream',
+        mimeType: blob.type || MEDIA_TYPES.OCTET_STREAM,
         cropRect: nextCropRect,
         thumbnailDataUrl,
       });

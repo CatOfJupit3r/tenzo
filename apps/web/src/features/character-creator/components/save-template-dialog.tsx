@@ -12,16 +12,17 @@ import {
 } from '@~/components/ui/dialog';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
-import { MultiSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
+import { MultiSelect } from '@~/components/ui/select';
+import { BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
+import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/cards/field-templates';
 import {
   sanitizeTemplateFieldKeys,
   TEMPLATE_FIELD_KEY_LABELS,
   TEMPLATE_FIELD_KEY_SCHEMA,
   TEMPLATE_MODES,
 } from '../lib/cards/field-templates';
-import type { iCreateStoredFieldTemplateInput, TemplateFieldKey } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 
 const templateFieldKeyOptions: iOptionType[] = TEMPLATE_FIELD_KEY_SCHEMA.options.map((fieldKey) => ({
@@ -64,7 +65,7 @@ export function SaveTemplateDialog({
     onSave({
       name: name.trim(),
       // Captured text is stored as guidance; switch to strict mode in Settings > Templates after adding slots.
-      mode: TEMPLATE_MODES.prompt,
+      mode: TEMPLATE_MODES.PROMPT,
       fieldKeys,
       content,
     });
@@ -117,7 +118,7 @@ export function SaveTemplateDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant={BUTTON_VARIANTS.OUTLINE} onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button type="button" disabled={!canSave} onClick={handleSave}>

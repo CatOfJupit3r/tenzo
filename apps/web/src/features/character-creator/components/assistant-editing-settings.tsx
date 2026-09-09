@@ -2,17 +2,17 @@ import { Switch } from '@~/components/ui/switch';
 
 import { CORE_FIELD_CONFIGS, METADATA_FIELD_CONFIGS, PROMPT_OVERRIDE_FIELD_CONFIGS } from '../constants/field-config';
 import type { CharacterAssistantFieldEditing } from '../lib/generation/generation-config';
-import { CHARACTER_EDIT_FIELD_KEYS } from '../lib/proposals/character-edit-proposal';
 import type { CharacterEditFieldKey } from '../lib/proposals/character-edit-proposal';
+import { CHARACTER_EDIT_FIELD_KEYS } from '../lib/proposals/character-edit-proposal';
 
 const ASSISTANT_EDITABLE_FIELDS = [
   ...CORE_FIELD_CONFIGS.map(({ key, label }) => ({ key, label })),
   ...PROMPT_OVERRIDE_FIELD_CONFIGS.map(({ key, label }) => ({ key, label })),
   ...METADATA_FIELD_CONFIGS.map(({ key, label }) => ({ key, label })),
-  { key: CHARACTER_EDIT_FIELD_KEYS.tags, label: 'Tags' },
-  { key: CHARACTER_EDIT_FIELD_KEYS.alternate_greetings, label: 'Alternate Greetings' },
-  { key: CHARACTER_EDIT_FIELD_KEYS.custom_fields, label: 'Custom Fields' },
-  { key: CHARACTER_EDIT_FIELD_KEYS.character_book, label: 'Character Book' },
+  { key: CHARACTER_EDIT_FIELD_KEYS.TAGS, label: 'Tags' },
+  { key: CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS, label: 'Alternate Greetings' },
+  { key: CHARACTER_EDIT_FIELD_KEYS.CUSTOM_FIELDS, label: 'Custom Fields' },
+  { key: CHARACTER_EDIT_FIELD_KEYS.CHARACTER_BOOK, label: 'Character Book' },
 ] satisfies { key: CharacterEditFieldKey; label: string }[];
 
 export function AssistantEditingSettings({

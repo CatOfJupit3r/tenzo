@@ -1,11 +1,15 @@
 import type { ContentPart } from '@tanstack/ai';
+import { em } from 'enumwaii';
 
+import {
+  CONTENT_SOURCE_TYPES_CASES,
+  MESSAGE_PART_TYPES_CASES,
+} from '@~/features/character-creator/lib/generation/message-enums';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
 import { generateUuid } from '@~/utils/uuid';
 
-export const CHAT_INPUT_ATTACHMENT_KINDS = {
-  image: 'image',
-  text: 'text',
-} as const;
+export const CHAT_INPUT_ATTACHMENT_KINDS_ENUM = em(['IMAGE', 'TEXT']);
+export const CHAT_INPUT_ATTACHMENT_KINDS = CHAT_INPUT_ATTACHMENT_KINDS_ENUM.enum;
 
 export type ChatInputAttachmentKind = (typeof CHAT_INPUT_ATTACHMENT_KINDS)[keyof typeof CHAT_INPUT_ATTACHMENT_KINDS];
 
@@ -37,16 +41,24 @@ export const CHAT_INPUT_ATTACHMENT_ACCEPT = [
   '.toml',
 ].join(',');
 
-const TEXT_FILE_EXTENSIONS = new Set(['csv', 'json', 'md', 'toml', 'xml', 'yaml', 'yml']);
+const TEXT_FILE_EXTENSION_ENUM = em({
+  CSV: 'csv',
+  JSON: 'json',
+  MD: 'md',
+  TOML: 'toml',
+  XML: 'xml',
+  YAML: 'yaml',
+  YML: 'yml',
+});
 
 function getFileExtension(fileName: string) {
   return fileName.split('.').at(-1)?.toLocaleLowerCase() ?? '';
 }
 
 function getAttachmentKind(file: File): ChatInputAttachmentKind | null {
-  if (file.type.startsWith('image/')) return CHAT_INPUT_ATTACHMENT_KINDS.image;
-  if (file.type.startsWith('text/') || TEXT_FILE_EXTENSIONS.has(getFileExtension(file.name))) {
-    return CHAT_INPUT_ATTACHMENT_KINDS.text;
+  if (file.type.startsWith('image/')) return CHAT_INPUT_ATTACHMENT_KINDS.IMAGE;
+  if (file.type.startsWith('text/') || TEXT_FILE_EXTENSION_ENUM.is(getFileExtension(file.name))) {
+    return CHAT_INPUT_ATTACHMENT_KINDS.TEXT;
   }
   return null;
 }
@@ -82,7 +94,7 @@ export async function createChatInputAttachments(files: File[], existingAttachme
       continue;
     }
     const sizeLimit =
-      kind === CHAT_INPUT_ATTACHMENT_KINDS.image
+      kind === CHAT_INPUT_ATTACHMENT_KINDS.IMAGE
         ? CHAT_INPUT_ATTACHMENT_LIMITS.imageBytes
         : CHAT_INPUT_ATTACHMENT_LIMITS.textBytes;
     if (file.size > sizeLimit) {
@@ -96,7 +108,7 @@ export async function createChatInputAttachments(files: File[], existingAttachme
 
     let content: string;
     try {
-      content = kind === CHAT_INPUT_ATTACHMENT_KINDS.image ? await readFileAsBase64(file) : await file.text();
+      content = kind === CHAT_INPUT_ATTACHMENT_KINDS.IMAGE ? await readFileAsBase64(file) : await file.text();
     } catch {
       errors.push(`${file.name} could not be read.`);
       continue;
@@ -105,7 +117,7 @@ export async function createChatInputAttachments(files: File[], existingAttachme
       id: generateUuid(),
       kind,
       name: file.name,
-      mimeType: file.type || (kind === CHAT_INPUT_ATTACHMENT_KINDS.text ? 'text/plain' : 'image/*'),
+      mimeType: file.type || (kind === CHAT_INPUT_ATTACHMENT_KINDS.TEXT ? MEDIA_TYPES.PLAIN_TEXT : 'image/*'),
       size: file.size,
       content,
     });
@@ -116,7 +128,7 @@ export async function createChatInputAttachments(files: File[], existingAttachme
 }
 
 export function buildChatInputContentParts(message: string, attachments: iChatInputAttachment[]): ContentPart[] {
-  const parts: ContentPart[] = [{ type: 'text', content: message }];
+  const parts: ContentPart[] = [{ type: MESSAGE_PART_TYPES_CASES.TEXT, content: message }];
 
   attachments.forEach((attachment) => {
     const attachmentMetadata = {
@@ -126,21 +138,21 @@ export function buildChatInputContentParts(message: string, attachments: iChatIn
         size: attachment.size,
       },
     };
-    if (attachment.kind === CHAT_INPUT_ATTACHMENT_KINDS.image) {
+    if (attachment.kind === CHAT_INPUT_ATTACHMENT_KINDS.IMAGE) {
       parts.push({
-        type: 'text',
+        type: MESSAGE_PART_TYPES_CASES.TEXT,
         content: `Attached image: ${attachment.name}`,
       });
       parts.push({
-        type: 'image',
-        source: { type: 'data', value: attachment.content, mimeType: attachment.mimeType },
+        type: MESSAGE_PART_TYPES_CASES.IMAGE,
+        source: { type: CONTENT_SOURCE_TYPES_CASES.DATA, value: attachment.content, mimeType: attachment.mimeType },
         metadata: attachmentMetadata,
       });
       return;
     }
 
     parts.push({
-      type: 'text',
+      type: MESSAGE_PART_TYPES_CASES.TEXT,
       content: [
         `Attached file: ${attachment.name}`,
         '<attachment-content>',

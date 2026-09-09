@@ -1,26 +1,31 @@
+import { em } from 'enumwaii';
 import { z } from 'zod';
 
-import { AGENT_ROLE_PROFILE_SCHEMA } from './agent-role-contracts';
 import type { iAgentRoleProfile } from './agent-role-contracts';
-import { MODEL_CAPABILITY_SCHEMA } from './model-capabilities';
+import { AGENT_ROLE_PROFILE_SCHEMA } from './agent-role-contracts';
 import type { ModelCapability } from './model-capabilities';
+import { MODEL_CAPABILITY_SCHEMA } from './model-capabilities';
 import { PROVIDER_KINDS } from './provider-health';
+
+export const PROVIDER_DATA_COLLECTION_DENY = 'deny';
 
 export const PROVIDER_POLICY_CATALOG_TTL_MS = 5 * 60 * 1_000;
 
-export const PROVIDER_POLICY_FAILURE_REASON_SCHEMA = z.enum([
-  'catalog-missing',
-  'catalog-stale',
-  'model-missing',
-  'model-moderated',
-  'endpoint-not-zdr',
-  'endpoint-data-collecting',
-  'provider-not-allowed',
-  'capability-mismatch',
-  'price-limit-exceeded',
-  'endpoint-unavailable',
+export const PROVIDER_POLICY_FAILURE_REASON_ENUM = em([
+  'CATALOG_MISSING',
+  'CATALOG_STALE',
+  'MODEL_MISSING',
+  'MODEL_MODERATED',
+  'ENDPOINT_NOT_ZDR',
+  'ENDPOINT_DATA_COLLECTING',
+  'PROVIDER_NOT_ALLOWED',
+  'CAPABILITY_MISMATCH',
+  'PRICE_LIMIT_EXCEEDED',
+  'ENDPOINT_UNAVAILABLE',
 ]);
-export const PROVIDER_POLICY_FAILURE_REASONS = PROVIDER_POLICY_FAILURE_REASON_SCHEMA.enum;
+export const PROVIDER_POLICY_FAILURE_REASONS = PROVIDER_POLICY_FAILURE_REASON_ENUM.enum;
+export const PROVIDER_POLICY_FAILURE_REASON_SCHEMA = z.enum(PROVIDER_POLICY_FAILURE_REASONS);
+
 export type ProviderPolicyFailureReason = z.infer<typeof PROVIDER_POLICY_FAILURE_REASON_SCHEMA>;
 
 export const PROVIDER_POLICY_ENDPOINT_SCHEMA = z.object({
@@ -48,7 +53,7 @@ export type iProviderPolicyCatalog = z.infer<typeof PROVIDER_POLICY_CATALOG_SCHE
 export const PROVIDER_POLICY_ROUTING_SCHEMA = z.object({
   only: z.array(z.string().trim().min(1)).min(1),
   allowFallbacks: z.literal(false),
-  dataCollection: z.literal('deny'),
+  dataCollection: z.literal(PROVIDER_DATA_COLLECTION_DENY),
   zdr: z.literal(true),
   requireParameters: z.boolean(),
 });
@@ -95,22 +100,22 @@ function getEndpointFailures(
   const { providerSlug } = endpoint;
 
   if (!endpoint.isZeroDataRetention)
-    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS['endpoint-not-zdr'], providerSlug));
+    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_NOT_ZDR, providerSlug));
   if (endpoint.doesCollectData)
-    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS['endpoint-data-collecting'], providerSlug));
+    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_DATA_COLLECTING, providerSlug));
   if (!endpoint.isAvailable)
-    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS['endpoint-unavailable'], providerSlug));
+    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_UNAVAILABLE, providerSlug));
   if (profile.allowedProviderSlugs.length > 0 && !profile.allowedProviderSlugs.includes(providerSlug)) {
-    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS['provider-not-allowed'], providerSlug));
+    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS.PROVIDER_NOT_ALLOWED, providerSlug));
   }
   if (!profile.requiredCapabilities.every((capability) => endpoint.supportedCapabilities.includes(capability))) {
-    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS['capability-mismatch'], providerSlug));
+    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS.CAPABILITY_MISMATCH, providerSlug));
   }
   if (
     endpoint.promptPricePerMillionUsd > profile.maximumPromptPricePerMillionUsd ||
     endpoint.completionPricePerMillionUsd > profile.maximumCompletionPricePerMillionUsd
   ) {
-    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS['price-limit-exceeded'], providerSlug));
+    failures.push(createFailure(PROVIDER_POLICY_FAILURE_REASONS.PRICE_LIMIT_EXCEEDED, providerSlug));
   }
 
   return failures;
@@ -118,7 +123,7 @@ function getEndpointFailures(
 
 export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): ProviderPolicyResolution {
   const profile = AGENT_ROLE_PROFILE_SCHEMA.parse(options.profile);
-  if (profile.providerKind === PROVIDER_KINDS.koboldcpp) {
+  if (profile.providerKind === PROVIDER_KINDS.KOBOLDCPP) {
     const hasRequiredCapabilities = profile.requiredCapabilities.every((capability) =>
       options.localCapabilities?.includes(capability),
     );
@@ -127,7 +132,7 @@ export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): P
         isEligible: false,
         isLocal: true,
         routing: null,
-        failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS['capability-mismatch'])],
+        failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS.CAPABILITY_MISMATCH)],
       };
     }
     return { isEligible: true, isLocal: true, routing: null, failures: [] };
@@ -138,7 +143,7 @@ export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): P
       isEligible: false,
       isLocal: false,
       routing: null,
-      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS['catalog-missing'])],
+      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS.CATALOG_MISSING)],
     };
   }
 
@@ -148,7 +153,7 @@ export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): P
       isEligible: false,
       isLocal: false,
       routing: null,
-      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS['catalog-stale'])],
+      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS.CATALOG_STALE)],
     };
   }
 
@@ -158,7 +163,7 @@ export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): P
       isEligible: false,
       isLocal: false,
       routing: null,
-      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS['model-missing'])],
+      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS.MODEL_MISSING)],
     };
   }
   if (model.isModerated) {
@@ -166,7 +171,7 @@ export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): P
       isEligible: false,
       isLocal: false,
       routing: null,
-      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS['model-moderated'])],
+      failures: [createFailure(PROVIDER_POLICY_FAILURE_REASONS.MODEL_MODERATED)],
     };
   }
 
@@ -183,7 +188,7 @@ export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): P
       isEligible: false,
       isLocal: false,
       routing: null,
-      failures: failures.length > 0 ? failures : [createFailure(PROVIDER_POLICY_FAILURE_REASONS['endpoint-not-zdr'])],
+      failures: failures.length > 0 ? failures : [createFailure(PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_NOT_ZDR)],
     };
   }
 
@@ -193,7 +198,7 @@ export function resolveProviderPolicy(options: iResolveProviderPolicyOptions): P
     routing: PROVIDER_POLICY_ROUTING_SCHEMA.parse({
       only: [...new Set(eligibleEndpoints.map((endpoint) => endpoint.providerSlug))].sort(),
       allowFallbacks: false,
-      dataCollection: 'deny',
+      dataCollection: PROVIDER_DATA_COLLECTION_DENY,
       zdr: true,
       requireParameters: profile.requiredCapabilities.length > 0,
     }),

@@ -1,18 +1,23 @@
-import { EventType } from '@tanstack/ai';
 import type { ModelMessage, StreamChunk, UIMessage } from '@tanstack/ai';
+import { EventType } from '@tanstack/ai';
 import { describe, expect, it, vi } from 'vitest';
+
+import { CHARACTER_TEXT_FIELD_KEY } from '@~/features/character-creator/lib/cards/card-schema';
+import { MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
 import {
-  CHARACTER_ASSISTANT_FOCUS_KINDS,
+  CHARACTER_ASSISTANT_FOCUS_KINDS_CASES,
   CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA,
 } from '../assistant/character-assistant-contracts';
 import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING, GENERATION_PROVIDERS } from '../generation/generation-config';
 import { createCharacterEditProposal } from '../proposals/character-edit-proposal';
+import type { AgentRole } from '../provider/agent-role-contracts';
 import { AGENT_ROLES } from '../provider/agent-role-contracts';
+import { MODEL_CAPABILITIES } from '../provider/model-capabilities';
 import { PROVIDER_KINDS } from '../provider/provider-health';
-import { AGENT_ROUTES } from './agent-orchestration-contracts';
 import type { iProseJob } from './agent-orchestration-contracts';
+import { AGENT_ROUTES } from './agent-orchestration-contracts';
 import {
   AGENT_ORCHESTRATION_EVENT_NAMES,
   AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA,
@@ -38,8 +43,8 @@ const PROSE = [
 function createPayload(message: string) {
   const card = createEmptyCharacterCard();
   return CHARACTER_ASSISTANT_STREAM_REQUEST_SCHEMA.parse({
-    provider: GENERATION_PROVIDERS.koboldcpp,
-    providerKind: PROVIDER_KINDS.koboldcpp,
+    provider: GENERATION_PROVIDERS.KOBOLDCPP,
+    providerKind: PROVIDER_KINDS.KOBOLDCPP,
     endpoint: 'http://localhost:5001',
     apiKey: 'local-key',
     model: 'koboldcpp/local',
@@ -52,25 +57,21 @@ function createPayload(message: string) {
     minP: 0,
     characterId: 'character-1',
     card,
-    focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS.field, fieldKey: 'description' },
-    messages: [{ role: 'user', content: message }],
+    focus: { kind: CHARACTER_ASSISTANT_FOCUS_KINDS_CASES.FIELD, fieldKey: 'description' },
+    messages: [{ role: MESSAGE_ROLES.USER, content: message }],
     fieldShouldAllowAssistantEditing: DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING,
-    localCapabilities: ['structured-output', 'tool-calling'],
+    localCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT, MODEL_CAPABILITIES.TOOL_CALLING],
   });
 }
 
-function createExecution<T>(
-  value: T,
-  role: keyof typeof AGENT_ROLES,
-  usageOverrides: Partial<iAgentRoleExecutionUsage> = {},
-) {
+function createExecution<T>(value: T, role: AgentRole, usageOverrides: Partial<iAgentRoleExecutionUsage> = {}) {
   return {
     value,
     runId: 'run-1',
     roleCallId: `call-${role}`,
-    role: AGENT_ROLES[role],
+    role,
     modelId: 'koboldcpp/local',
-    providerId: PROVIDER_KINDS.koboldcpp,
+    providerId: PROVIDER_KINDS.KOBOLDCPP,
     usage: {
       inputTokens: 10,
       outputTokens: 10,
@@ -107,7 +108,7 @@ describe('orchestrated character assistant stream', () => {
   it('renders strict prose slots into the app-owned template skeleton', () => {
     const job: iProseJob = {
       id: 'prose-description',
-      fieldKeys: ['description'],
+      fieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION],
       purposes: ['Describe the character.'],
       ownedFacts: [],
       allowedEchoes: [],
@@ -179,7 +180,7 @@ describe('orchestrated character assistant stream', () => {
   it('does not assign raw prose to a multi-slot strict repair', () => {
     const job: iProseJob = {
       id: 'prose-description',
-      fieldKeys: ['description'],
+      fieldKeys: [CHARACTER_TEXT_FIELD_KEY.DESCRIPTION],
       purposes: ['Describe the character.'],
       ownedFacts: [],
       allowedEchoes: [],
@@ -218,7 +219,7 @@ describe('orchestrated character assistant stream', () => {
   it('unwraps accidental slot markup from a field without a strict template', () => {
     const job: iProseJob = {
       id: 'prose-personality',
-      fieldKeys: ['personality'],
+      fieldKeys: [CHARACTER_TEXT_FIELD_KEY.PERSONALITY],
       purposes: ['Define personality.'],
       ownedFacts: [],
       allowedEchoes: [],
@@ -244,8 +245,8 @@ describe('orchestrated character assistant stream', () => {
       .fn()
       .mockResolvedValue(
         createExecution(
-          { route: AGENT_ROUTES.advice, answer: 'Use an opening action that leaves {{user}} room to respond.' },
-          'intent-router',
+          { route: AGENT_ROUTES.ADVICE, answer: 'Use an opening action that leaves {{user}} room to respond.' },
+          AGENT_ROLES.INTENT_ROUTER,
         ),
       );
     const executor = { executeStructured, executeProse: vi.fn() } as iAgentRoleExecutor;
@@ -269,7 +270,7 @@ describe('orchestrated character assistant stream', () => {
     expect(store.appendProposedCard).not.toHaveBeenCalled();
     expect(chunks.some((chunk) => chunk.type === EventType.RUN_FINISHED)).toBe(true);
     const metricsChunk = chunks.find(
-      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.metrics,
+      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.METRICS,
     );
     if (metricsChunk?.type !== EventType.CUSTOM) throw new Error('Metrics event was not emitted.');
     expect(AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metricsChunk.value)).toEqual({
@@ -289,7 +290,7 @@ describe('orchestrated character assistant stream', () => {
     const roles: string[] = [];
     const executeStructured: iAgentRoleExecutor['executeStructured'] = async (options) => {
       roles.push(options.profile.role);
-      if (options.profile.role === AGENT_ROLES['content-planner']) {
+      if (options.profile.role === AGENT_ROLES.CONTENT_PLANNER) {
         return createExecution(
           {
             entries: [
@@ -308,7 +309,7 @@ describe('orchestrated character assistant stream', () => {
             ],
             styleBible: ['Specific, grounded prose.'],
           },
-          'content-planner',
+          AGENT_ROLES.CONTENT_PLANNER,
           { costUsd: 0.02 },
         ) as never;
       }
@@ -316,7 +317,7 @@ describe('orchestrated character assistant stream', () => {
     };
     const executor = {
       executeStructured,
-      executeProse: vi.fn(async () => createExecution(PROSE, 'prose-worker', { costUsd: 0.03 })),
+      executeProse: vi.fn(async () => createExecution(PROSE, AGENT_ROLES.PROSE_WORKER, { costUsd: 0.03 })),
     } satisfies iAgentRoleExecutor;
     let projectedCard = structuredClone(payload.card);
     const appendProposedCard = vi.fn(({ proposedCard, toolCallId, summary }) => {
@@ -338,13 +339,13 @@ describe('orchestrated character assistant stream', () => {
       }),
     );
 
-    expect(roles).toEqual([AGENT_ROLES['content-planner']]);
+    expect(roles).toEqual([AGENT_ROLES.CONTENT_PLANNER]);
     expect(appendProposedCard).toHaveBeenCalledTimes(1);
     expect(projectedCard.data.description).toBe(PROSE);
     expect(chunks.some((chunk) => chunk.type === EventType.TOOL_CALL_END)).toBe(true);
     expect(chunks.filter((chunk) => chunk.type === EventType.CUSTOM).length).toBeGreaterThan(1);
     const proposalChunk = chunks.find(
-      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.proposal,
+      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.PROPOSAL,
     );
     if (proposalChunk?.type !== EventType.CUSTOM) throw new Error('Proposal event was not emitted.');
     expect(AGENT_ORCHESTRATION_PROPOSAL_EVENT_SCHEMA.parse(proposalChunk.value)).toMatchObject({
@@ -352,7 +353,7 @@ describe('orchestrated character assistant stream', () => {
       proposedFieldCount: 1,
     });
     const metricsChunk = chunks.find(
-      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.metrics,
+      (chunk) => chunk.type === EventType.CUSTOM && chunk.name === AGENT_ORCHESTRATION_EVENT_NAMES.METRICS,
     );
     if (metricsChunk?.type !== EventType.CUSTOM) throw new Error('Metrics event was not emitted.');
     expect(AGENT_ORCHESTRATION_METRICS_EVENT_SCHEMA.parse(metricsChunk.value)).toEqual({

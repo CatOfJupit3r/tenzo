@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { EDITOR_NODE_TYPES } from '@~/features/character-creator/lib/editor/editor-enums';
+import { MEDIA_TYPES } from '@~/lib/media-type-enums';
+
 import {
   CHAT_INPUT_ATTACHMENT_KINDS,
   buildChatInputContentParts,
@@ -12,11 +15,11 @@ describe('chat input attachments', () => {
     Object.defineProperty(file, 'text', { value: async () => 'character notes' });
     const [attachment] = (await createChatInputAttachments([file], [])).attachments;
 
-    expect(attachment).toMatchObject({ kind: CHAT_INPUT_ATTACHMENT_KINDS.text, name: 'notes.md' });
+    expect(attachment).toMatchObject({ kind: CHAT_INPUT_ATTACHMENT_KINDS.TEXT, name: 'notes.md' });
     expect(buildChatInputContentParts('Use these notes', attachment ? [attachment] : [])).toEqual([
-      { type: 'text', content: 'Use these notes' },
+      { type: EDITOR_NODE_TYPES.TEXT, content: 'Use these notes' },
       {
-        type: 'text',
+        type: EDITOR_NODE_TYPES.TEXT,
         content: 'Attached file: notes.md\n<attachment-content>\ncharacter notes\n</attachment-content>',
         metadata: {
           attachment: { name: 'notes.md', mimeType: 'text/markdown', size: 15 },
@@ -27,7 +30,7 @@ describe('chat input attachments', () => {
 
   it('rejects unsupported binary files', async () => {
     const result = await createChatInputAttachments(
-      [new File(['binary'], 'archive.zip', { type: 'application/zip' })],
+      [new File(['binary'], 'archive.zip', { type: MEDIA_TYPES.ZIP })],
       [],
     );
 

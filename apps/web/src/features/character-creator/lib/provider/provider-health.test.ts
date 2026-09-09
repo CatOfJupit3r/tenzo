@@ -10,7 +10,7 @@ describe('provider health model metadata', () => {
       {
         endpoint: 'https://openrouter.ai/api/v1',
         apiKey: 'test-key',
-        requestMode: REQUEST_MODES.proxy,
+        requestMode: REQUEST_MODES.PROXY,
         model: 'vision-model',
       },
       async (url) =>
@@ -43,13 +43,13 @@ describe('provider health model metadata', () => {
     });
     expect(result.modelCapabilities).toEqual({
       'text-model': {
-        [MODEL_CAPABILITIES['structured-output']]: true,
-        [MODEL_CAPABILITIES['tool-calling']]: false,
+        hasStructuredOutput: true,
+        hasToolCalling: false,
         hasJointStructuredOutputAndToolCalling: false,
       },
       'vision-model': {
-        [MODEL_CAPABILITIES['structured-output']]: true,
-        [MODEL_CAPABILITIES['tool-calling']]: true,
+        hasStructuredOutput: true,
+        hasToolCalling: true,
         hasJointStructuredOutputAndToolCalling: true,
       },
     });
@@ -60,7 +60,7 @@ describe('provider health model metadata', () => {
       {
         endpoint: 'https://openrouter.ai/api/v1',
         apiKey: 'test-key',
-        requestMode: REQUEST_MODES.proxy,
+        requestMode: REQUEST_MODES.PROXY,
       },
       async (url) =>
         url.endsWith('/models')
@@ -88,7 +88,7 @@ describe('provider health model metadata', () => {
       {
         endpoint: 'https://openrouter.ai/api/v1',
         apiKey: '',
-        requestMode: REQUEST_MODES.proxy,
+        requestMode: REQUEST_MODES.PROXY,
         model,
       },
       async (url) => {
@@ -128,8 +128,8 @@ describe('provider health model metadata', () => {
     );
 
     expect(result.modelCapabilities[model]).toEqual({
-      [MODEL_CAPABILITIES['structured-output']]: true,
-      [MODEL_CAPABILITIES['tool-calling']]: true,
+      hasStructuredOutput: true,
+      hasToolCalling: true,
       hasJointStructuredOutputAndToolCalling: false,
     });
     expect(result.modelProviders).toHaveLength(2);
@@ -141,7 +141,7 @@ describe('provider health model metadata', () => {
       {
         endpoint: 'https://openrouter.ai/api/v1',
         apiKey: 'test-key',
-        requestMode: REQUEST_MODES.proxy,
+        requestMode: REQUEST_MODES.PROXY,
         model,
       },
       async (url) => {
@@ -202,7 +202,7 @@ describe('provider health model metadata', () => {
               isZeroDataRetention: true,
               doesCollectData: false,
               isAvailable: true,
-              supportedCapabilities: [MODEL_CAPABILITIES['structured-output'], MODEL_CAPABILITIES['tool-calling']],
+              supportedCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT, MODEL_CAPABILITIES.TOOL_CALLING],
               promptPricePerMillionUsd: 1,
               completionPricePerMillionUsd: 2,
             },

@@ -1,19 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { createEmptyCharacterCard } from '../../constants/card-defaults';
-import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
 import {
   applyCharacterEditProposal,
+  CHARACTER_EDIT_FIELD_KEYS,
   CHARACTER_EDIT_PATCH_STATUSES,
+  CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES,
   CHARACTER_EDIT_PROPOSAL_STATUSES,
   createCharacterCardRevision,
-  createCharacterEditProposal,
   createCharacterEditPatches,
+  createCharacterEditProposal,
   preserveAssistantProtectedFields,
   reduceCharacterEditProposal,
   supersedeOverlappingCharacterEditProposals,
   upsertCharacterEditProposal,
-} from './character-edit-proposal';
+} from '@~/features/character-creator/lib/proposals/character-edit-proposal';
+
+import { createEmptyCharacterCard } from '../../constants/card-defaults';
+import { DEFAULT_CHARACTER_ASSISTANT_FIELD_EDITING } from '../generation/generation-config';
 
 describe('character edit proposals', () => {
   it('preserves fields disabled for assistant editing', () => {
@@ -58,7 +61,7 @@ describe('character edit proposals', () => {
       'custom_fields',
       'character_book',
     ]);
-    expect(patches.every((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed)).toBe(true);
+    expect(patches.every((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.PROPOSED)).toBe(true);
   });
 
   it('creates the same revision for semantically identical object key order', () => {
@@ -77,14 +80,14 @@ describe('character edit proposals', () => {
     proposedCard.data.description = 'A wandering cartographer.';
     const proposal = createCharacterEditProposal({ baseCard, proposedCard });
 
-    const result = applyCharacterEditProposal(proposal, baseCard, ['name']);
+    const result = applyCharacterEditProposal(proposal, baseCard, [CHARACTER_EDIT_FIELD_KEYS.NAME]);
 
     expect(result.conflictFieldKeys).toEqual([]);
     expect(result.card.data.name).toBe('Mira');
     expect(result.card.data.description).toBe('');
-    expect(result.proposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.review);
-    expect(result.proposal.patches.find((patch) => patch.fieldKey === 'name')?.status).toBe(
-      CHARACTER_EDIT_PATCH_STATUSES.applied,
+    expect(result.proposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.REVIEW);
+    expect(result.proposal.patches.find((patch) => patch.fieldKey === CHARACTER_EDIT_FIELD_KEYS.NAME)?.status).toBe(
+      CHARACTER_EDIT_PATCH_STATUSES.APPLIED,
     );
   });
 
@@ -101,8 +104,8 @@ describe('character edit proposals', () => {
     expect(result.conflictFieldKeys).toEqual(['description']);
     expect(result.card).toBe(currentCard);
     expect(result.card.data.description).toBe('Human description');
-    expect(result.proposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.conflict);
-    expect(result.proposal.patches[0]?.status).toBe(CHARACTER_EDIT_PATCH_STATUSES.conflict);
+    expect(result.proposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.CONFLICT);
+    expect(result.proposal.patches[0]?.status).toBe(CHARACTER_EDIT_PATCH_STATUSES.CONFLICT);
   });
 
   it('treats an already-applied value as an idempotent success', () => {
@@ -110,13 +113,13 @@ describe('character edit proposals', () => {
     const proposedCard = structuredClone(baseCard);
     proposedCard.data.name = 'Mira';
     const proposal = createCharacterEditProposal({ baseCard, proposedCard });
-    const firstResult = applyCharacterEditProposal(proposal, baseCard, ['name']);
+    const firstResult = applyCharacterEditProposal(proposal, baseCard, [CHARACTER_EDIT_FIELD_KEYS.NAME]);
 
-    const repeatedResult = applyCharacterEditProposal(proposal, firstResult.card, ['name']);
+    const repeatedResult = applyCharacterEditProposal(proposal, firstResult.card, [CHARACTER_EDIT_FIELD_KEYS.NAME]);
 
     expect(repeatedResult.conflictFieldKeys).toEqual([]);
     expect(repeatedResult.card.data.name).toBe('Mira');
-    expect(repeatedResult.proposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.applied);
+    expect(repeatedResult.proposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.APPLIED);
   });
 
   it('upserts streamed patches by field key', () => {
@@ -129,14 +132,14 @@ describe('character edit proposals', () => {
     const [replacementPatch] = createCharacterEditPatches(baseCard, secondCard);
 
     const nextProposal = reduceCharacterEditProposal(proposal, {
-      type: 'patches-upserted',
+      type: CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.PATCHES_UPSERTED,
       patches: replacementPatch ? [replacementPatch] : [],
       occurredAt: '2026-07-10T00:00:00.000Z',
     });
 
     expect(nextProposal.patches).toHaveLength(1);
     expect(nextProposal.patches[0]?.newValue).toBe('Second');
-    expect(nextProposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.streaming);
+    expect(nextProposal.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.STREAMING);
   });
 
   it('does not let a stale streamed proposal replace its persisted applied state', () => {
@@ -152,16 +155,16 @@ describe('character edit proposals', () => {
       updatedAt: '2026-07-19T12:00:00.000Z',
     };
     const appliedProposal = reduceCharacterEditProposal(streamedProposal, {
-      type: 'apply-succeeded',
-      fieldKeys: ['name'],
+      type: CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_SUCCEEDED,
+      fieldKeys: [CHARACTER_EDIT_FIELD_KEYS.NAME],
       occurredAt: '2026-07-19T12:00:01.000Z',
     });
 
     const proposals = upsertCharacterEditProposal([appliedProposal], streamedProposal);
 
     expect(proposals).toHaveLength(1);
-    expect(proposals[0]?.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.applied);
-    expect(proposals[0]?.patches[0]?.status).toBe(CHARACTER_EDIT_PATCH_STATUSES.applied);
+    expect(proposals[0]?.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.APPLIED);
+    expect(proposals[0]?.patches[0]?.status).toBe(CHARACTER_EDIT_PATCH_STATUSES.APPLIED);
   });
 
   it('supersedes unresolved changes to the same field with the latest proposal', () => {
@@ -176,12 +179,12 @@ describe('character edit proposals', () => {
 
     const [supersededProposal] = supersedeOverlappingCharacterEditProposals([firstProposal], latestProposal);
 
-    expect(supersededProposal?.patches.find((patch) => patch.fieldKey === 'name')?.status).toBe(
-      CHARACTER_EDIT_PATCH_STATUSES.rejected,
+    expect(supersededProposal?.patches.find((patch) => patch.fieldKey === CHARACTER_EDIT_FIELD_KEYS.NAME)?.status).toBe(
+      CHARACTER_EDIT_PATCH_STATUSES.REJECTED,
     );
-    expect(supersededProposal?.patches.find((patch) => patch.fieldKey === 'description')?.status).toBe(
-      CHARACTER_EDIT_PATCH_STATUSES.proposed,
-    );
-    expect(supersededProposal?.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.review);
+    expect(
+      supersededProposal?.patches.find((patch) => patch.fieldKey === CHARACTER_EDIT_FIELD_KEYS.DESCRIPTION)?.status,
+    ).toBe(CHARACTER_EDIT_PATCH_STATUSES.PROPOSED);
+    expect(supersededProposal?.status).toBe(CHARACTER_EDIT_PROPOSAL_STATUSES.REVIEW);
   });
 });

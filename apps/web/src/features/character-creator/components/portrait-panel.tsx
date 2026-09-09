@@ -1,5 +1,6 @@
 import { Badge } from '@~/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@~/components/ui/card';
+import { BADGE_VARIANTS } from '@~/components/ui/ui-enums';
 
 import { useCharacterCreatorContext } from '../context/character-creator-context/character-creator-context.hooks';
 import { ImageUpload } from './image-upload';
@@ -42,7 +43,7 @@ export function PortraitPanel() {
             {data.tags.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {data.tags.slice(0, 4).map((tag) => (
-                  <Badge key={tag} variant="outline" className="max-w-full truncate">
+                  <Badge key={tag} variant={BADGE_VARIANTS.OUTLINE} className="max-w-full truncate">
                     {tag}
                   </Badge>
                 ))}

@@ -1,12 +1,17 @@
 import type { ComponentProps } from 'react';
 
+import { MESSAGE_ALIGNMENTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 function MessageGroup({ className, ...props }: ComponentProps<'div'>) {
   return <div data-slot="message-group" className={cn('flex min-w-0 flex-col gap-2', className)} {...props} />;
 }
 
-function Message({ className, align = 'start', ...props }: ComponentProps<'div'> & { align?: 'start' | 'end' }) {
+function Message({
+  className,
+  align = MESSAGE_ALIGNMENTS.START,
+  ...props
+}: ComponentProps<'div'> & { align?: (typeof MESSAGE_ALIGNMENTS)[keyof typeof MESSAGE_ALIGNMENTS] }) {
   return (
     <div
       data-slot="message"
@@ -72,4 +77,4 @@ function MessageFooter({ className, ...props }: ComponentProps<'div'>) {
   );
 }
 
-export { MessageGroup, Message, MessageAvatar, MessageContent, MessageFooter, MessageHeader };
+export { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader };

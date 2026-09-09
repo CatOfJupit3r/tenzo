@@ -1,17 +1,18 @@
 import { toastError } from '@~/components/toastifications/create-jsx-toasts';
+import {
+  CHARACTER_EDIT_FIELD_KEYS,
+  CHARACTER_EDIT_PATCH_KINDS_CASES,
+} from '@~/features/character-creator/lib/proposals/character-edit-proposal';
 
 import { CORE_FIELD_CONFIGS } from '../../constants/field-config';
 import { useCharacterAssistant } from '../../context/character-assistant-context.hooks';
 import { useCharacterCreatorContext } from '../../context/character-creator-context/character-creator-context.hooks';
 import { TEMPLATE_FIELD_KEYS } from '../../lib/cards/field-templates';
 import { GENERATION_MODES } from '../../lib/prompt/generation-contracts';
-import { CHARACTER_EDIT_FIELD_KEYS } from '../../lib/proposals/character-edit-proposal';
 import { AlternateGreetings } from '../alternate-greetings';
 import { CharacterAssistantStructuredReview } from '../character-assistant-structured-review';
 import { CharacterFieldPanel } from '../character-field-panel';
-import { FIELD_PANEL_CLASS_NAME } from './tabs.constants';
-
-const DIALOGUE_FIELD_KEYS = new Set(['first_mes', 'mes_example']);
+import { DIALOGUE_FIELD_ENUM, FIELD_PANEL_CLASS_NAME } from './tabs.constants';
 
 export function DialogueTab() {
   const { workspace } = useCharacterAssistant();
@@ -34,30 +35,30 @@ export function DialogueTab() {
     acceptAlternateGreetingRewrite,
   } = useCharacterCreatorContext();
   const assistantPatchView = workspace.activePatches.find(
-    (patchView) => patchView.patch.fieldKey === CHARACTER_EDIT_FIELD_KEYS.alternate_greetings,
+    (patchView) => patchView.patch.fieldKey === CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS,
   );
   const reportAssistantError = (error: unknown) =>
     toastError('Assistant proposal was not updated', error instanceof Error ? error.message : 'The action failed.');
 
   return (
     <div className="space-y-4">
-      {CORE_FIELD_CONFIGS.filter((config) => DIALOGUE_FIELD_KEYS.has(config.key)).map((config) => (
+      {CORE_FIELD_CONFIGS.filter((config) => DIALOGUE_FIELD_ENUM.is(config.key)).map((config) => (
         <CharacterFieldPanel key={config.key} config={config} />
       ))}
 
       <div className={FIELD_PANEL_CLASS_NAME}>
-        {assistantPatchView?.patch.kind === 'string-list' ? (
+        {assistantPatchView?.patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.STRING_LIST ? (
           <div className="mb-4">
             <CharacterAssistantStructuredReview
               patch={assistantPatchView.patch}
               onApply={() => {
                 void workspace
-                  .applyProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.alternate_greetings])
+                  .applyProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS])
                   .catch(reportAssistantError);
               }}
               onReject={() => {
                 void workspace
-                  .rejectProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.alternate_greetings])
+                  .rejectProposalFields(assistantPatchView.proposalId, [CHARACTER_EDIT_FIELD_KEYS.ALTERNATE_GREETINGS])
                   .catch(reportAssistantError);
               }}
             />
@@ -66,7 +67,7 @@ export function DialogueTab() {
         <AlternateGreetings
           greetings={data.alternate_greetings}
           generationStates={greetingGenerationStates}
-          templateOptions={getTemplatesForField(TEMPLATE_FIELD_KEYS.alternate_greeting)}
+          templateOptions={getTemplatesForField(TEMPLATE_FIELD_KEYS.ALTERNATE_GREETING)}
           onAdd={addGreeting}
           onChange={updateGreeting}
           onRemove={handleRemoveGreeting}
@@ -79,10 +80,10 @@ export function DialogueTab() {
             void generateAlternateGreeting(index);
           }}
           onContinue={(index) => {
-            void generateAlternateGreeting(index, GENERATION_MODES.continue);
+            void generateAlternateGreeting(index, GENERATION_MODES.CONTINUE);
           }}
           onRewrite={(index) => {
-            void generateAlternateGreeting(index, GENERATION_MODES.rewrite);
+            void generateAlternateGreeting(index, GENERATION_MODES.REWRITE);
           }}
           onRevertRewrite={revertAlternateGreetingRewrite}
           onAcceptRewrite={acceptAlternateGreetingRewrite}

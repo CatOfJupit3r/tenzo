@@ -1,7 +1,7 @@
 import { gunzipSync, gzipSync, unzipSync, zipSync } from 'fflate';
 
-import { ARCHIVE_FORMAT_MIME_TYPES, ARCHIVE_FORMATS } from './export-settings';
 import type { ArchiveFormat } from './export-settings';
+import { ARCHIVE_FORMAT_MIME_TYPES, ARCHIVE_FORMATS } from './export-settings';
 
 export interface iArchiveFileEntry {
   path: string;
@@ -108,7 +108,7 @@ function readTarBytes(tarBytes: Uint8Array): iArchiveFileEntry[] {
 }
 
 export function createArchiveBytes(files: iArchiveFileEntry[], format: ArchiveFormat): Uint8Array {
-  if (format === ARCHIVE_FORMATS.tar_gz) {
+  if (format === ARCHIVE_FORMATS.TAR_GZ) {
     return gzipSync(createTarBytes(files));
   }
 
@@ -122,7 +122,7 @@ export function createArchiveBytes(files: iArchiveFileEntry[], format: ArchiveFo
 
 export function createArchiveBlob(files: iArchiveFileEntry[], format: ArchiveFormat): Blob {
   const archiveBytes = createArchiveBytes(files, format);
-  return new Blob([archiveBytes.slice()], { type: ARCHIVE_FORMAT_MIME_TYPES[format] });
+  return new Blob([archiveBytes.slice()], { type: ARCHIVE_FORMAT_MIME_TYPES.get(format) });
 }
 
 const ZIP_MAGIC = [0x50, 0x4b];
@@ -134,11 +134,11 @@ function matchesMagic(bytes: Uint8Array, magic: number[]): boolean {
 
 export function detectArchiveFormat(bytes: Uint8Array): ArchiveFormat | null {
   if (matchesMagic(bytes, ZIP_MAGIC)) {
-    return ARCHIVE_FORMATS.zip;
+    return ARCHIVE_FORMATS.ZIP;
   }
 
   if (matchesMagic(bytes, GZIP_MAGIC)) {
-    return ARCHIVE_FORMATS.tar_gz;
+    return ARCHIVE_FORMATS.TAR_GZ;
   }
 
   return null;
@@ -147,14 +147,14 @@ export function detectArchiveFormat(bytes: Uint8Array): ArchiveFormat | null {
 export function readArchiveBytes(bytes: Uint8Array): iArchiveFileEntry[] {
   const format = detectArchiveFormat(bytes);
 
-  if (format === ARCHIVE_FORMATS.zip) {
+  if (format === ARCHIVE_FORMATS.ZIP) {
     const unzipped = unzipSync(bytes);
     return Object.entries(unzipped)
       .filter(([path]) => !path.endsWith('/'))
       .map(([path, data]) => ({ path, data }));
   }
 
-  if (format === ARCHIVE_FORMATS.tar_gz) {
+  if (format === ARCHIVE_FORMATS.TAR_GZ) {
     return readTarBytes(gunzipSync(bytes));
   }
 

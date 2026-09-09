@@ -15,21 +15,23 @@ import {
   DialogTitle,
 } from '@~/components/ui/dialog';
 import { Label } from '@~/components/ui/label';
-import { MultiSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
+import { MultiSelect } from '@~/components/ui/select';
 import { Textarea } from '@~/components/ui/textarea';
+import { ALERT_VARIANTS, BADGE_VARIANTS, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
 import { cn } from '@~/lib/utils';
 
 import type { iEnhanceTemplateOptions } from '../hooks/use-template-enhancement';
+import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/cards/example-characters';
 import {
   EXAMPLE_CHARACTER_CONTEXT_FIELD_KEYS,
   EXAMPLE_CHARACTER_CONTEXT_FIELD_LABELS,
   getExampleCharacterDisplayName,
   hasExampleCharacterContextField,
 } from '../lib/cards/example-characters';
-import type { ExampleCharacterContextFieldKey, iStoredExampleCharacter } from '../lib/cards/example-characters';
-import { parseTemplateSlots, TEMPLATE_MODES } from '../lib/cards/field-templates';
 import type { iFieldTemplateViewModel } from '../lib/cards/field-templates';
+import { parseTemplateSlots, TEMPLATE_MODES } from '../lib/cards/field-templates';
 import { MAX_TEMPLATE_ENHANCEMENT_REFERENCE_COUNT } from '../lib/templates/template-enhancement';
 import { buildTemplateEnhancementRequest } from '../lib/templates/template-enhancement-request';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
@@ -109,13 +111,13 @@ export function EnhanceFieldTemplateDialog({
         }),
       );
 
-      if (targetTemplate.mode === TEMPLATE_MODES.strict && parseTemplateSlots(enhancedContent).length === 0) {
+      if (targetTemplate.mode === TEMPLATE_MODES.STRICT && parseTemplateSlots(enhancedContent).length === 0) {
         throw new Error('The enhanced strict template did not contain any {{gen:label}} slots.');
       }
 
       setCandidateContent(enhancedContent);
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      if (error instanceof DOMException && error.name === ABORT_ERROR_NAMES.ABORT_ERROR) {
         return;
       }
 
@@ -128,7 +130,7 @@ export function EnhanceFieldTemplateDialog({
       return;
     }
 
-    if (targetTemplate.mode === TEMPLATE_MODES.strict && parseTemplateSlots(candidateContent).length === 0) {
+    if (targetTemplate.mode === TEMPLATE_MODES.STRICT && parseTemplateSlots(candidateContent).length === 0) {
       setErrorMessage('The enhanced strict template needs at least one {{gen:label}} slot before it can be applied.');
       return;
     }
@@ -208,7 +210,9 @@ export function EnhanceFieldTemplateDialog({
                             <div className="min-w-0 space-y-1">
                               <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate text-sm font-medium">{displayName}</span>
-                                <Badge variant="outline">{exampleCharacter.sourceKind.toUpperCase()}</Badge>
+                                <Badge variant={BADGE_VARIANTS.OUTLINE}>
+                                  {exampleCharacter.sourceKind.toUpperCase()}
+                                </Badge>
                               </div>
                               <p className="truncate text-sm text-muted-foreground">{exampleCharacter.fileName}</p>
                             </div>
@@ -334,7 +338,7 @@ export function EnhanceFieldTemplateDialog({
           )}
 
           {errorMessage ? (
-            <Alert variant="destructive">
+            <Alert variant={ALERT_VARIANTS.DESTRUCTIVE}>
               <AlertTitle>Enhancement failed</AlertTitle>
               <AlertDescription>{errorMessage}</AlertDescription>
             </Alert>
@@ -344,14 +348,24 @@ export function EnhanceFieldTemplateDialog({
         <DialogFooter>
           {isReviewing ? (
             <>
-              <Button type="button" variant="ghost" disabled={isEnhancing} onClick={() => handleOpenChange(false)}>
+              <Button
+                type="button"
+                variant={BUTTON_VARIANTS.GHOST}
+                disabled={isEnhancing}
+                onClick={() => handleOpenChange(false)}
+              >
                 Discard
               </Button>
-              <Button type="button" variant="outline" disabled={isEnhancing} onClick={() => setCandidateContent(null)}>
+              <Button
+                type="button"
+                variant={BUTTON_VARIANTS.OUTLINE}
+                disabled={isEnhancing}
+                onClick={() => setCandidateContent(null)}
+              >
                 <LuArrowLeft className="size-4" />
                 Edit guidance
               </Button>
-              <Button type="button" variant="outline" disabled={isEnhancing} onClick={handleEnhance}>
+              <Button type="button" variant={BUTTON_VARIANTS.OUTLINE} disabled={isEnhancing} onClick={handleEnhance}>
                 {isEnhancing ? <LuLoaderCircle className="size-4 animate-spin" /> : <LuRefreshCw className="size-4" />}
                 {isEnhancing ? 'Regenerating' : 'Regenerate'}
               </Button>
@@ -361,7 +375,7 @@ export function EnhanceFieldTemplateDialog({
             </>
           ) : (
             <>
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+              <Button type="button" variant={BUTTON_VARIANTS.OUTLINE} onClick={() => handleOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="button" disabled={isEnhancing} onClick={handleEnhance}>

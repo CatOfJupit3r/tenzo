@@ -1,8 +1,9 @@
-import { cva } from 'class-variance-authority';
 import type { VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import { Toggle as TogglePrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 
+import { TOGGLE_SIZES, TOGGLE_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 const toggleVariants = cva(
@@ -10,18 +11,19 @@ const toggleVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-transparent',
-        outline: 'border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground',
+        [TOGGLE_VARIANTS.DEFAULT]: 'bg-transparent',
+        [TOGGLE_VARIANTS.OUTLINE]:
+          'border border-input bg-transparent shadow-xs hover:bg-accent hover:text-accent-foreground',
       },
       size: {
-        default: 'h-9 min-w-9 px-2',
-        sm: 'h-8 min-w-8 px-1.5',
-        lg: 'h-10 min-w-10 px-2.5',
+        [TOGGLE_SIZES.DEFAULT]: 'h-9 min-w-9 px-2',
+        [TOGGLE_SIZES.SM]: 'h-8 min-w-8 px-1.5',
+        [TOGGLE_SIZES.LG]: 'h-10 min-w-10 px-2.5',
       },
     },
     defaultVariants: {
-      variant: 'default',
-      size: 'default',
+      variant: TOGGLE_VARIANTS.DEFAULT,
+      size: TOGGLE_SIZES.DEFAULT,
     },
   },
 );

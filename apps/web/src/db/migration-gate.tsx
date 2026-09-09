@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { em } from 'enumwaii';
 import type { ReactNode } from 'react';
-import { z } from 'zod';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { loggerFactory } from '../lib/logging/logger';
 import { initializeApplicationCollections } from './collections/initialize-collections';
 import { applicationDatabase } from './database';
-import { createMigrationGateService } from './migration-gate-service';
 import type { iMigrationGateService } from './migration-gate-service';
-import { downloadMigrationBackup, getPendingMigrations, runMigrations } from './migrations';
+import { createMigrationGateService } from './migration-gate-service';
 import type { ApplicationMigration } from './migrations';
+import { downloadMigrationBackup, getPendingMigrations, runMigrations } from './migrations';
 
-const MIGRATION_GATE_STATUS_SCHEMA = z.enum(['checking', 'confirmation-required', 'running', 'ready', 'error']);
-const MIGRATION_GATE_STATUSES = MIGRATION_GATE_STATUS_SCHEMA.enum;
-type MigrationGateStatus = z.infer<typeof MIGRATION_GATE_STATUS_SCHEMA>;
+const MIGRATION_GATE_STATUS_ENUM = em(['CHECKING', 'CONFIRMATION_REQUIRED', 'RUNNING', 'READY', 'ERROR']);
+const MIGRATION_GATE_STATUSES = MIGRATION_GATE_STATUS_ENUM.enum;
+type MigrationGateStatus = (typeof MIGRATION_GATE_STATUS_ENUM)['~type'];
 const MIGRATION_LOGGER = loggerFactory.getLogger('database.migrations');
 
 interface iMigrationGateProps {
@@ -40,7 +40,7 @@ function MigrationShell({ children }: iMigrationShellProps) {
 }
 
 export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVICE }: iMigrationGateProps) {
-  const [status, setStatus] = useState<MigrationGateStatus>(MIGRATION_GATE_STATUSES.checking);
+  const [status, setStatus] = useState<MigrationGateStatus>(MIGRATION_GATE_STATUSES.CHECKING);
   const [pendingMigrations, setPendingMigrations] = useState<readonly ApplicationMigration[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasDownloadedBackup, setHasDownloadedBackup] = useState(false);
@@ -64,13 +64,13 @@ export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVI
       });
 
       if (migrations.some((migration) => migration.isDestructive)) {
-        setStatus(MIGRATION_GATE_STATUSES['confirmation-required']);
+        setStatus(MIGRATION_GATE_STATUSES.CONFIRMATION_REQUIRED);
         return;
       }
 
-      setStatus(MIGRATION_GATE_STATUSES.running);
+      setStatus(MIGRATION_GATE_STATUSES.RUNNING);
       await service.initialize(migrations);
-      setStatus(MIGRATION_GATE_STATUSES.ready);
+      setStatus(MIGRATION_GATE_STATUSES.READY);
       MIGRATION_LOGGER.debug('Local database initialization completed', {
         operation: 'initialize',
         migrationCount: migrations.length,
@@ -78,7 +78,7 @@ export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVI
     } catch (error) {
       MIGRATION_LOGGER.error('Local database initialization failed', error, { operation: 'initialize' });
       setErrorMessage(error instanceof Error ? error.message : 'The local database could not be prepared.');
-      setStatus(MIGRATION_GATE_STATUSES.error);
+      setStatus(MIGRATION_GATE_STATUSES.ERROR);
     }
   }, [service]);
 
@@ -100,7 +100,7 @@ export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVI
     } catch (error) {
       MIGRATION_LOGGER.error('Migration backup download failed', error, { operation: 'download-backup' });
       setErrorMessage(error instanceof Error ? error.message : 'The backup could not be downloaded.');
-      setStatus(MIGRATION_GATE_STATUSES.error);
+      setStatus(MIGRATION_GATE_STATUSES.ERROR);
     }
   }, [service]);
 
@@ -110,14 +110,14 @@ export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVI
     }
 
     try {
-      setStatus(MIGRATION_GATE_STATUSES.running);
+      setStatus(MIGRATION_GATE_STATUSES.RUNNING);
       MIGRATION_LOGGER.debug('Destructive migrations started', {
         operation: 'run-migrations',
         migrationCount: pendingMigrations.length,
         migrationIds: pendingMigrations.map((migration) => migration.id),
       });
       await service.initialize(pendingMigrations);
-      setStatus(MIGRATION_GATE_STATUSES.ready);
+      setStatus(MIGRATION_GATE_STATUSES.READY);
       MIGRATION_LOGGER.debug('Destructive migrations completed', {
         operation: 'run-migrations',
         migrationCount: pendingMigrations.length,
@@ -129,15 +129,15 @@ export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVI
         migrationIds: pendingMigrations.map((migration) => migration.id),
       });
       setErrorMessage(error instanceof Error ? error.message : 'The local database migration failed.');
-      setStatus(MIGRATION_GATE_STATUSES.error);
+      setStatus(MIGRATION_GATE_STATUSES.ERROR);
     }
   }, [hasDownloadedBackup, pendingMigrations, service]);
 
-  if (status === MIGRATION_GATE_STATUSES.ready) {
+  if (status === MIGRATION_GATE_STATUSES.READY) {
     return <>{children}</>;
   }
 
-  if (status === MIGRATION_GATE_STATUSES['confirmation-required']) {
+  if (status === MIGRATION_GATE_STATUSES.CONFIRMATION_REQUIRED) {
     return (
       <MigrationShell>
         <p className="text-sm font-medium text-destructive">Data migration requires confirmation</p>
@@ -177,7 +177,7 @@ export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVI
     );
   }
 
-  if (status === MIGRATION_GATE_STATUSES.error) {
+  if (status === MIGRATION_GATE_STATUSES.ERROR) {
     return (
       <MigrationShell>
         <p className="text-sm font-medium text-destructive">Local database unavailable</p>
@@ -198,7 +198,7 @@ export function MigrationGate({ children, service = DEFAULT_MIGRATION_GATE_SERVI
   }
 
   const loadingMessage =
-    status === MIGRATION_GATE_STATUSES.running
+    status === MIGRATION_GATE_STATUSES.RUNNING
       ? 'Finishing database migrations before opening the editor.'
       : 'Checking the local database before opening the editor.';
 

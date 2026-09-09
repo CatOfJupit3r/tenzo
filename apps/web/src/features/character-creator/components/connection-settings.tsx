@@ -4,34 +4,41 @@ import { Alert, AlertDescription, AlertTitle } from '@~/components/ui/alert';
 import { Button } from '@~/components/ui/button';
 import { Input } from '@~/components/ui/input';
 import { Label } from '@~/components/ui/label';
-import { SingleSelect } from '@~/components/ui/select';
 import type { iOptionType } from '@~/components/ui/select';
+import { SingleSelect } from '@~/components/ui/select';
 import { Switch } from '@~/components/ui/switch';
+import { ALERT_VARIANTS, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
+import {
+  FIELD_WRITING_STRATEGY_ENUM,
+  FIELD_WRITING_STRATEGY_LABELS,
+} from '@~/features/character-creator/lib/orchestration/field-writing-strategy';
+import {
+  AGENT_GENERATION_BUDGET_ENUM,
+  AGENT_GENERATION_BUDGET_LABELS,
+} from '@~/features/character-creator/lib/provider/agent-generation-budget';
 import { cn } from '@~/lib/utils';
 
+import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
 import {
   GENERATION_PROVIDER_DEFAULTS,
+  GENERATION_PROVIDER_ENUM,
   GENERATION_PROVIDERS,
+  OUTPUT_FORMAT_ENUM,
   OUTPUT_FORMATS,
   REQUEST_MODES,
 } from '../lib/generation/generation-config';
-import type { iCharacterGenerationSettings } from '../lib/generation/generation-config';
-import { FIELD_WRITING_STRATEGIES, FIELD_WRITING_STRATEGY_LABELS } from '../lib/orchestration/field-writing-strategy';
-import { AGENT_GENERATION_BUDGET_LABELS, AGENT_GENERATION_BUDGETS } from '../lib/provider/agent-generation-budget';
+import type { iModelCapabilities, iModelProviderOption } from '../lib/provider/model-capabilities';
 import {
-  getRequiredModelCapabilities,
   getModelCompatibilityStatus,
+  getRequiredModelCapabilities,
+  hasModelCapability,
   MODEL_CAPABILITIES,
+  MODEL_CAPABILITY_ENUM,
+  MODEL_COMPATIBILITY_STATUS_ENUM,
   MODEL_COMPATIBILITY_STATUSES,
 } from '../lib/provider/model-capabilities';
-import type {
-  iModelCapabilities,
-  iModelProviderOption,
-  ModelCapability,
-  ModelCompatibilityStatus,
-} from '../lib/provider/model-capabilities';
-import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { iProviderModelOption, ProviderKind } from '../lib/provider/provider-health';
+import { PROVIDER_KINDS } from '../lib/provider/provider-health';
 import type { iProviderPolicyCatalog } from '../lib/provider/provider-policy-resolver';
 import type { iGenerationSettingsPatchHandler } from './generation-settings-contracts';
 
@@ -50,17 +57,18 @@ export interface iConnectionHealthViewModel {
   policyCatalog: iProviderPolicyCatalog | null;
 }
 
-const MODEL_CAPABILITY_LABELS = {
-  [MODEL_CAPABILITIES['structured-output']]: 'Structured responses',
-} satisfies Partial<Record<ModelCapability, string>>;
+const MODEL_CAPABILITY_LABELS = MODEL_CAPABILITY_ENUM.derive<string>()(
+  [MODEL_CAPABILITIES.STRUCTURED_OUTPUT, 'Structured responses'],
+  [MODEL_CAPABILITIES.TOOL_CALLING, 'Tool calling'],
+);
 
-const DISPLAYED_MODEL_CAPABILITIES = [MODEL_CAPABILITIES['structured-output']] as const;
+const DISPLAYED_MODEL_CAPABILITIES = [MODEL_CAPABILITIES.STRUCTURED_OUTPUT] as const;
 
-const MODEL_COMPATIBILITY_TITLES = {
-  [MODEL_COMPATIBILITY_STATUSES.compatible]: 'Model meets project requirements',
-  [MODEL_COMPATIBILITY_STATUSES.incompatible]: 'Model is missing required capabilities',
-  [MODEL_COMPATIBILITY_STATUSES.unknown]: 'Model capabilities could not be verified',
-} satisfies Record<ModelCompatibilityStatus, string>;
+const MODEL_COMPATIBILITY_TITLES = MODEL_COMPATIBILITY_STATUS_ENUM.derive<string>()(
+  [MODEL_COMPATIBILITY_STATUSES.COMPATIBLE, 'Model meets project requirements'],
+  [MODEL_COMPATIBILITY_STATUSES.INCOMPATIBLE, 'Model is missing required capabilities'],
+  [MODEL_COMPATIBILITY_STATUSES.UNKNOWN, 'Model capabilities could not be verified'],
+);
 
 function getCapabilityIcon(isSupported: boolean | undefined) {
   if (isSupported === true) {
@@ -85,17 +93,17 @@ function getCapabilitySupportLabel(isSupported: boolean | undefined) {
 const outputFormatOptions: iOptionType[] = [
   {
     label: 'XML wrapper',
-    value: OUTPUT_FORMATS.xml,
+    value: OUTPUT_FORMATS.XML,
     description: 'Most reliable for smaller models and partial continue parsing.',
   },
   {
     label: 'JSON wrapper',
-    value: OUTPUT_FORMATS.json,
+    value: OUTPUT_FORMATS.JSON,
     description: 'Useful when the provider follows JSON instructions consistently.',
   },
   {
     label: 'Raw text',
-    value: OUTPUT_FORMATS.none,
+    value: OUTPUT_FORMATS.NONE,
     description: 'Fastest, but the least structured when models drift.',
   },
 ];
@@ -103,23 +111,23 @@ const outputFormatOptions: iOptionType[] = [
 const providerOptions: iOptionType[] = [
   {
     label: 'KoboldCpp',
-    value: GENERATION_PROVIDERS.koboldcpp,
+    value: GENERATION_PROVIDERS.KOBOLDCPP,
     description: 'Connect to a local KoboldCpp OpenAI-compatible endpoint.',
   },
   {
     label: 'OpenRouter',
-    value: GENERATION_PROVIDERS.openrouter,
+    value: GENERATION_PROVIDERS.OPENROUTER,
     description: 'Use an OpenRouter API key and model ID through TanStack AI.',
   },
 ];
 
-const agentGenerationBudgetOptions: iOptionType[] = Object.values(AGENT_GENERATION_BUDGETS).map((value) => ({
-  label: AGENT_GENERATION_BUDGET_LABELS[value],
+const agentGenerationBudgetOptions: iOptionType[] = AGENT_GENERATION_BUDGET_ENUM.values.map((value) => ({
+  label: AGENT_GENERATION_BUDGET_LABELS.get(value),
   value,
 }));
 
-const fieldWritingStrategyOptions: iOptionType[] = Object.values(FIELD_WRITING_STRATEGIES).map((value) => ({
-  label: FIELD_WRITING_STRATEGY_LABELS[value],
+const fieldWritingStrategyOptions: iOptionType[] = FIELD_WRITING_STRATEGY_ENUM.values.map((value) => ({
+  label: FIELD_WRITING_STRATEGY_LABELS.get(value),
   value,
 }));
 
@@ -140,8 +148,8 @@ export function ConnectionSettings({
   onHealthCheck,
   onSettingsChange,
 }: iConnectionSettingsProps) {
-  const isUsingProxy = generationSettings.requestMode === REQUEST_MODES.proxy;
-  const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.openrouter;
+  const isUsingProxy = generationSettings.requestMode === REQUEST_MODES.PROXY;
+  const isUsingOpenRouter = generationSettings.provider === GENERATION_PROVIDERS.OPENROUTER;
   const selectedModel = generationSettings.model.trim() || connectionHealth.detectedModel;
   const selectedProvider = connectionHealth.modelProviders.find(
     (provider) => provider.slug === generationSettings.openRouterProvider,
@@ -168,7 +176,7 @@ export function ConnectionSettings({
     ) ?? [];
   const isCurrentProfileEligible = isUsingOpenRouter
     ? Boolean(policyModel && !policyModel.isModerated && policyEndpoints.length > 0)
-    : compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.compatible;
+    : compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.COMPATIBLE;
 
   return (
     <div className="space-y-4">
@@ -180,9 +188,9 @@ export function ConnectionSettings({
             options={providerOptions}
             value={generationSettings.provider}
             onValueChange={(value) => {
-              if (value && GENERATION_PROVIDERS[value as keyof typeof GENERATION_PROVIDERS]) {
-                const provider = value as iCharacterGenerationSettings['provider'];
-                onSettingsChange({ provider, ...GENERATION_PROVIDER_DEFAULTS[provider] });
+              if (GENERATION_PROVIDER_ENUM.is(value)) {
+                const provider = value;
+                onSettingsChange({ provider, ...GENERATION_PROVIDER_DEFAULTS.get(provider) });
               }
             }}
           />
@@ -210,7 +218,7 @@ export function ConnectionSettings({
             className="w-full"
             disabled={connectionHealth.isChecking}
             type="button"
-            variant="outline"
+            variant={BUTTON_VARIANTS.OUTLINE}
             onClick={() => {
               onHealthCheck().catch(() => undefined);
             }}
@@ -245,8 +253,8 @@ export function ConnectionSettings({
             options={outputFormatOptions}
             value={generationSettings.outputFormat}
             onValueChange={(value) => {
-              if (value) {
-                onSettingsChange({ outputFormat: value as iCharacterGenerationSettings['outputFormat'] });
+              if (OUTPUT_FORMAT_ENUM.is(value)) {
+                onSettingsChange({ outputFormat: value });
               }
             }}
           />
@@ -259,9 +267,9 @@ export function ConnectionSettings({
             options={agentGenerationBudgetOptions}
             value={generationSettings.agentGenerationBudget}
             onValueChange={(value) => {
-              if (value && AGENT_GENERATION_BUDGETS[value as keyof typeof AGENT_GENERATION_BUDGETS]) {
+              if (AGENT_GENERATION_BUDGET_ENUM.is(value)) {
                 onSettingsChange({
-                  agentGenerationBudget: value as iCharacterGenerationSettings['agentGenerationBudget'],
+                  agentGenerationBudget: value,
                 });
               }
             }}
@@ -278,9 +286,9 @@ export function ConnectionSettings({
             options={fieldWritingStrategyOptions}
             value={generationSettings.fieldWritingStrategy}
             onValueChange={(value) => {
-              if (value && FIELD_WRITING_STRATEGIES[value as keyof typeof FIELD_WRITING_STRATEGIES]) {
+              if (FIELD_WRITING_STRATEGY_ENUM.is(value)) {
                 onSettingsChange({
-                  fieldWritingStrategy: value as iCharacterGenerationSettings['fieldWritingStrategy'],
+                  fieldWritingStrategy: value,
                 });
               }
             }}
@@ -298,7 +306,7 @@ export function ConnectionSettings({
           <Switch
             checked={isUsingProxy}
             onCheckedChange={(checked) =>
-              onSettingsChange({ requestMode: checked ? REQUEST_MODES.proxy : REQUEST_MODES.browser })
+              onSettingsChange({ requestMode: checked ? REQUEST_MODES.PROXY : REQUEST_MODES.BROWSER })
             }
             aria-label="Use server proxy"
           />
@@ -306,7 +314,7 @@ export function ConnectionSettings({
       </div>
 
       {connectionHealth.errorMessage ? (
-        <Alert variant="destructive">
+        <Alert variant={ALERT_VARIANTS.DESTRUCTIVE}>
           <AlertTitle>Health check failed</AlertTitle>
           <AlertDescription>{connectionHealth.errorMessage}</AlertDescription>
         </Alert>
@@ -321,7 +329,7 @@ export function ConnectionSettings({
               <span
                 className={cn(
                   'font-medium',
-                  connectionHealth.providerKind === PROVIDER_KINDS.koboldcpp ? 'text-foreground' : undefined,
+                  connectionHealth.providerKind === PROVIDER_KINDS.KOBOLDCPP ? 'text-foreground' : undefined,
                 )}
               >
                 {connectionHealth.providerName ?? 'Unknown provider'}
@@ -336,8 +344,14 @@ export function ConnectionSettings({
       ) : null}
 
       {connectionHealth.hasCompletedCheck ? (
-        <Alert variant={compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.incompatible ? 'destructive' : 'default'}>
-          <AlertTitle>{MODEL_COMPATIBILITY_TITLES[compatibilityStatus]}</AlertTitle>
+        <Alert
+          variant={
+            compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.INCOMPATIBLE
+              ? ALERT_VARIANTS.DESTRUCTIVE
+              : ALERT_VARIANTS.DEFAULT
+          }
+        >
+          <AlertTitle>{MODEL_COMPATIBILITY_TITLES.get(compatibilityStatus)}</AlertTitle>
           <AlertDescription className="space-y-2">
             <p className="break-all">{selectedModel ?? 'No model selected'}</p>
             {generationSettings.openRouterProvider ? (
@@ -345,7 +359,9 @@ export function ConnectionSettings({
             ) : null}
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               {DISPLAYED_MODEL_CAPABILITIES.map((capability) => {
-                const isSupported = selectedModelCapabilities?.[capability];
+                const isSupported = selectedModelCapabilities
+                  ? hasModelCapability(selectedModelCapabilities, capability)
+                  : undefined;
                 const Icon = getCapabilityIcon(isSupported);
 
                 return (
@@ -357,12 +373,12 @@ export function ConnectionSettings({
                         isSupported === undefined && 'text-muted-foreground',
                       )}
                     />
-                    {MODEL_CAPABILITY_LABELS[capability]}: {getCapabilitySupportLabel(isSupported)}
+                    {MODEL_CAPABILITY_LABELS.get(capability)}: {getCapabilitySupportLabel(isSupported)}
                   </span>
                 );
               })}
             </div>
-            {compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.unknown ? (
+            {compatibilityStatus === MODEL_COMPATIBILITY_STATUSES.UNKNOWN ? (
               <p>The provider did not publish capability metadata for this model.</p>
             ) : null}
           </AlertDescription>
@@ -370,7 +386,7 @@ export function ConnectionSettings({
       ) : null}
 
       {connectionHealth.hasCompletedCheck ? (
-        <Alert variant={isCurrentProfileEligible ? 'default' : 'destructive'}>
+        <Alert variant={isCurrentProfileEligible ? ALERT_VARIANTS.DEFAULT : ALERT_VARIANTS.DESTRUCTIVE}>
           <AlertTitle>
             {isCurrentProfileEligible
               ? 'Current assistant profile is eligible'

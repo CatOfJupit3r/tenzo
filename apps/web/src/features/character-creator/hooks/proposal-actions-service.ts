@@ -1,13 +1,16 @@
-import type { iCharacterAssistantSession } from '../lib/assistant/character-assistant-session';
-import type { CharacterCard } from '../lib/cards/card-schema';
 import {
   applyCharacterEditProposal,
+  CHARACTER_EDIT_PATCH_KINDS_CASES,
   CHARACTER_EDIT_PATCH_STATUSES,
+  CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES,
   CHARACTER_EDIT_PROPOSAL_STATUSES,
   isCharacterEditPatchUnresolved,
   reduceCharacterEditProposal,
   upsertCharacterEditProposal,
-} from '../lib/proposals/character-edit-proposal';
+} from '@~/features/character-creator/lib/proposals/character-edit-proposal';
+
+import type { iCharacterAssistantSession } from '../lib/assistant/character-assistant-session';
+import type { CharacterCard } from '../lib/cards/card-schema';
 import type {
   CharacterEditFieldKey,
   CharacterEditProposalStatus,
@@ -15,11 +18,11 @@ import type {
 } from '../lib/proposals/character-edit-proposal';
 
 const ACTIVE_PROPOSAL_STATUSES = new Set<CharacterEditProposalStatus>([
-  CHARACTER_EDIT_PROPOSAL_STATUSES.streaming,
-  CHARACTER_EDIT_PROPOSAL_STATUSES.review,
-  CHARACTER_EDIT_PROPOSAL_STATUSES.applying,
-  CHARACTER_EDIT_PROPOSAL_STATUSES.conflict,
-  CHARACTER_EDIT_PROPOSAL_STATUSES.failed,
+  CHARACTER_EDIT_PROPOSAL_STATUSES.STREAMING,
+  CHARACTER_EDIT_PROPOSAL_STATUSES.REVIEW,
+  CHARACTER_EDIT_PROPOSAL_STATUSES.APPLYING,
+  CHARACTER_EDIT_PROPOSAL_STATUSES.CONFLICT,
+  CHARACTER_EDIT_PROPOSAL_STATUSES.FAILED,
 ]);
 
 export interface iProposalSessionRepository {
@@ -78,14 +81,14 @@ export function createProposalActionsService({
     const selectedFieldKeys =
       fieldKeys ??
       proposal.patches
-        .filter((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed)
+        .filter((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.PROPOSED)
         .map((patch) => patch.fieldKey);
     const proposalToApply =
       resolvedTextValue !== undefined && selectedFieldKeys.length === 1
         ? {
             ...proposal,
             patches: proposal.patches.map((patch) =>
-              patch.fieldKey === selectedFieldKeys[0] && patch.kind === 'text'
+              patch.fieldKey === selectedFieldKeys[0] && patch.kind === CHARACTER_EDIT_PATCH_KINDS_CASES.TEXT
                 ? { ...patch, newValue: resolvedTextValue }
                 : patch,
             ),
@@ -93,7 +96,7 @@ export function createProposalActionsService({
         : proposal;
     await persistProposal(
       reduceCharacterEditProposal(proposalToApply, {
-        type: 'apply-requested',
+        type: CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.APPLY_REQUESTED,
         fieldKeys: selectedFieldKeys,
         occurredAt: new Date().toISOString(),
       }),
@@ -116,7 +119,7 @@ export function createProposalActionsService({
     if (!proposal) throw new Error('The selected proposal is unavailable.');
     await persistProposal(
       reduceCharacterEditProposal(proposal, {
-        type: 'patches-rejected',
+        type: CHARACTER_EDIT_PROPOSAL_EVENT_TYPES_CASES.PATCHES_REJECTED,
         fieldKeys,
         occurredAt: new Date().toISOString(),
       }),
@@ -129,7 +132,7 @@ export function createProposalActionsService({
     const results: ReturnType<typeof applyCharacterEditProposal>[] = [];
     for (const proposal of activeProposals) {
       const fieldKeys = proposal.patches
-        .filter((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.proposed)
+        .filter((patch) => patch.status === CHARACTER_EDIT_PATCH_STATUSES.PROPOSED)
         .map((patch) => patch.fieldKey);
       if (fieldKeys.length === 0) continue;
       const result = applyCharacterEditProposal(proposal, projectedCard, fieldKeys);
@@ -154,7 +157,7 @@ export function createProposalActionsService({
     await Promise.all(
       activeProposals.map(async (proposal) => {
         const fieldKeys = proposal.patches
-          .filter((patch) => patch.status !== CHARACTER_EDIT_PATCH_STATUSES.applied)
+          .filter((patch) => patch.status !== CHARACTER_EDIT_PATCH_STATUSES.APPLIED)
           .map((patch) => patch.fieldKey);
         if (fieldKeys.length > 0) await rejectProposalFields(proposal.id, fieldKeys);
       }),

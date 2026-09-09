@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { AGENT_ROLES } from './agent-role-contracts';
+import {
+  PROVIDER_DATA_COLLECTION_DENY,
+  PROVIDER_POLICY_FAILURE_REASONS,
+  resolveProviderPolicy,
+} from '@~/features/character-creator/lib/provider/provider-policy-resolver';
+
 import type { iAgentRoleProfile } from './agent-role-contracts';
+import { AGENT_ROLES } from './agent-role-contracts';
 import { MODEL_CAPABILITIES } from './model-capabilities';
 import { PROVIDER_KINDS } from './provider-health';
 import { createProviderPolicyCatalogCache } from './provider-policy-catalog-cache';
-import { PROVIDER_POLICY_FAILURE_REASONS, resolveProviderPolicy } from './provider-policy-resolver';
 import type { iProviderPolicyCatalog } from './provider-policy-resolver';
 
 const NOW = new Date('2026-08-21T00:00:00.000Z');
@@ -13,11 +18,11 @@ const NOW = new Date('2026-08-21T00:00:00.000Z');
 function createProfile(overrides: Partial<iAgentRoleProfile> = {}): iAgentRoleProfile {
   return {
     id: 'content-planner-test',
-    role: AGENT_ROLES['content-planner'],
-    providerKind: PROVIDER_KINDS.openrouter,
+    role: AGENT_ROLES.CONTENT_PLANNER,
+    providerKind: PROVIDER_KINDS.OPENROUTER,
     modelId: 'test/unmoderated',
     allowedProviderSlugs: ['eligible-provider'],
-    requiredCapabilities: [MODEL_CAPABILITIES['structured-output'], MODEL_CAPABILITIES['tool-calling']],
+    requiredCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT, MODEL_CAPABILITIES.TOOL_CALLING],
     temperature: 0.4,
     topP: 0.9,
     budget: {
@@ -49,7 +54,7 @@ function createCatalog(
             isZeroDataRetention: true,
             doesCollectData: false,
             isAvailable: true,
-            supportedCapabilities: [MODEL_CAPABILITIES['structured-output'], MODEL_CAPABILITIES['tool-calling']],
+            supportedCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT, MODEL_CAPABILITIES.TOOL_CALLING],
             promptPricePerMillionUsd: 1,
             completionPricePerMillionUsd: 2,
             ...endpointOverrides,
@@ -71,7 +76,7 @@ describe('provider policy resolver', () => {
       routing: {
         only: ['eligible-provider'],
         allowFallbacks: false,
-        dataCollection: 'deny',
+        dataCollection: PROVIDER_DATA_COLLECTION_DENY,
         zdr: true,
         requireParameters: true,
       },
@@ -82,23 +87,23 @@ describe('provider policy resolver', () => {
   it.each([
     {
       overrides: { isZeroDataRetention: false },
-      reason: PROVIDER_POLICY_FAILURE_REASONS['endpoint-not-zdr'],
+      reason: PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_NOT_ZDR,
     },
     {
       overrides: { doesCollectData: true },
-      reason: PROVIDER_POLICY_FAILURE_REASONS['endpoint-data-collecting'],
+      reason: PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_DATA_COLLECTING,
     },
     {
-      overrides: { supportedCapabilities: [MODEL_CAPABILITIES['structured-output']] },
-      reason: PROVIDER_POLICY_FAILURE_REASONS['capability-mismatch'],
+      overrides: { supportedCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT] },
+      reason: PROVIDER_POLICY_FAILURE_REASONS.CAPABILITY_MISMATCH,
     },
     {
       overrides: { isAvailable: false },
-      reason: PROVIDER_POLICY_FAILURE_REASONS['endpoint-unavailable'],
+      reason: PROVIDER_POLICY_FAILURE_REASONS.ENDPOINT_UNAVAILABLE,
     },
     {
       overrides: { completionPricePerMillionUsd: 5 },
-      reason: PROVIDER_POLICY_FAILURE_REASONS['price-limit-exceeded'],
+      reason: PROVIDER_POLICY_FAILURE_REASONS.PRICE_LIMIT_EXCEEDED,
     },
   ])('fails closed for $reason endpoints', ({ overrides, reason }) => {
     const result = resolveProviderPolicy({ profile: createProfile(), catalog: createCatalog(overrides), now: NOW });
@@ -117,14 +122,14 @@ describe('provider policy resolver', () => {
     expect(result).toEqual(
       expect.objectContaining({
         isEligible: false,
-        failures: [{ reason: PROVIDER_POLICY_FAILURE_REASONS['model-moderated'], providerSlug: null }],
+        failures: [{ reason: PROVIDER_POLICY_FAILURE_REASONS.MODEL_MODERATED, providerSlug: null }],
       }),
     );
   });
 
   it('rejects missing and stale catalogs instead of relaxing policy', () => {
     expect(resolveProviderPolicy({ profile: createProfile(), catalog: null, now: NOW }).failures).toEqual([
-      { reason: PROVIDER_POLICY_FAILURE_REASONS['catalog-missing'], providerSlug: null },
+      { reason: PROVIDER_POLICY_FAILURE_REASONS.CATALOG_MISSING, providerSlug: null },
     ]);
     expect(
       resolveProviderPolicy({
@@ -132,12 +137,12 @@ describe('provider policy resolver', () => {
         catalog: { ...createCatalog(), fetchedAt: '2026-08-20T23:00:00.000Z' },
         now: NOW,
       }).failures,
-    ).toEqual([{ reason: PROVIDER_POLICY_FAILURE_REASONS['catalog-stale'], providerSlug: null }]);
+    ).toEqual([{ reason: PROVIDER_POLICY_FAILURE_REASONS.CATALOG_STALE, providerSlug: null }]);
   });
 
   it('identifies local KoboldCpp separately and still enforces role capabilities', () => {
     const localProfile = createProfile({
-      providerKind: PROVIDER_KINDS.koboldcpp,
+      providerKind: PROVIDER_KINDS.KOBOLDCPP,
       allowedProviderSlugs: [],
       modelId: 'koboldcpp/local',
     });
@@ -146,7 +151,7 @@ describe('provider policy resolver', () => {
       resolveProviderPolicy({
         profile: localProfile,
         catalog: null,
-        localCapabilities: [MODEL_CAPABILITIES['structured-output'], MODEL_CAPABILITIES['tool-calling']],
+        localCapabilities: [MODEL_CAPABILITIES.STRUCTURED_OUTPUT, MODEL_CAPABILITIES.TOOL_CALLING],
         now: NOW,
       }),
     ).toEqual({ isEligible: true, isLocal: true, routing: null, failures: [] });
@@ -154,7 +159,7 @@ describe('provider policy resolver', () => {
       expect.objectContaining({
         isEligible: false,
         isLocal: true,
-        failures: [{ reason: PROVIDER_POLICY_FAILURE_REASONS['capability-mismatch'], providerSlug: null }],
+        failures: [{ reason: PROVIDER_POLICY_FAILURE_REASONS.CAPABILITY_MISMATCH, providerSlug: null }],
       }),
     );
   });

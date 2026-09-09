@@ -2,6 +2,7 @@ import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { LuCheck, LuChevronRight, LuCircle } from 'react-icons/lu';
 
+import { DROPDOWN_MENU_VARIANTS } from '@~/components/ui/ui-enums';
 import { cn } from '@~/lib/utils';
 
 function DropdownMenu({ ...props }: ComponentProps<typeof DropdownMenuPrimitive.Root>) {
@@ -43,11 +44,11 @@ function DropdownMenuGroup({ ...props }: ComponentProps<typeof DropdownMenuPrimi
 function DropdownMenuItem({
   className,
   inset,
-  variant = 'default',
+  variant = DROPDOWN_MENU_VARIANTS.DEFAULT,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.Item> & {
   inset?: boolean;
-  variant?: 'default' | 'destructive';
+  variant?: (typeof DROPDOWN_MENU_VARIANTS)[keyof typeof DROPDOWN_MENU_VARIANTS];
 }) {
   return (
     <DropdownMenuPrimitive.Item
@@ -197,18 +198,18 @@ function DropdownMenuSubContent({ className, ...props }: ComponentProps<typeof D
 
 export {
   DropdownMenu,
-  DropdownMenuPortal,
-  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuLabel,
   DropdownMenuItem,
-  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
-  DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
 };

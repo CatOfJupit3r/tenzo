@@ -1,6 +1,8 @@
-import { chat, defineChatMiddleware } from '@tanstack/ai';
 import type { AnyTextAdapter, ChatMiddleware, ModelMessage, TokenUsage, UIMessage } from '@tanstack/ai';
+import { chat, defineChatMiddleware } from '@tanstack/ai';
 import type { z } from 'zod';
+
+import { MESSAGE_ROLES } from '@~/features/character-creator/lib/generation/message-enums';
 
 import { describeGenerationError } from './generation-error';
 
@@ -37,7 +39,7 @@ function buildMessages(prompt?: string, messages?: Array<ModelMessage | UIMessag
   }
 
   if (prompt) {
-    return [{ role: 'user', content: prompt }];
+    return [{ role: MESSAGE_ROLES.USER, content: prompt }];
   }
 
   throw new Error('Structured generation requires a prompt or messages.');

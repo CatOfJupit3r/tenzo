@@ -65,16 +65,16 @@ Examples:
   ```
 - Do not generate a reference guide, comprehensive summary document, or new docs markdown files unless the user explicitly asks for them.
 - Follow standard TypeScript conventions with strict typing, `async/await`, and modular design.
-- Avoid TypeScript `enum`; prefer `z.enum(...)` for shared value sets and derive exported types from the schema.
+- Define closed string sets with `em(...)` from `enumwaii`, not TypeScript enums or standalone Zod enums. Use `.enum` for application members and `.cases` for discriminants. Build native Zod enums from extracted `.enum` members; reserve `.rawEnum` for raw-key records and serialization boundaries.
   ```typescript
-  import z from "zod";
+  import { em } from "enumwaii";
 
-  export const userRolesSchema = z.enum(["ADMIN", "USER", "GUEST"]);
-  export const USER_ROLES = userRolesSchema.enum;
-  export type UserRole = z.infer<typeof userRolesSchema>;
+  export const userRoles = em(["ADMIN", "USER", "GUEST"]);
+  export const USER_ROLES = userRoles.enum;
+  export type UserRole = (typeof userRoles)["~type"];
   ```
 - Use kebab-case for filenames.
-- If a string literal represents a reusable closed set of values, extract it into a shared enum-like schema instead of hardcoding the string in multiple places. IF YOU ENCOUNTER STRING LITERALS WITHOUT ENUM, extract them into a shared enum. ALWAYS consider if a value should be an enum instead of a string literal, especially if it's used in multiple places or has a specific set of valid values.
+- If a string literal represents a reusable closed set of values, extract it into a shared enumwaii declaration instead of hardcoding it in multiple places. Reuse existing declarations and derive subsets with `.pick()` or `.omit()` and extensions with `.extend()`. Use `.derive()` for exhaustive mappings and `.deriveTo()` for mappings to another enum.
 - When resolving warnings or errors, fix the root cause instead of relying on `// @ts-ignore` or `as unknown as ...` unless there is no better option and the code explains why.
 - All boolean values have to have `is`, `should`, `will`, `has`, or `does` prefixes. For example, `isActive`, `shouldShow`, `hasPermission`, or `doesSupportStreaming`. All interfaces must have `i` prefix. For example, `iUser`, `iProduct`, or `iOrder`.
 - When referencing values with an existing enum or schema-backed constant, always use that exported value instead of hardcoded strings.

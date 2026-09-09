@@ -3,15 +3,16 @@ import { LuPlus, LuTrash2 } from 'react-icons/lu';
 
 import { Button } from '@~/components/ui/button/button';
 import { Input } from '@~/components/ui/input';
+import { BUTTON_SIZES, BUTTON_VARIANTS } from '@~/components/ui/ui-enums';
 
 import type { iFieldGenerationState } from '../hooks/use-character-creator-page';
 import type { CustomField } from '../lib/cards/card-schema';
-import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import type { iCreateStoredFieldTemplateInput, iFieldTemplateViewModel } from '../lib/cards/field-templates';
+import { TEMPLATE_FIELD_KEYS } from '../lib/cards/field-templates';
 import { MarkdownFieldEditor } from './editor/markdown-field-editor';
 import { RewriteDiffReview } from './editor/rewrite-diff-review';
-import { FieldGenerationControls } from './field-generation-controls';
 import { buildFieldGenerationControlProps } from './field-generation-control-props';
+import { FieldGenerationControls } from './field-generation-controls';
 
 export interface iCustomFieldsProps {
   fields: CustomField[];
@@ -57,7 +58,7 @@ export function CustomFields({
       <div className="flex items-center justify-between">
         <span className="text-sm leading-none font-medium">Custom Fields</span>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+          <Button type="button" variant={BUTTON_VARIANTS.OUTLINE} size={BUTTON_SIZES.SM} onClick={onAdd}>
             <LuPlus className="size-4" />
             Add field
           </Button>
@@ -93,7 +94,7 @@ export function CustomFields({
                       fieldId: `custom-field-${field.id}`,
                       label: field.label.trim() || 'Custom Field',
                       fieldValue: field.value,
-                      templateFieldKey: TEMPLATE_FIELD_KEYS.custom_field,
+                      templateFieldKey: TEMPLATE_FIELD_KEYS.CUSTOM_FIELD,
                       generationState,
                       templateOptions,
                       onTemplateIdChange: (templateId) => onTemplateIdChange(field.id, templateId),
@@ -110,8 +111,8 @@ export function CustomFields({
                   />
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="icon"
+                    variant={BUTTON_VARIANTS.GHOST}
+                    size={BUTTON_SIZES.ICON}
                     tooltip="Remove field"
                     onClick={() => onRemove(field.id)}
                   >

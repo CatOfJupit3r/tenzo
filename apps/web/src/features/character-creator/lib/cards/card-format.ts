@@ -1,33 +1,38 @@
 import { z } from 'zod';
 
-import { JSON_VALUE_SCHEMA } from '@~/lib/json-value';
+import {
+  CHARACTER_BOOK_ENTRY_POSITION_SCHEMA,
+  CHARACTER_CARD_SCHEMA,
+  CHARACTER_FIELD_KEY_ENUM,
+  CHARACTER_FIELD_KEYS,
+} from '@~/features/character-creator/lib/cards/card-schema';
 import type { iJsonValue } from '@~/lib/json-value';
+import { JSON_VALUE_SCHEMA } from '@~/lib/json-value';
 import { generateUuid } from '@~/utils/uuid';
 
 import { createEmptyCharacterCard } from '../../constants/card-defaults';
-import { sanitizeCharacterGenerationPromptSettings } from '../generation/generation-config';
 import type { iCharacterGenerationPromptSettings } from '../generation/generation-config';
-import {
-  PORTRAIT_CROP_RECT_INPUT_SCHEMA,
-  sanitizeStoredPortraitCropRect,
-} from '../portrait/portrait-focal-point';
+import { sanitizeCharacterGenerationPromptSettings } from '../generation/generation-config';
 import type { iPortraitCropRect } from '../portrait/portrait-focal-point';
-import { CHARACTER_BOOK_ENTRY_POSITION_SCHEMA, CHARACTER_CARD_SCHEMA } from './card-schema';
+import { PORTRAIT_CROP_RECT_INPUT_SCHEMA, sanitizeStoredPortraitCropRect } from '../portrait/portrait-focal-point';
+import { CHARACTER_CARD_SPEC_VERSIONS, CHARACTER_CARD_SPECS } from './card-file-enums';
 import type { CharacterBook, CharacterBookEntry, CharacterCard, CustomField } from './card-schema';
-import { EXPORT_DETAIL_LEVELS } from './export-settings';
 import type { ExportDetailLevel } from './export-settings';
+import { EXPORT_DETAIL_LEVELS } from './export-settings';
 
 export const TENZO_CARD_EXTENSION_KEY = 'tenzo';
 export const TENZO_CARD_EXTENSION_VERSION = 1;
 
-const HYBRID_TOP_LEVEL_FIELD_KEYS = [
-  'name',
-  'description',
-  'personality',
-  'scenario',
-  'first_mes',
-  'mes_example',
-] as const;
+const HYBRID_TOP_LEVEL_FIELD_ENUM = CHARACTER_FIELD_KEY_ENUM.pick([
+  CHARACTER_FIELD_KEYS.NAME,
+  CHARACTER_FIELD_KEYS.DESCRIPTION,
+  CHARACTER_FIELD_KEYS.PERSONALITY,
+  CHARACTER_FIELD_KEYS.SCENARIO,
+  CHARACTER_FIELD_KEYS.FIRST_MES,
+  CHARACTER_FIELD_KEYS.MES_EXAMPLE,
+]);
+
+const HYBRID_TOP_LEVEL_FIELD_KEYS = HYBRID_TOP_LEVEL_FIELD_ENUM.rawValues;
 
 type HybridTopLevelFieldKey = (typeof HYBRID_TOP_LEVEL_FIELD_KEYS)[number];
 
@@ -136,8 +141,8 @@ const EMPTY_CHARACTER_DATA = {
 };
 
 const CHARACTER_CARD_V2_IMPORT_SCHEMA = z.object({
-  spec: z.literal('chara_card_v2'),
-  spec_version: z.literal('2.0'),
+  spec: z.literal(CHARACTER_CARD_SPECS.CHARA_CARD_V2),
+  spec_version: z.literal(CHARACTER_CARD_SPEC_VERSIONS.VALUE_2_0),
   data: CHARACTER_DATA_IMPORT_SCHEMA.catch(EMPTY_CHARACTER_DATA),
 });
 
@@ -242,8 +247,8 @@ export function normalizeImportedCharacterCard(value: unknown): CharacterCard {
   );
 
   const normalizedCard: CharacterCard = {
-    spec: 'chara_card_v2',
-    spec_version: '2.0',
+    spec: CHARACTER_CARD_SPECS.CHARA_CARD_V2,
+    spec_version: CHARACTER_CARD_SPEC_VERSIONS.VALUE_2_0,
     data: {
       ...emptyCard.data,
       name: source.name,
@@ -346,7 +351,7 @@ function buildTenzoCardExtension(customFields: CustomField[], options: iCharacte
     general_character_idea: options.promptSettings?.generalCharacterIdea ?? '',
   };
 
-  if (options.detailLevel === EXPORT_DETAIL_LEVELS.full) {
+  if (options.detailLevel === EXPORT_DETAIL_LEVELS.FULL) {
     tenzoExtension.field_instructions = options.promptSettings?.fieldInstructions ?? {};
     tenzoExtension.field_should_use_general_character_idea =
       options.promptSettings?.fieldShouldUseGeneralCharacterIdea ?? {};
@@ -367,7 +372,7 @@ export function buildExportedCharacterCard(
   );
 
   const extensions: Record<string, iJsonValue> =
-    options.detailLevel === EXPORT_DETAIL_LEVELS.minimal
+    options.detailLevel === EXPORT_DETAIL_LEVELS.MINIMAL
       ? passthroughExtensions
       : {
           ...passthroughExtensions,

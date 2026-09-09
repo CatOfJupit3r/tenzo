@@ -1,4 +1,13 @@
+import { ABORT_ERROR_NAMES } from '@~/lib/abort-error-enums';
+
 import type { CharacterTextFieldKey } from '../cards/card-schema';
+import { CHARACTER_TEXT_FIELD_KEY_ENUM } from '../cards/card-schema';
+import type {
+  AgentProgressPhase,
+  iAgentOrchestrationResult,
+  iProseJob,
+  iProseJobResult,
+} from './agent-orchestration-contracts';
 import {
   AGENT_ORCHESTRATION_RECOVERIES,
   AGENT_ORCHESTRATION_RESULT_SCHEMA,
@@ -7,12 +16,6 @@ import {
   AGENT_ROUTE_DECISION_SCHEMA,
   PROSE_JOB_RESULT_SCHEMA,
   QUALITY_FINDING_SEVERITIES,
-} from './agent-orchestration-contracts';
-import type {
-  AgentProgressPhase,
-  iAgentOrchestrationResult,
-  iProseJob,
-  iProseJobResult,
 } from './agent-orchestration-contracts';
 import type { iAgentCallUsage, iAgentRunBudgetLimits } from './agent-run-budget';
 import { createAgentRunBudget } from './agent-run-budget';
@@ -70,8 +73,8 @@ function emitPhase(input: iAgentOrchestrationInput, phase: AgentProgressPhase) {
 function createBaseResult(input: iAgentOrchestrationInput): iAgentOrchestrationResult {
   return {
     runId: input.runId,
-    route: AGENT_ROUTES['full-card'],
-    phase: AGENT_PROGRESS_PHASES.failed,
+    route: AGENT_ROUTES.FULL_CARD,
+    phase: AGENT_PROGRESS_PHASES.FAILED,
     brief: null,
     plan: null,
     drafts: {},
@@ -88,7 +91,9 @@ function assertJobResult(candidate: iProseJobResultCandidate): iProseJobResult {
   const resultFieldKeys = Object.keys(result.fields);
   if (
     resultFieldKeys.length !== candidate.job.fieldKeys.length ||
-    resultFieldKeys.some((fieldKey) => !candidate.job.fieldKeys.includes(fieldKey as CharacterTextFieldKey))
+    resultFieldKeys.some(
+      (fieldKey) => !CHARACTER_TEXT_FIELD_KEY_ENUM.is(fieldKey) || !candidate.job.fieldKeys.includes(fieldKey),
+    )
   ) {
     throw new Error(`Prose result for ${candidate.job.id} must contain only its assigned fields.`);
   }
@@ -140,7 +145,7 @@ async function runProseJobs(
 }
 
 function isCancellation(error: unknown, abortSignal?: AbortSignal): boolean {
-  return abortSignal?.aborted === true || (error instanceof Error && error.name === 'AbortError');
+  return abortSignal?.aborted === true || (error instanceof Error && error.name === ABORT_ERROR_NAMES.ABORT_ERROR);
 }
 
 export function createAgentOrchestrationService(dependencies: iAgentOrchestrationDependencies) {
@@ -148,14 +153,14 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
     async run(input: iAgentOrchestrationInput): Promise<iAgentOrchestrationResult> {
       const result = createBaseResult(input);
       try {
-        emitPhase(input, AGENT_PROGRESS_PHASES.understanding);
+        emitPhase(input, AGENT_PROGRESS_PHASES.UNDERSTANDING);
         input.abortSignal?.throwIfAborted();
         const routeCall = await dependencies.routeIntent(input);
         const routeDecision = AGENT_ROUTE_DECISION_SCHEMA.parse(routeCall.output);
         result.route = routeDecision.route;
 
-        if (routeDecision.route === AGENT_ROUTES.advice) {
-          result.phase = AGENT_PROGRESS_PHASES.completed;
+        if (routeDecision.route === AGENT_ROUTES.ADVICE) {
+          result.phase = AGENT_PROGRESS_PHASES.COMPLETED;
           result.answer = routeDecision.answer ?? '';
           emitPhase(input, result.phase);
           return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
@@ -164,14 +169,14 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
         const briefResult = await dependencies.createBrief(input, input.abortSignal);
         result.brief = briefResult.brief;
         if (briefResult.brief.unresolvedQuestions.length > 0) {
-          result.phase = AGENT_PROGRESS_PHASES.failed;
-          result.recovery = AGENT_ORCHESTRATION_RECOVERIES['clarification-required'];
+          result.phase = AGENT_PROGRESS_PHASES.FAILED;
+          result.recovery = AGENT_ORCHESTRATION_RECOVERIES.CLARIFICATION_REQUIRED;
           result.answer = briefResult.brief.unresolvedQuestions.map((question) => question.question).join('\n');
           emitPhase(input, result.phase);
           return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
         }
 
-        emitPhase(input, AGENT_PROGRESS_PHASES.planning);
+        emitPhase(input, AGENT_PROGRESS_PHASES.PLANNING);
         const planInput = {
           brief: briefResult.brief,
           requestedFieldKeys: input.requestedFieldKeys,
@@ -184,14 +189,14 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
         const { plan, jobs } = await dependencies.createPlan(planInput, input.abortSignal);
         result.plan = plan;
 
-        emitPhase(input, AGENT_PROGRESS_PHASES.drafting);
+        emitPhase(input, AGENT_PROGRESS_PHASES.DRAFTING);
         const prose = await runProseJobs(jobs, input, dependencies);
         result.drafts = prose.drafts;
         if (!prose.isComplete) {
-          result.phase = AGENT_PROGRESS_PHASES.failed;
+          result.phase = AGENT_PROGRESS_PHASES.FAILED;
           result.recovery = prose.isBudgetExhausted
-            ? AGENT_ORCHESTRATION_RECOVERIES['repair-budget-exhausted']
-            : AGENT_ORCHESTRATION_RECOVERIES['partial-draft'];
+            ? AGENT_ORCHESTRATION_RECOVERIES.REPAIR_BUDGET_EXHAUSTED
+            : AGENT_ORCHESTRATION_RECOVERIES.PARTIAL_DRAFT;
           result.answer = prose.failureMessage
             ? `${prose.failureMessage} No proposal was created.`
             : 'Some drafts could not be completed. No proposal was created.';
@@ -199,7 +204,7 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
           return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
         }
 
-        emitPhase(input, AGENT_PROGRESS_PHASES.reviewing);
+        emitPhase(input, AGENT_PROGRESS_PHASES.REVIEWING);
         const quality = await dependencies.reviewQuality(
           {
             brief: briefResult.brief,
@@ -214,26 +219,26 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
         result.drafts = quality.drafts;
         result.findings = quality.findings;
         if (!quality.isRepairAvailable) {
-          result.recovery = AGENT_ORCHESTRATION_RECOVERIES['repair-unavailable'];
+          result.recovery = AGENT_ORCHESTRATION_RECOVERIES.REPAIR_UNAVAILABLE;
         } else if (quality.isBudgetExhausted) {
-          result.recovery = AGENT_ORCHESTRATION_RECOVERIES['repair-budget-exhausted'];
+          result.recovery = AGENT_ORCHESTRATION_RECOVERIES.REPAIR_BUDGET_EXHAUSTED;
         }
-        if (quality.repairCount > 0) emitPhase(input, AGENT_PROGRESS_PHASES.repairing);
+        if (quality.repairCount > 0) emitPhase(input, AGENT_PROGRESS_PHASES.REPAIRING);
 
         const hasBlockingFinding = quality.findings.some(
-          (finding) => !finding.isResolved && finding.severity === QUALITY_FINDING_SEVERITIES.error,
+          (finding) => !finding.isResolved && finding.severity === QUALITY_FINDING_SEVERITIES.ERROR,
         );
         if (hasBlockingFinding) {
-          result.phase = AGENT_PROGRESS_PHASES.failed;
+          result.phase = AGENT_PROGRESS_PHASES.FAILED;
           result.answer = 'Draft review found unresolved blocking issues. No proposal was created.';
           emitPhase(input, result.phase);
           return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
         }
 
-        emitPhase(input, AGENT_PROGRESS_PHASES.proposing);
+        emitPhase(input, AGENT_PROGRESS_PHASES.PROPOSING);
         const proposal = await dependencies.submitProposal(quality.drafts, quality.findings);
         result.proposalId = proposal.proposalId;
-        result.phase = AGENT_PROGRESS_PHASES.completed;
+        result.phase = AGENT_PROGRESS_PHASES.COMPLETED;
         result.answer =
           quality.findings.length > 0
             ? 'Drafts are ready for review with quality warnings.'
@@ -242,13 +247,13 @@ export function createAgentOrchestrationService(dependencies: iAgentOrchestratio
         return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
       } catch (error) {
         if (isCancellation(error, input.abortSignal)) {
-          result.phase = AGENT_PROGRESS_PHASES.cancelled;
-          result.recovery = AGENT_ORCHESTRATION_RECOVERIES.cancelled;
+          result.phase = AGENT_PROGRESS_PHASES.CANCELLED;
+          result.recovery = AGENT_ORCHESTRATION_RECOVERIES.CANCELLED;
           result.answer = 'Generation was cancelled before any proposal was submitted.';
           emitPhase(input, result.phase);
           return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
         }
-        result.phase = AGENT_PROGRESS_PHASES.failed;
+        result.phase = AGENT_PROGRESS_PHASES.FAILED;
         result.answer = error instanceof Error ? error.message : 'Agent orchestration failed.';
         emitPhase(input, result.phase);
         return AGENT_ORCHESTRATION_RESULT_SCHEMA.parse(result);
